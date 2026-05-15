@@ -41,6 +41,7 @@ export const FOOTER_GROUPS: Record<Locale, Array<{ title: string; links: Array<{
       links: [
         { label: 'Docs', href: '/docs' },
         { label: 'Why Plumego', href: '/why-plumego' },
+        { label: 'Compare Frameworks', href: '/compare' },
         { label: 'Architecture', href: '/architecture' },
         { label: 'Examples', href: '/examples' },
       ],
@@ -71,6 +72,7 @@ export const FOOTER_GROUPS: Record<Locale, Array<{ title: string; links: Array<{
       links: [
         { label: '文档', href: '/zh/docs' },
         { label: '为什么选择 Plumego', href: '/zh/why-plumego' },
+        { label: '框架横向对比', href: '/zh/compare' },
         { label: '架构', href: '/zh/architecture' },
         { label: '示例', href: '/zh/examples' },
       ],

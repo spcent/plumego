@@ -1,0 +1,1055 @@
+---
+import MarketingLayout from '../layouts/MarketingLayout.astro';
+import PageHero from '../components/marketing/PageHero.astro';
+
+// ── Framework data ──────────────────────────────────────────────────────────
+
+const frameworks = [
+  {
+    id: 'gin',
+    name: 'Gin',
+    url: 'https://github.com/gin-gonic/gin',
+    tagline: 'Martini-like web framework, radix tree router',
+    handlerSig: 'func(c *gin.Context)',
+    stdlibHandler: false,
+    zeroDeps: false,
+    responseContract: false,
+    canonicalShape: false,
+    middlewareStdlib: false,
+    agentReady: false,
+    stabilityModel: false,
+    stars: '~80k',
+    verdict: 'Best-in-class speed for teams happy with a custom context type. Large ecosystem. The go-to default for many Go teams.',
+    whenToChoose: [
+      'Your team wants the fastest possible time-to-working-API',
+      'You need a large plugin ecosystem for auth, rate limiting, etc.',
+      'The team is comfortable with gin.Context and its trade-offs',
+      'Existing Gin code makes the switching cost too high',
+    ],
+    whenNotToChoose: [
+      'You need plain func(w, r) handlers so existing stdlib middleware works without adapters',
+      'You want route ownership and middleware order visible in code review without reading framework internals',
+      'You want a structured, consistent error and response envelope across all handlers',
+    ],
+    color: '#00b4d8',
+  },
+  {
+    id: 'echo',
+    name: 'Echo',
+    url: 'https://github.com/labstack/echo',
+    tagline: 'High performance, minimalist web framework',
+    handlerSig: 'func(c echo.Context) error',
+    stdlibHandler: false,
+    zeroDeps: false,
+    responseContract: false,
+    canonicalShape: false,
+    middlewareStdlib: false,
+    agentReady: false,
+    stabilityModel: false,
+    stars: '~30k',
+    verdict: 'Clean API, good middleware ecosystem, error return in handler is ergonomic. Solid choice when the custom context trade-off is acceptable.',
+    whenToChoose: [
+      'You prefer returning errors from handlers rather than writing to w directly',
+      'You want a clean, well-documented framework with good middleware support',
+      'The team appreciates the grouped routing and binder/validator conveniences',
+    ],
+    whenNotToChoose: [
+      'You need plain net/http compatibility — echo.Context breaks middleware reuse',
+      'You need a consistent JSON envelope; Echo leaves response formatting to you',
+      'You want one canonical service shape across multiple teams',
+    ],
+    color: '#6c63ff',
+  },
+  {
+    id: 'fiber',
+    name: 'Fiber',
+    url: 'https://github.com/gofiber/fiber',
+    tagline: 'Express-inspired, Fasthttp-based web framework',
+    handlerSig: 'func(c *fiber.Ctx) error',
+    stdlibHandler: false,
+    zeroDeps: false,
+    responseContract: false,
+    canonicalShape: false,
+    middlewareStdlib: false,
+    agentReady: false,
+    stabilityModel: false,
+    stars: '~34k',
+    verdict: 'Highest raw throughput by benchmark. The tradeoff is total incompatibility with net/http — no stdlib middleware, no net/http handler, no standard library ecosystem.',
+    whenToChoose: [
+      'Raw HTTP throughput is the primary constraint and you have benchmarks proving it matters',
+      'You are building a greenfield service with no existing net/http middleware to integrate',
+      'The team has Fasthttp experience and understands the net/http incompatibility trade-off',
+    ],
+    whenNotToChoose: [
+      'You have any net/http middleware, handlers, or tooling — none of it will work',
+      'You use net/http-based observability, tracing, or auth libraries',
+      'Your team is Go-stdlib-first and expects standard library compatibility',
+    ],
+    color: '#00d4aa',
+    warning: 'Fiber uses Fasthttp, not net/http. It is incompatible with the Go standard library HTTP ecosystem.',
+  },
+  {
+    id: 'chi',
+    name: 'Chi',
+    url: 'https://github.com/go-chi/chi',
+    tagline: 'Lightweight, idiomatic router for Go HTTP services',
+    handlerSig: 'func(w http.ResponseWriter, r *http.Request)',
+    stdlibHandler: true,
+    zeroDeps: true,
+    responseContract: false,
+    canonicalShape: false,
+    middlewareStdlib: true,
+    agentReady: false,
+    stabilityModel: false,
+    stars: '~18k',
+    verdict: "The minimalist's choice. Pure stdlib, zero opinions on response format, service shape, or module stability. If you want to build everything yourself, Chi is the right starting point.",
+    whenToChoose: [
+      'You only need routing — you are happy assembling your own response envelope, middleware, and security layer',
+      'You want pure stdlib compatibility with no framework opinions on service structure',
+      'The team prefers maximum flexibility and is willing to build and maintain the surrounding layer',
+    ],
+    whenNotToChoose: [
+      'You want a consistent response envelope across handlers without implementing it yourself',
+      'You need a canonical service shape to onboard new team members quickly',
+      'You want explicit maturity signals per module rather than all-or-nothing routing',
+    ],
+    color: '#f59e0b',
+  },
+  {
+    id: 'plumego',
+    name: 'Plumego',
+    url: 'https://github.com/spcent/plumego',
+    tagline: 'Explicit HTTP toolkit — stdlib-only, agent-ready, pre-v1',
+    handlerSig: 'func(w http.ResponseWriter, r *http.Request)',
+    stdlibHandler: true,
+    zeroDeps: true,
+    responseContract: true,
+    canonicalShape: true,
+    middlewareStdlib: true,
+    agentReady: true,
+    stabilityModel: true,
+    stars: 'pre-v1',
+    verdict: 'For teams where route ownership, review clarity, and a shared service shape matter more than framework convenience. The only choice if your team uses AI coding tools and wants machine-readable ownership signals.',
+    whenToChoose: [
+      'Route registration, middleware order, and dependency wiring must be visible in code review',
+      'Multiple services should start from one canonical shape rather than each team\'s custom bootstrap',
+      'You use AI coding assistants and want explicit machine-readable rules about where changes belong',
+      'You need clear separation between stable modules and experimental capability work',
+    ],
+    whenNotToChoose: [
+      'You want a framework to hide structure decisions — Plumego keeps them explicit by design',
+      'Your team already has a large Gin/Echo codebase and the migration cost outweighs the benefit',
+      'You need a mature v1+ release with a proven long-term track record',
+      'Your service is a small script or short-lived tool where structure overhead isn\'t worth it',
+    ],
+    isPlumego: true,
+    color: 'var(--accent)',
+  },
+] as const;
+
+// ── Feature matrix rows ─────────────────────────────────────────────────────
+
+const matrixRows = [
+  {
+    feature: 'stdlib handler signature',
+    note: 'func(w http.ResponseWriter, r *http.Request)',
+    values: { gin: false, echo: false, fiber: false, chi: true, plumego: true },
+  },
+  {
+    feature: 'net/http middleware reuse',
+    note: 'No adapter needed for existing stdlib middleware',
+    values: { gin: false, echo: false, fiber: false, chi: true, plumego: true },
+  },
+  {
+    feature: 'Zero external dependencies',
+    note: 'Stable core uses only Go standard library',
+    values: { gin: false, echo: false, fiber: false, chi: true, plumego: true },
+  },
+  {
+    feature: 'Built-in response contract',
+    note: 'Typed JSON envelope for success and error responses',
+    values: { gin: false, echo: false, fiber: false, chi: false, plumego: true },
+  },
+  {
+    feature: 'Canonical service shape',
+    note: 'Reference app for bootstrap, routing, and handler layout',
+    values: { gin: false, echo: false, fiber: false, chi: false, plumego: true },
+  },
+  {
+    feature: 'Explicit module stability tiers',
+    note: 'stable / beta / experimental labels with adoption guidance',
+    values: { gin: false, echo: false, fiber: false, chi: false, plumego: true },
+  },
+  {
+    feature: 'AI / agent-ready control plane',
+    note: 'Machine-readable specs, task routing, boundary enforcement',
+    values: { gin: false, echo: false, fiber: false, chi: false, plumego: true },
+  },
+] as const;
+
+type FwId = 'gin' | 'echo' | 'fiber' | 'chi' | 'plumego';
+const fwIds: FwId[] = ['gin', 'echo', 'fiber', 'chi', 'plumego'];
+---
+
+<MarketingLayout
+  locale="en"
+  title="Go HTTP Toolkits Compared: Gin, Echo, Fiber, Chi, Plumego"
+  description="An honest technical comparison of the five most-used Go HTTP toolkits. Handler signatures, response contracts, stdlib compatibility, and when NOT to choose each one."
+  currentPath="/compare"
+  keywords={['go web framework comparison', 'gin vs echo', 'fiber vs chi', 'plumego vs gin', 'go http toolkit']}
+>
+  <PageHero
+    eyebrow="Framework Comparison"
+    title="Go HTTP Toolkits"
+    description="Gin, Echo, Fiber, Chi, and Plumego — what each one trades away and what it gets in return. This page is a decision aid, not a benchmark race."
+    visual="decision"
+    links={[
+      { label: 'Why Plumego', href: '/why-plumego' },
+      { label: 'Stability', href: '/stability' },
+      { label: 'Getting Started', href: '/docs/getting-started' },
+    ]}
+  />
+
+  <!-- 30-second verdict cards -->
+  <section class="section">
+    <div class="section__intro">
+      <h2>The 30-second verdict.</h2>
+      <p>
+        All five toolkits are built for Go HTTP services. The differences are philosophy and scope, not
+        raw performance at typical request volumes. Read the verdict row first, then follow the deep-dive
+        that matches your team's actual constraint.
+      </p>
+    </div>
+
+    <div class="verdict-grid">
+      {frameworks.map((fw) => (
+        <article class={`verdict-card ${fw.isPlumego ? 'verdict-card--highlight' : ''}`}>
+          {fw.warning && (
+            <div class="verdict-warning">
+              <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                <path d="M8 2L14.5 13H1.5L8 2Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+                <path d="M8 6v4M8 11.5v.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+              </svg>
+              {fw.warning}
+            </div>
+          )}
+          <div class="verdict-card__header">
+            <h3 class="verdict-card__name">{fw.name}</h3>
+            <span class="verdict-card__stars">{fw.stars} ★</span>
+          </div>
+          <p class="verdict-card__tagline">{fw.tagline}</p>
+          <p class="verdict-card__verdict">{fw.verdict}</p>
+          <code class="verdict-card__sig">{fw.handlerSig}</code>
+        </article>
+      ))}
+    </div>
+  </section>
+
+  <!-- Feature matrix -->
+  <section class="section section--tinted">
+    <div class="section__intro">
+      <h2>Feature matrix.</h2>
+      <p>
+        Read across a row to compare one property across all five toolkits. The matrix does not capture
+        ecosystem size, community, or raw performance — those depend on your benchmark. It captures
+        structural trade-offs that don't change with load.
+      </p>
+    </div>
+
+    <div class="matrix-wrap">
+      <table class="matrix-table" role="table">
+        <thead>
+          <tr>
+            <th class="matrix-table__feature-col">Property</th>
+            {frameworks.map((fw) => (
+              <th class={fw.isPlumego ? 'matrix-table__fw-col matrix-table__fw-col--highlight' : 'matrix-table__fw-col'}>
+                {fw.name}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {matrixRows.map((row) => (
+            <tr>
+              <td class="matrix-table__feature">
+                <strong>{row.feature}</strong>
+                <span class="matrix-table__note">{row.note}</span>
+              </td>
+              {fwIds.map((id) => {
+                const val = row.values[id];
+                const isPlumego = id === 'plumego';
+                return (
+                  <td class={`matrix-table__cell ${isPlumego ? 'matrix-table__cell--highlight' : ''}`}>
+                    {val ? (
+                      <svg class="matrix-icon matrix-icon--yes" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-label="yes">
+                        <circle cx="8" cy="8" r="7" fill="color-mix(in srgb, currentColor 12%, transparent)" stroke="currentColor" stroke-width="1.4"/>
+                        <path d="M4.5 8l2.5 2.5L11.5 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                      </svg>
+                    ) : (
+                      <svg class="matrix-icon matrix-icon--no" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-label="no">
+                        <circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.4" stroke-dasharray="3 2"/>
+                        <path d="M10.5 5.5l-5 5M5.5 5.5l5 5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+                      </svg>
+                    )}
+                  </td>
+                );
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+
+    <p class="matrix-note">
+      Fiber's net/http incompatibility is not a missing feature — it's a deliberate architectural choice that
+      enables higher throughput. See the Fiber deep-dive for when this trade is worth making.
+    </p>
+  </section>
+
+  <!-- Handler signature comparison — the most visible trade-off -->
+  <section class="section">
+    <div class="section__intro">
+      <h2>The handler signature is the most consequential choice.</h2>
+      <p>
+        Custom context types (Gin, Echo, Fiber) break compatibility with the existing net/http middleware
+        ecosystem. If you adopt one of these frameworks, every stdlib middleware needs an adapter. With
+        Chi and Plumego, the entire net/http world works out of the box.
+      </p>
+    </div>
+
+    <div class="code-compare-grid">
+      <!-- Gin -->
+      <div class="code-compare-item">
+        <div class="code-compare-item__header">
+          <span class="code-compare-item__fw">Gin</span>
+          <span class="compat-badge compat-badge--no">custom context</span>
+        </div>
+        <div class="hero-code">
+          <div class="hero-code__bar">
+            <span class="hero-code__dots"><span></span><span></span><span></span></span>
+            <span class="hero-code__filename">handler.go</span>
+          </div>
+          <pre class="hero-code__pre"><code><span class="hc-cm">// gin.Context — net/http middleware needs adapter</span>
+r.<span class="hc-fn">GET</span>(<span class="hc-str">"/users/:id"</span>, <span class="hc-kw">func</span>(c *gin.Context) &#123;
+    id := c.<span class="hc-fn">Param</span>(<span class="hc-str">"id"</span>)
+    c.<span class="hc-fn">JSON</span>(http.StatusOK, gin.H&#123;<span class="hc-str">"id"</span>: id&#125;)
+&#125;)
+
+<span class="hc-cm">// to reuse net/http middleware:</span>
+r.<span class="hc-fn">Use</span>(gin.<span class="hc-fn">WrapH</span>(myStdlibMiddleware))</code></pre>
+        </div>
+      </div>
+
+      <!-- Echo -->
+      <div class="code-compare-item">
+        <div class="code-compare-item__header">
+          <span class="code-compare-item__fw">Echo</span>
+          <span class="compat-badge compat-badge--no">custom context</span>
+        </div>
+        <div class="hero-code">
+          <div class="hero-code__bar">
+            <span class="hero-code__dots"><span></span><span></span><span></span></span>
+            <span class="hero-code__filename">handler.go</span>
+          </div>
+          <pre class="hero-code__pre"><code><span class="hc-cm">// echo.Context + error return</span>
+e.<span class="hc-fn">GET</span>(<span class="hc-str">"/users/:id"</span>, <span class="hc-kw">func</span>(c echo.Context) error &#123;
+    id := c.<span class="hc-fn">Param</span>(<span class="hc-str">"id"</span>)
+    <span class="hc-kw">return</span> c.<span class="hc-fn">JSON</span>(http.StatusOK,
+        map[string]any&#123;<span class="hc-str">"id"</span>: id&#125;)
+&#125;)</code></pre>
+        </div>
+      </div>
+
+      <!-- Fiber -->
+      <div class="code-compare-item">
+        <div class="code-compare-item__header">
+          <span class="code-compare-item__fw">Fiber</span>
+          <span class="compat-badge compat-badge--warn">fasthttp — not net/http</span>
+        </div>
+        <div class="hero-code">
+          <div class="hero-code__bar">
+            <span class="hero-code__dots"><span></span><span></span><span></span></span>
+            <span class="hero-code__filename">handler.go</span>
+          </div>
+          <pre class="hero-code__pre"><code><span class="hc-cm">// fasthttp — incompatible with net/http entirely</span>
+<span class="hc-cm">// zero net/http middleware can be reused</span>
+app.<span class="hc-fn">Get</span>(<span class="hc-str">"/users/:id"</span>, <span class="hc-kw">func</span>(c *fiber.Ctx) error &#123;
+    id := c.<span class="hc-fn">Params</span>(<span class="hc-str">"id"</span>)
+    <span class="hc-kw">return</span> c.<span class="hc-fn">JSON</span>(fiber.Map&#123;<span class="hc-str">"id"</span>: id&#125;)
+&#125;)</code></pre>
+        </div>
+      </div>
+
+      <!-- Chi -->
+      <div class="code-compare-item">
+        <div class="code-compare-item__header">
+          <span class="code-compare-item__fw">Chi</span>
+          <span class="compat-badge compat-badge--yes">stdlib handler</span>
+        </div>
+        <div class="hero-code">
+          <div class="hero-code__bar">
+            <span class="hero-code__dots"><span></span><span></span><span></span></span>
+            <span class="hero-code__filename">handler.go</span>
+          </div>
+          <pre class="hero-code__pre"><code><span class="hc-cm">// pure stdlib — but no response contract</span>
+r.<span class="hc-fn">Get</span>(<span class="hc-str">"/users/&#123;id&#125;"</span>, <span class="hc-kw">func</span>(w http.ResponseWriter, r *http.Request) &#123;
+    id := chi.<span class="hc-fn">URLParam</span>(r, <span class="hc-str">"id"</span>)
+    <span class="hc-cm">// build your own JSON response every time</span>
+    json.<span class="hc-fn">NewEncoder</span>(w).<span class="hc-fn">Encode</span>(map[string]any&#123;<span class="hc-str">"id"</span>: id&#125;)
+&#125;)</code></pre>
+        </div>
+      </div>
+
+      <!-- Plumego -->
+      <div class="code-compare-item code-compare-item--highlight">
+        <div class="code-compare-item__header">
+          <span class="code-compare-item__fw">Plumego</span>
+          <span class="compat-badge compat-badge--yes">stdlib handler + contract</span>
+        </div>
+        <div class="hero-code hero-code--canonical">
+          <div class="hero-code__bar">
+            <span class="hero-code__dots"><span></span><span></span><span></span></span>
+            <span class="hero-code__filename">internal/handler/users.go</span>
+          </div>
+          <pre class="hero-code__pre"><code><span class="hc-cm">// stdlib signature + typed response contract</span>
+r.<span class="hc-fn">Get</span>(<span class="hc-str">"/users/:id"</span>, <span class="hc-kw">func</span>(w http.ResponseWriter, r *http.Request) &#123;
+    id := router.<span class="hc-fn">Param</span>(r, <span class="hc-str">"id"</span>)
+    contract.<span class="hc-fn">WriteResponse</span>(w, r, http.StatusOK, user, <span class="hc-kw">nil</span>)
+    <span class="hc-cm">// → &#123;"data": &#123;...&#125;, "meta": null&#125;</span>
+&#125;)
+
+<span class="hc-cm">// all net/http middleware works without adapters</span>
+r.<span class="hc-fn">Use</span>(middleware.RequestID)
+r.<span class="hc-fn">Use</span>(myOtelMiddleware)  <span class="hc-cm">// any net/http middleware</span></code></pre>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Response contract comparison -->
+  <section class="section section--tinted">
+    <div class="section__intro">
+      <h2>Response contracts: consistent envelope vs. build your own.</h2>
+      <p>
+        Gin, Echo, Fiber, and Chi all leave the JSON response format to you. This means each team,
+        each handler, or each project may produce subtly different shapes. Plumego's
+        <code>contract</code> module enforces one envelope for both success and error responses.
+      </p>
+    </div>
+
+    <div class="contract-compare">
+      <div class="contract-panel contract-panel--before">
+        <p class="contract-panel__label">Gin / Echo / Fiber / Chi — roll your own</p>
+        <div class="hero-code">
+          <div class="hero-code__bar">
+            <span class="hero-code__dots"><span></span><span></span><span></span></span>
+            <span class="hero-code__filename">handler.go</span>
+          </div>
+          <pre class="hero-code__pre"><code><span class="hc-cm">// success — each team decides the shape</span>
+c.<span class="hc-fn">JSON</span>(200, gin.H&#123;
+    <span class="hc-str">"data"</span>:    user,
+    <span class="hc-str">"success"</span>: <span class="hc-kw">true</span>,   <span class="hc-cm">// some teams add this</span>
+    <span class="hc-str">"code"</span>:    0,          <span class="hc-cm">// some teams add this</span>
+&#125;)
+
+<span class="hc-cm">// error — even more inconsistent</span>
+c.<span class="hc-fn">JSON</span>(400, gin.H&#123;
+    <span class="hc-str">"error"</span>:   <span class="hc-str">"name required"</span>,
+    <span class="hc-str">"message"</span>: <span class="hc-str">"..."</span>,       <span class="hc-cm">// duplicate? missing?</span>
+    <span class="hc-str">"code"</span>:    1001,
+&#125;)</code></pre>
+        </div>
+      </div>
+
+      <div class="contract-panel contract-panel--after">
+        <p class="contract-panel__label">Plumego — one contract, all handlers</p>
+        <div class="hero-code hero-code--canonical">
+          <div class="hero-code__bar">
+            <span class="hero-code__dots"><span></span><span></span><span></span></span>
+            <span class="hero-code__filename">internal/handler/users.go</span>
+          </div>
+          <pre class="hero-code__pre"><code><span class="hc-cm">// success — always &#123;"data": ..., "meta": ...&#125;</span>
+contract.<span class="hc-fn">WriteResponse</span>(w, r, 200, user, <span class="hc-kw">nil</span>)
+
+<span class="hc-cm">// error — always &#123;"error": &#123;"type": ..., "message": ...&#125;&#125;</span>
+contract.<span class="hc-fn">WriteError</span>(w, r,
+    contract.<span class="hc-fn">NewErrorBuilder</span>().
+        <span class="hc-fn">Type</span>(contract.TypeRequired).
+        <span class="hc-fn">Field</span>(<span class="hc-str">"name"</span>).
+        <span class="hc-fn">Message</span>(<span class="hc-str">"name is required"</span>).
+        <span class="hc-fn">Build</span>())
+
+<span class="hc-cm">// same envelope from every handler, every service</span></code></pre>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Per-framework deep dives -->
+  <section class="section">
+    <div class="section__intro">
+      <h2>When to choose each framework.</h2>
+      <p>
+        The table below is not intended to declare a winner. Each row answers two questions:
+        what does this framework excel at, and what should make you pause.
+        The honest answer to "when NOT to choose Plumego" is at the bottom.
+      </p>
+    </div>
+
+    <div class="comparison-table" role="table" aria-label="Framework decision guide">
+      <div class="comparison-table__head" role="row">
+        <span role="columnheader">Framework</span>
+        <span role="columnheader">
+          <svg class="comparison-cell-icon comparison-cell-icon--fit" width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <path d="M3 8l3.5 3.5L13 4" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          Choose when
+        </span>
+        <span role="columnheader">
+          <svg class="comparison-cell-icon comparison-cell-icon--caution" width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <path d="M8 3v6M8 11.5v1" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+          </svg>
+          Pause when
+        </span>
+      </div>
+      {frameworks.map((fw) => (
+        <div class={`comparison-table__row ${fw.isPlumego ? 'comparison-table__row--highlight' : ''}`} role="row">
+          <strong role="cell">
+            {fw.name}
+            {fw.isPlumego && (
+              <span class="plumego-star" aria-label="this page's framework">★</span>
+            )}
+            {fw.warning && (
+              <span class="fw-warning-chip" title={fw.warning}>⚠ fasthttp</span>
+            )}
+          </strong>
+          <ul class="fw-points" role="cell">
+            {fw.whenToChoose.map((point) => (
+              <li>
+                <svg class="comparison-cell-icon comparison-cell-icon--fit" width="11" height="11" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                  <path d="M3 8l3.5 3.5L13 4" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                {point}
+              </li>
+            ))}
+          </ul>
+          <ul class="fw-points" role="cell">
+            {fw.whenNotToChoose.map((point) => (
+              <li>
+                <svg class="comparison-cell-icon comparison-cell-icon--caution" width="11" height="11" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                  <path d="M8 3v6M8 11.5v1" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+                </svg>
+                {point}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
+    </div>
+  </section>
+
+  <!-- When NOT to choose Plumego — required honest section (CONTENT_RULES Rule 5) -->
+  <section class="section section--tinted">
+    <div class="section__intro">
+      <h2>When NOT to choose Plumego.</h2>
+      <p>
+        This section is required by Plumego's own content rules. An honest comparison
+        includes cases where the framework is the wrong choice — not just where it wins.
+      </p>
+    </div>
+    <div class="control-grid">
+      <article class="control-grid__item">
+        <p class="signal-list__kicker">
+          <svg class="comparison-cell-icon comparison-cell-icon--caution" width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <path d="M8 3v6M8 11.5v1" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+          </svg>
+          convention-first teams
+        </p>
+        <h3>You want the framework to manage structure for you</h3>
+        <p>
+          Plumego keeps route registration, middleware order, and dependency wiring explicitly in your code.
+          If your team prefers a framework that manages structure invisibly, the explicit model adds friction
+          without adding value. Gin or Echo will be more productive.
+        </p>
+      </article>
+      <article class="control-grid__item">
+        <p class="signal-list__kicker">
+          <svg class="comparison-cell-icon comparison-cell-icon--caution" width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <path d="M8 3v6M8 11.5v1" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+          </svg>
+          existing large codebase
+        </p>
+        <h3>Your team already has a large Gin/Echo service</h3>
+        <p>
+          Migrating a mature Gin or Echo service to Plumego requires rewriting all handlers from
+          custom context to net/http signatures. If your service is working and the team is productive,
+          that cost is rarely worth it. Stay on what you have.
+        </p>
+      </article>
+      <article class="control-grid__item">
+        <p class="signal-list__kicker">
+          <svg class="comparison-cell-icon comparison-cell-icon--caution" width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <path d="M8 3v6M8 11.5v1" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+          </svg>
+          maximum throughput
+        </p>
+        <h3>Raw HTTP throughput is your primary bottleneck</h3>
+        <p>
+          Plumego uses a net/http-compatible trie router. Its overhead is minimal but non-zero compared
+          to Fiber's Fasthttp baseline. If you have <em>measured</em> evidence that HTTP routing is your
+          bottleneck (not database, not business logic), Fiber is the right conversation.
+        </p>
+      </article>
+      <article class="control-grid__item">
+        <p class="signal-list__kicker">
+          <svg class="comparison-cell-icon comparison-cell-icon--caution" width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <path d="M8 3v6M8 11.5v1" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+          </svg>
+          v1 stability required now
+        </p>
+        <h3>You need a proven v1+ track record</h3>
+        <p>
+          Plumego is pre-v1. The 9 stable roots have a compatibility promise, but the project has not
+          yet accumulated the long-term production track record that Gin or Echo have. If "proven at
+          scale for 5+ years" is a hard requirement, Gin or Echo is the safer organizational choice.
+        </p>
+      </article>
+    </div>
+  </section>
+
+  <!-- Honest performance note -->
+  <section class="section">
+    <div class="section__intro">
+      <h2>A note on performance benchmarks.</h2>
+      <p>
+        Benchmark comparisons between these frameworks are widely published. Read them with care.
+      </p>
+    </div>
+    <div class="signal-list">
+      <article class="signal-list__item">
+        <p class="signal-list__kicker">fiber caveat</p>
+        <h3>Fiber's performance lead comes from Fasthttp, not from better routing</h3>
+        <p>
+          Fasthttp avoids standard library allocations by reusing buffers. This yields measurable throughput
+          gains in synthetic benchmarks. However, those gains disappear if you need net/http middleware, use
+          standard library HTTP clients against the same service, or run workloads where the bottleneck is
+          database I/O rather than HTTP parsing.
+        </p>
+      </article>
+      <article class="signal-list__item">
+        <p class="signal-list__kicker">plumego baseline</p>
+        <h3>Plumego's router is net/http-comparable — not yet formally benchmarked</h3>
+        <p>
+          The trie router has no reflection and no global state. It is designed to run at net/http-comparable
+          throughput. Reproducible benchmarks against Gin, Echo, and Chi are not yet published. Follow the
+          <a class="text-link" href="https://github.com/spcent/plumego/issues">issue tracker</a> for the
+          benchmark roadmap item.
+        </p>
+      </article>
+      <article class="signal-list__item">
+        <p class="signal-list__kicker">general advice</p>
+        <h3>Profile your actual workload before framework selection on performance grounds</h3>
+        <p>
+          In most Go HTTP services, the bottleneck is database round-trips, external API calls, or
+          serialization — not the router. Framework selection on performance grounds alone is rarely
+          justified without measurements on your specific workload at your target scale.
+        </p>
+      </article>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section class="section section--cta">
+    <div class="section__intro section__intro--cta">
+      <h2>Made your decision?</h2>
+      <p>
+        If Plumego matches your team's model, start from the reference app. If another toolkit is the
+        better fit, that's the right call — this page exists to help you decide, not to sell.
+      </p>
+      <div class="cta-actions">
+        <a class="button button--primary" href="/docs/getting-started">Get Started with Plumego</a>
+        <a class="button button--ghost" href="/why-plumego">Full adoption guide</a>
+      </div>
+    </div>
+  </section>
+</MarketingLayout>
+
+<style>
+  /* ── Verdict cards ─────────────────────────────────────────────────────── */
+  .verdict-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+    gap: 1.1rem;
+    max-width: 72rem;
+    margin-inline: auto;
+  }
+
+  .verdict-card {
+    background: var(--bg-elevated);
+    border: 1px solid var(--line);
+    border-radius: 0.875rem;
+    padding: 1.4rem 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    box-shadow: var(--shadow);
+    transition: border-color 0.18s;
+  }
+
+  .verdict-card--highlight {
+    border-color: color-mix(in srgb, var(--accent) 35%, var(--line));
+    background: color-mix(in srgb, var(--accent) 4%, var(--bg-elevated));
+  }
+
+  .verdict-card:hover {
+    border-color: color-mix(in srgb, var(--accent) 28%, var(--line));
+  }
+
+  .verdict-warning {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.75rem;
+    color: #b45309;
+    background: color-mix(in srgb, #d97706 10%, var(--bg-elevated));
+    border: 1px solid color-mix(in srgb, #d97706 20%, var(--line));
+    border-radius: 0.35rem;
+    padding: 0.3rem 0.6rem;
+    line-height: 1.4;
+  }
+
+  :root[data-theme="dark"] .verdict-warning {
+    color: #fbbf24;
+    background: color-mix(in srgb, #fbbf24 8%, var(--bg-elevated));
+    border-color: color-mix(in srgb, #fbbf24 16%, var(--line));
+  }
+
+  .verdict-card__header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.5rem;
+  }
+
+  .verdict-card__name {
+    font-size: 1.05rem;
+    font-weight: 700;
+    margin: 0;
+    color: var(--fg);
+    letter-spacing: -0.01em;
+  }
+
+  .verdict-card--highlight .verdict-card__name {
+    color: var(--accent-strong);
+  }
+
+  :root[data-theme="dark"] .verdict-card--highlight .verdict-card__name {
+    color: var(--accent);
+  }
+
+  .verdict-card__stars {
+    font-size: 0.72rem;
+    color: var(--fg-soft);
+    font-family: var(--font-mono);
+    white-space: nowrap;
+  }
+
+  .verdict-card__tagline {
+    font-size: 0.78rem;
+    color: var(--fg-soft);
+    margin: 0;
+    font-style: italic;
+  }
+
+  .verdict-card__verdict {
+    font-size: 0.86rem;
+    color: var(--fg-soft);
+    line-height: 1.6;
+    margin: 0;
+    flex: 1;
+  }
+
+  .verdict-card__sig {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    padding: 0.25rem 0.55rem;
+    background: var(--bg-strong);
+    border: 1px solid var(--line);
+    border-radius: 0.3rem;
+    color: var(--fg-soft);
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+    margin-top: 0.25rem;
+  }
+
+  /* ── Feature matrix ────────────────────────────────────────────────────── */
+  .matrix-wrap {
+    overflow-x: auto;
+    max-width: 72rem;
+    margin-inline: auto;
+    border: 1px solid var(--line);
+    border-radius: 0.875rem;
+    background: var(--bg-elevated);
+    box-shadow: var(--shadow);
+  }
+
+  .matrix-table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 42rem;
+  }
+
+  .matrix-table thead tr {
+    background: var(--bg-strong);
+    border-bottom: 1px solid var(--line);
+  }
+
+  .matrix-table th {
+    padding: 0.65rem 1rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--fg-soft);
+    text-align: center;
+  }
+
+  .matrix-table__feature-col {
+    text-align: left !important;
+    width: 40%;
+  }
+
+  .matrix-table__fw-col {
+    width: 12%;
+  }
+
+  .matrix-table__fw-col--highlight {
+    background: color-mix(in srgb, var(--accent) 5%, var(--bg-strong));
+    color: var(--accent-strong) !important;
+  }
+
+  :root[data-theme="dark"] .matrix-table__fw-col--highlight {
+    color: var(--accent) !important;
+  }
+
+  .matrix-table tbody tr {
+    border-bottom: 1px solid var(--line);
+    transition: background-color 120ms ease;
+  }
+
+  .matrix-table tbody tr:last-child {
+    border-bottom: none;
+  }
+
+  .matrix-table tbody tr:hover {
+    background: color-mix(in srgb, var(--accent-soft) 50%, transparent);
+  }
+
+  .matrix-table__feature {
+    padding: 0.85rem 1rem;
+    vertical-align: top;
+  }
+
+  .matrix-table__feature strong {
+    display: block;
+    font-size: 0.86rem;
+    color: var(--fg);
+    margin-bottom: 0.2rem;
+  }
+
+  .matrix-table__note {
+    display: block;
+    font-size: 0.75rem;
+    color: var(--fg-soft);
+    line-height: 1.4;
+    font-family: var(--font-mono);
+  }
+
+  .matrix-table__cell {
+    padding: 0.85rem 1rem;
+    text-align: center;
+    vertical-align: middle;
+  }
+
+  .matrix-table__cell--highlight {
+    background: color-mix(in srgb, var(--accent) 5%, var(--bg-elevated));
+  }
+
+  .matrix-icon {
+    display: inline-block;
+  }
+
+  .matrix-icon--yes {
+    color: var(--accent-strong);
+  }
+
+  :root[data-theme="dark"] .matrix-icon--yes {
+    color: var(--accent);
+  }
+
+  .matrix-icon--no {
+    color: var(--fg-soft);
+    opacity: 0.45;
+  }
+
+  .matrix-note {
+    max-width: 72rem;
+    margin: 0.85rem auto 0;
+    font-size: 0.82rem;
+    color: var(--fg-soft);
+    line-height: 1.55;
+    padding-inline: 0.25rem;
+  }
+
+  /* ── Code compare grid ─────────────────────────────────────────────────── */
+  .code-compare-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
+    gap: 1rem;
+    max-width: 72rem;
+    margin-inline: auto;
+  }
+
+  .code-compare-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+  }
+
+  .code-compare-item--highlight .hero-code {
+    border-color: color-mix(in srgb, var(--accent) 28%, var(--code-border));
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 12%, transparent);
+  }
+
+  .code-compare-item__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding-inline: 0.1rem;
+  }
+
+  .code-compare-item__fw {
+    font-size: 0.88rem;
+    font-weight: 700;
+    color: var(--fg);
+  }
+
+  .compat-badge {
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    font-weight: 500;
+    padding: 0.18rem 0.5rem;
+    border-radius: 0.3rem;
+    white-space: nowrap;
+  }
+
+  .compat-badge--yes {
+    background: color-mix(in srgb, var(--accent) 10%, var(--bg-elevated));
+    border: 1px solid color-mix(in srgb, var(--accent) 20%, var(--line));
+    color: var(--accent-strong);
+  }
+
+  :root[data-theme="dark"] .compat-badge--yes {
+    color: var(--accent);
+  }
+
+  .compat-badge--no {
+    background: color-mix(in srgb, var(--fg-soft) 8%, var(--bg-elevated));
+    border: 1px solid var(--line);
+    color: var(--fg-soft);
+  }
+
+  .compat-badge--warn {
+    background: color-mix(in srgb, #d97706 10%, var(--bg-elevated));
+    border: 1px solid color-mix(in srgb, #d97706 18%, var(--line));
+    color: #b45309;
+  }
+
+  :root[data-theme="dark"] .compat-badge--warn {
+    background: color-mix(in srgb, #fbbf24 8%, var(--bg-elevated));
+    border-color: color-mix(in srgb, #fbbf24 16%, var(--line));
+    color: #fbbf24;
+  }
+
+  /* ── Contract compare ──────────────────────────────────────────────────── */
+  .contract-compare {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.25rem;
+    max-width: 64rem;
+    margin-inline: auto;
+  }
+
+  @media (max-width: 700px) {
+    .contract-compare {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .contract-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+  }
+
+  .contract-panel__label {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--fg-soft);
+    margin: 0;
+    padding-inline: 0.1rem;
+  }
+
+  .contract-panel--after .contract-panel__label {
+    color: var(--accent-strong);
+  }
+
+  :root[data-theme="dark"] .contract-panel--after .contract-panel__label {
+    color: var(--accent);
+  }
+
+  /* ── Decision table extras ─────────────────────────────────────────────── */
+  .fw-points {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    font-size: 0.84rem;
+    color: var(--fg-soft);
+    line-height: 1.5;
+  }
+
+  .fw-points li {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.4rem;
+  }
+
+  .fw-points .comparison-cell-icon {
+    flex-shrink: 0;
+    margin-top: 0.2rem;
+  }
+
+  .plumego-star {
+    color: var(--accent);
+    margin-left: 0.3em;
+    font-size: 0.9em;
+  }
+
+  .fw-warning-chip {
+    display: inline-block;
+    margin-left: 0.4em;
+    font-size: 0.72rem;
+    font-weight: 500;
+    color: #b45309;
+    font-family: var(--font-mono);
+  }
+
+  :root[data-theme="dark"] .fw-warning-chip {
+    color: #fbbf24;
+  }
+</style>
