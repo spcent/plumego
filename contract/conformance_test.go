@@ -568,9 +568,7 @@ func TestExternalWriteResponseUsesSuccessStatuses(t *testing.T) {
 		t.Fatalf("resolve repo root: %v", err)
 	}
 
-	allowedDynamicStatusCalls := map[string]int{
-		"x/ops/healthhttp/helpers.go#writeHealthResponse": 1,
-	}
+	allowedDynamicStatusCalls := map[string]int{}
 	actualDynamicStatusCalls := map[string]int{}
 	var violations []string
 	fset := token.NewFileSet()
@@ -608,7 +606,7 @@ func TestExternalWriteResponseUsesSuccessStatuses(t *testing.T) {
 				if statusIsKnownNonSuccess(call.Args[2], httpNames) {
 					pos := fset.Position(call.Args[2].Pos())
 					violations = append(violations, filepath.ToSlash(rel)+":"+strconv.Itoa(pos.Line)+
-						" uses a known non-2xx status; use WriteError for errors or an explicit allowlisted health helper")
+						" uses a known non-2xx status; use WriteError for errors or a module-owned status document writer")
 					return true
 				}
 				if statusIsKnownSuccess(call.Args[2], httpNames) {
@@ -618,7 +616,7 @@ func TestExternalWriteResponseUsesSuccessStatuses(t *testing.T) {
 				if _, ok := allowedDynamicStatusCalls[key]; !ok {
 					pos := fset.Position(call.Args[2].Pos())
 					violations = append(violations, filepath.ToSlash(rel)+":"+strconv.Itoa(pos.Line)+
-						" uses a dynamic status; route health/readiness style success bodies through an explicit allowlisted helper")
+						" uses a dynamic status; keep contract.WriteResponse on known 2xx success statuses")
 				}
 				return true
 			})
@@ -639,7 +637,7 @@ func TestExternalWriteResponseUsesSuccessStatuses(t *testing.T) {
 		}
 	}
 	if len(violations) > 0 {
-		t.Fatalf("external contract.WriteResponse calls must use known 2xx statuses unless explicitly allowlisted:\n%s", strings.Join(violations, "\n"))
+		t.Fatalf("external contract.WriteResponse calls must use known 2xx statuses:\n%s", strings.Join(violations, "\n"))
 	}
 }
 

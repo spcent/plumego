@@ -69,6 +69,7 @@ public_entrypoints:
   - TraceContext.HasSpanID
   - TraceContext.Valid
   - Err* transport sentinel errors
+  - ErrInvalidResponseStatus
 
 public_surface_stability:
   stable_v1:
@@ -107,11 +108,11 @@ public_surface_stability:
     - ContentTypeJSON
     - RequestIDHeader
     - Err* transport sentinel errors
+    - ErrInvalidResponseStatus
   future_breaking_only:
     - Removing TraceContext as the lightweight context carrier
   residual_v1_tradeoffs:
     - APIError remains exported as an opaque error value because WriteError accepts it directly; callers construct values through NewErrorBuilder and inspect them through read-only methods.
-    - WriteResponse preserves any valid HTTP status for compatibility with structured health/readiness bodies; external dynamic status use is guarded by conformance allowlists.
 
 error_taxonomy:
   categories:

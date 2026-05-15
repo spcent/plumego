@@ -53,4 +53,12 @@ Done Definition:
 - Dependency rules pass.
 
 Outcome:
-
+- Removed the `WriteResponse` compatibility behavior that normalized invalid
+  statuses or allowed non-2xx success envelopes.
+- Added `ErrInvalidResponseStatus`; `WriteResponse` now returns it before
+  writing when called with any non-2xx status.
+- Migrated `x/ops/healthhttp` dynamic health/readiness status documents away
+  from `contract.WriteResponse` so `contract` owns only canonical success
+  envelopes.
+- Updated conformance and freeze tests to enforce known 2xx
+  `contract.WriteResponse` usage.

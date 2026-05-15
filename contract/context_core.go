@@ -26,6 +26,10 @@ var (
 
 	// ErrResponseWriterNil is returned when a response writer is nil.
 	ErrResponseWriterNil = errors.New("response writer cannot be nil")
+
+	// ErrInvalidResponseStatus is returned when WriteResponse receives a
+	// non-success HTTP status. Use WriteError for error statuses.
+	ErrInvalidResponseStatus = errors.New("response status must be 2xx")
 )
 
 // WithRequestContext stores rc in ctx using the package-internal requestContextKey.

@@ -1,54 +1,36 @@
 package contract
 
 import (
-	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 )
 
-func TestFreezeWriteResponseNormalizesInvalidStatus(t *testing.T) {
+func TestFreezeWriteResponseRejectsInvalidStatus(t *testing.T) {
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 
-	if err := WriteResponse(rec, req, 42, map[string]string{"ok": "true"}, nil); err != nil {
-		t.Fatalf("unexpected write error: %v", err)
+	if err := WriteResponse(rec, req, 42, map[string]string{"ok": "true"}, nil); !errors.Is(err, ErrInvalidResponseStatus) {
+		t.Fatalf("error = %v, want %v", err, ErrInvalidResponseStatus)
 	}
-	if rec.Code != http.StatusInternalServerError {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusInternalServerError)
+	if rec.Body.Len() != 0 {
+		t.Fatalf("body = %q, want empty", rec.Body.String())
 	}
-
-	var got response
-	if err := json.NewDecoder(rec.Body).Decode(&got); err != nil {
-		t.Fatalf("decode response: %v", err)
-	}
-	if got.Data == nil {
-		t.Fatalf("expected response data to be preserved after status normalization")
+	if got := rec.Header().Get(HeaderContentType); got != "" {
+		t.Fatalf("content type = %q, want empty", got)
 	}
 }
 
-func TestFreezeWriteResponseAllowsCallerSelectedNon2xxStatus(t *testing.T) {
+func TestFreezeWriteResponseRejectsNonSuccessStatus(t *testing.T) {
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 
-	if err := WriteResponse(rec, req, http.StatusServiceUnavailable, map[string]string{"status": "degraded"}, nil); err != nil {
-		t.Fatalf("unexpected write error: %v", err)
+	if err := WriteResponse(rec, req, http.StatusServiceUnavailable, map[string]string{"status": "degraded"}, nil); !errors.Is(err, ErrInvalidResponseStatus) {
+		t.Fatalf("error = %v, want %v", err, ErrInvalidResponseStatus)
 	}
-	if rec.Code != http.StatusServiceUnavailable {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusServiceUnavailable)
-	}
-	if got := rec.Header().Get(HeaderContentType); got != ContentTypeJSON {
-		t.Fatalf("content type = %q, want %q", got, ContentTypeJSON)
-	}
-
-	var got response
-	if err := json.NewDecoder(rec.Body).Decode(&got); err != nil {
-		t.Fatalf("decode response: %v", err)
-	}
-	data, ok := got.Data.(map[string]any)
-	if !ok || data["status"] != "degraded" {
-		t.Fatalf("response data = %#v, want degraded status map", got.Data)
+	if rec.Body.Len() != 0 {
+		t.Fatalf("body = %q, want empty", rec.Body.String())
 	}
 }
 
