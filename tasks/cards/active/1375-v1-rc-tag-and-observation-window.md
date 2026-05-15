@@ -75,3 +75,7 @@ Progress:
   - `GOCACHE=/private/tmp/plumego-gocache make gates`
   - `git status --short --branch`
   - `GOCACHE=/private/tmp/plumego-gocache go run ./internal/checks/extension-beta-evidence`
+- M-005 follow-up:
+  - Card 1429 created milestone verify artifacts for M-001, M-002, and M-003.
+  - Card 1430 owns the next local rc tag attempt from the reviewed
+    release-execution commit.
