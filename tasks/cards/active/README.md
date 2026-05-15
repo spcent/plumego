@@ -47,7 +47,6 @@ The active queue is an execution surface, not an archive.
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
 | [1429](1429-v1-milestone-verify-artifacts.md) | P0 | release | Add verify artifacts and reconcile milestone state before release execution |
-| [1433](1433-extension-maturity-final-boundary.md) | P1 | extension-evidence | Record final extension maturity boundaries for the v1 decision |
 | [1434](1434-final-v1-release-decision.md) | P0 | release | Decide whether to tag final `v1.0.0` or open bounded blocker cards |
 | [1375](1375-v1-rc-tag-and-observation-window.md) | P0 | release | Existing rc.1 release candidate card; executed through card 1430 |
 | [1367](1367-x-tenant-beta-evidence-closure.md) | P2 | x/tenant | Complete beta evidence closure for `x/tenant` when real release refs and owner sign-off are available |
