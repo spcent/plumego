@@ -81,3 +81,26 @@ func TestMatcherCacheEviction(t *testing.T) {
 		t.Errorf("cache entries = %d, should be <= %d after eviction", count, capacity)
 	}
 }
+
+func TestMatcherCacheEvictsLeastRecentlyUsedEntry(t *testing.T) {
+	cache := newMatchCache(3)
+
+	cache.Set("key1", &matchResult{})
+	cache.Set("key2", &matchResult{})
+	cache.Set("key3", &matchResult{})
+
+	if _, found := cache.Get("key1"); !found {
+		t.Fatal("key1 should exist before eviction")
+	}
+
+	cache.Set("key4", &matchResult{})
+
+	for _, key := range []string{"key1", "key3", "key4"} {
+		if _, found := cache.Get(key); !found {
+			t.Fatalf("%s should still exist after eviction", key)
+		}
+	}
+	if _, found := cache.Get("key2"); found {
+		t.Fatal("key2 should have been evicted")
+	}
+}
