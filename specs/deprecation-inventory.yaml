@@ -274,6 +274,7 @@ entries:
     decision: Keep as explicit unsupported experimental behavior. MQTT and AMQP bridge configuration fails closed and remains documented as unavailable in v1.
     replacement: implemented protocol bridge or removed config surface
     paths:
+      - x/mq/broker_routes.go
       - x/mq/broker.go
       - x/mq/config.go
       - x/mq/errors.go

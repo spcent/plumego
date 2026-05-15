@@ -90,6 +90,7 @@ func VerifyGitHubWithOptions(r *http.Request, secret string, opts GitHubVerifyOp
 
 	result, err := VerifyHMAC(r, cfg)
 	if err != nil {
+		// Map generic errors to GitHub-specific errors for backwards compatibility.
 		return nil, mapGitHubVerifyError(err)
 	}
 
