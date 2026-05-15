@@ -12,10 +12,10 @@ export const SITE = {
 
 export const SITE_COPY: Record<Locale, { footerTagline: string }> = {
   en: {
-    footerTagline: 'stdlib-first Go HTTP toolkit for explicit services.',
+    footerTagline: 'stdlib-only Go HTTP toolkit — explicit by design, agent-ready by structure.',
   },
   zh: {
-    footerTagline: 'Go 服务显式 wiring 工具包，stdlib 优先。',
+    footerTagline: 'stdlib only 的 Go HTTP 工具包——显式设计，结构化 Agent 就绪。',
   },
 };
 
@@ -97,106 +97,33 @@ export const FOOTER_GROUPS: Record<Locale, Array<{ title: string; links: Array<{
 
 export const HOME_COPY = {
   en: {
-    eyebrow: 'Go 1.24 · net/http compatible · agent-ready',
-    headline: 'Build Go services your team and AI agents can maintain together.',
+    eyebrow: 'Go HTTP toolkit · stdlib-only · pre-v1',
+    headline: 'Explicit routing. Narrow stable surface. Machine-readable specs.',
     summary:
-      'Most frameworks hide routing and wiring behind conventions. Plumego keeps them visible and machine-readable — so human reviewers and code agents both operate from the same model.',
+      'Routes, middleware, and dependency wiring stay in code — visible at code review and in <code>specs/</code>. 9 stable modules toward v1. Extension families branch outward without stretching the kernel.',
     primaryCta: { label: 'Get Started', href: '/docs/getting-started' },
-    secondaryCta: { label: 'See Architecture', href: '/architecture' },
-    notes: ['Go 1.24+', 'net/http compatible', 'machine-readable specs', 'agent-ready'],
-    heroAudience: {
-      label: 'Who it fits',
-      title: 'Teams building internal APIs or platform services',
-      body: 'Best when route ownership, middleware order, and dependency wiring should stay visible in code review — not hidden behind framework-managed registration.',
-    },
-    heroStatus: {
-      label: 'Pre-v1',
-      title: `${RELEASE_FACTS.currentVersion} — pre-v1, stable roots ready to evaluate`,
-      body: 'Pre-v1: stable root APIs may change until v1 is released. Stable roots are the first production evaluation scope. Extension families (x/*) carry explicit maturity labels and are experimental unless stated otherwise.',
-    },
-    heroVisual: {
-      stableLabel: 'one stable model',
-      stableTitle: 'explicit request path',
-      stableBody: 'Routes, middleware, handlers, and application wiring remain visible in code instead of disappearing into framework-owned registration.',
-      extensionLabel: 'one expansion rule',
-      extensionTitle: 'capabilities branch outward',
-      extensionBody: 'Stable roots stay narrow while optional capability work starts in x/* families instead of stretching the kernel.',
-      footerLabel: 'default path',
-      footerBody: 'docs → reference app → request flow → maturity check → module fit',
-    },
-    heroPath: [
-      {
-        label: '01',
-        title: 'Start in docs',
-        body: 'Use getting-started to understand the default path before browsing deeper packages.',
-      },
-      {
-        label: '02',
-        title: 'Run the reference app',
-        body: 'Treat reference/standard-service as the canonical service shape instead of a disposable demo.',
-      },
-      {
-        label: '03',
-        title: 'Trace one request',
-        body: 'Read the request flow before deciding where transport responsibility ends.',
-      },
-      {
-        label: '04',
-        title: 'Read release posture deliberately',
-        body: 'Check which modules are stable, which are supported references, and which are still experimental before widening adoption scope.',
-      },
-      {
-        label: '05',
-        title: 'Only then classify module ownership',
-        body: 'Decide whether the next change belongs in stable core modules, app-local wiring, or extension modules.',
-      },
+    secondaryCta: { label: 'Architecture', href: '/architecture' },
+    moduleTitle: 'Stable modules.',
+    moduleLead: '9 packages with compatibility guarantees toward v1. The recommended starting scope for production evaluation.',
+    moduleBaseImport: 'github.com/spcent/plumego',
+    modules: [
+      { name: 'core',       description: 'App bootstrap, server lifecycle, and configuration assembly',                        docHref: '/docs/modules/core' },
+      { name: 'router',     description: 'http.Handler-compatible mux with groups and path parameter matching',                docHref: '/docs/modules/router' },
+      { name: 'contract',   description: 'Typed request/response envelope: WriteResponse, WriteError, error builders',         docHref: '/docs/modules/contract' },
+      { name: 'middleware', description: 'Transport-only middleware: request ID, logger, recovery, CORS, rate limiter',        docHref: '/docs/modules/middleware' },
+      { name: 'security',   description: 'JWT validation, RBAC guards, and authentication handler wrappers',                   docHref: '/docs/modules/security' },
+      { name: 'store',      description: 'database/sql connection factory and query helpers',                                  docHref: '/docs/modules/store' },
+      { name: 'health',     description: 'Liveness and readiness check registration with HTTP endpoints',                     docHref: '/docs/modules/health' },
+      { name: 'log',        description: 'slog-backed structured logger with request context correlation',                     docHref: '/docs/modules/log' },
+      { name: 'metrics',    description: 'Prometheus-compatible metrics registration and collection',                          docHref: '/docs/modules/metrics' },
     ],
-    valueTitle: 'What this approach changes.',
-    valueLead:
-      'Not to add more abstraction — to keep the important structure visible after the codebase stops being small and reviewers need a shared model to work from.',
-    values: [
-      {
-        icon: 'wiring',
-        kicker: 'visible wiring',
-        title: 'Routes, middleware, and dependencies stay in code',
-        body: 'When a new engineer opens the service, they can trace exactly how it starts, which middleware runs, and where dependencies enter — without reading framework source.',
-      },
-      {
-        icon: 'surface',
-        kicker: 'narrow surface',
-        title: 'The stable surface stays intentionally small',
-        body: 'Core modules carry strong compatibility guarantees. New capabilities start in extension families so the kernel does not absorb every fast-moving concern.',
-      },
-      {
-        icon: 'signal',
-        kicker: 'adoption signals',
-        title: 'Know what is safe to adopt before committing',
-        body: 'Compatibility boundaries are documented, not inferred from package existence. Teams can distinguish a stable baseline from an experimental family without guessing.',
-      },
-      {
-        icon: 'clarity',
-        kicker: 'repo clarity',
-        title: 'Change ownership stays easy to classify',
-        body: 'When a PR touches middleware, a handler, and a new module, the docs and specs structure gives both human reviewers and code agents a shared language — and specs/task-routing.yaml routes the next task before editing starts.',
-      },
-      {
-        icon: 'stdlib',
-        kicker: 'stdlib first',
-        title: 'net/http compatible — no framework lock-in',
-        body: 'Handlers are plain func(http.ResponseWriter, *http.Request). Existing stdlib middleware, clients, and test helpers work without adapters or wrappers.',
-      },
-      {
-        icon: 'shape',
-        kicker: 'canonical shape',
-        title: 'One reference service shape for the whole team',
-        body: 'reference/standard-service defines the default wiring pattern so every service — and every code agent working on it — starts from the same baseline instead of reinventing structure each time.',
-      },
-    ],
-    valueFootnote:
-      'The point is not more framework. The point is a toolkit that still reads clearly after the codebase stops being small — whether the next reviewer is a human engineer or a code agent.',
-    adoptionTitle: 'Choose the next page by question, not by package.',
+    extensionTitle: 'Extension families (x/*).',
+    extensionNote: '4 beta — API frozen between release refs: x/rest, x/gateway, x/websocket, x/observability. 13 experimental families for product-specific capability work.',
+    extensionDocsHref: '/docs/x-family',
+    extensionReleasesHref: '/releases',
+    adoptionTitle: 'Where to go next.',
     adoptionBody:
-      'Why Plumego answers whether Plumego fits your team. Examples walk through a runnable service. Releases tells you what is stable versus experimental. Pick the page that answers the question in front of you.',
+      'Start with Why Plumego if the question is fit. Start with Examples to run the reference service. Use Releases to check what is stable before widening adoption scope.',
     adoptionCards: [
       {
         kicker: 'fit',
@@ -227,155 +154,45 @@ export const HOME_COPY = {
         label: 'Read FAQ',
       },
     ],
-    stableRoots: MODULE_FACTS.stableRoots,
-    extensions: MODULE_FACTS.primaryExtensionFamilies,
-    canonicalTitle: 'Start from one canonical request path.',
-    canonicalBody:
-      'Begin with reference/standard-service. Read main.go to see how the server is assembled, check app.go for explicit dependency wiring, then finish in routes.go to understand what is public and where transport control ends.',
-    canonicalCta: { label: 'Read the Reference App Guide', href: '/docs/reference-app' },
-    canonicalSteps: [
-      {
-        label: 'bootstrap',
-        title: 'Read main.go first',
-        body: 'Confirm where the application starts and how the server is assembled.',
-      },
-      {
-        label: 'wiring',
-        title: 'Open internal/app/app.go',
-        body: 'Inspect the app-local constructor and keep dependencies explicit.',
-      },
-      {
-        label: 'routes',
-        title: 'Finish in internal/app/routes.go',
-        body: 'Check route registration to understand which paths are public, what middleware runs, and where transport control ends.',
-      },
-    ],
-    mapTitle: 'Use the module map after the canonical path is clear.',
-    mapLead:
-      'The module map is not a second starting point. It is the next layer of orientation once you understand the default request path, release posture, and need to classify where deeper work belongs.',
-    mapPanels: {
-      stable: {
-        title: 'Stable roots protect the default path',
-        caption: 'Narrow modules with stronger compatibility burden, clearer review expectations, and a published baseline role.',
-      },
-      extension: {
-        title: 'Extension modules protect optional capability work',
-        caption: 'Product or protocol-specific work moves outward instead of stretching the kernel, and stays easier to evaluate deliberately.',
-      },
-      footer: 'Read the path first; use the module map when the next question is ownership or module maturity.',
-    },
-    finalTitle: 'Read the docs, run the reference app, then expand only when the boundary is clear.',
+    finalTitle: 'Start from the reference app. Check module maturity. Expand when the boundary is clear.',
     finalBody:
       'Plumego works best when you start from the default path, check module maturity early, and branch into deeper boundaries only after the owning capability is obvious.',
     finalPrimary: { label: 'Read Docs', href: '/docs' },
     finalSecondary: { label: 'See Reference App', href: '/docs/reference-app' },
     contrastTitle: 'The difference shows in code review.',
     contrastLead:
-      'When routes are spread across packages, a reviewer has to open each one to understand what paths exist and what middleware runs. Plumego keeps the full route map in one explicit file — and adds a structured contract layer so error and success responses stay consistent across all handlers.',
+      'When routes are spread across packages, a reviewer has to open each one to understand what paths exist and what middleware runs. Plumego keeps the full route map in one explicit file — and adds a structured <code>contract</code> layer so error and success responses stay consistent across all handlers.',
     contrastBeforeLabel: 'routes split across packages',
     contrastAfterLabel: 'plumego: one file, one contract',
   },
   zh: {
-    eyebrow: 'Go 1.24 · net/http 兼容 · Agent 友好',
-    headline: '人类工程师与 AI Agent 共同维护的 Go 服务。',
+    eyebrow: 'Go HTTP 工具包 · stdlib only · pre-v1',
+    headline: '显式路由。收敛的稳定表面。机器可读规范。',
     summary:
-      '大多数框架把路由和依赖注入藏在约定背后。Plumego 把它们留在代码里，也留在机器可读的规范里——让代码 Agent 和人类评审者共用同一套认知模型。',
+      '路由、中间件和依赖 wiring 留在代码里——在代码评审和 <code>specs/</code> 中均可见。9 个稳定模块向 v1 推进，扩展家族向外分叉而不拉长内核。',
     primaryCta: { label: '开始使用', href: '/zh/docs/getting-started' },
-    secondaryCta: { label: '查看架构', href: '/zh/architecture' },
-    notes: ['Go 1.24+', 'net/http 兼容', '机器可读规范', 'Agent 友好'],
-    heroAudience: {
-      label: '适合场景',
-      title: '构建内部 API 或平台服务的团队',
-      body: '尤其适合需要在代码评审中直接看清 route ownership、中间件顺序和依赖 wiring 的场景，而不是把这些结构藏在框架注册机制后面。',
-    },
-    heroStatus: {
-      label: 'Pre-v1',
-      title: `${RELEASE_FACTS.currentVersion} —— pre-v1，稳定根可先评估`,
-      body: 'Pre-v1：v1 发布前稳定根 API 可能调整。稳定根是最适合先进入生产评估的范围。扩展家族（x/*）明确标注成熟度，未标注为稳定则视为实验性。',
-    },
-    heroVisual: {
-      stableLabel: '一套稳定模型',
-      stableTitle: '显式请求路径',
-      stableBody: 'Routes、middleware、handlers 和应用 wiring 都继续留在代码里，而不是消失在框架注册机制后面。',
-      extensionLabel: '一条扩展规则',
-      extensionTitle: '能力向外分叉',
-      extensionBody: '稳定根保持收敛，可选能力从 x/* 家族开始，而不是继续拉长内核。',
-      footerLabel: '默认路径',
-      footerBody: 'docs → reference app → request flow → 成熟度确认 → 模块归属',
-    },
-    heroPath: [
-      {
-        label: '01',
-        title: '先从文档进入',
-        body: '先用开始使用理解默认路径，再决定要不要看更深的包。',
-      },
-      {
-        label: '02',
-        title: '运行 reference app',
-        body: '把 reference/standard-service 当成 canonical 服务形态，而不是一次性 demo。',
-      },
-      {
-        label: '03',
-        title: '沿 request flow 读一遍',
-        body: '先追清一条请求，判断 transport 责任到底在哪一层结束。',
-      },
-      {
-        label: '04',
-        title: '先检查发布姿态',
-        body: '在扩大采用范围之前，先确认哪些模块稳定可用，哪些仍然只是支持参考或实验性能力。',
-      },
-      {
-        label: '05',
-        title: '最后判断模块归属',
-        body: '再决定这项工作属于稳定核心模块、应用本地依赖注入，还是扩展模块。',
-      },
+    secondaryCta: { label: '架构', href: '/zh/architecture' },
+    moduleTitle: '稳定模块。',
+    moduleLead: '9 个包，具备向 v1 迈进的兼容性保证，是推荐的生产评估起点。',
+    moduleBaseImport: 'github.com/spcent/plumego',
+    modules: [
+      { name: 'core',       description: '应用启动、服务器生命周期与配置组装',                              docHref: '/zh/docs/modules/core' },
+      { name: 'router',     description: '兼容 http.Handler 的多路复用器，支持路由组和路径参数匹配',         docHref: '/zh/docs/modules/router' },
+      { name: 'contract',   description: '请求/响应类型封装：WriteResponse、WriteError、错误构建器',        docHref: '/zh/docs/modules/contract' },
+      { name: 'middleware', description: '传输层中间件：请求 ID、日志、recover、CORS、限流',               docHref: '/zh/docs/modules/middleware' },
+      { name: 'security',   description: 'JWT 验证、RBAC 守卫与认证 handler 包装器',                     docHref: '/zh/docs/modules/security' },
+      { name: 'store',      description: '基于 database/sql 的连接工厂与查询辅助工具',                    docHref: '/zh/docs/modules/store' },
+      { name: 'health',     description: '存活/就绪探针注册与 HTTP 端点',                               docHref: '/zh/docs/modules/health' },
+      { name: 'log',        description: '基于 slog 的结构化日志，支持请求上下文关联',                     docHref: '/zh/docs/modules/log' },
+      { name: 'metrics',    description: '兼容 Prometheus 的指标注册与采集',                            docHref: '/zh/docs/modules/metrics' },
     ],
-    valueTitle: '这个方案改变了什么。',
-    valueLead:
-      '不是为了增加抽象——而是在仓库不再小、评审者需要一个共同模型时，把重要结构继续保持可见。',
-    values: [
-      {
-        icon: 'wiring',
-        kicker: '可见 wiring',
-        title: 'routes、middleware 和依赖都留在代码里',
-        body: '当新工程师打开服务时，他们可以直接追溯服务如何启动、哪些中间件在运行、依赖从哪里进入——不需要先读框架源码。',
-      },
-      {
-        icon: 'surface',
-        kicker: '收敛的表面',
-        title: '稳定表面保持刻意收敛',
-        body: '核心模块承担强兼容性保证。新能力从扩展家族起步，这样内核就不会吸入每一项快速演进的工作。',
-      },
-      {
-        icon: 'signal',
-        kicker: '采用信号',
-        title: '在做决定前知道哪些可以安全采用',
-        body: '兼容性边界有文档，而不是靠包是否存在来推断。团队可以一眼分清稳定基线和实验性家族，而不需要猜测。',
-      },
-      {
-        icon: 'clarity',
-        kicker: '仓库清晰度',
-        title: '改动归属保持容易判断',
-        body: '当一个 PR 同时涉及 middleware、handler 和新模块时，docs/specs 的分层结构给人类评审者和代码 Agent 提供共同语言——specs/task-routing.yaml 在编辑前就完成任务路由。',
-      },
-      {
-        icon: 'stdlib',
-        kicker: 'stdlib 优先',
-        title: 'net/http 兼容，不锁定框架',
-        body: 'Handler 就是普通的 func(http.ResponseWriter, *http.Request)，现有的 stdlib 中间件、客户端和测试工具不需要任何适配器就能直接使用。',
-      },
-      {
-        icon: 'shape',
-        kicker: 'canonical 形态',
-        title: '全团队共用一套参考服务形态',
-        body: 'reference/standard-service 定义了默认的 wiring 模式，让每一个服务——以及每一个在仓库里工作的代码 Agent——都从同一条基线出发，而不是每次都重新摸索结构。',
-      },
-    ],
-    valueFootnote:
-      '重点不是更多框架抽象。而是在仓库不再小时，工具包依然读起来清晰——无论下一个评审者是人类工程师还是代码 Agent。',
-    adoptionTitle: '根据问题选下一页，而不是先选包。',
+    extensionTitle: '扩展家族 (x/*)。',
+    extensionNote: '4 个 beta（版本引用间 API 冻结）：x/rest、x/gateway、x/websocket、x/observability。另有 13 个实验性家族，用于产品能力工作。',
+    extensionDocsHref: '/zh/docs/x-family',
+    extensionReleasesHref: '/zh/releases',
+    adoptionTitle: '下一步去哪里。',
     adoptionBody:
-      '为什么选 Plumego 回答工具包是否适合你的团队，示例展示可运行的服务，发布页告诉你哪些稳定、哪些还在实验阶段。先选那个真正回答你当前问题的页面。',
+      '如果问题是适用性，先看「为什么选择 Plumego」。如果要运行参考服务，先看示例。在扩大采用范围之前，用发布页确认模块成熟度。',
     adoptionCards: [
       {
         kicker: 'fit',
@@ -406,50 +223,13 @@ export const HOME_COPY = {
         label: '查看常见问题',
       },
     ],
-    stableRoots: MODULE_FACTS.stableRoots,
-    extensions: MODULE_FACTS.primaryExtensionFamilies,
-    canonicalTitle: '先从一条 canonical 请求路径起步。',
-    canonicalBody:
-      '先看 reference/standard-service。读 main.go 了解 server 如何组装，看 app.go 确认依赖显式，再看 routes.go 了解哪些路径是公开的以及 transport 控制在哪里结束。',
-    canonicalCta: { label: '阅读参考应用说明', href: '/zh/docs/reference-app' },
-    canonicalSteps: [
-      {
-        label: 'bootstrap',
-        title: '先读 main.go',
-        body: '确认应用从哪里启动，以及 server 是怎样被组装起来的。',
-      },
-      {
-        label: 'wiring',
-        title: '再看 internal/app/app.go',
-        body: '检查应用本地 wiring，保持依赖显式。',
-      },
-      {
-        label: 'routes',
-        title: '然后看 internal/app/routes.go',
-        body: '看清哪些路径是公开的、哪些中间件在运行，以及 transport 控制在哪里结束。',
-      },
-    ],
-    mapTitle: '只有 canonical path 清楚以后，再看 module map。',
-    mapLead:
-      '模块地图不是第二个起点，而是在默认请求路径已经读清之后，帮助你继续判断更深工作归属的下一层视图。',
-    mapPanels: {
-      stable: {
-        title: '稳定根负责保护默认路径',
-        caption: '这些模块更收敛、兼容性负担更重，也承担公开基线的角色。',
-      },
-      extension: {
-        title: '扩展模块负责承接可选能力工作',
-        caption: '产品能力或协议工作向外分叉，而不是继续把内核拉长，也更适合被审慎地单独评估。',
-      },
-      footer: '先读路径，再用 module map 判断归属与模块成熟度。',
-    },
-    finalTitle: '先读文档，跑通 reference app，再在边界清楚时向外扩展。',
+    finalTitle: '从 reference app 起步。确认模块成熟度。边界清晰后再向外扩展。',
     finalBody: 'Plumego 最适合从默认路径进入，并尽早确认模块成熟度；只有在归属已经明确之后，再进入更深的模块边界。',
     finalPrimary: { label: '阅读文档', href: '/zh/docs' },
     finalSecondary: { label: '查看参考应用', href: '/zh/docs/reference-app' },
     contrastTitle: '差异在代码评审时最明显。',
     contrastLead:
-      '当路由分散在各个包里时，评审者必须逐个打开才能知道有哪些路径和中间件在运行。Plumego 把完整路由表放在一个显式文件里——同时加入结构化的 contract 层，让所有 handler 的错误响应和成功响应保持一致。',
+      '当路由分散在各个包里时，评审者必须逐个打开才能知道有哪些路径和中间件在运行。Plumego 把完整路由表放在一个显式文件里——同时加入结构化的 <code>contract</code> 层，让所有 handler 的错误响应和成功响应保持一致。',
     contrastBeforeLabel: '路由分散在各包里',
     contrastAfterLabel: 'plumego：一个文件，一套 contract',
   },

@@ -5,6 +5,7 @@ import '../styles/prose.css';
 import '../styles/home.css';
 import SiteHeader from '../components/shared/SiteHeader.astro';
 import { FOOTER_GROUPS, SITE, SITE_COPY, type Locale } from '../data/site';
+import { RELEASE_FACTS } from '../generated/releases';
 import { buildMarketingSeo } from '../lib/seo';
 
 interface Props {
@@ -20,6 +21,11 @@ interface Props {
 }
 
 const { locale, title, description, currentPath, imagePath, noindex, type, keywords, includeAlternates } = Astro.props;
+const releasesHref = locale === 'zh' ? '/zh/releases' : '/releases';
+const preBadgeLabel = locale === 'zh'
+  ? `pre-v1 · 稳定根可评估 · 扩展模块按成熟度标注`
+  : `pre-v1 · stable roots ready to evaluate · x/* families carry explicit maturity labels`;
+const preBadgeCta = locale === 'zh' ? '查看发布策略 →' : 'View release posture →';
 const pageTitle = `${title} · ${SITE.name}`;
 const footerGroups = FOOTER_GROUPS[locale];
 const seo = buildMarketingSeo({
@@ -51,7 +57,7 @@ const footerTagline = SITE_COPY[locale].footerTagline;
     <meta name="theme-color" content="#f3f6fb" data-theme-color-meta />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="canonical" href={seo.canonicalUrl} />
     {seo.includeAlternates && <link rel="alternate" href="https://plumego.birdor.com/" hreflang="x-default" />}
@@ -89,6 +95,12 @@ const footerTagline = SITE_COPY[locale].footerTagline;
     </script>
   </head>
   <body class="marketing-shell">
+    <div class="pre-v1-banner" role="note">
+      <span class="pre-v1-banner__version">{RELEASE_FACTS.currentVersion}</span>
+      <span class="pre-v1-banner__sep" aria-hidden="true">·</span>
+      <span class="pre-v1-banner__text">{preBadgeLabel}</span>
+      <a class="pre-v1-banner__link" href={releasesHref}>{preBadgeCta}</a>
+    </div>
     <SiteHeader locale={locale} currentPath={currentPath} />
     <main>
       <slot />
@@ -123,7 +135,7 @@ const footerTagline = SITE_COPY[locale].footerTagline;
     <script is:inline>
       (() => {
         const initSpotlight = () => {
-          document.querySelectorAll('.signal-list__item, .page-panel, .feature-card, .fit-check-board__item').forEach((card) => {
+          document.querySelectorAll('.signal-list__item, .page-panel, .fit-check-board__item').forEach((card) => {
             card.addEventListener('mousemove', (e) => {
               const r = card.getBoundingClientRect();
               card.style.setProperty('--spotlight-x', ((e.clientX - r.left) / r.width * 100).toFixed(1) + '%');
@@ -135,22 +147,6 @@ const footerTagline = SITE_COPY[locale].footerTagline;
         };
         document.addEventListener('astro:page-load', initSpotlight);
         initSpotlight();
-      })();
-    </script>
-    <script is:inline>
-      (() => {
-        const obs = new IntersectionObserver(
-          (entries) => {
-            entries.forEach((e) => {
-              if (e.isIntersecting) {
-                e.target.classList.add('is-visible');
-                obs.unobserve(e.target);
-              }
-            });
-          },
-          { threshold: 0.08, rootMargin: '0px 0px -48px 0px' }
-        );
-        document.querySelectorAll('.reveal, .reveal-stagger').forEach((el) => obs.observe(el));
       })();
     </script>
   </body>

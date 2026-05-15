@@ -1,6 +1,4 @@
 ---
-import AdoptionNav from '../../components/home/AdoptionNav.astro';
-import CanonicalPath from '../../components/home/CanonicalPath.astro';
 import FinalCta from '../../components/home/FinalCta.astro';
 import Hero from '../../components/home/Hero.astro';
 import MinimalExample from '../../components/home/MinimalExample.astro';
@@ -14,29 +12,126 @@ const copy = HOME_COPY.zh;
 
 <MarketingLayout
   locale="zh"
-  title="stdlib 优先的 Go HTTP 工具包"
-  description="stdlib 优先的 Go Web 工具包——可见路由 ownership、收敛稳定根、canonical 参考路径。"
+  title="显式设计。结构化 Agent 就绪。"
+  description="stdlib only 的 Go HTTP 工具包——路由、中间件和 ownership 留在代码里，也留在机器可读规范里，适合工程师与 AI Agent 共同评审每一次改动的团队。"
   currentPath="/zh"
 >
   <Hero copy={copy} />
-  <WiringContrast copy={copy} />
-  <MinimalExample locale="zh" />
-  <CanonicalPath copy={copy} />
 
-  <section class="section stability-signal-strip">
-    <div class="stability-signal-strip__inner">
-      <span class="stability-signal-strip__item stability-signal-strip__item--stable">
-        <strong>稳定根</strong> — 长期 API 目标：core, router, contract, middleware, security, store, health, log, metrics
-      </span>
-      <span class="stability-signal-strip__divider" aria-hidden="true">·</span>
-      <span class="stability-signal-strip__item stability-signal-strip__item--experimental">
-        <strong>x/* 家族</strong> — 实验性，除非另有标注
-      </span>
-      <a class="text-link stability-signal-strip__cta" href="/zh/releases">查看模块成熟度 →</a>
+  <section class="quick-spec-strip" aria-label="快速规格">
+    <div class="quick-spec-strip__inner">
+      <span class="quick-spec-item"><code>go 1.24+</code></span>
+      <span class="quick-spec-sep" aria-hidden="true">/</span>
+      <span class="quick-spec-item"><code>stdlib</code> only 内核</span>
+      <span class="quick-spec-sep" aria-hidden="true">/</span>
+      <span class="quick-spec-item"><code>9</code> 个稳定模块</span>
+      <span class="quick-spec-sep" aria-hidden="true">/</span>
+      <span class="quick-spec-item"><code>4</code> 个 beta 扩展</span>
+      <span class="quick-spec-sep" aria-hidden="true">/</span>
+      <span class="quick-spec-item">MIT</span>
+      <span class="quick-spec-sep" aria-hidden="true">/</span>
+      <span class="quick-spec-item quick-spec-item--pre">pre-v1</span>
+      <span class="quick-spec-sep" aria-hidden="true">/</span>
+      <a class="quick-spec-link" href="/zh/releases">发布矩阵 →</a>
     </div>
   </section>
 
+  <MinimalExample locale="zh" />
+  <WiringContrast copy={copy} />
   <ValueProps copy={copy} />
-  <AdoptionNav copy={copy} />
+
+  <section class="section entry-points-section">
+    <div class="section__intro section__intro--center">
+      <h2>{copy.adoptionTitle}</h2>
+      <p>{copy.adoptionBody}</p>
+    </div>
+    <div class="entry-points-grid reveal-stagger">
+      {copy.adoptionCards.slice(0, 3).map((card: { kicker: string; title: string; body: string; href: string; label: string }) => (
+        <article class="entry-point-card">
+          <p class="entry-point-card__kicker">{card.kicker}</p>
+          <h3>{card.title}</h3>
+          <p>{card.body}</p>
+          <a class="entry-point-card__cta" href={card.href}>{card.label} →</a>
+        </article>
+      ))}
+    </div>
+  </section>
+
   <FinalCta copy={copy} />
 </MarketingLayout>
+
+<style>
+  .entry-points-section {
+    padding-block: 4rem;
+  }
+
+  .entry-points-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1.25rem;
+    max-width: 56rem;
+    margin-inline: auto;
+  }
+
+  @media (min-width: 640px) {
+    .entry-points-grid {
+      grid-template-columns: repeat(3, 1fr);
+    }
+  }
+
+  .entry-point-card {
+    background: var(--bg-elevated);
+    border: 1px solid var(--line);
+    border-radius: 0.75rem;
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    box-shadow: var(--shadow);
+    transition: border-color 0.18s, box-shadow 0.18s;
+  }
+
+  .entry-point-card:hover {
+    border-color: var(--accent-soft);
+    box-shadow: var(--shadow), 0 0 0 3px var(--accent-soft);
+  }
+
+  .entry-point-card__kicker {
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0;
+  }
+
+  .entry-point-card h3 {
+    font-size: 1.05rem;
+    font-weight: 600;
+    margin: 0;
+    color: var(--fg);
+    line-height: 1.3;
+  }
+
+  .entry-point-card p {
+    font-size: 0.88rem;
+    color: var(--fg-soft);
+    line-height: 1.6;
+    margin: 0;
+    flex: 1;
+  }
+
+  .entry-point-card__cta {
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--accent);
+    text-decoration: none;
+    margin-top: 0.25rem;
+    transition: color 0.15s;
+  }
+
+  .entry-point-card__cta:hover {
+    color: var(--accent-strong);
+    text-decoration: underline;
+  }
+</style>

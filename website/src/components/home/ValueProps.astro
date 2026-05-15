@@ -1,62 +1,255 @@
 ---
 const { copy } = Astro.props;
 
-const icons: Record<string, string> = {
-  wiring: `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-    <circle cx="4" cy="10" r="2.5"/>
-    <circle cx="16" cy="4.5" r="2.5"/>
-    <circle cx="16" cy="15.5" r="2.5"/>
-    <line x1="6.2" y1="9" x2="13.6" y2="5.6"/>
-    <line x1="6.2" y1="11" x2="13.6" y2="14.4"/>
-  </svg>`,
-  surface: `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true">
-    <circle cx="10" cy="10" r="7.5"/>
-    <circle cx="10" cy="10" r="3"/>
-    <line x1="10" y1="1" x2="10" y2="3.5"/>
-    <line x1="10" y1="16.5" x2="10" y2="19"/>
-    <line x1="1" y1="10" x2="3.5" y2="10"/>
-    <line x1="16.5" y1="10" x2="19" y2="10"/>
-  </svg>`,
-  signal: `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-    <circle cx="10" cy="10" r="8"/>
-    <path d="M6.5 10.5l2.5 2.5 4.5-5.5"/>
-  </svg>`,
-  clarity: `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-    <path d="M2 7h5l2 2h9v8H2V7z"/>
-    <line x1="2" y1="10" x2="18" y2="10"/>
-    <line x1="2" y1="4" x2="8" y2="4"/>
-    <line x1="2" y1="4" x2="2" y2="7"/>
-  </svg>`,
-  stdlib: `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-    <path d="M8 12a4 4 0 005.66 0l2-2a4 4 0 00-5.66-5.66L9 5.34"/>
-    <path d="M12 8a4 4 0 00-5.66 0l-2 2a4 4 0 005.66 5.66L11 14.66"/>
-  </svg>`,
-  shape: `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-    <rect x="2" y="2" width="16" height="16" rx="2"/>
-    <line x1="2" y1="7" x2="18" y2="7"/>
-    <line x1="8" y1="7" x2="8" y2="18"/>
-  </svg>`,
-};
+type Module = { name: string; description: string; docHref: string };
 ---
 
-<section class="section">
-  <div class="section__intro section__intro--center reveal">
-    <h2>{copy.valueTitle}</h2>
-    <p>{copy.valueLead}</p>
+<section class="section module-ref-section">
+  <div class="module-ref-header">
+    <div class="module-ref-header__left">
+      <h2>{copy.moduleTitle}</h2>
+      <p>{copy.moduleLead}</p>
+    </div>
+    <p class="module-ref-header__base">{copy.moduleBaseImport}</p>
   </div>
-  <div class="feature-grid reveal-stagger">
-    {copy.values.map((item: { icon?: string; kicker: string; title: string; body: string }) => (
-      <article class="feature-card">
-        {item.icon && (
-          <span class="feature-card__icon" set:html={icons[item.icon] ?? ''} />
-        )}
-        <p class="feature-card__kicker">{item.kicker}</p>
-        <h3>{item.title}</h3>
-        <p>{item.body}</p>
-      </article>
+
+  <div class="module-table" role="table" aria-label="Stable modules">
+    <div class="module-table__head" role="row">
+      <span role="columnheader">package</span>
+      <span role="columnheader">description</span>
+      <span role="columnheader">status</span>
+    </div>
+    {(copy.modules as Module[]).map((mod) => (
+      <a class="module-table__row" href={mod.docHref} role="row">
+        <span class="module-table__path" role="cell">
+          <span class="module-table__base">{copy.moduleBaseImport}/</span><strong>{mod.name}</strong>
+        </span>
+        <span class="module-table__desc" role="cell">{mod.description}</span>
+        <span class="module-table__badge module-table__badge--stable" role="cell">stable</span>
+      </a>
     ))}
   </div>
-  {copy.valueFootnote && (
-    <p class="section__footnote section__footnote--center">{copy.valueFootnote}</p>
-  )}
+
+  <div class="extension-ref">
+    <div class="extension-ref__header">
+      <h3>{copy.extensionTitle}</h3>
+      <p>{copy.extensionNote}</p>
+    </div>
+    <div class="extension-ref__links">
+      <a class="extension-ref__link" href={copy.extensionDocsHref}>Extension overview →</a>
+      <a class="extension-ref__link" href={copy.extensionReleasesHref}>Maturity matrix →</a>
+    </div>
+  </div>
 </section>
+
+<style>
+  .module-ref-section {
+    padding-block: 4rem;
+  }
+
+  .module-ref-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 2rem;
+    flex-wrap: wrap;
+    max-width: 64rem;
+    margin-inline: auto;
+    margin-bottom: 1.25rem;
+  }
+
+  .module-ref-header__left h2 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin: 0 0 0.35rem;
+    letter-spacing: -0.02em;
+  }
+
+  .module-ref-header__left p {
+    font-size: 0.9rem;
+    color: var(--fg-soft);
+    margin: 0;
+    max-width: 38rem;
+    line-height: 1.55;
+  }
+
+  .module-ref-header__base {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--fg-soft);
+    background: var(--bg-strong);
+    border: 1px solid var(--line);
+    border-radius: 0.35rem;
+    padding: 0.28rem 0.7rem;
+    white-space: nowrap;
+    margin: 0;
+    align-self: center;
+    flex-shrink: 0;
+  }
+
+  .module-table {
+    max-width: 64rem;
+    margin-inline: auto;
+    border: 1px solid var(--line);
+    border-radius: 0.625rem;
+    overflow: hidden;
+    background: var(--bg-elevated);
+  }
+
+  .module-table__head {
+    display: grid;
+    grid-template-columns: 18rem 1fr 5.5rem;
+    padding: 0.55rem 1.25rem;
+    background: var(--bg-strong);
+    border-bottom: 1px solid var(--line);
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--fg-soft);
+  }
+
+  .module-table__row {
+    display: grid;
+    grid-template-columns: 18rem 1fr 5.5rem;
+    align-items: center;
+    padding: 0.72rem 1.25rem;
+    border-bottom: 1px solid var(--line);
+    text-decoration: none;
+    color: inherit;
+    transition: background-color 120ms ease;
+  }
+
+  .module-table__row:last-child {
+    border-bottom: none;
+  }
+
+  .module-table__row:hover {
+    background: color-mix(in srgb, var(--accent-soft) 60%, var(--bg-elevated));
+  }
+
+  .module-table__path {
+    font-family: var(--font-mono);
+    font-size: 0.82rem;
+    line-height: 1.4;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .module-table__base {
+    color: var(--fg-soft);
+  }
+
+  .module-table__path strong {
+    color: var(--accent);
+    font-weight: 600;
+  }
+
+  .module-table__row:hover .module-table__path strong {
+    color: var(--accent-strong);
+  }
+
+  .module-table__desc {
+    font-size: 0.86rem;
+    color: var(--fg-soft);
+    line-height: 1.45;
+    padding-right: 1rem;
+  }
+
+  .module-table__badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    padding: 0.18rem 0.55rem;
+    border-radius: 0.3rem;
+    white-space: nowrap;
+  }
+
+  .module-table__badge--stable {
+    background: color-mix(in srgb, var(--accent) 10%, var(--bg-elevated));
+    border: 1px solid color-mix(in srgb, var(--accent) 22%, var(--line));
+    color: var(--accent-strong);
+  }
+
+  :root[data-theme="dark"] .module-table__badge--stable {
+    color: var(--accent);
+  }
+
+  .extension-ref {
+    max-width: 64rem;
+    margin-inline: auto;
+    margin-top: 1.5rem;
+    padding: 1rem 1.25rem;
+    border: 1px solid var(--line);
+    border-radius: 0.625rem;
+    display: flex;
+    align-items: center;
+    gap: 2rem;
+    flex-wrap: wrap;
+    background: var(--bg-elevated);
+  }
+
+  .extension-ref__header {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .extension-ref__header h3 {
+    font-size: 0.92rem;
+    font-weight: 600;
+    margin: 0 0 0.25rem;
+    letter-spacing: -0.01em;
+  }
+
+  .extension-ref__header p {
+    font-size: 0.84rem;
+    color: var(--fg-soft);
+    margin: 0;
+    line-height: 1.5;
+  }
+
+  .extension-ref__links {
+    display: flex;
+    gap: 1.25rem;
+    flex-shrink: 0;
+    flex-wrap: wrap;
+  }
+
+  .extension-ref__link {
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--accent);
+    white-space: nowrap;
+    transition: color 140ms ease;
+  }
+
+  .extension-ref__link:hover {
+    color: var(--accent-strong);
+  }
+
+  @media (max-width: 760px) {
+    .module-table__head,
+    .module-table__row {
+      grid-template-columns: 1fr;
+    }
+
+    .module-table__head span:not(:first-child),
+    .module-table__badge {
+      display: none;
+    }
+
+    .module-ref-header__base {
+      display: none;
+    }
+
+    .module-table__path {
+      white-space: normal;
+      overflow: visible;
+    }
+  }
+</style>

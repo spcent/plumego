@@ -13,7 +13,7 @@ const journeySteps = [
 const wiringCopy = {
   contrastTitle: 'What explicit wiring looks like in review.',
   contrastLead:
-    'The core question before adopting: should route ownership, middleware order, and dependency wiring be visible in code — or managed by the framework?',
+    'The core question before adopting: should route ownership, middleware order, and dependency wiring be visible in code — or managed by the framework?  Plumego keeps registration in <code>internal/app/routes.go</code>, where it appears in every code review.',
   contrastBeforeLabel: 'hidden behind registration calls',
   contrastAfterLabel: 'plumego: visible in routes.go',
 };
@@ -142,8 +142,8 @@ const teamRows = [
 const frameworkDecision = [
   {
     name: 'Gin / Echo',
-    whenToChoose: 'Your team wants fast setup, a large plugin ecosystem, and is comfortable with custom context types (gin.Context / echo.Context). Existing net/http middleware needs adapters, but the convention-first model is a worthwhile trade.',
-    whenNotToChoose: 'You need handlers to stay as plain func(w, r) and want all existing stdlib middleware to work without wrappers.',
+    whenToChoose: 'Your team wants fast setup, a large plugin ecosystem, and is comfortable with custom context types (<code>gin.Context</code> / <code>echo.Context</code>). Existing <code>net/http</code> middleware needs adapters, but the convention-first model is a worthwhile trade.',
+    whenNotToChoose: 'You need handlers to stay as plain <code>func(w, r)</code> and want all existing stdlib middleware to work without wrappers.',
     isPlumego: false,
   },
   {
@@ -154,7 +154,7 @@ const frameworkDecision = [
   },
   {
     name: 'Plumego',
-    whenToChoose: 'Visible route ownership and review clarity matter more than framework convenience. You want stdlib handler signature, a structured response contract, a middleware catalog, and an explicit canonical service shape — all without hidden registration.',
+    whenToChoose: 'Visible route ownership and review clarity matter more than framework convenience. You want <code>stdlib</code> handler signature (<code>func(w http.ResponseWriter, r *http.Request)</code>), a structured <code>contract</code> layer, and an explicit canonical service shape — without hidden registration.',
     whenNotToChoose: 'You want the framework to handle structure invisibly, or your team is already comfortable with Gin/Echo and happy with the trade-offs.',
     isPlumego: true,
   },
@@ -294,6 +294,81 @@ const frameworkDecision = [
 
   <section class="section">
     <div class="section__intro reveal">
+      <h2>AI coding tools work more reliably with a machine-readable repository.</h2>
+      <p>
+        <em>This section is about AI <strong>coding assistants</strong> (Copilot, Claude, Cursor) — tools that write
+        or review code. It is not about building AI agent services; that is the scope of <code>x/ai</code>.</em>
+      </p>
+      <p>
+        Most teams using these tools today face the same problem: the assistant has to guess where a change belongs.
+        Plumego's control plane gives those tools the same routing signals a senior reviewer uses.
+      </p>
+    </div>
+    <div class="signal-list reveal-stagger">
+      <article class="signal-list__item">
+        <p class="signal-list__kicker">work routing</p>
+        <h3>The agent knows which module owns the change before writing any code</h3>
+        <p>
+          <code>specs/task-routing.yaml</code> maps work types to owning modules. An agent reads the routing table
+          when evaluating a change instead of inferring ownership by guessing directory structure.
+        </p>
+      </article>
+      <article class="signal-list__item">
+        <p class="signal-list__kicker">boundary enforcement</p>
+        <h3>Import violations are caught by a machine, not by reviewer memory</h3>
+        <p>
+          <code>specs/dependency-rules.yaml</code> and <code>internal/checks/dependency-rules</code> reject
+          PRs that cross stable-root boundaries — whether the change came from a human or an AI tool.
+        </p>
+      </article>
+      <article class="signal-list__item">
+        <p class="signal-list__kicker">change recipes</p>
+        <h3>Common change types have a defined path, not an open prompt</h3>
+        <p>
+          <code>specs/change-recipes/</code> gives agents an explicit execution sequence for known change
+          types: new stable module, bug fix, extension promotion, deprecation. Recipes reduce hallucination
+          surface and make agent output reviewable with the same rules as human PRs.
+        </p>
+      </article>
+    </div>
+    <div class="routing-teaser">
+      <p class="routing-teaser__label">How task routing works in practice</p>
+      <div class="comparison-table routing-teaser__table" role="table" aria-label="Task routing examples">
+        <div class="comparison-table__head" role="row">
+          <strong role="columnheader">Task description</strong>
+          <strong role="columnheader">Routing rule</strong>
+          <strong role="columnheader">Owner</strong>
+        </div>
+        <div class="comparison-table__row" role="row">
+          <span role="cell">Add rate limiting to inbound HTTP endpoint</span>
+          <span role="cell"><code>middleware</code></span>
+          <span role="cell"><code>middleware/</code></span>
+        </div>
+        <div class="comparison-table__row" role="row">
+          <span role="cell">Add per-tenant JWT validation</span>
+          <span role="cell"><code>tenant_policy_change</code></span>
+          <span role="cell"><code>x/tenant/</code></span>
+        </div>
+        <div class="comparison-table__row" role="row">
+          <span role="cell">Build AI streaming SSE endpoint</span>
+          <span role="cell"><code>extension_work → x/ai</code></span>
+          <span role="cell"><code>x/ai/</code></span>
+        </div>
+        <div class="comparison-table__row" role="row">
+          <span role="cell">Update allowed import directions in specs</span>
+          <span role="cell"><code>repo_rules</code></span>
+          <span role="cell"><code>specs/</code></span>
+        </div>
+      </div>
+      <p class="routing-teaser__note">The full routing table covers 10 task types. The interactive demo on the docs page lets you step through each classification.</p>
+    </div>
+    <div class="page-links" style="margin-top: 1.5rem;">
+      <a class="text-link" href="/docs/concepts/agent-first-workflow">Try the interactive routing demo →</a>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="section__intro reveal">
       <h2>Good fit versus caution signals.</h2>
       <p>
         This comparison should help you decide, not merely admire the architecture. Use it when you need to know whether Plumego's explicit model actually improves the
@@ -370,8 +445,8 @@ const frameworkDecision = [
               </svg>
             )}
           </strong>
-          <span role="cell">{row.whenToChoose}</span>
-          <span role="cell">{row.whenNotToChoose}</span>
+          <span role="cell" set:html={row.whenToChoose} />
+          <span role="cell" set:html={row.whenNotToChoose} />
         </div>
       ))}
     </div>
@@ -388,81 +463,6 @@ const frameworkDecision = [
           the benchmark roadmap.
         </p>
       </article>
-    </div>
-  </section>
-
-  <section class="section">
-    <div class="section__intro reveal">
-      <h2>AI coding tools work more reliably with a machine-readable repository.</h2>
-      <p>
-        <em>This section is about AI <strong>coding assistants</strong> (Copilot, Claude, Cursor) — tools that write
-        or review code. It is not about building AI agent services; that is the scope of <code>x/ai</code>.</em>
-      </p>
-      <p>
-        Most teams using these tools today face the same problem: the assistant has to guess where a change belongs.
-        Plumego's control plane gives those tools the same routing signals a senior reviewer uses.
-      </p>
-    </div>
-    <div class="signal-list reveal-stagger">
-      <article class="signal-list__item">
-        <p class="signal-list__kicker">work routing</p>
-        <h3>The agent knows which module owns the change before writing any code</h3>
-        <p>
-          <code>specs/task-routing.yaml</code> maps work types to owning modules. An agent reads the routing table
-          when evaluating a change instead of inferring ownership by guessing directory structure.
-        </p>
-      </article>
-      <article class="signal-list__item">
-        <p class="signal-list__kicker">boundary enforcement</p>
-        <h3>Import violations are caught by a machine, not by reviewer memory</h3>
-        <p>
-          <code>specs/dependency-rules.yaml</code> and <code>internal/checks/dependency-rules</code> reject
-          PRs that cross stable-root boundaries — whether the change came from a human or an AI tool.
-        </p>
-      </article>
-      <article class="signal-list__item">
-        <p class="signal-list__kicker">change recipes</p>
-        <h3>Common change types have a defined path, not an open prompt</h3>
-        <p>
-          <code>specs/change-recipes/</code> gives agents an explicit execution sequence for known change
-          types: new stable module, bug fix, extension promotion, deprecation. Recipes reduce hallucination
-          surface and make agent output reviewable with the same rules as human PRs.
-        </p>
-      </article>
-    </div>
-    <div class="routing-teaser">
-      <p class="routing-teaser__label">How task routing works in practice</p>
-      <div class="comparison-table routing-teaser__table" role="table" aria-label="Task routing examples">
-        <div class="comparison-table__head" role="row">
-          <strong role="columnheader">Task description</strong>
-          <strong role="columnheader">Routing rule</strong>
-          <strong role="columnheader">Owner</strong>
-        </div>
-        <div class="comparison-table__row" role="row">
-          <span role="cell">Add rate limiting to inbound HTTP endpoint</span>
-          <span role="cell"><code>middleware</code></span>
-          <span role="cell"><code>middleware/</code></span>
-        </div>
-        <div class="comparison-table__row" role="row">
-          <span role="cell">Add per-tenant JWT validation</span>
-          <span role="cell"><code>tenant_policy_change</code></span>
-          <span role="cell"><code>x/tenant/</code></span>
-        </div>
-        <div class="comparison-table__row" role="row">
-          <span role="cell">Build AI streaming SSE endpoint</span>
-          <span role="cell"><code>extension_work → x/ai</code></span>
-          <span role="cell"><code>x/ai/</code></span>
-        </div>
-        <div class="comparison-table__row" role="row">
-          <span role="cell">Update allowed import directions in specs</span>
-          <span role="cell"><code>repo_rules</code></span>
-          <span role="cell"><code>specs/</code></span>
-        </div>
-      </div>
-      <p class="routing-teaser__note">The full routing table covers 10 task types. The interactive demo on the docs page lets you step through each classification.</p>
-    </div>
-    <div class="page-links" style="margin-top: 1.5rem;">
-      <a class="text-link" href="/docs/concepts/agent-first-workflow">Try the interactive routing demo →</a>
     </div>
   </section>
 
