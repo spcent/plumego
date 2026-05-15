@@ -216,7 +216,7 @@ export const ROUTING_SCENARIOS = {
   "zh": [
     {
       "id": "add_rate_limiting",
-      "chipLabel": "加入站限流",
+      "chipLabel": "加入入站限流",
       "taskDescription": "给某个入站 HTTP 端点加入限流（如 greet 路由）。",
       "ruleName": "middleware",
       "intent": "给某个入站 HTTP 端点加入限流（如 greet 路由）。",
