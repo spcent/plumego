@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-func TestLimiterNegativeMatrix_EmptyKeyFallsBackToUnknown(t *testing.T) {
+func TestLimiterNegativeMatrix_EmptyKeyFailsClosed(t *testing.T) {
 	limiter := NewLimiter(Config{
 		Rate:            1,
 		Capacity:        1,
@@ -17,18 +17,11 @@ func TestLimiterNegativeMatrix_EmptyKeyFallsBackToUnknown(t *testing.T) {
 	defer limiter.Stop()
 
 	first := limiter.Allow("")
-	if !first.Allowed {
-		t.Fatalf("first request with empty key should be allowed")
+	if first.Allowed {
+		t.Fatalf("request with empty key should be denied")
 	}
-
-	// Empty key is normalized to "unknown". The explicit "unknown" key should
-	// hit the same bucket and be rate-limited immediately.
-	second := limiter.Allow("unknown")
-	if second.Allowed {
-		t.Fatalf("expected explicit unknown key to be limited after empty-key consumption")
-	}
-	if second.RetryAfter <= 0 {
-		t.Fatalf("expected positive retry_after when request is limited")
+	if limiter.Metrics().Rejected != 1 {
+		t.Fatalf("empty key rejected metrics = %d, want 1", limiter.Metrics().Rejected)
 	}
 }
 

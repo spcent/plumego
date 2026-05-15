@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| [1425](1425-security-fail-closed-breaking-cleanup.md) | P0 | security | Remove lenient security fallbacks and make invalid auth/input/policy paths fail closed |
 | [1426](1426-log-v1-output-contract-cleanup.md) | P1 | log | Normalize logger configuration and caller/output contract before v1 freeze |
 | [1427](1427-metrics-health-v1-contract-cleanup.md) | P2 | metrics, health | Keep metrics and health contracts minimal, deleting redundant aliases or helper surfaces |
 | [1428](1428-core-v1-minimal-kernel-freeze.md) | P1 | core | Freeze core as a minimal kernel after router, middleware, and contract cleanup land |

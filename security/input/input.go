@@ -460,14 +460,6 @@ func BestEffortSanitizeHTML(s string) string {
 	return s
 }
 
-// SanitizeHTML is a legacy compatibility alias for BestEffortSanitizeHTML.
-//
-// New code should call BestEffortSanitizeHTML so the best-effort and
-// defense-in-depth limits are visible at the call site.
-func SanitizeHTML(s string) string {
-	return BestEffortSanitizeHTML(s)
-}
-
 // BestEffortSanitizeSQL applies a lossy, best-effort SQL text cleanup pass.
 //
 // WARNING: This is NOT a substitute for parameterized queries. Always use
@@ -490,14 +482,6 @@ func BestEffortSanitizeSQL(s string) string {
 	s = sqlKeywordRe.ReplaceAllString(s, "")
 
 	return s
-}
-
-// SanitizeSQL is a legacy compatibility alias for BestEffortSanitizeSQL.
-//
-// New code should call BestEffortSanitizeSQL so the best-effort and
-// defense-in-depth limits are visible at the call site.
-func SanitizeSQL(s string) string {
-	return BestEffortSanitizeSQL(s)
 }
 
 // StripControlChars removes ASCII control characters except newline and tab.

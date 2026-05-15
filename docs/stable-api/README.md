@@ -27,8 +27,8 @@ that promise explicit.
 - Checked-in snapshots match the current exported API surface for the patterns
   recorded in each snapshot file.
 - Stable root production code has no `x/*` imports.
-- Retained stable compatibility aliases, lenient constructors, and no-error
-  compatibility methods are recorded in `specs/deprecation-inventory.yaml`.
+- Retained stable compatibility paths are recorded in
+  `specs/deprecation-inventory.yaml`.
 
 ## Retained Compatibility Paths
 
@@ -37,18 +37,6 @@ future symbol-change card migrates every caller in the same change:
 
 - `contract.APIError` remains exported, but new code should construct values
   through `contract.NewErrorBuilder`.
-- `security/input.SanitizeHTML` and `security/input.SanitizeSQL` remain aliases
-  for the explicit `BestEffort*` sanitizer names.
-- `security/headers.Policy.Apply` and `security/headers.CSPBuilder.Build`
-  remain lenient compatibility paths; production startup code should prefer
-  `ApplyChecked`, `Validate`, and `BuildChecked`.
-- `security/abuse.NewLimiter` and `Limiter.Allow` remain lenient compatibility
-  paths; production startup and subject-key checks should prefer
-  `NewLimiterWithConfig` and `AllowKey`.
-- `store/cache.ErrCacheMiss` remains an alias for `ErrNotFound`.
-- `store/kv.Exists`, `Keys`, `Size`, and `GetStats` remain no-error
-  compatibility methods; new code that needs error handling should use the
-  `Context`-suffixed variants.
 
 ## Regeneration
 

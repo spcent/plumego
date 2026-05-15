@@ -47,24 +47,6 @@ entries:
       - middleware/internal/transport/http.go
       - middleware/internal/observability/helpers.go
 
-  - id: security-headers-lenient-policy-compatibility
-    category: compatibility_behavior
-    status: keep
-    owner: security
-    decision: Keep for v1. Policy.Apply and CSPBuilder.Build preserve lenient direct-application compatibility while Policy.ApplyChecked, Policy.Validate, and CSPBuilder.BuildChecked are the fail-closed production paths.
-    replacement: Policy.ApplyChecked, Policy.Validate, and CSPBuilder.BuildChecked
-    paths:
-      - security/headers/headers.go
-
-  - id: security-abuse-limiter-lenient-compatibility
-    category: compatibility_behavior
-    status: keep
-    owner: security
-    decision: Keep for v1. NewLimiter and Allow preserve historical lenient behavior while NewLimiterWithConfig and AllowKey are the strict production paths.
-    replacement: NewLimiterWithConfig and AllowKey
-    paths:
-      - security/abuse/limiter.go
-
   - id: middleware-httpmetrics-observer-alias
     category: public_alias
     status: keep
@@ -73,33 +55,6 @@ entries:
     replacement: metrics.HTTPObserver
     paths:
       - middleware/httpmetrics/http_metrics.go
-
-  - id: store-cache-miss-compatibility-alias
-    category: public_alias
-    status: keep
-    owner: persistence
-    decision: Keep for v1. store/cache is a stable package and ErrCacheMiss remains a public compatibility name for the canonical ErrNotFound sentinel.
-    replacement: ErrNotFound
-    paths:
-      - store/cache/cache.go
-
-  - id: store-kv-no-error-compatibility-methods
-    category: compatibility_behavior
-    status: keep
-    owner: persistence
-    decision: Keep for v1. Exists, Keys, Size, and GetStats collapse errors for existing callers, while the Context-suffixed methods remain the preferred error-returning path.
-    replacement: ExistsContext, KeysContext, SizeContext, and GetStatsContext
-    paths:
-      - store/kv/compat.go
-
-  - id: security-input-best-effort-sanitizer-aliases
-    category: public_alias
-    status: keep
-    owner: security
-    decision: Keep for v1 compatibility. SanitizeHTML and SanitizeSQL remain aliases while docs and snapshots steer new code to the explicit BestEffortSanitizeHTML and BestEffortSanitizeSQL names.
-    replacement: BestEffortSanitizeHTML and BestEffortSanitizeSQL
-    paths:
-      - security/input/input.go
 
   - id: x-gateway-graphql-introspection-deprecated-field
     category: protocol_literal

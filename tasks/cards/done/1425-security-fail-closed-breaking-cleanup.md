@@ -49,4 +49,24 @@ Done Definition:
 - Security tests and dependency checks pass.
 
 Outcome:
-
+- Removed security leniency retained only for compatibility:
+  - `headers.Policy.Apply` now validates first and writes no headers when the
+    policy is invalid.
+  - `headers.CSPBuilder.Build` now returns an empty header value when any
+    configured source value is invalid.
+  - `abuse.NewLimiter` now returns a disabled fail-closed limiter for invalid
+    explicit configuration instead of falling back to defaults.
+  - `abuse.Limiter.Allow` now denies empty keys instead of mapping them to the
+    shared `unknown` bucket.
+  - `input.SanitizeHTML` and `input.SanitizeSQL` legacy aliases were removed;
+    callers use the explicit `BestEffortSanitizeHTML` and
+    `BestEffortSanitizeSQL` names.
+- Updated security docs, deprecation inventory, and stable API snapshots for
+  the v1 breaking surface.
+- Validation:
+  - `go test -timeout 20s ./security/...`
+  - `go vet ./security/...`
+  - `go run ./internal/checks/dependency-rules`
+  - `go run ./internal/checks/module-manifests`
+  - `go run ./internal/checks/agent-workflow`
+  - `go build ./...`

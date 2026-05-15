@@ -206,7 +206,7 @@ func TestValidatePhone(t *testing.T) {
 	}
 }
 
-func TestSanitizeHTML(t *testing.T) {
+func TestBestEffortSanitizeHTML(t *testing.T) {
 	tests := []struct {
 		name        string
 		input       string
@@ -273,7 +273,7 @@ func TestSanitizeHTML(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := SanitizeHTML(tt.input)
+			got := BestEffortSanitizeHTML(tt.input)
 			if tt.contains != "" {
 				if !strings.Contains(got, tt.contains) {
 					t.Fatalf("expected %q to contain %q", got, tt.contains)
@@ -288,14 +288,7 @@ func TestSanitizeHTML(t *testing.T) {
 	}
 }
 
-func TestBestEffortSanitizeHTMLAlias(t *testing.T) {
-	input := `<button onclick="alert(1)">Click</button><script>alert(2)</script>`
-	if got, want := SanitizeHTML(input), BestEffortSanitizeHTML(input); got != want {
-		t.Fatalf("SanitizeHTML() = %q, want alias output %q", got, want)
-	}
-}
-
-func TestSanitizeSQL(t *testing.T) {
+func TestBestEffortSanitizeSQL(t *testing.T) {
 	tests := []struct {
 		name        string
 		input       string
@@ -315,18 +308,11 @@ func TestSanitizeSQL(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := SanitizeSQL(tt.input)
+			got := BestEffortSanitizeSQL(tt.input)
 			if strings.Contains(got, tt.notContains) {
 				t.Fatalf("expected %q not to contain %q", got, tt.notContains)
 			}
 		})
-	}
-}
-
-func TestBestEffortSanitizeSQLAlias(t *testing.T) {
-	input := "test; DROP TABLE users -- comment"
-	if got, want := SanitizeSQL(input), BestEffortSanitizeSQL(input); got != want {
-		t.Fatalf("SanitizeSQL() = %q, want alias output %q", got, want)
 	}
 }
 

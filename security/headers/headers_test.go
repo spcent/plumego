@@ -65,7 +65,7 @@ func TestStrictPolicyDoesNotTrustForwardedSSLForHSTS(t *testing.T) {
 	}
 }
 
-func TestAdditionalHeadersValidation(t *testing.T) {
+func TestPolicyApplyFailsClosedForInvalidAdditionalHeaders(t *testing.T) {
 	policy := Policy{
 		Additional: map[string]string{
 			"X-Test":       "ok",
@@ -80,8 +80,8 @@ func TestAdditionalHeadersValidation(t *testing.T) {
 	policy.Apply(w, req)
 
 	resp := w.Result()
-	if got := resp.Header.Get("X-Test"); got != "ok" {
-		t.Fatalf("expected X-Test to be set, got %q", got)
+	if got := resp.Header.Get("X-Test"); got != "" {
+		t.Fatalf("expected X-Test not to be written for invalid policy, got %q", got)
 	}
 	if got := resp.Header.Get("Bad Header"); got != "" {
 		t.Fatalf("expected invalid header name to be skipped")
@@ -89,12 +89,12 @@ func TestAdditionalHeadersValidation(t *testing.T) {
 	if got := resp.Header.Get("X-Injected"); got != "" {
 		t.Fatalf("expected invalid header value to be skipped")
 	}
-	if got := resp.Header.Get("X-Also-Valid"); got != "still-ok" {
-		t.Fatalf("expected X-Also-Valid to be set, got %q", got)
+	if got := resp.Header.Get("X-Also-Valid"); got != "" {
+		t.Fatalf("expected X-Also-Valid not to be written for invalid policy, got %q", got)
 	}
 }
 
-func TestPolicyApplySkipsUnsupportedStandardHeaderValues(t *testing.T) {
+func TestPolicyApplyFailsClosedForUnsupportedStandardHeaderValues(t *testing.T) {
 	policy := Policy{
 		FrameOptions:              "ALLOWALL",
 		ContentTypeOptions:        "sniff",
@@ -118,22 +118,16 @@ func TestPolicyApplySkipsUnsupportedStandardHeaderValues(t *testing.T) {
 		"X-Frame-Options",
 		"X-Content-Type-Options",
 		"Referrer-Policy",
+		"Permissions-Policy",
+		"Content-Security-Policy",
 		"Cross-Origin-Opener-Policy",
 		"Cross-Origin-Resource-Policy",
 		"Cross-Origin-Embedder-Policy",
+		"X-Trace-Mode",
 	} {
 		if got := resp.Header.Get(name); got != "" {
-			t.Fatalf("expected unsupported %s value to be skipped, got %q", name, got)
+			t.Fatalf("expected %s not to be written for invalid policy, got %q", name, got)
 		}
-	}
-	if got := resp.Header.Get("Permissions-Policy"); got != "geolocation=()" {
-		t.Fatalf("expected valid Permissions-Policy to be preserved, got %q", got)
-	}
-	if got := resp.Header.Get("Content-Security-Policy"); got != "default-src 'self'" {
-		t.Fatalf("expected valid CSP to be preserved, got %q", got)
-	}
-	if got := resp.Header.Get("X-Trace-Mode"); got != "sampled" {
-		t.Fatalf("expected valid additional header to be preserved, got %q", got)
 	}
 }
 
@@ -320,7 +314,7 @@ func TestCSPBuilder(t *testing.T) {
 			expected: "",
 		},
 		{
-			name: "drops directive injection values",
+			name: "fails closed on directive injection values",
 			build: func() string {
 				return NewCSPBuilder().
 					DefaultSrc("'self'", "'none'; script-src *").
@@ -329,10 +323,10 @@ func TestCSPBuilder(t *testing.T) {
 					Sandbox("allow-scripts", "allow-forms; allow-same-origin").
 					Build()
 			},
-			expected: "default-src 'self'; script-src https://cdn.example.com; report-uri /csp-report; sandbox allow-scripts",
+			expected: "",
 		},
 		{
-			name: "drops directive with only unsafe values",
+			name: "fails closed on directive with only unsafe values",
 			build: func() string {
 				return NewCSPBuilder().
 					DefaultSrc("'none'; script-src *").
@@ -340,7 +334,7 @@ func TestCSPBuilder(t *testing.T) {
 					UpgradeInsecureRequests().
 					Build()
 			},
-			expected: "upgrade-insecure-requests",
+			expected: "",
 		},
 	}
 
@@ -398,9 +392,8 @@ func TestCSPBuilderBuildCheckedRejectsDroppedSources(t *testing.T) {
 		ScriptSrc("https://cdn.example.com", "bad\nvalue")
 
 	csp := builder.Build()
-	wantCompat := "default-src 'self'; script-src https://cdn.example.com"
-	if csp != wantCompat {
-		t.Fatalf("Build compatibility output = %q, want %q", csp, wantCompat)
+	if csp != "" {
+		t.Fatalf("Build output = %q, want empty fail-closed output", csp)
 	}
 
 	if _, err := builder.BuildChecked(); !errors.Is(err, ErrInvalidPolicy) {
