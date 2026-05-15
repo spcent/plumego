@@ -2,6 +2,8 @@
 import FinalCta from '../../components/home/FinalCta.astro';
 import Hero from '../../components/home/Hero.astro';
 import MinimalExample from '../../components/home/MinimalExample.astro';
+import ScenarioCards from '../../components/home/ScenarioCards.astro';
+import StabilityBand from '../../components/home/StabilityBand.astro';
 import ValueProps from '../../components/home/ValueProps.astro';
 import WiringContrast from '../../components/home/WiringContrast.astro';
 import MarketingLayout from '../../layouts/MarketingLayout.astro';
@@ -12,8 +14,8 @@ const copy = HOME_COPY.zh;
 
 <MarketingLayout
   locale="zh"
-  title="显式设计。结构化 Agent 就绪。"
-  description="stdlib only 的 Go HTTP 工具包——路由、中间件和 ownership 留在代码里，也留在机器可读规范里，适合工程师与 AI Agent 共同评审每一次改动的团队。"
+  title="不挡你路的 Go HTTP 工具包。"
+  description="零外部依赖。9 个稳定模块，API 向 v1 冻结。代码评审里清晰可见的显式路由。从一个参考应用起步——只在边界清晰时向外扩展。"
   currentPath="/zh"
 >
   <Hero copy={copy} />
@@ -22,7 +24,7 @@ const copy = HOME_COPY.zh;
     <div class="quick-spec-strip__inner">
       <span class="quick-spec-item"><code>go 1.24+</code></span>
       <span class="quick-spec-sep" aria-hidden="true">/</span>
-      <span class="quick-spec-item"><code>stdlib</code> only 内核</span>
+      <span class="quick-spec-item">零外部依赖</span>
       <span class="quick-spec-sep" aria-hidden="true">/</span>
       <span class="quick-spec-item"><code>9</code> 个稳定模块</span>
       <span class="quick-spec-sep" aria-hidden="true">/</span>
@@ -30,14 +32,21 @@ const copy = HOME_COPY.zh;
       <span class="quick-spec-sep" aria-hidden="true">/</span>
       <span class="quick-spec-item">MIT</span>
       <span class="quick-spec-sep" aria-hidden="true">/</span>
-      <span class="quick-spec-item quick-spec-item--pre">pre-v1</span>
-      <span class="quick-spec-sep" aria-hidden="true">/</span>
-      <a class="quick-spec-link" href="/zh/releases">发布矩阵 →</a>
+      <a class="quick-spec-link quick-spec-item--pre" href="/zh/stability">pre-v1 · 哪些已经稳定？ →</a>
     </div>
   </section>
 
+  <ScenarioCards cards={copy.scenarioCards} />
+
   <MinimalExample locale="zh" />
   <WiringContrast copy={copy} />
+
+  <StabilityBand
+    title={copy.stabilityBandTitle}
+    items={copy.stabilityBandItems}
+    cta={copy.stabilityBandCta}
+  />
+
   <ValueProps copy={copy} />
 
   <section class="section entry-points-section">

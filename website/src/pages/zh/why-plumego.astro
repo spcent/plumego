@@ -6,7 +6,7 @@ import MarketingLayout from '../../layouts/MarketingLayout.astro';
 const journeySteps = [
   { label: '为什么选择', href: '/zh/why-plumego' },
   { label: '示例', href: '/zh/examples' },
-  { label: '发布', href: '/zh/releases' },
+  { label: '稳定性', href: '/zh/stability' },
 ];
 
 const guideCards = [
@@ -174,6 +174,41 @@ const frameworkRows = [
   />
 
   <JourneyBar steps={journeySteps} current="/zh/why-plumego" />
+
+  <!-- Agent-first callout — 独特差异化能力，在页面顶部突出展示 -->
+  <section class="section agent-first-callout">
+    <div class="agent-first-callout__inner">
+      <div class="agent-first-callout__badge">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <rect x="2" y="2" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.5"/>
+          <rect x="9" y="2" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.5"/>
+          <rect x="2" y="9" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.5"/>
+          <rect x="9" y="9" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.5"/>
+        </svg>
+        Agent 就绪
+      </div>
+      <h2 class="agent-first-callout__title">专为使用 AI 编码工具的团队设计。</h2>
+      <p class="agent-first-callout__body">
+        Plumego 是第一个让 AI 编码助手（Claude、Copilot、Cursor）在动手写代码之前就能精确定位变更归属的 Go HTTP 工具包。
+        机器可读规范、每模块 manifest 和显式边界规则，让 Agent 拥有和资深 reviewer 相同的任务路由信号。
+      </p>
+      <div class="agent-first-callout__points">
+        <div class="agent-first-callout__point">
+          <code>specs/task-routing.yaml</code>
+          <span>将任务类型映射到所属模块</span>
+        </div>
+        <div class="agent-first-callout__point">
+          <code>specs/dependency-rules.yaml</code>
+          <span>阻止 Agent 越过稳定根边界</span>
+        </div>
+        <div class="agent-first-callout__point">
+          <code>AGENTS.md</code>
+          <span>定义人类与 AI 协作的共享协议</span>
+        </div>
+      </div>
+      <a class="text-link" href="/zh/docs/concepts/agent-first-workflow">查看交互式任务路由演示 →</a>
+    </div>
+  </section>
 
   <!-- 术语定义：Plumego 专有术语（CONTENT_RULES Rule 4） -->
   <section class="section section--tinted">
@@ -435,7 +470,93 @@ const frameworkRows = [
     </div>
     <div class="page-links">
       <a class="text-link" href="/zh/architecture">打开架构页</a>
+      <a class="text-link" href="/zh/stability">查看模块稳定性</a>
       <a class="text-link" href="/zh/docs/getting-started">开始实现</a>
     </div>
   </section>
 </MarketingLayout>
+
+<style>
+  .agent-first-callout {
+    padding-block: 2rem;
+  }
+
+  .agent-first-callout__inner {
+    max-width: 56rem;
+    margin-inline: auto;
+    background: var(--bg-elevated);
+    border: 1px solid var(--line);
+    border-left: 4px solid var(--accent);
+    border-radius: 0.75rem;
+    padding: 1.75rem 2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+  }
+
+  .agent-first-callout__badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--accent-strong);
+    background: var(--accent-soft);
+    padding: 0.22rem 0.6rem;
+    border-radius: 0.3rem;
+    width: fit-content;
+  }
+
+  :root[data-theme="dark"] .agent-first-callout__badge {
+    color: var(--accent);
+  }
+
+  .agent-first-callout__title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    margin: 0;
+    letter-spacing: -0.02em;
+    color: var(--fg);
+    line-height: 1.3;
+  }
+
+  .agent-first-callout__body {
+    font-size: 0.9rem;
+    color: var(--fg-soft);
+    line-height: 1.65;
+    margin: 0;
+    max-width: 46rem;
+  }
+
+  .agent-first-callout__points {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    margin-top: 0.25rem;
+  }
+
+  .agent-first-callout__point {
+    display: flex;
+    align-items: baseline;
+    gap: 0.65rem;
+    font-size: 0.86rem;
+  }
+
+  .agent-first-callout__point code {
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    color: var(--accent);
+    background: var(--accent-soft);
+    padding: 0.1rem 0.4rem;
+    border-radius: 0.25rem;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .agent-first-callout__point span {
+    color: var(--fg-soft);
+    line-height: 1.5;
+  }
+</style>

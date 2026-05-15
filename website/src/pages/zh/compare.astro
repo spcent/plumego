@@ -1,0 +1,1019 @@
+---
+import MarketingLayout from '../../layouts/MarketingLayout.astro';
+import PageHero from '../../components/marketing/PageHero.astro';
+
+interface Framework {
+  id: string;
+  name: string;
+  tagline: string;
+  handlerSig: string;
+  stdlibHandler: boolean;
+  zeroDeps: boolean;
+  responseContract: boolean;
+  canonicalShape: boolean;
+  middlewareStdlib: boolean;
+  agentReady: boolean;
+  stabilityModel: boolean;
+  stars: string;
+  verdict: string;
+  whenToChoose: string[];
+  whenNotToChoose: string[];
+  color: string;
+  isPlumego?: boolean;
+  warning?: string;
+}
+
+const frameworks: Framework[] = [
+  {
+    id: 'gin',
+    name: 'Gin',
+    tagline: 'Martini 风格路由器，基数树路由',
+    handlerSig: 'func(c *gin.Context)',
+    stdlibHandler: false,
+    zeroDeps: false,
+    responseContract: false,
+    canonicalShape: false,
+    middlewareStdlib: false,
+    agentReady: false,
+    stabilityModel: false,
+    stars: '~80k',
+    verdict: '对于接受自定义 context 类型的团队，是最快上手的选择。生态丰富。很多 Go 团队的默认选项。',
+    whenToChoose: [
+      '需要最快速度跑起一个 API',
+      '需要认证、限流等大量插件生态',
+      '团队已经熟悉 gin.Context 及其权衡',
+      '已有大量 Gin 代码，切换成本太高',
+    ],
+    whenNotToChoose: [
+      '需要 handler 保持 func(w, r) 形式，让已有 stdlib 中间件无需适配器就能工作',
+      '希望在代码评审里直接看到路由归属和中间件顺序，而不需要翻框架源码',
+      '需要跨所有 handler 一致的结构化错误与响应封装',
+    ],
+    color: '#00b4d8',
+  },
+  {
+    id: 'echo',
+    name: 'Echo',
+    tagline: '高性能极简 Web 框架',
+    handlerSig: 'func(c echo.Context) error',
+    stdlibHandler: false,
+    zeroDeps: false,
+    responseContract: false,
+    canonicalShape: false,
+    middlewareStdlib: false,
+    agentReady: false,
+    stabilityModel: false,
+    stars: '~30k',
+    verdict: 'API 整洁，中间件生态不错，handler 里 return error 的设计符合 Go 习惯。自定义 context 的权衡可以接受时，是个扎实的选择。',
+    whenToChoose: [
+      '更喜欢从 handler 返回 error 而不是直接写 w',
+      '需要文档清晰、中间件支持好的框架',
+      '团队欣赏路由分组和内置 binder/validator',
+    ],
+    whenNotToChoose: [
+      '需要纯 net/http 兼容——echo.Context 破坏了中间件复用',
+      '需要统一的 JSON 响应封装——Echo 把响应格式留给你自己决定',
+      '需要跨多个团队共用一套规范服务骨架',
+    ],
+    color: '#6c63ff',
+  },
+  {
+    id: 'fiber',
+    name: 'Fiber',
+    tagline: 'Express 风格，基于 Fasthttp',
+    handlerSig: 'func(c *fiber.Ctx) error',
+    stdlibHandler: false,
+    zeroDeps: false,
+    responseContract: false,
+    canonicalShape: false,
+    middlewareStdlib: false,
+    agentReady: false,
+    stabilityModel: false,
+    stars: '~34k',
+    verdict: '基准测试吞吐量最高。代价是与 net/http 完全不兼容——没有 stdlib 中间件、没有 net/http handler、没有标准库生态。',
+    whenToChoose: [
+      '原始 HTTP 吞吐量是主要瓶颈，且你有基准数据证明',
+      '从零新建服务，没有任何需要集成的 net/http 中间件',
+      '团队有 Fasthttp 经验，清楚这个不兼容性的权衡',
+    ],
+    whenNotToChoose: [
+      '有任何 net/http 中间件、handler 或工具——一个都用不了',
+      '使用基于 net/http 的可观测性、链路追踪或认证库',
+      '团队以 Go 标准库为中心，期望标准库兼容性',
+    ],
+    color: '#00d4aa',
+    warning: 'Fiber 使用 Fasthttp，不是 net/http。与 Go 标准库 HTTP 生态完全不兼容。',
+  },
+  {
+    id: 'chi',
+    name: 'Chi',
+    tagline: '轻量惯用的 Go HTTP 服务路由器',
+    handlerSig: 'func(w http.ResponseWriter, r *http.Request)',
+    stdlibHandler: true,
+    zeroDeps: true,
+    responseContract: false,
+    canonicalShape: false,
+    middlewareStdlib: true,
+    agentReady: false,
+    stabilityModel: false,
+    stars: '~18k',
+    verdict: '极简主义者的选择。纯 stdlib，对响应格式、服务结构或模块稳定性零主张。如果你想自己搭建所有东西，Chi 是合适的起点。',
+    whenToChoose: [
+      '只需要路由——愿意自己实现响应封装、中间件和安全层',
+      '需要纯 stdlib 兼容，不想要任何框架结构主张',
+      '团队偏好最大灵活性，愿意自己构建维护周边层',
+    ],
+    whenNotToChoose: [
+      '需要跨 handler 一致的响应封装，但不想自己实现',
+      '需要快速上手的规范服务结构',
+      '需要每个模块单独的成熟度信号',
+    ],
+    color: '#f59e0b',
+  },
+  {
+    id: 'plumego',
+    name: 'Plumego',
+    tagline: '显式 HTTP 工具包 — stdlib only，Agent 就绪，pre-v1',
+    handlerSig: 'func(w http.ResponseWriter, r *http.Request)',
+    stdlibHandler: true,
+    zeroDeps: true,
+    responseContract: true,
+    canonicalShape: true,
+    middlewareStdlib: true,
+    agentReady: true,
+    stabilityModel: true,
+    stars: 'pre-v1',
+    verdict: '适合那些更看重路由 ownership、评审清晰度和共享服务骨架的团队，而不是框架便利性。如果团队在使用 AI 编码工具，这是唯一有机器可读 ownership 信号的选择。',
+    whenToChoose: [
+      '路由注册、中间件顺序和依赖 wiring 必须在代码评审里清晰可见',
+      '多个服务需要从同一个规范骨架起步，而不是各自发明 bootstrap',
+      '使用 AI 编码助手，需要明确的机器可读规则来定位变更归属',
+      '需要区分稳定模块和实验性能力工作',
+    ],
+    whenNotToChoose: [
+      '希望框架隐藏结构决策——Plumego 刻意保持显式',
+      '已有大量 Gin/Echo 代码，迁移成本超过收益',
+      '需要经过验证的 v1+ 版本和长期使用记录',
+      '服务是小脚本或短生命周期工具，结构开销不划算',
+    ],
+    isPlumego: true,
+    color: 'var(--accent)',
+  },
+];
+
+const matrixRows = [
+  {
+    feature: 'stdlib handler 签名',
+    note: 'func(w http.ResponseWriter, r *http.Request)',
+    values: { gin: false, echo: false, fiber: false, chi: true, plumego: true },
+  },
+  {
+    feature: 'net/http 中间件复用',
+    note: '已有 stdlib 中间件无需适配器',
+    values: { gin: false, echo: false, fiber: false, chi: true, plumego: true },
+  },
+  {
+    feature: '零外部依赖',
+    note: '稳定内核仅用 Go 标准库',
+    values: { gin: false, echo: false, fiber: false, chi: true, plumego: true },
+  },
+  {
+    feature: '内置响应 contract',
+    note: '成功与错误响应的类型化 JSON 封装',
+    values: { gin: false, echo: false, fiber: false, chi: false, plumego: true },
+  },
+  {
+    feature: '规范服务骨架',
+    note: 'bootstrap、路由和 handler 布局的参考应用',
+    values: { gin: false, echo: false, fiber: false, chi: false, plumego: true },
+  },
+  {
+    feature: '显式模块稳定性层级',
+    note: 'stable / beta / experimental 标签与采用指南',
+    values: { gin: false, echo: false, fiber: false, chi: false, plumego: true },
+  },
+  {
+    feature: 'AI / Agent 就绪控制面',
+    note: '机器可读规范、任务路由、边界检查',
+    values: { gin: false, echo: false, fiber: false, chi: false, plumego: true },
+  },
+] as const;
+
+type FwId = 'gin' | 'echo' | 'fiber' | 'chi' | 'plumego';
+const fwIds: FwId[] = ['gin', 'echo', 'fiber', 'chi', 'plumego'];
+---
+
+<MarketingLayout
+  locale="zh"
+  title="Go HTTP 框架横向对比：Gin、Echo、Fiber、Chi、Plumego"
+  description="五款最常用 Go HTTP 工具包的诚实技术对比。Handler 签名、响应 contract、stdlib 兼容性，以及各自不该选择的场景。"
+  currentPath="/zh/compare"
+  keywords={['go web 框架对比', 'gin vs echo', 'fiber vs chi', 'plumego 对比', 'go http 工具包']}
+>
+  <PageHero
+    eyebrow="框架对比"
+    title="Go HTTP 工具包"
+    description="Gin、Echo、Fiber、Chi 和 Plumego——每个框架放弃了什么，换来了什么。这页是决策辅助工具，不是基准测试排行榜。"
+    visual="decision"
+    links={[
+      { label: '为什么选择 Plumego', href: '/zh/why-plumego' },
+      { label: '稳定性', href: '/zh/stability' },
+      { label: '开始使用', href: '/zh/docs/getting-started' },
+    ]}
+  />
+
+  <!-- 30 秒快速结论 -->
+  <section class="section">
+    <div class="section__intro">
+      <h2>30 秒快速结论。</h2>
+      <p>
+        五个工具包都针对 Go HTTP 服务。差异在于设计哲学和使用范围，而不是在典型请求量下的原始性能。
+        先看结论一行，再跟着符合你团队实际约束的深度分析走。
+      </p>
+    </div>
+
+    <div class="verdict-grid">
+      {frameworks.map((fw) => (
+        <article class={`verdict-card ${fw.isPlumego ? 'verdict-card--highlight' : ''}`}>
+          {fw.warning && (
+            <div class="verdict-warning">
+              <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                <path d="M8 2L14.5 13H1.5L8 2Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+                <path d="M8 6v4M8 11.5v.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+              </svg>
+              {fw.warning}
+            </div>
+          )}
+          <div class="verdict-card__header">
+            <h3 class="verdict-card__name">{fw.name}</h3>
+            <span class="verdict-card__stars">{fw.stars} ★</span>
+          </div>
+          <p class="verdict-card__tagline">{fw.tagline}</p>
+          <p class="verdict-card__verdict">{fw.verdict}</p>
+          <code class="verdict-card__sig">{fw.handlerSig}</code>
+        </article>
+      ))}
+    </div>
+  </section>
+
+  <!-- 特性矩阵 -->
+  <section class="section section--tinted">
+    <div class="section__intro">
+      <h2>特性矩阵。</h2>
+      <p>
+        横向阅读一行，对比所有五个工具包的同一属性。矩阵不涵盖生态大小、社区活跃度或原始性能——这些取决于你的基准。它捕捉的是不随负载变化的结构性权衡。
+      </p>
+    </div>
+
+    <div class="matrix-wrap">
+      <table class="matrix-table" role="table">
+        <thead>
+          <tr>
+            <th class="matrix-table__feature-col">属性</th>
+            {frameworks.map((fw) => (
+              <th class={fw.isPlumego ? 'matrix-table__fw-col matrix-table__fw-col--highlight' : 'matrix-table__fw-col'}>
+                {fw.name}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {matrixRows.map((row) => (
+            <tr>
+              <td class="matrix-table__feature">
+                <strong>{row.feature}</strong>
+                <span class="matrix-table__note">{row.note}</span>
+              </td>
+              {fwIds.map((id) => {
+                const val = row.values[id];
+                const isPlumego = id === 'plumego';
+                return (
+                  <td class={`matrix-table__cell ${isPlumego ? 'matrix-table__cell--highlight' : ''}`}>
+                    {val ? (
+                      <svg class="matrix-icon matrix-icon--yes" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-label="是">
+                        <circle cx="8" cy="8" r="7" fill="color-mix(in srgb, currentColor 12%, transparent)" stroke="currentColor" stroke-width="1.4"/>
+                        <path d="M4.5 8l2.5 2.5L11.5 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                      </svg>
+                    ) : (
+                      <svg class="matrix-icon matrix-icon--no" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-label="否">
+                        <circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.4" stroke-dasharray="3 2"/>
+                        <path d="M10.5 5.5l-5 5M5.5 5.5l5 5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+                      </svg>
+                    )}
+                  </td>
+                );
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+
+    <p class="matrix-note">
+      Fiber 与 net/http 的不兼容性不是缺失的功能——这是换取更高吞吐量的刻意架构取舍。参见 Fiber 深度分析，了解这个权衡什么时候值得做。
+    </p>
+  </section>
+
+  <!-- Handler 签名对比 -->
+  <section class="section">
+    <div class="section__intro">
+      <h2>Handler 签名是最关键的选择。</h2>
+      <p>
+        自定义 context 类型（Gin、Echo、Fiber）破坏了与已有 net/http 中间件生态的兼容性。
+        采用这些框架后，每个 stdlib 中间件都需要适配器。用 Chi 和 Plumego，整个 net/http 世界都能直接使用。
+      </p>
+    </div>
+
+    <div class="code-compare-grid">
+      <div class="code-compare-item">
+        <div class="code-compare-item__header">
+          <span class="code-compare-item__fw">Gin</span>
+          <span class="compat-badge compat-badge--no">自定义 context</span>
+        </div>
+        <div class="hero-code">
+          <div class="hero-code__bar">
+            <span class="hero-code__dots"><span></span><span></span><span></span></span>
+            <span class="hero-code__filename">handler.go</span>
+          </div>
+          <pre class="hero-code__pre"><code><span class="hc-cm">// gin.Context — net/http 中间件需要适配器</span>
+r.<span class="hc-fn">GET</span>(<span class="hc-str">"/users/:id"</span>, <span class="hc-kw">func</span>(c *gin.Context) &#123;
+    id := c.<span class="hc-fn">Param</span>(<span class="hc-str">"id"</span>)
+    c.<span class="hc-fn">JSON</span>(http.StatusOK, gin.H&#123;<span class="hc-str">"id"</span>: id&#125;)
+&#125;)
+<span class="hc-cm">// 复用 net/http 中间件需要：</span>
+r.<span class="hc-fn">Use</span>(gin.<span class="hc-fn">WrapH</span>(myStdlibMiddleware))</code></pre>
+        </div>
+      </div>
+
+      <div class="code-compare-item">
+        <div class="code-compare-item__header">
+          <span class="code-compare-item__fw">Echo</span>
+          <span class="compat-badge compat-badge--no">自定义 context</span>
+        </div>
+        <div class="hero-code">
+          <div class="hero-code__bar">
+            <span class="hero-code__dots"><span></span><span></span><span></span></span>
+            <span class="hero-code__filename">handler.go</span>
+          </div>
+          <pre class="hero-code__pre"><code><span class="hc-cm">// echo.Context + error 返回值</span>
+e.<span class="hc-fn">GET</span>(<span class="hc-str">"/users/:id"</span>, <span class="hc-kw">func</span>(c echo.Context) error &#123;
+    id := c.<span class="hc-fn">Param</span>(<span class="hc-str">"id"</span>)
+    <span class="hc-kw">return</span> c.<span class="hc-fn">JSON</span>(http.StatusOK,
+        map[string]any&#123;<span class="hc-str">"id"</span>: id&#125;)
+&#125;)</code></pre>
+        </div>
+      </div>
+
+      <div class="code-compare-item">
+        <div class="code-compare-item__header">
+          <span class="code-compare-item__fw">Fiber</span>
+          <span class="compat-badge compat-badge--warn">fasthttp — 非 net/http</span>
+        </div>
+        <div class="hero-code">
+          <div class="hero-code__bar">
+            <span class="hero-code__dots"><span></span><span></span><span></span></span>
+            <span class="hero-code__filename">handler.go</span>
+          </div>
+          <pre class="hero-code__pre"><code><span class="hc-cm">// fasthttp — 与 net/http 完全不兼容</span>
+<span class="hc-cm">// 零个 net/http 中间件可以复用</span>
+app.<span class="hc-fn">Get</span>(<span class="hc-str">"/users/:id"</span>, <span class="hc-kw">func</span>(c *fiber.Ctx) error &#123;
+    id := c.<span class="hc-fn">Params</span>(<span class="hc-str">"id"</span>)
+    <span class="hc-kw">return</span> c.<span class="hc-fn">JSON</span>(fiber.Map&#123;<span class="hc-str">"id"</span>: id&#125;)
+&#125;)</code></pre>
+        </div>
+      </div>
+
+      <div class="code-compare-item">
+        <div class="code-compare-item__header">
+          <span class="code-compare-item__fw">Chi</span>
+          <span class="compat-badge compat-badge--yes">stdlib handler</span>
+        </div>
+        <div class="hero-code">
+          <div class="hero-code__bar">
+            <span class="hero-code__dots"><span></span><span></span><span></span></span>
+            <span class="hero-code__filename">handler.go</span>
+          </div>
+          <pre class="hero-code__pre"><code><span class="hc-cm">// 纯 stdlib — 但没有响应 contract</span>
+r.<span class="hc-fn">Get</span>(<span class="hc-str">"/users/&#123;id&#125;"</span>, <span class="hc-kw">func</span>(w http.ResponseWriter, r *http.Request) &#123;
+    id := chi.<span class="hc-fn">URLParam</span>(r, <span class="hc-str">"id"</span>)
+    <span class="hc-cm">// 每次都要自己构建 JSON 响应格式</span>
+    json.<span class="hc-fn">NewEncoder</span>(w).<span class="hc-fn">Encode</span>(map[string]any&#123;<span class="hc-str">"id"</span>: id&#125;)
+&#125;)</code></pre>
+        </div>
+      </div>
+
+      <div class="code-compare-item code-compare-item--highlight">
+        <div class="code-compare-item__header">
+          <span class="code-compare-item__fw">Plumego</span>
+          <span class="compat-badge compat-badge--yes">stdlib handler + contract</span>
+        </div>
+        <div class="hero-code hero-code--canonical">
+          <div class="hero-code__bar">
+            <span class="hero-code__dots"><span></span><span></span><span></span></span>
+            <span class="hero-code__filename">internal/handler/users.go</span>
+          </div>
+          <pre class="hero-code__pre"><code><span class="hc-cm">// stdlib 签名 + 类型化响应 contract</span>
+r.<span class="hc-fn">Get</span>(<span class="hc-str">"/users/:id"</span>, <span class="hc-kw">func</span>(w http.ResponseWriter, r *http.Request) &#123;
+    id := router.<span class="hc-fn">Param</span>(r, <span class="hc-str">"id"</span>)
+    contract.<span class="hc-fn">WriteResponse</span>(w, r, http.StatusOK, user, <span class="hc-kw">nil</span>)
+    <span class="hc-cm">// → &#123;"data": &#123;...&#125;, "meta": null&#125;</span>
+&#125;)
+
+<span class="hc-cm">// 所有 net/http 中间件直接可用</span>
+r.<span class="hc-fn">Use</span>(middleware.RequestID)
+r.<span class="hc-fn">Use</span>(myOtelMiddleware)</code></pre>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 响应 contract 对比 -->
+  <section class="section section--tinted">
+    <div class="section__intro">
+      <h2>响应 contract：统一封装 vs. 自己构建。</h2>
+      <p>
+        Gin、Echo、Fiber 和 Chi 都把 JSON 响应格式留给你决定。这意味着每个团队、每个 handler 或每个项目的响应格式可能都微妙不同。
+        Plumego 的 <code>contract</code> 模块对成功和错误响应强制执行同一个封装。
+      </p>
+    </div>
+
+    <div class="contract-compare">
+      <div class="contract-panel contract-panel--before">
+        <p class="contract-panel__label">Gin / Echo / Fiber / Chi — 各自决定格式</p>
+        <div class="hero-code">
+          <div class="hero-code__bar">
+            <span class="hero-code__dots"><span></span><span></span><span></span></span>
+            <span class="hero-code__filename">handler.go</span>
+          </div>
+          <pre class="hero-code__pre"><code><span class="hc-cm">// 成功响应 — 每个团队格式不同</span>
+c.<span class="hc-fn">JSON</span>(200, gin.H&#123;
+    <span class="hc-str">"data"</span>:    user,
+    <span class="hc-str">"success"</span>: <span class="hc-kw">true</span>,   <span class="hc-cm">// 有些团队加</span>
+    <span class="hc-str">"code"</span>:    0,          <span class="hc-cm">// 有些团队加</span>
+&#125;)
+
+<span class="hc-cm">// 错误响应 — 更加不一致</span>
+c.<span class="hc-fn">JSON</span>(400, gin.H&#123;
+    <span class="hc-str">"error"</span>:   <span class="hc-str">"name required"</span>,
+    <span class="hc-str">"message"</span>: <span class="hc-str">"..."</span>,  <span class="hc-cm">// 重复？缺失？</span>
+    <span class="hc-str">"code"</span>:    1001,
+&#125;)</code></pre>
+        </div>
+      </div>
+
+      <div class="contract-panel contract-panel--after">
+        <p class="contract-panel__label">Plumego — 所有 handler 共用一套 contract</p>
+        <div class="hero-code hero-code--canonical">
+          <div class="hero-code__bar">
+            <span class="hero-code__dots"><span></span><span></span><span></span></span>
+            <span class="hero-code__filename">internal/handler/users.go</span>
+          </div>
+          <pre class="hero-code__pre"><code><span class="hc-cm">// 成功 — 始终是 &#123;"data": ..., "meta": ...&#125;</span>
+contract.<span class="hc-fn">WriteResponse</span>(w, r, 200, user, <span class="hc-kw">nil</span>)
+
+<span class="hc-cm">// 错误 — 始终是 &#123;"error": &#123;"type": ..., "message": ...&#125;&#125;</span>
+contract.<span class="hc-fn">WriteError</span>(w, r,
+    contract.<span class="hc-fn">NewErrorBuilder</span>().
+        <span class="hc-fn">Type</span>(contract.TypeRequired).
+        <span class="hc-fn">Field</span>(<span class="hc-str">"name"</span>).
+        <span class="hc-fn">Message</span>(<span class="hc-str">"name 是必填项"</span>).
+        <span class="hc-fn">Build</span>())
+
+<span class="hc-cm">// 每个 handler、每个服务的封装都一致</span></code></pre>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 决策表 -->
+  <section class="section">
+    <div class="section__intro">
+      <h2>各框架的选择指南。</h2>
+      <p>
+        下表不是为了评出胜者。每行回答两个问题：这个框架擅长什么，以及什么情况下应该暂停考虑。
+        「什么时候不该选 Plumego」的诚实回答在最后。
+      </p>
+    </div>
+
+    <div class="comparison-table" role="table" aria-label="框架决策指南">
+      <div class="comparison-table__head" role="row">
+        <span role="columnheader">框架</span>
+        <span role="columnheader">
+          <svg class="comparison-cell-icon comparison-cell-icon--fit" width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <path d="M3 8l3.5 3.5L13 4" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          选择场景
+        </span>
+        <span role="columnheader">
+          <svg class="comparison-cell-icon comparison-cell-icon--caution" width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <path d="M8 3v6M8 11.5v1" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+          </svg>
+          暂停场景
+        </span>
+      </div>
+      {frameworks.map((fw) => (
+        <div class={`comparison-table__row ${fw.isPlumego ? 'comparison-table__row--highlight' : ''}`} role="row">
+          <strong role="cell">
+            {fw.name}
+            {fw.isPlumego && <span class="plumego-star" aria-label="本页框架">★</span>}
+            {fw.warning && <span class="fw-warning-chip" title={fw.warning}>⚠ fasthttp</span>}
+          </strong>
+          <ul class="fw-points" role="cell">
+            {fw.whenToChoose.map((point) => (
+              <li>
+                <svg class="comparison-cell-icon comparison-cell-icon--fit" width="11" height="11" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                  <path d="M3 8l3.5 3.5L13 4" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                {point}
+              </li>
+            ))}
+          </ul>
+          <ul class="fw-points" role="cell">
+            {fw.whenNotToChoose.map((point) => (
+              <li>
+                <svg class="comparison-cell-icon comparison-cell-icon--caution" width="11" height="11" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                  <path d="M8 3v6M8 11.5v1" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+                </svg>
+                {point}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
+    </div>
+  </section>
+
+  <!-- 不该选 Plumego 的场景 -->
+  <section class="section section--tinted">
+    <div class="section__intro">
+      <h2>什么时候不该选 Plumego。</h2>
+      <p>
+        这一节是 Plumego 自己的内容规则要求的。诚实的对比必须包含框架不合适的场景——不只是它赢的地方。
+      </p>
+    </div>
+    <div class="control-grid">
+      <article class="control-grid__item">
+        <p class="signal-list__kicker">
+          <svg class="comparison-cell-icon comparison-cell-icon--caution" width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <path d="M8 3v6M8 11.5v1" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+          </svg>
+          约定优先的团队
+        </p>
+        <h3>你希望框架替你管理结构</h3>
+        <p>
+          Plumego 把路由注册、中间件顺序和依赖 wiring 都明确地留在你的代码里。
+          如果团队更希望框架隐式管理结构，显式模型只会增加摩擦而没有额外价值。选 Gin 或 Echo 会更高效。
+        </p>
+      </article>
+      <article class="control-grid__item">
+        <p class="signal-list__kicker">
+          <svg class="comparison-cell-icon comparison-cell-icon--caution" width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <path d="M8 3v6M8 11.5v1" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+          </svg>
+          已有大型代码库
+        </p>
+        <h3>团队已经有大量 Gin/Echo 服务</h3>
+        <p>
+          把成熟的 Gin 或 Echo 服务迁移到 Plumego，需要把所有 handler 从自定义 context 改成 net/http 签名。
+          如果服务运行正常、团队工作顺畅，这个迁移成本几乎不值得。留在你已有的框架上。
+        </p>
+      </article>
+      <article class="control-grid__item">
+        <p class="signal-list__kicker">
+          <svg class="comparison-cell-icon comparison-cell-icon--caution" width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <path d="M8 3v6M8 11.5v1" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+          </svg>
+          最大吞吐量
+        </p>
+        <h3>原始 HTTP 吞吐量是你的主要瓶颈</h3>
+        <p>
+          Plumego 使用 net/http 兼容的 trie 路由器，开销极小但不为零，比 Fiber 的 Fasthttp 基线多一点。
+          如果你有<em>测量数据</em>证明 HTTP 路由是瓶颈（不是数据库、不是业务逻辑），那 Fiber 才是对的话题。
+        </p>
+      </article>
+      <article class="control-grid__item">
+        <p class="signal-list__kicker">
+          <svg class="comparison-cell-icon comparison-cell-icon--caution" width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <path d="M8 3v6M8 11.5v1" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+          </svg>
+          现在就需要 v1 稳定性
+        </p>
+        <h3>你需要经过验证的 v1+ 版本记录</h3>
+        <p>
+          Plumego 仍是 pre-v1。9 个稳定根有兼容性承诺，但项目尚未积累 Gin 或 Echo 那样的长期生产记录。
+          如果"5年以上大规模验证"是硬性要求，Gin 或 Echo 在组织层面更安全。
+        </p>
+      </article>
+    </div>
+  </section>
+
+  <!-- 性能基准说明 -->
+  <section class="section">
+    <div class="section__intro">
+      <h2>关于性能基准的说明。</h2>
+      <p>这几个框架的基准对比在网上广泛流传。阅读时请保持审慎。</p>
+    </div>
+    <div class="signal-list">
+      <article class="signal-list__item">
+        <p class="signal-list__kicker">Fiber 注意事项</p>
+        <h3>Fiber 的性能优势来自 Fasthttp，而不是更好的路由</h3>
+        <p>
+          Fasthttp 通过复用 buffer 来避免标准库分配，在合成基准中产生可测量的吞吐量提升。
+          但如果你需要 net/http 中间件、使用标准库 HTTP 客户端对接同一服务，或者工作负载的瓶颈是数据库 I/O 而不是 HTTP 解析，这个提升就会消失。
+        </p>
+      </article>
+      <article class="signal-list__item">
+        <p class="signal-list__kicker">Plumego 基准</p>
+        <h3>Plumego 路由器与 net/http 性能相当——尚未正式发布基准数据</h3>
+        <p>
+          Trie 路由器无反射、无全局状态，设计目标是与 net/http 性能相当。与 Gin、Echo、Chi 的可重现基准尚未发布，请关注
+          <a class="text-link" href="https://github.com/spcent/plumego/issues">issue tracker</a> 中的基准路线图。
+        </p>
+      </article>
+      <article class="signal-list__item">
+        <p class="signal-list__kicker">通用建议</p>
+        <h3>以性能为由选框架之前，先对你的实际工作负载做性能分析</h3>
+        <p>
+          大多数 Go HTTP 服务的瓶颈在数据库往返、外部 API 调用或序列化——而不是路由器。
+          没有针对你的具体工作负载和目标规模的测量数据，纯粹基于性能选择框架很难站住脚。
+        </p>
+      </article>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section class="section section--cta">
+    <div class="section__intro section__intro--cta">
+      <h2>做出决策了吗？</h2>
+      <p>
+        如果 Plumego 符合你团队的工作模式，从 reference app 开始。如果另一个框架更合适，那就是正确的选择——这页存在是为了帮你决策，不是为了推销。
+      </p>
+      <div class="cta-actions">
+        <a class="button button--primary" href="/zh/docs/getting-started">开始使用 Plumego</a>
+        <a class="button button--ghost" href="/zh/why-plumego">完整适配指南</a>
+      </div>
+    </div>
+  </section>
+</MarketingLayout>
+
+<style>
+  .verdict-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+    gap: 1.1rem;
+    max-width: 72rem;
+    margin-inline: auto;
+  }
+
+  .verdict-card {
+    background: var(--bg-elevated);
+    border: 1px solid var(--line);
+    border-radius: 0.875rem;
+    padding: 1.4rem 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    box-shadow: var(--shadow);
+    transition: border-color 0.18s;
+  }
+
+  .verdict-card--highlight {
+    border-color: color-mix(in srgb, var(--accent) 35%, var(--line));
+    background: color-mix(in srgb, var(--accent) 4%, var(--bg-elevated));
+  }
+
+  .verdict-warning {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.75rem;
+    color: #b45309;
+    background: color-mix(in srgb, #d97706 10%, var(--bg-elevated));
+    border: 1px solid color-mix(in srgb, #d97706 20%, var(--line));
+    border-radius: 0.35rem;
+    padding: 0.3rem 0.6rem;
+    line-height: 1.4;
+  }
+
+  :root[data-theme="dark"] .verdict-warning {
+    color: #fbbf24;
+    background: color-mix(in srgb, #fbbf24 8%, var(--bg-elevated));
+    border-color: color-mix(in srgb, #fbbf24 16%, var(--line));
+  }
+
+  .verdict-card__header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.5rem;
+  }
+
+  .verdict-card__name {
+    font-size: 1.05rem;
+    font-weight: 700;
+    margin: 0;
+    color: var(--fg);
+    letter-spacing: -0.01em;
+  }
+
+  .verdict-card--highlight .verdict-card__name {
+    color: var(--accent-strong);
+  }
+
+  :root[data-theme="dark"] .verdict-card--highlight .verdict-card__name {
+    color: var(--accent);
+  }
+
+  .verdict-card__stars {
+    font-size: 0.72rem;
+    color: var(--fg-soft);
+    font-family: var(--font-mono);
+    white-space: nowrap;
+  }
+
+  .verdict-card__tagline {
+    font-size: 0.78rem;
+    color: var(--fg-soft);
+    margin: 0;
+    font-style: italic;
+  }
+
+  .verdict-card__verdict {
+    font-size: 0.86rem;
+    color: var(--fg-soft);
+    line-height: 1.6;
+    margin: 0;
+    flex: 1;
+  }
+
+  .verdict-card__sig {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    padding: 0.25rem 0.55rem;
+    background: var(--bg-strong);
+    border: 1px solid var(--line);
+    border-radius: 0.3rem;
+    color: var(--fg-soft);
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+    margin-top: 0.25rem;
+  }
+
+  .matrix-wrap {
+    overflow-x: auto;
+    max-width: 72rem;
+    margin-inline: auto;
+    border: 1px solid var(--line);
+    border-radius: 0.875rem;
+    background: var(--bg-elevated);
+    box-shadow: var(--shadow);
+  }
+
+  .matrix-table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 42rem;
+  }
+
+  .matrix-table thead tr {
+    background: var(--bg-strong);
+    border-bottom: 1px solid var(--line);
+  }
+
+  .matrix-table th {
+    padding: 0.65rem 1rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--fg-soft);
+    text-align: center;
+  }
+
+  .matrix-table__feature-col {
+    text-align: left !important;
+    width: 40%;
+  }
+
+  .matrix-table__fw-col {
+    width: 12%;
+  }
+
+  .matrix-table__fw-col--highlight {
+    background: color-mix(in srgb, var(--accent) 5%, var(--bg-strong));
+    color: var(--accent-strong) !important;
+  }
+
+  :root[data-theme="dark"] .matrix-table__fw-col--highlight {
+    color: var(--accent) !important;
+  }
+
+  .matrix-table tbody tr {
+    border-bottom: 1px solid var(--line);
+    transition: background-color 120ms ease;
+  }
+
+  .matrix-table tbody tr:last-child {
+    border-bottom: none;
+  }
+
+  .matrix-table tbody tr:hover {
+    background: color-mix(in srgb, var(--accent-soft) 50%, transparent);
+  }
+
+  .matrix-table__feature {
+    padding: 0.85rem 1rem;
+    vertical-align: top;
+  }
+
+  .matrix-table__feature strong {
+    display: block;
+    font-size: 0.86rem;
+    color: var(--fg);
+    margin-bottom: 0.2rem;
+  }
+
+  .matrix-table__note {
+    display: block;
+    font-size: 0.75rem;
+    color: var(--fg-soft);
+    line-height: 1.4;
+    font-family: var(--font-mono);
+  }
+
+  .matrix-table__cell {
+    padding: 0.85rem 1rem;
+    text-align: center;
+    vertical-align: middle;
+  }
+
+  .matrix-table__cell--highlight {
+    background: color-mix(in srgb, var(--accent) 5%, var(--bg-elevated));
+  }
+
+  .matrix-icon { display: inline-block; }
+
+  .matrix-icon--yes {
+    color: var(--accent-strong);
+  }
+
+  :root[data-theme="dark"] .matrix-icon--yes {
+    color: var(--accent);
+  }
+
+  .matrix-icon--no {
+    color: var(--fg-soft);
+    opacity: 0.45;
+  }
+
+  .matrix-note {
+    max-width: 72rem;
+    margin: 0.85rem auto 0;
+    font-size: 0.82rem;
+    color: var(--fg-soft);
+    line-height: 1.55;
+    padding-inline: 0.25rem;
+  }
+
+  .code-compare-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
+    gap: 1rem;
+    max-width: 72rem;
+    margin-inline: auto;
+  }
+
+  .code-compare-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+  }
+
+  .code-compare-item--highlight .hero-code {
+    border-color: color-mix(in srgb, var(--accent) 28%, var(--code-border));
+  }
+
+  .code-compare-item__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding-inline: 0.1rem;
+  }
+
+  .code-compare-item__fw {
+    font-size: 0.88rem;
+    font-weight: 700;
+    color: var(--fg);
+  }
+
+  .compat-badge {
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    font-weight: 500;
+    padding: 0.18rem 0.5rem;
+    border-radius: 0.3rem;
+    white-space: nowrap;
+  }
+
+  .compat-badge--yes {
+    background: color-mix(in srgb, var(--accent) 10%, var(--bg-elevated));
+    border: 1px solid color-mix(in srgb, var(--accent) 20%, var(--line));
+    color: var(--accent-strong);
+  }
+
+  :root[data-theme="dark"] .compat-badge--yes { color: var(--accent); }
+
+  .compat-badge--no {
+    background: color-mix(in srgb, var(--fg-soft) 8%, var(--bg-elevated));
+    border: 1px solid var(--line);
+    color: var(--fg-soft);
+  }
+
+  .compat-badge--warn {
+    background: color-mix(in srgb, #d97706 10%, var(--bg-elevated));
+    border: 1px solid color-mix(in srgb, #d97706 18%, var(--line));
+    color: #b45309;
+  }
+
+  :root[data-theme="dark"] .compat-badge--warn {
+    background: color-mix(in srgb, #fbbf24 8%, var(--bg-elevated));
+    border-color: color-mix(in srgb, #fbbf24 16%, var(--line));
+    color: #fbbf24;
+  }
+
+  .contract-compare {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.25rem;
+    max-width: 64rem;
+    margin-inline: auto;
+  }
+
+  @media (max-width: 700px) {
+    .contract-compare { grid-template-columns: 1fr; }
+  }
+
+  .contract-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+  }
+
+  .contract-panel__label {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--fg-soft);
+    margin: 0;
+    padding-inline: 0.1rem;
+  }
+
+  .contract-panel--after .contract-panel__label {
+    color: var(--accent-strong);
+  }
+
+  :root[data-theme="dark"] .contract-panel--after .contract-panel__label {
+    color: var(--accent);
+  }
+
+  .fw-points {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    font-size: 0.84rem;
+    color: var(--fg-soft);
+    line-height: 1.5;
+  }
+
+  .fw-points li {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.4rem;
+  }
+
+  .fw-points .comparison-cell-icon {
+    flex-shrink: 0;
+    margin-top: 0.2rem;
+  }
+
+  .plumego-star {
+    color: var(--accent);
+    margin-left: 0.3em;
+    font-size: 0.9em;
+  }
+
+  .fw-warning-chip {
+    display: inline-block;
+    margin-left: 0.4em;
+    font-size: 0.72rem;
+    font-weight: 500;
+    color: #b45309;
+    font-family: var(--font-mono);
+  }
+
+  :root[data-theme="dark"] .fw-warning-chip { color: #fbbf24; }
+</style>

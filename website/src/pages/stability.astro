@@ -1,0 +1,394 @@
+---
+import MarketingLayout from '../layouts/MarketingLayout.astro';
+import PageHero from '../components/marketing/PageHero.astro';
+import JourneyBar from '../components/marketing/JourneyBar.astro';
+import { STABILITY_COPY, SITE } from '../data/site';
+import { MODULE_FACTS } from '../generated/modules';
+import { RELEASE_FACTS } from '../generated/releases';
+
+const copy = STABILITY_COPY.en;
+
+const journeySteps = [
+  { label: 'Why Plumego', href: '/why-plumego' },
+  { label: 'Examples', href: '/examples' },
+  { label: 'Stability', href: '/stability' },
+];
+
+function tierRowClass(status: string): string {
+  if (status === 'stable') return 'tier-row--stable';
+  if (status === 'supported') return 'tier-row--supported';
+  if (status === 'beta') return 'tier-row--beta';
+  return 'tier-row--experimental';
+}
+
+function badgeClass(status: string): string {
+  if (status === 'stable') return 'status-badge status-badge--ga';
+  if (status === 'supported') return 'status-badge status-badge--supported';
+  if (status === 'beta') return 'status-badge status-badge--beta';
+  return 'status-badge status-badge--experimental';
+}
+---
+
+<MarketingLayout
+  locale="en"
+  title={copy.title}
+  description={copy.description}
+  currentPath="/stability"
+>
+  <PageHero
+    eyebrow={copy.eyebrow}
+    title={copy.heroTitle}
+    description={copy.heroBody}
+    visual="releases"
+    links={[
+      { label: 'Full Release Matrix', href: '/releases' },
+      { label: 'Roadmap', href: '/roadmap' },
+    ]}
+  />
+
+  <JourneyBar steps={journeySteps} current="/stability" />
+
+  <!-- Quick stat bar -->
+  <section class="section">
+    <div class="stat-hero">
+      <div class="stat-hero__cell">
+        <span class="stat-hero__num stat-hero__num--accent">{MODULE_FACTS.stableRoots.length}</span>
+        <span class="stat-hero__label">stable roots</span>
+      </div>
+      <div class="stat-hero__cell">
+        <span class="stat-hero__num" style="color: #4f46e5">{MODULE_FACTS.betaExtensionFamilies.length}</span>
+        <span class="stat-hero__label">beta extensions</span>
+      </div>
+      <div class="stat-hero__cell">
+        <span class="stat-hero__num stat-hero__num--warn">
+          {MODULE_FACTS.allExtensionPaths.length - MODULE_FACTS.betaExtensionFamilies.length}
+        </span>
+        <span class="stat-hero__label">experimental extensions</span>
+      </div>
+      <div class="stat-hero__cell">
+        <span class="stat-hero__num">{SITE.currentVersion}</span>
+        <span class="stat-hero__label">current version</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Four-tier overview -->
+  <section class="section section--tinted">
+    <div class="section__intro">
+      <h2>Four tiers — each with a clear adoption signal.</h2>
+      <p>Read across each row: what the tier promises, what to do with it, and which modules belong to it.</p>
+    </div>
+
+    <div class="tier-table" role="table" aria-label="Module stability tiers">
+      <div class="tier-table__head" role="row">
+        <span role="columnheader">Tier</span>
+        <span role="columnheader">API Promise</span>
+        <span role="columnheader">Adoption signal</span>
+        <span role="columnheader">Modules</span>
+      </div>
+      {copy.tiers.map((tier) => (
+        <div class={`tier-table__row ${tierRowClass(tier.status)}`} role="row">
+          <div class="tier-table__tier" role="cell">
+            <span class={badgeClass(tier.status)}>{tier.badge}</span>
+            <strong>{tier.label}</strong>
+          </div>
+          <span class="tier-table__promise" role="cell">{tier.promise}</span>
+          <span class="tier-table__adopt" role="cell">{tier.adopt}</span>
+          <div class="tier-table__modules" role="cell">
+            {tier.modules.map((mod) => (
+              <code class="tier-module-chip">{mod}</code>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  </section>
+
+  <!-- Stable roots deep dive -->
+  <section class="section">
+    <div class="section__intro">
+      <h2>The 9 stable roots in detail.</h2>
+      <p>
+        These are the only modules with a long-term API compatibility promise. They are the recommended
+        foundation for all production services built on Plumego.
+      </p>
+    </div>
+    <div class="module-table" role="table" aria-label="Stable modules">
+      <div class="module-table__head" role="row">
+        <span role="columnheader">package</span>
+        <span role="columnheader">description</span>
+        <span role="columnheader">status</span>
+      </div>
+      {RELEASE_FACTS.supportMatrix
+        .filter((entry) => /Stable-root/i.test(entry.status))
+        .map((entry) => (
+          <div class="module-table__row stable-row" role="row">
+            <span class="module-table__path" role="cell">
+              <span class="module-table__base">github.com/spcent/plumego/</span>
+              <strong>{entry.modules.split(',')[0].trim()}</strong>
+            </span>
+            <span class="module-table__desc" role="cell">{entry.promise}</span>
+            <span class="module-table__badge module-table__badge--stable" role="cell">stable</span>
+          </div>
+        ))}
+    </div>
+  </section>
+
+  <!-- Beta extensions -->
+  <section class="section section--tinted">
+    <div class="section__intro">
+      <h2>Beta extensions — API frozen between refs.</h2>
+      <p>
+        These four modules completed the promotion checklist: two consecutive tagged release refs with no API
+        changes, release-backed snapshots, and owner sign-off. Safe to adopt, but check release notes before upgrading.
+      </p>
+    </div>
+    <div class="page-grid">
+      {[
+        { name: 'x/rest', owner: 'platform-api', desc: 'CRUD resource controllers and REST conventions', href: '/docs/modules/x-rest' },
+        { name: 'x/gateway', owner: 'edge', desc: 'Proxy, rewrite, load balancing, and edge transport', href: '/docs/modules/x-gateway' },
+        { name: 'x/websocket', owner: 'realtime', desc: 'WebSocket hub and explicit route registration', href: '/docs/modules/x-websocket' },
+        { name: 'x/observability', owner: 'observability', desc: 'Exporter, tracer, collector, and adapter wiring', href: '/docs/modules/x-observability' },
+      ].map((mod) => (
+        <a class="page-panel page-panel--info beta-panel" href={mod.href}>
+          <p class="signal-list__kicker">beta</p>
+          <h3>{mod.name}</h3>
+          <p>{mod.desc}</p>
+          <span class="beta-panel__owner">owner: {mod.owner}</span>
+        </a>
+      ))}
+    </div>
+  </section>
+
+  <!-- Promotion process -->
+  <section class="section">
+    <div class="section__intro">
+      <h2>{copy.promotionTitle}</h2>
+      <p>{copy.promotionBody}</p>
+    </div>
+    <div class="control-grid control-grid--tight">
+      {copy.promotionSteps.map((step) => (
+        <article class="control-grid__item">
+          <p class="signal-list__kicker">{step.label}</p>
+          <h3>{step.title}</h3>
+          <p>{step.body}</p>
+        </article>
+      ))}
+      <article class="control-grid__item">
+        <p class="signal-list__kicker">machine-readable ledger</p>
+        <h3>Evidence tracked in specs, not prose</h3>
+        <p>
+          <code>specs/extension-beta-evidence.yaml</code> records release refs, snapshot paths, owner
+          sign-off state, and open blockers for every candidate module.
+        </p>
+      </article>
+    </div>
+    <div class="hero-code" style="max-width: 38rem; margin: 2rem auto 0;">
+      <div class="hero-code__bar">
+        <span class="hero-code__dots"><span></span><span></span><span></span></span>
+        <span class="hero-code__filename">specs/extension-beta-evidence.yaml</span>
+      </div>
+      <pre class="hero-code__pre"><code><span class="hc-cm"># promotion evidence for x/websocket</span>
+<span class="hc-kw">module</span>: x/websocket
+<span class="hc-kw">base_ref</span>: <span class="hc-str">v0.1.0</span>
+<span class="hc-kw">head_ref</span>: <span class="hc-str">v0.2.0</span>
+<span class="hc-kw">snapshot_base</span>: docs/extension-evidence/snapshots/websocket-v0.1.0.json
+<span class="hc-kw">snapshot_head</span>: docs/extension-evidence/snapshots/websocket-v0.2.0.json
+<span class="hc-kw">api_diff</span>: <span class="hc-str">none</span>
+<span class="hc-kw">owner_signoff</span>: <span class="hc-str">true</span></code></pre>
+    </div>
+  </section>
+
+  <!-- What runs at release -->
+  <section class="section section--tinted">
+    <div class="section__intro">
+      <h2>What runs before every release tag.</h2>
+      <p>Every check below is machine-executed. A release cannot proceed if any check fails.</p>
+    </div>
+    <div class="hero-code" style="max-width: 40rem; margin-inline: auto;">
+      <div class="hero-code__bar">
+        <span class="hero-code__dots"><span></span><span></span><span></span></span>
+        <span class="hero-code__filename">Makefile</span>
+      </div>
+      <pre class="hero-code__pre"><code><span class="hc-cm"># one command runs all gates</span>
+make gates
+
+<span class="hc-cm">#   gofmt -l .                              ← zero unformatted files</span>
+<span class="hc-cm">#   go run ./internal/checks/dependency-rules  ← stable roots cannot import x/*</span>
+<span class="hc-cm">#   go run ./internal/checks/module-manifests  ← every module declares its boundary</span>
+<span class="hc-cm">#   go run ./internal/checks/reference-layout  ← reference apps match canonical shape</span>
+<span class="hc-cm">#   go test -race -timeout 30s ./...          ← full race-detector test suite</span></code></pre>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section class="section section--cta">
+    <div class="section__intro section__intro--cta">
+      <h2>{copy.ctaTitle}</h2>
+      <p>{copy.ctaBody}</p>
+      <div class="cta-actions">
+        <a class="button button--primary" href={copy.ctaPrimary.href}>{copy.ctaPrimary.label}</a>
+        <a class="button button--ghost" href={copy.ctaSecondary.href}>{copy.ctaSecondary.label}</a>
+      </div>
+    </div>
+  </section>
+</MarketingLayout>
+
+<style>
+  .tier-table {
+    max-width: 64rem;
+    margin-inline: auto;
+    border: 1px solid var(--line);
+    border-radius: 0.75rem;
+    overflow: hidden;
+    background: var(--bg-elevated);
+  }
+
+  .tier-table__head {
+    display: grid;
+    grid-template-columns: 14rem 18rem 18rem 1fr;
+    padding: 0.6rem 1.25rem;
+    background: var(--bg-strong);
+    border-bottom: 1px solid var(--line);
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--fg-soft);
+    gap: 1rem;
+  }
+
+  .tier-table__row {
+    display: grid;
+    grid-template-columns: 14rem 18rem 18rem 1fr;
+    align-items: start;
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--line);
+    gap: 1rem;
+    transition: background-color 120ms ease;
+  }
+
+  .tier-table__row:last-child {
+    border-bottom: none;
+  }
+
+  .tier-row--stable {
+    border-left: 3px solid var(--accent);
+  }
+
+  .tier-row--beta {
+    border-left: 3px solid #4f46e5;
+  }
+
+  :root[data-theme="dark"] .tier-row--beta {
+    border-left-color: #818cf8;
+  }
+
+  .tier-row--experimental {
+    border-left: 3px solid #d97706;
+  }
+
+  :root[data-theme="dark"] .tier-row--experimental {
+    border-left-color: #fbbf24;
+  }
+
+  .tier-row--supported {
+    border-left: 3px solid var(--fg-soft);
+  }
+
+  .tier-table__tier {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+
+  .tier-table__tier strong {
+    font-size: 0.88rem;
+    color: var(--fg);
+  }
+
+  .tier-table__promise,
+  .tier-table__adopt {
+    font-size: 0.84rem;
+    color: var(--fg-soft);
+    line-height: 1.5;
+    padding-top: 0.15rem;
+  }
+
+  .tier-table__modules {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+    align-content: flex-start;
+  }
+
+  .tier-module-chip {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    padding: 0.15rem 0.4rem;
+    background: var(--bg-strong);
+    border: 1px solid var(--line);
+    border-radius: 0.25rem;
+    color: var(--fg-soft);
+    white-space: nowrap;
+  }
+
+  .stable-row {
+    display: grid;
+    grid-template-columns: 22rem 1fr 6rem;
+    align-items: center;
+    padding: 0.72rem 1.25rem;
+    border-bottom: 1px solid var(--line);
+    text-decoration: none;
+    color: inherit;
+  }
+
+  .stable-row:last-child {
+    border-bottom: none;
+  }
+
+  .beta-panel {
+    text-decoration: none;
+    color: inherit;
+    transition: border-color 0.18s, box-shadow 0.18s;
+  }
+
+  .beta-panel:hover {
+    border-color: color-mix(in srgb, #4f46e5 30%, var(--line));
+    box-shadow: var(--shadow), 0 0 0 3px color-mix(in srgb, #4f46e5 10%, transparent);
+  }
+
+  :root[data-theme="dark"] .beta-panel:hover {
+    border-color: color-mix(in srgb, #818cf8 30%, var(--line));
+    box-shadow: var(--shadow), 0 0 0 3px color-mix(in srgb, #818cf8 10%, transparent);
+  }
+
+  .beta-panel__owner {
+    font-size: 0.75rem;
+    font-family: var(--font-mono);
+    color: var(--fg-soft);
+    margin-top: 0.5rem;
+    display: block;
+  }
+
+  @media (max-width: 900px) {
+    .tier-table__head,
+    .tier-table__row {
+      grid-template-columns: 1fr;
+    }
+
+    .tier-table__head span:not(:first-child) {
+      display: none;
+    }
+  }
+
+  @media (max-width: 640px) {
+    .stable-row {
+      grid-template-columns: 1fr;
+    }
+
+    .module-table__badge {
+      display: none;
+    }
+  }
+</style>

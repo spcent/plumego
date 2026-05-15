@@ -2,6 +2,8 @@
 import FinalCta from '../components/home/FinalCta.astro';
 import Hero from '../components/home/Hero.astro';
 import MinimalExample from '../components/home/MinimalExample.astro';
+import ScenarioCards from '../components/home/ScenarioCards.astro';
+import StabilityBand from '../components/home/StabilityBand.astro';
 import ValueProps from '../components/home/ValueProps.astro';
 import WiringContrast from '../components/home/WiringContrast.astro';
 import MarketingLayout from '../layouts/MarketingLayout.astro';
@@ -12,8 +14,8 @@ const copy = HOME_COPY.en;
 
 <MarketingLayout
   locale="en"
-  title="Explicit by Design. Agent-Ready by Structure."
-  description="A stdlib-only Go HTTP toolkit where routing, middleware, and ownership stay visible in code and in machine-readable specs — for teams where engineers and AI agents review every change."
+  title="The Go HTTP toolkit that stays out of your way."
+  description="Zero external dependencies. 9 stable modules, API frozen toward v1. Explicit routing that survives code review. Start from one reference app — expand only where boundaries are clear."
   currentPath="/"
 >
   <Hero copy={copy} />
@@ -22,7 +24,7 @@ const copy = HOME_COPY.en;
     <div class="quick-spec-strip__inner">
       <span class="quick-spec-item"><code>go 1.24+</code></span>
       <span class="quick-spec-sep" aria-hidden="true">/</span>
-      <span class="quick-spec-item"><code>stdlib</code>-only core</span>
+      <span class="quick-spec-item">zero external deps</span>
       <span class="quick-spec-sep" aria-hidden="true">/</span>
       <span class="quick-spec-item"><code>9</code> stable modules</span>
       <span class="quick-spec-sep" aria-hidden="true">/</span>
@@ -30,14 +32,21 @@ const copy = HOME_COPY.en;
       <span class="quick-spec-sep" aria-hidden="true">/</span>
       <span class="quick-spec-item">MIT</span>
       <span class="quick-spec-sep" aria-hidden="true">/</span>
-      <span class="quick-spec-item quick-spec-item--pre">pre-v1</span>
-      <span class="quick-spec-sep" aria-hidden="true">/</span>
-      <a class="quick-spec-link" href="/releases">release matrix →</a>
+      <a class="quick-spec-link quick-spec-item--pre" href="/stability">pre-v1 · what's stable? →</a>
     </div>
   </section>
 
+  <ScenarioCards cards={copy.scenarioCards} />
+
   <MinimalExample locale="en" />
   <WiringContrast copy={copy} />
+
+  <StabilityBand
+    title={copy.stabilityBandTitle}
+    items={copy.stabilityBandItems}
+    cta={copy.stabilityBandCta}
+  />
+
   <ValueProps copy={copy} />
 
   <section class="section entry-points-section">

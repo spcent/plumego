@@ -1,0 +1,321 @@
+---
+import MarketingLayout from '../../layouts/MarketingLayout.astro';
+import PageHero from '../../components/marketing/PageHero.astro';
+import JourneyBar from '../../components/marketing/JourneyBar.astro';
+import { STABILITY_COPY, SITE } from '../../data/site';
+import { MODULE_FACTS } from '../../generated/modules';
+import { RELEASE_FACTS } from '../../generated/releases';
+
+const copy = STABILITY_COPY.zh;
+
+const journeySteps = [
+  { label: '为什么选择', href: '/zh/why-plumego' },
+  { label: '示例', href: '/zh/examples' },
+  { label: '稳定性', href: '/zh/stability' },
+];
+
+function tierRowClass(status: string): string {
+  if (status === 'stable') return 'tier-row--stable';
+  if (status === 'supported') return 'tier-row--supported';
+  if (status === 'beta') return 'tier-row--beta';
+  return 'tier-row--experimental';
+}
+
+function badgeClass(status: string): string {
+  if (status === 'stable') return 'status-badge status-badge--ga';
+  if (status === 'supported') return 'status-badge status-badge--supported';
+  if (status === 'beta') return 'status-badge status-badge--beta';
+  return 'status-badge status-badge--experimental';
+}
+---
+
+<MarketingLayout
+  locale="zh"
+  title={copy.title}
+  description={copy.description}
+  currentPath="/zh/stability"
+>
+  <PageHero
+    eyebrow={copy.eyebrow}
+    title={copy.heroTitle}
+    description={copy.heroBody}
+    visual="releases"
+    links={[
+      { label: '完整发布矩阵', href: '/zh/releases' },
+      { label: '路线图', href: '/zh/roadmap' },
+    ]}
+  />
+
+  <JourneyBar steps={journeySteps} current="/zh/stability" />
+
+  <section class="section">
+    <div class="stat-hero">
+      <div class="stat-hero__cell">
+        <span class="stat-hero__num stat-hero__num--accent">{MODULE_FACTS.stableRoots.length}</span>
+        <span class="stat-hero__label">稳定根</span>
+      </div>
+      <div class="stat-hero__cell">
+        <span class="stat-hero__num" style="color: #4f46e5">{MODULE_FACTS.betaExtensionFamilies.length}</span>
+        <span class="stat-hero__label">beta 扩展</span>
+      </div>
+      <div class="stat-hero__cell">
+        <span class="stat-hero__num stat-hero__num--warn">
+          {MODULE_FACTS.allExtensionPaths.length - MODULE_FACTS.betaExtensionFamilies.length}
+        </span>
+        <span class="stat-hero__label">实验性扩展</span>
+      </div>
+      <div class="stat-hero__cell">
+        <span class="stat-hero__num">{SITE.currentVersion}</span>
+        <span class="stat-hero__label">当前版本</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="section section--tinted">
+    <div class="section__intro">
+      <h2>四个层级，每个层级都有明确的采用信号。</h2>
+      <p>每行横向阅读：该层级的承诺是什么、应该怎么对待，以及哪些模块属于它。</p>
+    </div>
+
+    <div class="tier-table" role="table" aria-label="模块稳定性层级">
+      <div class="tier-table__head" role="row">
+        <span role="columnheader">层级</span>
+        <span role="columnheader">API 承诺</span>
+        <span role="columnheader">采用信号</span>
+        <span role="columnheader">模块</span>
+      </div>
+      {copy.tiers.map((tier) => (
+        <div class={`tier-table__row ${tierRowClass(tier.status)}`} role="row">
+          <div class="tier-table__tier" role="cell">
+            <span class={badgeClass(tier.status)}>{tier.badge}</span>
+            <strong>{tier.label}</strong>
+          </div>
+          <span class="tier-table__promise" role="cell">{tier.promise}</span>
+          <span class="tier-table__adopt" role="cell">{tier.adopt}</span>
+          <div class="tier-table__modules" role="cell">
+            {tier.modules.map((mod) => (
+              <code class="tier-module-chip">{mod}</code>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="section__intro">
+      <h2>9 个稳定根详情。</h2>
+      <p>
+        这是唯一拥有长期 API 兼容性承诺的模块，也是所有生产服务推荐的起点。
+      </p>
+    </div>
+    <div class="module-table" role="table" aria-label="稳定模块">
+      <div class="module-table__head" role="row">
+        <span role="columnheader">包名</span>
+        <span role="columnheader">说明</span>
+        <span role="columnheader">状态</span>
+      </div>
+      {RELEASE_FACTS.supportMatrix
+        .filter((entry) => /Stable-root/i.test(entry.status))
+        .map((entry) => (
+          <div class="module-table__row stable-row" role="row">
+            <span class="module-table__path" role="cell">
+              <span class="module-table__base">github.com/spcent/plumego/</span>
+              <strong>{entry.modules.split(',')[0].trim()}</strong>
+            </span>
+            <span class="module-table__desc" role="cell">{entry.promise}</span>
+            <span class="module-table__badge module-table__badge--stable" role="cell">stable</span>
+          </div>
+        ))}
+    </div>
+  </section>
+
+  <section class="section section--tinted">
+    <div class="section__intro">
+      <h2>Beta 扩展——ref 间 API 冻结。</h2>
+      <p>
+        这四个模块完成了晋级清单：连续两个 tagged release ref 内 API 无变化、有 release-backed 快照、以及负责人签字确认。
+        可以采用，但升级前需要查看 release notes。
+      </p>
+    </div>
+    <div class="page-grid">
+      {[
+        { name: 'x/rest', owner: 'platform-api', desc: 'CRUD 资源控制器与 REST 规范', href: '/zh/docs/modules/x-rest' },
+        { name: 'x/gateway', owner: 'edge', desc: '代理、重写、负载均衡与边缘传输', href: '/zh/docs/modules/x-gateway' },
+        { name: 'x/websocket', owner: 'realtime', desc: 'WebSocket hub 与显式路由注册', href: '/zh/docs/modules/x-websocket' },
+        { name: 'x/observability', owner: 'observability', desc: 'Exporter、tracer、collector 与 adapter 接线', href: '/zh/docs/modules/x-observability' },
+      ].map((mod) => (
+        <a class="page-panel page-panel--info beta-panel" href={mod.href}>
+          <p class="signal-list__kicker">beta</p>
+          <h3>{mod.name}</h3>
+          <p>{mod.desc}</p>
+          <span class="beta-panel__owner">owner: {mod.owner}</span>
+        </a>
+      ))}
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="section__intro">
+      <h2>{copy.promotionTitle}</h2>
+      <p>{copy.promotionBody}</p>
+    </div>
+    <div class="control-grid control-grid--tight">
+      {copy.promotionSteps.map((step) => (
+        <article class="control-grid__item">
+          <p class="signal-list__kicker">{step.label}</p>
+          <h3>{step.title}</h3>
+          <p>{step.body}</p>
+        </article>
+      ))}
+      <article class="control-grid__item">
+        <p class="signal-list__kicker">machine-readable ledger</p>
+        <h3>证据追踪在 specs 里，而不是散文里</h3>
+        <p>
+          <code>specs/extension-beta-evidence.yaml</code> 记录了每个候选模块的 release ref、快照路径、负责人签字状态和开放阻塞项。
+        </p>
+      </article>
+    </div>
+  </section>
+
+  <section class="section section--cta">
+    <div class="section__intro section__intro--cta">
+      <h2>{copy.ctaTitle}</h2>
+      <p>{copy.ctaBody}</p>
+      <div class="cta-actions">
+        <a class="button button--primary" href={copy.ctaPrimary.href}>{copy.ctaPrimary.label}</a>
+        <a class="button button--ghost" href={copy.ctaSecondary.href}>{copy.ctaSecondary.label}</a>
+      </div>
+    </div>
+  </section>
+</MarketingLayout>
+
+<style>
+  .tier-table {
+    max-width: 64rem;
+    margin-inline: auto;
+    border: 1px solid var(--line);
+    border-radius: 0.75rem;
+    overflow: hidden;
+    background: var(--bg-elevated);
+  }
+
+  .tier-table__head {
+    display: grid;
+    grid-template-columns: 14rem 18rem 18rem 1fr;
+    padding: 0.6rem 1.25rem;
+    background: var(--bg-strong);
+    border-bottom: 1px solid var(--line);
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--fg-soft);
+    gap: 1rem;
+  }
+
+  .tier-table__row {
+    display: grid;
+    grid-template-columns: 14rem 18rem 18rem 1fr;
+    align-items: start;
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--line);
+    gap: 1rem;
+  }
+
+  .tier-table__row:last-child {
+    border-bottom: none;
+  }
+
+  .tier-row--stable { border-left: 3px solid var(--accent); }
+  .tier-row--beta { border-left: 3px solid #4f46e5; }
+  .tier-row--experimental { border-left: 3px solid #d97706; }
+  .tier-row--supported { border-left: 3px solid var(--fg-soft); }
+
+  :root[data-theme="dark"] .tier-row--beta { border-left-color: #818cf8; }
+  :root[data-theme="dark"] .tier-row--experimental { border-left-color: #fbbf24; }
+
+  .tier-table__tier {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+
+  .tier-table__tier strong {
+    font-size: 0.88rem;
+    color: var(--fg);
+  }
+
+  .tier-table__promise,
+  .tier-table__adopt {
+    font-size: 0.84rem;
+    color: var(--fg-soft);
+    line-height: 1.5;
+    padding-top: 0.15rem;
+  }
+
+  .tier-table__modules {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+    align-content: flex-start;
+  }
+
+  .tier-module-chip {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    padding: 0.15rem 0.4rem;
+    background: var(--bg-strong);
+    border: 1px solid var(--line);
+    border-radius: 0.25rem;
+    color: var(--fg-soft);
+    white-space: nowrap;
+  }
+
+  .stable-row {
+    display: grid;
+    grid-template-columns: 22rem 1fr 6rem;
+    align-items: center;
+    padding: 0.72rem 1.25rem;
+    border-bottom: 1px solid var(--line);
+    color: inherit;
+  }
+
+  .stable-row:last-child { border-bottom: none; }
+
+  .beta-panel {
+    text-decoration: none;
+    color: inherit;
+    transition: border-color 0.18s, box-shadow 0.18s;
+  }
+
+  .beta-panel:hover {
+    border-color: color-mix(in srgb, #4f46e5 30%, var(--line));
+    box-shadow: var(--shadow), 0 0 0 3px color-mix(in srgb, #4f46e5 10%, transparent);
+  }
+
+  :root[data-theme="dark"] .beta-panel:hover {
+    border-color: color-mix(in srgb, #818cf8 30%, var(--line));
+  }
+
+  .beta-panel__owner {
+    font-size: 0.75rem;
+    font-family: var(--font-mono);
+    color: var(--fg-soft);
+    margin-top: 0.5rem;
+    display: block;
+  }
+
+  @media (max-width: 900px) {
+    .tier-table__head,
+    .tier-table__row {
+      grid-template-columns: 1fr;
+    }
+    .tier-table__head span:not(:first-child) { display: none; }
+  }
+
+  @media (max-width: 640px) {
+    .stable-row { grid-template-columns: 1fr; }
+    .module-table__badge { display: none; }
+  }
+</style>

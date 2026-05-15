@@ -1,0 +1,169 @@
+---
+type StabilityItem = {
+  label: string;
+  detail: string;
+  status: 'stable' | 'beta' | 'experimental';
+  href: string;
+};
+
+interface Props {
+  title: string;
+  items: readonly StabilityItem[];
+  cta: { label: string; href: string };
+}
+
+const { title, items, cta } = Astro.props;
+---
+
+<section class="stability-band" aria-label="Module stability overview">
+  <div class="stability-band__inner">
+    <p class="stability-band__title">{title}</p>
+    <div class="stability-band__items">
+      {items.map((item) => (
+        <a class={`stability-band__item stability-band__item--${item.status}`} href={item.href}>
+          <strong class="stability-band__item-label">{item.label}</strong>
+          <span class="stability-band__item-detail">{item.detail}</span>
+        </a>
+      ))}
+    </div>
+    <a class="stability-band__cta" href={cta.href}>{cta.label} →</a>
+  </div>
+</section>
+
+<style>
+  .stability-band {
+    max-width: 1180px;
+    margin-inline: auto;
+    width: 100%;
+    padding-inline: 0;
+  }
+
+  .stability-band__inner {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.75rem 1.5rem;
+    padding: 1rem 1.5rem;
+    background: var(--bg-elevated);
+    border: 1px solid var(--line);
+    border-radius: 0.75rem;
+  }
+
+  .stability-band__title {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--fg);
+    margin: 0;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .stability-band__items {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    flex: 1;
+  }
+
+  .stability-band__item {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.3rem 0.75rem;
+    border-radius: 0.4rem;
+    text-decoration: none;
+    transition: opacity 0.15s, transform 0.15s;
+    border: 1px solid transparent;
+  }
+
+  .stability-band__item:hover {
+    opacity: 0.85;
+    transform: translateY(-1px);
+  }
+
+  .stability-band__item--stable {
+    background: color-mix(in srgb, var(--accent) 9%, var(--bg-elevated));
+    border-color: color-mix(in srgb, var(--accent) 20%, var(--line));
+  }
+
+  .stability-band__item--beta {
+    background: color-mix(in srgb, #4f46e5 9%, var(--bg-elevated));
+    border-color: color-mix(in srgb, #4f46e5 18%, var(--line));
+  }
+
+  :root[data-theme="dark"] .stability-band__item--beta {
+    background: color-mix(in srgb, #818cf8 8%, var(--bg-elevated));
+    border-color: color-mix(in srgb, #818cf8 16%, var(--line));
+  }
+
+  .stability-band__item--experimental {
+    background: color-mix(in srgb, #d97706 8%, var(--bg-elevated));
+    border-color: color-mix(in srgb, #d97706 15%, var(--line));
+  }
+
+  :root[data-theme="dark"] .stability-band__item--experimental {
+    background: color-mix(in srgb, #fbbf24 7%, var(--bg-elevated));
+    border-color: color-mix(in srgb, #fbbf24 14%, var(--line));
+  }
+
+  .stability-band__item-label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--fg);
+    white-space: nowrap;
+  }
+
+  .stability-band__item--stable .stability-band__item-label {
+    color: var(--accent-strong);
+  }
+
+  :root[data-theme="dark"] .stability-band__item--stable .stability-band__item-label {
+    color: var(--accent);
+  }
+
+  .stability-band__item--beta .stability-band__item-label {
+    color: #4f46e5;
+  }
+
+  :root[data-theme="dark"] .stability-band__item--beta .stability-band__item-label {
+    color: #818cf8;
+  }
+
+  .stability-band__item--experimental .stability-band__item-label {
+    color: #b45309;
+  }
+
+  :root[data-theme="dark"] .stability-band__item--experimental .stability-band__item-label {
+    color: #fbbf24;
+  }
+
+  .stability-band__item-detail {
+    font-size: 0.74rem;
+    color: var(--fg-soft);
+    white-space: nowrap;
+  }
+
+  .stability-band__cta {
+    font-size: 0.82rem;
+    font-weight: 500;
+    color: var(--accent);
+    white-space: nowrap;
+    flex-shrink: 0;
+    transition: color 0.15s;
+  }
+
+  .stability-band__cta:hover {
+    color: var(--accent-strong);
+    text-decoration: underline;
+  }
+
+  @media (max-width: 600px) {
+    .stability-band__item-detail {
+      display: none;
+    }
+    .stability-band__title {
+      display: none;
+    }
+  }
+</style>

@@ -7,7 +7,7 @@ import WiringContrast from '../components/home/WiringContrast.astro';
 const journeySteps = [
   { label: 'Why Plumego', href: '/why-plumego' },
   { label: 'Examples', href: '/examples' },
-  { label: 'Releases', href: '/releases' },
+  { label: 'Stability', href: '/stability' },
 ];
 
 const wiringCopy = {
@@ -181,6 +181,42 @@ const frameworkDecision = [
   />
 
   <JourneyBar steps={journeySteps} current="/why-plumego" />
+
+  <!-- Agent-first callout — surfaced near the top as a unique differentiator -->
+  <section class="section agent-first-callout">
+    <div class="agent-first-callout__inner">
+      <div class="agent-first-callout__badge">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <rect x="2" y="2" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.5"/>
+          <rect x="9" y="2" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.5"/>
+          <rect x="2" y="9" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.5"/>
+          <rect x="9" y="9" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.5"/>
+        </svg>
+        Agent-ready
+      </div>
+      <h2 class="agent-first-callout__title">Built for teams using AI coding tools.</h2>
+      <p class="agent-first-callout__body">
+        Plumego is the first Go HTTP toolkit designed so AI coding assistants (Claude, Copilot, Cursor)
+        know exactly where a change belongs — before writing any code. Machine-readable specs, per-module
+        manifests, and explicit boundary rules give agents the same routing signals a senior reviewer uses.
+      </p>
+      <div class="agent-first-callout__points">
+        <div class="agent-first-callout__point">
+          <code>specs/task-routing.yaml</code>
+          <span>maps work types to owning modules</span>
+        </div>
+        <div class="agent-first-callout__point">
+          <code>specs/dependency-rules.yaml</code>
+          <span>prevents agents from crossing stable-root boundaries</span>
+        </div>
+        <div class="agent-first-callout__point">
+          <code>AGENTS.md</code>
+          <span>defines the shared protocol for human + AI collaboration</span>
+        </div>
+      </div>
+      <a class="text-link" href="/docs/concepts/agent-first-workflow">See the interactive routing demo →</a>
+    </div>
+  </section>
 
   <!-- Terminology: Plumego-specific terms defined on first use (CONTENT_RULES Rule 4) -->
   <section class="section section--tinted">
@@ -498,7 +534,93 @@ const frameworkDecision = [
     </div>
     <div class="page-links">
       <a class="text-link" href="/architecture">Open architecture</a>
+      <a class="text-link" href="/stability">Check module stability</a>
       <a class="text-link" href="/docs/getting-started">Start implementation</a>
     </div>
   </section>
 </MarketingLayout>
+
+<style>
+  .agent-first-callout {
+    padding-block: 2rem;
+  }
+
+  .agent-first-callout__inner {
+    max-width: 56rem;
+    margin-inline: auto;
+    background: var(--bg-elevated);
+    border: 1px solid var(--line);
+    border-left: 4px solid var(--accent);
+    border-radius: 0.75rem;
+    padding: 1.75rem 2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+  }
+
+  .agent-first-callout__badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--accent-strong);
+    background: var(--accent-soft);
+    padding: 0.22rem 0.6rem;
+    border-radius: 0.3rem;
+    width: fit-content;
+  }
+
+  :root[data-theme="dark"] .agent-first-callout__badge {
+    color: var(--accent);
+  }
+
+  .agent-first-callout__title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    margin: 0;
+    letter-spacing: -0.02em;
+    color: var(--fg);
+    line-height: 1.3;
+  }
+
+  .agent-first-callout__body {
+    font-size: 0.9rem;
+    color: var(--fg-soft);
+    line-height: 1.65;
+    margin: 0;
+    max-width: 46rem;
+  }
+
+  .agent-first-callout__points {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    margin-top: 0.25rem;
+  }
+
+  .agent-first-callout__point {
+    display: flex;
+    align-items: baseline;
+    gap: 0.65rem;
+    font-size: 0.86rem;
+  }
+
+  .agent-first-callout__point code {
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    color: var(--accent);
+    background: var(--accent-soft);
+    padding: 0.1rem 0.4rem;
+    border-radius: 0.25rem;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .agent-first-callout__point span {
+    color: var(--fg-soft);
+    line-height: 1.5;
+  }
+</style>

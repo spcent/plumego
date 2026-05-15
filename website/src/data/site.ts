@@ -24,13 +24,13 @@ export const NAV_LINKS: Record<Locale, Array<{ label: string; href: string }>> =
     { label: 'Docs', href: '/docs' },
     { label: 'Why Plumego', href: '/why-plumego' },
     { label: 'Examples', href: '/examples' },
-    { label: 'Releases', href: '/releases' },
+    { label: 'Stability', href: '/stability' },
   ],
   zh: [
     { label: '文档', href: '/zh/docs' },
     { label: '为什么选择', href: '/zh/why-plumego' },
     { label: '示例', href: '/zh/examples' },
-    { label: '发布', href: '/zh/releases' },
+    { label: '稳定性', href: '/zh/stability' },
   ],
 };
 
@@ -41,6 +41,7 @@ export const FOOTER_GROUPS: Record<Locale, Array<{ title: string; links: Array<{
       links: [
         { label: 'Docs', href: '/docs' },
         { label: 'Why Plumego', href: '/why-plumego' },
+        { label: 'Compare Frameworks', href: '/compare' },
         { label: 'Architecture', href: '/architecture' },
         { label: 'Examples', href: '/examples' },
       ],
@@ -56,6 +57,7 @@ export const FOOTER_GROUPS: Record<Locale, Array<{ title: string; links: Array<{
     {
       title: 'Status',
       links: [
+        { label: 'Stability', href: '/stability' },
         { label: 'Roadmap', href: '/roadmap' },
         { label: 'Releases', href: '/releases' },
         { label: 'Changelog', href: `${SITE.githubUrl}/releases` },
@@ -70,6 +72,7 @@ export const FOOTER_GROUPS: Record<Locale, Array<{ title: string; links: Array<{
       links: [
         { label: '文档', href: '/zh/docs' },
         { label: '为什么选择 Plumego', href: '/zh/why-plumego' },
+        { label: '框架横向对比', href: '/zh/compare' },
         { label: '架构', href: '/zh/architecture' },
         { label: '示例', href: '/zh/examples' },
       ],
@@ -85,6 +88,7 @@ export const FOOTER_GROUPS: Record<Locale, Array<{ title: string; links: Array<{
     {
       title: '状态',
       links: [
+        { label: '稳定性', href: '/zh/stability' },
         { label: '路线图', href: '/zh/roadmap' },
         { label: '发布', href: '/zh/releases' },
         { label: 'Changelog', href: `${SITE.githubUrl}/releases` },
@@ -98,11 +102,59 @@ export const FOOTER_GROUPS: Record<Locale, Array<{ title: string; links: Array<{
 export const HOME_COPY = {
   en: {
     eyebrow: 'Go HTTP toolkit · stdlib-only · pre-v1',
-    headline: 'Explicit routing. Narrow stable surface. Machine-readable specs.',
+    headline: 'The Go HTTP toolkit that stays out of your way.',
     summary:
-      'Routes, middleware, and dependency wiring stay in code — visible at code review and in <code>specs/</code>. 9 stable modules toward v1. Extension families branch outward without stretching the kernel.',
+      'Zero external dependencies. 9 stable modules, API frozen toward v1. Explicit routing that survives code review. Start from one reference app — expand only where boundaries are clear.',
     primaryCta: { label: 'Get Started', href: '/docs/getting-started' },
-    secondaryCta: { label: 'Architecture', href: '/architecture' },
+    secondaryCta: { label: 'Why Plumego', href: '/why-plumego' },
+    scenarioCards: [
+      {
+        kicker: 'REST API',
+        title: 'Build a REST API in minutes',
+        code: `r := router.New()
+api := r.Group("/api/v1",
+    middleware.Auth(cfg.JWTSecret))
+api.Get("/users/:id", users.Get)
+api.Post("/users",    users.Create)`,
+        body: 'Trie-based routing with path params, middleware groups, and typed responses — all using standard net/http handlers. No custom context types.',
+        href: '/docs/guides/build-rest-resource',
+        label: 'REST API guide',
+        maturity: null,
+      },
+      {
+        kicker: 'WebSocket',
+        title: 'Add real-time without touching core',
+        code: `hub := websocket.NewHub()
+r.Get("/ws", hub.Handler(onMessage))
+
+// broadcast to all connected clients
+hub.Broadcast([]byte("update"))`,
+        body: 'x/websocket adds a managed hub on top of the stable HTTP kernel. Routes stay explicit; transport concerns stay separate.',
+        href: '/docs/modules/x-websocket',
+        label: 'WebSocket module',
+        maturity: 'beta',
+      },
+      {
+        kicker: 'Multi-tenant SaaS',
+        title: 'Isolate tenants without changing core',
+        code: `api.Use(tenant.FromJWT(cfg.Secret))
+api.Get("/data", tenant.Guard(data.List))
+
+// tenant identity resolved at transport
+// stable roots never see tenant logic`,
+        body: 'x/tenant attaches per-tenant identity and policy at the transport layer. The stable root API stays unchanged as your tenant logic evolves.',
+        href: '/docs/modules/x-tenant',
+        label: 'Tenant module',
+        maturity: 'experimental',
+      },
+    ],
+    stabilityBandTitle: 'Know exactly what you can rely on.',
+    stabilityBandItems: [
+      { label: '9 stable modules', detail: 'API frozen, v1-bound', status: 'stable', href: '/stability' },
+      { label: '4 beta extensions', detail: 'API frozen between refs', status: 'beta', href: '/stability' },
+      { label: '13 experimental', detail: 'Evaluate before adopting', status: 'experimental', href: '/stability' },
+    ],
+    stabilityBandCta: { label: 'Full stability matrix', href: '/stability' },
     moduleTitle: 'Stable modules.',
     moduleLead: '9 packages with compatibility guarantees toward v1. The recommended starting scope for production evaluation.',
     moduleBaseImport: 'github.com/spcent/plumego',
@@ -154,11 +206,11 @@ export const HOME_COPY = {
         label: 'Read FAQ',
       },
     ],
-    finalTitle: 'Start from the reference app. Check module maturity. Expand when the boundary is clear.',
+    finalTitle: 'Start from the reference app. Check stability. Expand when boundaries are clear.',
     finalBody:
-      'Plumego works best when you start from the default path, check module maturity early, and branch into deeper boundaries only after the owning capability is obvious.',
+      'The fastest path to production: clone reference/standard-service, confirm module maturity on the stability page, then extend only where the owning module is obvious.',
     finalPrimary: { label: 'Read Docs', href: '/docs' },
-    finalSecondary: { label: 'See Reference App', href: '/docs/reference-app' },
+    finalSecondary: { label: 'Check Stability', href: '/stability' },
     contrastTitle: 'The difference shows in code review.',
     contrastLead:
       'When routes are spread across packages, a reviewer has to open each one to understand what paths exist and what middleware runs. Plumego keeps the full route map in one explicit file — and adds a structured <code>contract</code> layer so error and success responses stay consistent across all handlers.',
@@ -167,11 +219,59 @@ export const HOME_COPY = {
   },
   zh: {
     eyebrow: 'Go HTTP 工具包 · stdlib only · pre-v1',
-    headline: '显式路由。收敛的稳定表面。机器可读规范。',
+    headline: '不挡你路的 Go HTTP 工具包。',
     summary:
-      '路由、中间件和依赖 wiring 留在代码里——在代码评审和 <code>specs/</code> 中均可见。9 个稳定模块向 v1 推进，扩展家族向外分叉而不拉长内核。',
+      '零外部依赖。9 个稳定模块，API 向 v1 冻结。代码评审里清晰可见的显式路由。从一个参考应用起步——只在边界清晰时向外扩展。',
     primaryCta: { label: '开始使用', href: '/zh/docs/getting-started' },
-    secondaryCta: { label: '架构', href: '/zh/architecture' },
+    secondaryCta: { label: '为什么选择', href: '/zh/why-plumego' },
+    scenarioCards: [
+      {
+        kicker: 'REST API',
+        title: '几分钟搭一个 REST API',
+        code: `r := router.New()
+api := r.Group("/api/v1",
+    middleware.Auth(cfg.JWTSecret))
+api.Get("/users/:id", users.Get)
+api.Post("/users",    users.Create)`,
+        body: '基于 trie 树的路由，支持路径参数、中间件组和类型化响应，全部使用标准 net/http handler，无自定义 context 类型。',
+        href: '/zh/docs/guides/build-rest-resource',
+        label: 'REST API 指南',
+        maturity: null,
+      },
+      {
+        kicker: 'WebSocket',
+        title: '不动内核，加入实时能力',
+        code: `hub := websocket.NewHub()
+r.Get("/ws", hub.Handler(onMessage))
+
+// 向所有连接的客户端广播
+hub.Broadcast([]byte("update"))`,
+        body: 'x/websocket 在稳定 HTTP 内核上加了一个托管 hub，路由保持显式，传输层关注点保持独立。',
+        href: '/zh/docs/modules/x-websocket',
+        label: 'WebSocket 模块',
+        maturity: 'beta',
+      },
+      {
+        kicker: '多租户 SaaS',
+        title: '不改内核，隔离多租户',
+        code: `api.Use(tenant.FromJWT(cfg.Secret))
+api.Get("/data", tenant.Guard(data.List))
+
+// 租户身份在传输层解析
+// 稳定根永远感知不到租户逻辑`,
+        body: 'x/tenant 在传输层附加每租户身份与策略，稳定根 API 不受租户逻辑演进影响。',
+        href: '/zh/docs/modules/x-tenant',
+        label: '租户模块',
+        maturity: 'experimental',
+      },
+    ],
+    stabilityBandTitle: '清楚知道哪些可以依赖。',
+    stabilityBandItems: [
+      { label: '9 个稳定模块', detail: 'API 冻结，向 v1 推进', status: 'stable', href: '/zh/stability' },
+      { label: '4 个 beta 扩展', detail: 'ref 间 API 冻结', status: 'beta', href: '/zh/stability' },
+      { label: '13 个实验性', detail: '采用前请先评估', status: 'experimental', href: '/zh/stability' },
+    ],
+    stabilityBandCta: { label: '完整稳定性矩阵', href: '/zh/stability' },
     moduleTitle: '稳定模块。',
     moduleLead: '9 个包，具备向 v1 迈进的兼容性保证，是推荐的生产评估起点。',
     moduleBaseImport: 'github.com/spcent/plumego',
@@ -223,10 +323,10 @@ export const HOME_COPY = {
         label: '查看常见问题',
       },
     ],
-    finalTitle: '从 reference app 起步。确认模块成熟度。边界清晰后再向外扩展。',
-    finalBody: 'Plumego 最适合从默认路径进入，并尽早确认模块成熟度；只有在归属已经明确之后，再进入更深的模块边界。',
+    finalTitle: '从 reference app 起步。确认稳定性。边界清晰后再扩展。',
+    finalBody: '到达生产最快路径：clone reference/standard-service，在稳定性页确认模块成熟度，然后只在归属明确的模块边界内向外延伸。',
     finalPrimary: { label: '阅读文档', href: '/zh/docs' },
-    finalSecondary: { label: '查看参考应用', href: '/zh/docs/reference-app' },
+    finalSecondary: { label: '查看稳定性', href: '/zh/stability' },
     contrastTitle: '差异在代码评审时最明显。',
     contrastLead:
       '当路由分散在各个包里时，评审者必须逐个打开才能知道有哪些路径和中间件在运行。Plumego 把完整路由表放在一个显式文件里——同时加入结构化的 <code>contract</code> 层，让所有 handler 的错误响应和成功响应保持一致。',
@@ -1011,6 +1111,113 @@ export const EXAMPLES_COPY = {
     ],
     workerfleetMaturity: '生产参考 — 完整深度示例',
     workerfleetLabel: '阅读 workerfleet README',
+  },
+} as const;
+
+export const STABILITY_COPY = {
+  en: {
+    title: 'Stability',
+    description: 'Which modules you can depend on today, which are frozen between release refs, and which still require evaluation before adopting.',
+    eyebrow: 'Module Stability',
+    heroTitle: 'Know what you can rely on before you build.',
+    heroBody: 'Plumego separates its surface into four tiers. The 9 stable roots are the only surfaces with a long-term compatibility promise. Everything else has a label that tells you exactly how much to trust it.',
+    tiers: [
+      {
+        status: 'stable',
+        label: 'Stable roots',
+        badge: 'stable',
+        promise: 'API frozen toward v1. Safe for production.',
+        adopt: 'Adopt now — these are the recommended starting point for every service.',
+        modules: ['core', 'router', 'contract', 'middleware', 'security', 'store', 'health', 'log', 'metrics'],
+      },
+      {
+        status: 'supported',
+        label: 'Supported reference',
+        badge: 'supported',
+        promise: 'Aligned with the canonical path. Read as a guide.',
+        adopt: 'Use reference/standard-service as your starting template.',
+        modules: ['reference/standard-service', 'cmd/plumego'],
+      },
+      {
+        status: 'beta',
+        label: 'Beta extensions',
+        badge: 'beta',
+        promise: 'API frozen between minor release refs.',
+        adopt: 'Safe to adopt with awareness — check release notes before upgrades.',
+        modules: ['x/rest', 'x/gateway', 'x/websocket', 'x/observability'],
+      },
+      {
+        status: 'experimental',
+        label: 'Experimental extensions',
+        badge: 'experimental',
+        promise: 'API may change. Evaluate deliberately before adopting.',
+        adopt: 'Adopt for clear reasons after reading the module primer and maturity evidence.',
+        modules: ['x/ai', 'x/tenant', 'x/data', 'x/fileapi', 'x/messaging', 'x/resilience', 'x/cache', 'x/devtools', 'x/discovery', 'x/ipc', 'x/mq', 'x/ops', 'x/pubsub', 'x/scheduler', 'x/webhook'],
+      },
+    ],
+    promotionTitle: 'How modules get promoted',
+    promotionBody: 'A module does not become stable by declaration. Beta requires two consecutive tagged release refs with no API changes, release-backed snapshots, and owner sign-off.',
+    promotionSteps: [
+      { label: '01', title: 'Two release refs', body: 'No exported symbol may change across two consecutive tagged release refs.' },
+      { label: '02', title: 'Release-backed snapshots', body: 'API snapshots are recorded at both refs and compared automatically by CI.' },
+      { label: '03', title: 'Owner sign-off', body: 'The module owner confirms compatibility obligations in writing before the status field changes.' },
+    ],
+    ctaTitle: 'Ready to build?',
+    ctaBody: 'Start from the reference app, verify your module choices against the stability matrix, then expand.',
+    ctaPrimary: { label: 'Get Started', href: '/docs/getting-started' },
+    ctaSecondary: { label: 'Full release matrix', href: '/releases' },
+  },
+  zh: {
+    title: '稳定性',
+    description: '哪些模块今天可以依赖，哪些在发布 ref 间冻结，哪些在采用前还需要评估。',
+    eyebrow: '模块稳定性',
+    heroTitle: '动手之前，先搞清楚能靠哪些。',
+    heroBody: 'Plumego 把表面分成四个层级。9 个稳定根是唯一有长期兼容性承诺的部分，其他所有内容都有标签明确告诉你能信任多少。',
+    tiers: [
+      {
+        status: 'stable',
+        label: '稳定根',
+        badge: '稳定',
+        promise: 'API 向 v1 冻结，可用于生产。',
+        adopt: '立即采用——这是所有服务推荐的起点。',
+        modules: ['core', 'router', 'contract', 'middleware', 'security', 'store', 'health', 'log', 'metrics'],
+      },
+      {
+        status: 'supported',
+        label: '受支持参考',
+        badge: '受支持',
+        promise: '与 canonical path 保持同步，作为指南阅读。',
+        adopt: '以 reference/standard-service 作为起步模板。',
+        modules: ['reference/standard-service', 'cmd/plumego'],
+      },
+      {
+        status: 'beta',
+        label: 'Beta 扩展',
+        badge: 'beta',
+        promise: 'minor 发布 ref 间 API 冻结。',
+        adopt: '可以采用，但升级前需要查看 release notes。',
+        modules: ['x/rest', 'x/gateway', 'x/websocket', 'x/observability'],
+      },
+      {
+        status: 'experimental',
+        label: '实验性扩展',
+        badge: '实验性',
+        promise: 'API 可能变化，采用前请评估。',
+        adopt: '在阅读模块手册和成熟度证据后，有明确理由时再采用。',
+        modules: ['x/ai', 'x/tenant', 'x/data', 'x/fileapi', 'x/messaging', 'x/resilience', 'x/cache', 'x/devtools', 'x/discovery', 'x/ipc', 'x/mq', 'x/ops', 'x/pubsub', 'x/scheduler', 'x/webhook'],
+      },
+    ],
+    promotionTitle: '模块如何晋级',
+    promotionBody: '模块不能靠声明变稳定。Beta 晋级要求：连续两个 release ref 内没有 API 变化、有 release-backed 快照，以及负责人书面签字。',
+    promotionSteps: [
+      { label: '01', title: '两个 release ref', body: '在连续两个 release ref 之间，不得有任何 exported symbol 变化。' },
+      { label: '02', title: 'Release-backed 快照', body: '在两个 ref 分别记录 API 快照，由 CI 自动比对。' },
+      { label: '03', title: '负责人签字', body: '模块负责人在状态字段变更前书面确认兼容性义务。' },
+    ],
+    ctaTitle: '准备好动手了？',
+    ctaBody: '从参考应用起步，对照稳定性矩阵确认模块选择，然后再扩展。',
+    ctaPrimary: { label: '开始使用', href: '/zh/docs/getting-started' },
+    ctaSecondary: { label: '完整发布矩阵', href: '/zh/releases' },
   },
 } as const;
 
