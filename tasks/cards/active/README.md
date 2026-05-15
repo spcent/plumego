@@ -46,9 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| [1429](1429-v1-milestone-verify-artifacts.md) | P0 | release | Add verify artifacts and reconcile milestone state before release execution |
-| [1436](1436-v1-rc1-observation-window.md) | P0 | release | Complete the `v1.0.0-rc.1` observation window and decide final v1 handoff |
-| [1375](1375-v1-rc-tag-and-observation-window.md) | P0 | release | Existing rc.1 release candidate card; executed through card 1430 |
 | [1367](1367-x-tenant-beta-evidence-closure.md) | P2 | x/tenant | Complete beta evidence closure for `x/tenant` when real release refs and owner sign-off are available |
 | [1370](1370-x-ai-stable-tier-beta-evidence-closure.md) | P2 | x/ai | Complete beta evidence closure for `x/ai` stable-tier subpackages |
 | [1371](1371-x-data-surface-beta-evidence-closure.md) | P2 | x/data | Complete beta evidence closure for selected `x/data` surfaces |
