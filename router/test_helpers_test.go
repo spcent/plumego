@@ -58,3 +58,9 @@ func newRouterWithMatchCapacity(capacity int, opts ...RouterOption) *Router {
 	allOpts := append([]RouterOption{withCacheCapacity(capacity)}, opts...)
 	return NewRouter(allOpts...)
 }
+
+func matchCacheEntryCount(cache *matchCache) int {
+	cache.mu.RLock()
+	defer cache.mu.RUnlock()
+	return len(cache.cache)
+}

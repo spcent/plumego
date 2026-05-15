@@ -1134,8 +1134,8 @@ func TestCachedRouteNormalizesTrailingSlash(t *testing.T) {
 		t.Fatalf("expected 200, got %d", rec.Code)
 	}
 
-	if size := r.state.matchCache.Size(); size != 1 {
-		t.Fatalf("expected cache size 1, got %d", size)
+	if count := matchCacheEntryCount(r.state.matchCache); count != 1 {
+		t.Fatalf("expected cache entry count 1, got %d", count)
 	}
 }
 
@@ -1157,8 +1157,8 @@ func TestCachedRouteNormalizesRepeatedLeadingSlash(t *testing.T) {
 	assertResponseStatus(t, rec, http.StatusOK)
 	assertResponseBody(t, rec, "123")
 
-	if size := r.state.matchCache.Size(); size != 1 {
-		t.Fatalf("expected cache size 1, got %d", size)
+	if count := matchCacheEntryCount(r.state.matchCache); count != 1 {
+		t.Fatalf("expected cache entry count 1, got %d", count)
 	}
 }
 
@@ -1195,8 +1195,8 @@ func TestCachedRouteKeyUsesMethodAndNormalizedPath(t *testing.T) {
 		t.Fatalf("expected 200, got %d", rec.Code)
 	}
 
-	size := r.state.matchCache.Size()
-	if size != 2 {
-		t.Fatalf("expected method/path cache size 2, got %d", size)
+	count := matchCacheEntryCount(r.state.matchCache)
+	if count != 2 {
+		t.Fatalf("expected method/path cache entry count 2, got %d", count)
 	}
 }

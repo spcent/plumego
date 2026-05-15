@@ -251,7 +251,7 @@ func TestGroupRootNamedRouteUsesNormalizedPrefix(t *testing.T) {
 	}
 }
 
-func TestNamedMethodHelpersOnGroups(t *testing.T) {
+func TestNamedRoutesOnGroups(t *testing.T) {
 	r := NewRouter()
 
 	api := r.Group("/api")

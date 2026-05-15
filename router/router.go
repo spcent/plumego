@@ -297,19 +297,10 @@ func (r *Router) metaFor(method, pattern string) RouteMeta {
 }
 
 func (r *Router) metaForLocked(method, pattern string) RouteMeta {
-	pattern = normalizeStoredPattern(pattern)
 	if byMethod, ok := r.state.routeMeta[method]; ok {
 		return byMethod[pattern]
 	}
 	return RouteMeta{}
-}
-
-func normalizeStoredPattern(pattern string) string {
-	pattern = strings.TrimRight(pattern, "/")
-	if pattern == "" {
-		return "/"
-	}
-	return pattern
 }
 
 // Param returns the value of the named path parameter from the request context.

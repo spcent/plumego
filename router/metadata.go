@@ -23,7 +23,6 @@ func (r *Router) storeRouteMetaLocked(method, pattern string, meta RouteMeta) {
 	if meta == (RouteMeta{}) {
 		return
 	}
-	pattern = normalizeStoredPattern(pattern)
 	if r.state.routeMeta == nil {
 		r.state.routeMeta = make(map[string]map[string]RouteMeta)
 	}

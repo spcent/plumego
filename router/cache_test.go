@@ -38,7 +38,7 @@ func TestMatcherCacheConcurrentAccess(t *testing.T) {
 
 	wg.Wait()
 
-	if size := cache.Size(); size > 64 {
-		t.Fatalf("cache size exceeded capacity: %d", size)
+	if count := matchCacheEntryCount(cache); count > 64 {
+		t.Fatalf("cache entry count exceeded capacity: %d", count)
 	}
 }

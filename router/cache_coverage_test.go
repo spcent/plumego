@@ -27,25 +27,14 @@ func TestMatcherCacheClear(t *testing.T) {
 	cache.Get("key-0")
 	cache.Get("missing")
 
-	if cache.Size() == 0 {
+	if matchCacheEntryCount(cache) == 0 {
 		t.Fatal("cache should have entries before Clear")
 	}
 
 	cache.Clear()
 
-	if cache.Size() != 0 {
-		t.Errorf("Size after Clear = %d, want 0", cache.Size())
-	}
-
-	stats := cache.Stats()
-	if stats.Hits != 0 {
-		t.Errorf("Hits after Clear = %d, want 0", stats.Hits)
-	}
-	if stats.Misses != 0 {
-		t.Errorf("Misses after Clear = %d, want 0", stats.Misses)
-	}
-	if stats.ExactEntries != 0 {
-		t.Errorf("ExactEntries after Clear = %d, want 0", stats.ExactEntries)
+	if count := matchCacheEntryCount(cache); count != 0 {
+		t.Errorf("cache entries after Clear = %d, want 0", count)
 	}
 }
 
@@ -53,53 +42,8 @@ func TestMatcherCacheClearEmptyCache(t *testing.T) {
 	cache := newMatchCache(10)
 	cache.Clear()
 
-	if size := cache.Size(); size != 0 {
-		t.Errorf("size after Clear of empty = %d, want 0", size)
-	}
-}
-
-func TestMatcherStatsInitial(t *testing.T) {
-	cache := newMatchCache(50)
-	stats := cache.Stats()
-
-	if stats.Capacity != 50 {
-		t.Errorf("Capacity = %d, want 50", stats.Capacity)
-	}
-	if stats.Hits != 0 {
-		t.Errorf("Hits = %d, want 0", stats.Hits)
-	}
-	if stats.Misses != 0 {
-		t.Errorf("Misses = %d, want 0", stats.Misses)
-	}
-	if stats.HitRate != 0 {
-		t.Errorf("HitRate = %f, want 0", stats.HitRate)
-	}
-	if stats.ExactEntries != 0 {
-		t.Errorf("ExactEntries = %d, want 0", stats.ExactEntries)
-	}
-}
-
-func TestMatcherStatsAfterOperations(t *testing.T) {
-	cache := newMatchCache(10)
-	cache.Set("a", &matchResult{})
-	cache.Set("b", &matchResult{})
-
-	cache.Get("a")
-	cache.Get("a")
-	cache.Get("miss")
-
-	stats := cache.Stats()
-	if stats.ExactEntries != 2 {
-		t.Errorf("ExactEntries = %d, want 2", stats.ExactEntries)
-	}
-	if stats.Hits != 2 {
-		t.Errorf("Hits = %d, want 2", stats.Hits)
-	}
-	if stats.Misses != 1 {
-		t.Errorf("Misses = %d, want 1", stats.Misses)
-	}
-	if stats.HitRate < 0.66 || stats.HitRate > 0.68 {
-		t.Errorf("HitRate = %f, want ~0.667", stats.HitRate)
+	if count := matchCacheEntryCount(cache); count != 0 {
+		t.Errorf("cache entries after Clear of empty = %d, want 0", count)
 	}
 }
 
@@ -119,13 +63,9 @@ func TestMatcherCacheGetExactHit(t *testing.T) {
 
 func TestMatcherCacheGetMiss(t *testing.T) {
 	cache := newMatchCache(10)
-	before := cache.Stats().Misses
 
-	cache.Get("GET:/not/found")
-
-	after := cache.Stats().Misses
-	if after != before+1 {
-		t.Errorf("misses should increment: before=%d after=%d", before, after)
+	if result, found := cache.Get("GET:/not/found"); found || result != nil {
+		t.Fatalf("Get miss = (%v, %v), want (nil, false)", result, found)
 	}
 }
 
@@ -137,8 +77,7 @@ func TestMatcherCacheEviction(t *testing.T) {
 		cache.Set(fmt.Sprintf("key-%d", i), &matchResult{})
 	}
 
-	stats := cache.Stats()
-	if stats.ExactEntries > capacity {
-		t.Errorf("ExactEntries = %d, should be <= %d after eviction", stats.ExactEntries, capacity)
+	if count := matchCacheEntryCount(cache); count > capacity {
+		t.Errorf("cache entries = %d, should be <= %d after eviction", count, capacity)
 	}
 }
