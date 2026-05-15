@@ -46,6 +46,14 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
+| [1421](1421-contract-v1-breaking-contract-cleanup.md) | P0 | contract | Remove compatibility response/error/binding surfaces and keep one canonical v1 transport contract |
+| [1422](1422-store-v1-alias-wrapper-removal.md) | P0 | store | Remove cache/kv compatibility aliases and wrappers, then migrate callers to canonical store contracts |
+| [1423](1423-middleware-responsewriter-helper-unification.md) | P1 | middleware | Consolidate duplicate response writer recording helpers while preserving transport-only middleware behavior |
+| [1424](1424-router-metadata-path-rule-cleanup.md) | P1 | router | Normalize route metadata/path error handling and cover negative paths without adding HTTP concerns |
+| [1425](1425-security-fail-closed-breaking-cleanup.md) | P0 | security | Remove lenient security fallbacks and make invalid auth/input/policy paths fail closed |
+| [1426](1426-log-v1-output-contract-cleanup.md) | P1 | log | Normalize logger configuration and caller/output contract before v1 freeze |
+| [1427](1427-metrics-health-v1-contract-cleanup.md) | P2 | metrics, health | Keep metrics and health contracts minimal, deleting redundant aliases or helper surfaces |
+| [1428](1428-core-v1-minimal-kernel-freeze.md) | P1 | core | Freeze core as a minimal kernel after router, middleware, and contract cleanup land |
 | [1367](1367-x-tenant-beta-evidence-closure.md) | P2 | x/tenant | Complete beta evidence closure for `x/tenant` when real release refs and owner sign-off are available |
 | [1370](1370-x-ai-stable-tier-beta-evidence-closure.md) | P2 | x/ai | Complete beta evidence closure for `x/ai` stable-tier subpackages |
 | [1371](1371-x-data-surface-beta-evidence-closure.md) | P2 | x/data | Complete beta evidence closure for selected `x/data` surfaces |
