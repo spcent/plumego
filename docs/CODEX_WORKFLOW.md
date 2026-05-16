@@ -274,9 +274,9 @@ Companion workflow assets:
 
 High-level loop:
 
-1. scaffold the spec with `make new-milestone`
+1. scaffold the spec with `make new-milestone N=NNN TITLE="..."`
 2. fill Goal, Architecture Decisions, Context, Tasks, Acceptance Criteria, and Out of Scope
-3. validate with `make check-spec`
+3. validate with `make check-spec M=active/M-NNN`
 4. launch with `make milestone M=active/M-NNN`
 5. let the agent execute autonomously on the milestone branch
 6. review the PR as the only manual checkpoint

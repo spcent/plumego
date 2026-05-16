@@ -225,17 +225,6 @@ The default agent loop is:
 If step 1 or 2 leaves the owning module unclear, the agent should stop in
 analysis mode instead of coding through ambiguity.
 
-## Migration Direction
-
-Near-term restructuring follows this order:
-
-1. Add specs and module manifests.
-2. Freeze the canonical app path: reference app plus matching template root.
-3. Introduce and harden `x/tenant` as the first extension boundary.
-4. Remove the root package facade.
-5. Move feature catalogs and topology-heavy capabilities out of stable roots.
-6. Replace broad legacy top-level roots such as `net`, `utils`, `validator`, `rest`, and `pubsub` with stable roots or explicit `x/*` families.
-
 ## Extension Discovery Defaults
 
 Agents should prefer these entrypoints when multiple related `x/*` packages exist:

@@ -277,7 +277,6 @@ Next work:
 4. Advance `x/tenant` production readiness.
 5. Clarify `x/data` and `x/fileapi` operational guidance.
 6. Expand `x/gateway/discovery` backends only when explicit adapters are ready.
-7. Raise `x/observability` and `x/gateway` test depth.
 
 ## What Not to Do
 
