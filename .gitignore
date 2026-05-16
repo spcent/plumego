@@ -11,6 +11,9 @@
 cmd/plumego/plumego
 cmd/plumego/plumego-*
 
+# Generated task execution bundle (agent working context, not for commit)
+.agent-bundle.yaml
+
 # Logs and temporary files
 *.log
 *.bak
