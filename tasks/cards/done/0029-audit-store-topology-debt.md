@@ -1,6 +1,7 @@
 # Card 0029
 
 Priority: P1
+State: done
 
 Goal:
 - Audit stable `store` for topology-heavy placement debt and define the next migration steps for distributed cache and provider-heavy adapters.

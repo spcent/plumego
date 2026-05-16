@@ -3,7 +3,7 @@
 Milestone: none
 Recipe: specs/change-recipes/http-endpoint-bugfix.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: x/resilience/circuitbreaker
 Owned Files:
 - `x/resilience/circuitbreaker/circuitbreaker_test.go`

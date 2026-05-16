@@ -1,6 +1,7 @@
 # Card 0059
 
 Priority: P0
+State: done
 
 Goal:
 - Audit every exported symbol in all stable library roots and remove or unexport

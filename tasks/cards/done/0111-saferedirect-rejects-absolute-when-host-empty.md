@@ -1,6 +1,7 @@
 # Card 0111
 
 Priority: P2
+State: done
 
 Goal:
 - Fix `validateRedirectURL` so that it does not reject all absolute same-origin

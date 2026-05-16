@@ -1,6 +1,7 @@
 # Card 0030
 
 Priority: P1
+State: done
 
 Goal:
 - Ensure transport health endpoint ownership remains outside the stable `health` root and is documented consistently.

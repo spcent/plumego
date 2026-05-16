@@ -1,6 +1,7 @@
 # Card 0105
 
 Priority: P2
+State: done
 
 Goal:
 - Fix `clientIPFromRequest` so it does not unconditionally trust the

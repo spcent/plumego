@@ -1,4 +1,6 @@
 ---
+
+State: done
 id: 1360
 title: x/data rw replica ownership
 status: done

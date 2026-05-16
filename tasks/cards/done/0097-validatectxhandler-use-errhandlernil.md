@@ -1,6 +1,7 @@
 # Card 0097
 
 Priority: P3
+State: done
 
 Goal:
 - Fix `ValidateCtxHandler` to return the existing `ErrHandlerNil` sentinel

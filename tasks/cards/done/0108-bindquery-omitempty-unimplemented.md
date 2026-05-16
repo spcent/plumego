@@ -1,6 +1,7 @@
 # Card 0108
 
 Priority: P3
+State: done
 
 Goal:
 - Implement the `omitempty` query tag option, or remove the TODO comment and

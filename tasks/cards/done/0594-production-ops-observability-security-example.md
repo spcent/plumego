@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/add-http-endpoint.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: reference
 Owned Files:
 - reference/production-service/README.md

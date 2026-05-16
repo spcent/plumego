@@ -1,6 +1,7 @@
 # Card 0072
 
 Priority: P1
+State: done
 
 Goal:
 - Move the full Tracer/Span/Collector/Sampler subsystem out of the stable

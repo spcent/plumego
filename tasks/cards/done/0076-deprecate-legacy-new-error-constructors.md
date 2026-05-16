@@ -1,6 +1,7 @@
 # Card 0076
 
 Priority: P1
+State: done
 
 Goal:
 - Mark the 8 legacy `NewXxxError` convenience constructors with proper Go

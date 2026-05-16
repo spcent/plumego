@@ -1,6 +1,7 @@
 # Card 0664
 
 Priority: P0
+State: done
 
 Goal:
 - Align the control plane with the existing file capability split and remove the remaining empty protocol residue.

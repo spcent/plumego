@@ -1,6 +1,7 @@
 # Card 0665
 
 Priority: P1
+State: done
 
 Goal:
 - Define the first package-level metadata spec for ambiguity hotspots.

@@ -2,6 +2,7 @@
 
 Status: done
 Priority: P3
+State: done
 Primary module: `x/websocket`
 
 ## Problem

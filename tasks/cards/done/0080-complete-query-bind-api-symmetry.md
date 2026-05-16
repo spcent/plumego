@@ -1,6 +1,7 @@
 # Card 0080
 
 Priority: P1
+State: done
 
 Goal:
 - Complete the Query binding API so it is symmetric with the JSON binding API

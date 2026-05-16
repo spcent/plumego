@@ -1,6 +1,7 @@
 # Card 0002
 
 Priority: P1
+State: done
 
 Goal:
 - Add a repo check that ensures `specs/change-recipes/*` remains discoverable from canonical repo metadata.

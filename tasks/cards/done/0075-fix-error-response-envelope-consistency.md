@@ -1,6 +1,7 @@
 # Card 0075
 
 Priority: P1
+State: done
 
 Goal:
 - Make `Ctx.ErrorJSON` produce the same JSON envelope as `WriteError` so all

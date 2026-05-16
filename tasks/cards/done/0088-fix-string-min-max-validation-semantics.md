@@ -1,6 +1,7 @@
 # Card 0088
 
 Priority: P2
+State: done
 
 Goal:
 - Fix `validateMin` and `validateMax` for string fields so that `min`/`max`

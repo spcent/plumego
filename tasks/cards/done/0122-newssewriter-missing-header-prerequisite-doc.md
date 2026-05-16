@@ -1,6 +1,7 @@
 # Card 0122
 
 Priority: P3
+State: done
 
 Goal:
 - Document that `NewSSEWriter` requires SSE response headers to have been set

@@ -1,6 +1,7 @@
 # Card 0061
 
 Priority: P1
+State: done
 
 Goal:
 - Define a formal deprecation policy for stable library roots and extension

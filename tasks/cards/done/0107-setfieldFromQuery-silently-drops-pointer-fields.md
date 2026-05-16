@@ -1,6 +1,7 @@
 # Card 0107
 
 Priority: P2
+State: done
 
 Goal:
 - Fix `setFieldFromQuery` to handle pointer fields (`*string`, `*int`, etc.)

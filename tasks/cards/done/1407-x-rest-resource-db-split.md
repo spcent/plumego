@@ -3,7 +3,7 @@
 Milestone: v1-package-cleanup
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/rest
 Owned Files:
 - x/rest/resource_db.go

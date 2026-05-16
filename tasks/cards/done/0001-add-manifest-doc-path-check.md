@@ -1,6 +1,7 @@
 # Card 0001
 
 Priority: P0
+State: done
 
 Goal:
 - Extend manifest validation so every declared `doc_paths` target must exist.

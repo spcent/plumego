@@ -1,6 +1,7 @@
 # Card 0060
 
 Priority: P1
+State: done
 
 Goal:
 - Expand negative-path and integration test coverage for critical stable roots

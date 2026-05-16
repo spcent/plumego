@@ -1,7 +1,9 @@
 # 0329 · x/pubsub — extension sentinel errors bypass the package's structured *Error type
 
+State: done
+
 ## Status
-active
+done
 
 ## Problem
 `x/pubsub/errors.go` defines a well-designed structured error type:

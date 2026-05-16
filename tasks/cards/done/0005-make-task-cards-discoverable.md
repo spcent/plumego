@@ -1,6 +1,7 @@
 # Card 0005
 
 Priority: P2
+State: done
 
 Goal:
 - Make `tasks/cards/` part of the normal agent workflow instead of an undocumented side directory.

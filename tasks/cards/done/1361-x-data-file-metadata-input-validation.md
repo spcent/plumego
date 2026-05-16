@@ -1,4 +1,6 @@
 ---
+
+State: done
 id: 1361
 title: x/data file metadata input validation
 status: done

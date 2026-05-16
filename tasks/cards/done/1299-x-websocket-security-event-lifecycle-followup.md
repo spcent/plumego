@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/extension-stability.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/websocket
 Owned Files: x/websocket/hub.go, x/websocket/hub_test.go, docs/modules/x-websocket/README.md
 Depends On:

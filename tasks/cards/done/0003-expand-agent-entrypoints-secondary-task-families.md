@@ -1,6 +1,7 @@
 # Card 0003
 
 Priority: P1
+State: done
 
 Goal:
 - Expand `specs/task-routing.yaml` to cover remaining common task families at finer granularity.

@@ -3,7 +3,7 @@
 Milestone: cmd stable hardening
 Recipe: specs/change-recipes/refactor-small.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: cmd/plumego external process
 Owned Files: cmd/plumego/internal/executil/*, cmd/plumego/commands/build.go, cmd/plumego/commands/test.go, cmd/plumego/internal/checker/checker.go
 Depends On: 0753

@@ -1,6 +1,7 @@
 # Card 0028
 
 Priority: P2
+State: done
 
 Goal:
 - Clarify reusable response/error conventions and layering guidance for `x/rest` without turning it into a bootstrap surface.

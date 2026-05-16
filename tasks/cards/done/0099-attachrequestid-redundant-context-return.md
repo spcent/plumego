@@ -1,6 +1,7 @@
 # Card 0099
 
 Priority: P3
+State: done
 
 Goal:
 - Remove the redundant `context.Context` return value from

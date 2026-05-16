@@ -1,6 +1,7 @@
 # Card 0081
 
 Priority: P2
+State: done
 
 Goal:
 - Remove the exported mutable pointer `DefaultRequestConfig` and replace it

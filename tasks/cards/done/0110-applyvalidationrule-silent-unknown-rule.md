@@ -1,6 +1,7 @@
 # Card 0110
 
 Priority: P2
+State: done
 
 Goal:
 - Make `applyValidationRule` return an error on unknown rule names so that tag

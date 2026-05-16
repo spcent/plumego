@@ -1,6 +1,7 @@
 # Card 0004
 
 Priority: P1
+State: done
 
 Goal:
 - Ensure manifest-declared module primers exist and user-facing modules point to the right primer locations.

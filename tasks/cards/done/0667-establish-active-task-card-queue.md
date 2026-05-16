@@ -1,6 +1,7 @@
 # Card 0667
 
 Priority: P1
+State: done
 
 Goal:
 - Establish the active task-card queue and lifecycle rules.

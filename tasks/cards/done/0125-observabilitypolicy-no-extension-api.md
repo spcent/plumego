@@ -1,6 +1,7 @@
 # Card 0125
 
 Priority: P3
+State: done
 
 Goal:
 - Add a `WithSensitiveKeys` constructor option (or a builder method) to

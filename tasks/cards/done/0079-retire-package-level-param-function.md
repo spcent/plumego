@@ -1,6 +1,7 @@
 # Card 0079
 
 Priority: P1
+State: done
 
 Goal:
 - Remove the deprecated package-level `contract.Param(r, key)` function by

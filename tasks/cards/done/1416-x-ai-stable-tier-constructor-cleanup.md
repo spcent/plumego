@@ -3,7 +3,7 @@
 Milestone: v1-package-cleanup
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/ai
 Owned Files:
 - x/ai/provider/manager.go

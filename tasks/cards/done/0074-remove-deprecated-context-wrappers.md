@@ -1,6 +1,7 @@
 # Card 0074
 
 Priority: P0
+State: done
 
 Goal:
 - Remove the two deprecated context-accessor wrapper functions that remain in

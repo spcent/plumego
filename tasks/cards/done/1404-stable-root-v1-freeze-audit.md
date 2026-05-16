@@ -3,7 +3,7 @@
 Milestone: v1-package-cleanup
 Recipe: specs/change-recipes/stable-root-boundary-review.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: stable-roots
 Owned Files:
 - docs/release/v1.0.0-rc.1.md

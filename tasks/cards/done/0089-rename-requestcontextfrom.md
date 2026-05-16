@@ -1,6 +1,7 @@
 # Card 0089
 
 Priority: P3
+State: done
 
 Goal:
 - Rename `RequestContextFrom` to `RequestContextFromContext` to follow the

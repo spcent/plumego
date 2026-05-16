@@ -1,4 +1,6 @@
 ---
+
+State: done
 id: 1355
 title: x/data sharding range resolvability and default validation
 status: done

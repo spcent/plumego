@@ -1,6 +1,7 @@
 # Card 0078
 
 Priority: P2
+State: done
 
 Goal:
 - Remove three small inconsistencies in `contract` that were missed by the

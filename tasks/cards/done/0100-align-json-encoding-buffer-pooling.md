@@ -1,6 +1,7 @@
 # Card 0100
 
 Priority: P3
+State: done
 
 Goal:
 - Make JSON buffer pooling consistent: `WriteJSON` should use the same pooled

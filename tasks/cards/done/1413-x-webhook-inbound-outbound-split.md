@@ -3,7 +3,7 @@
 Milestone: v1-package-cleanup
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: x/webhook
 Owned Files:
 - x/webhook/outbound_service.go

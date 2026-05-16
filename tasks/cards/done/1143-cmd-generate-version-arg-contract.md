@@ -3,7 +3,7 @@
 Milestone: cmd stable hardening
 Recipe: specs/change-recipes/refactor-small.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: cmd/plumego argument contract
 Owned Files: cmd/plumego/commands/generate.go, cmd/plumego/commands/version.go, cmd/plumego/commands/cli_e2e_test.go
 Depends On: 0752

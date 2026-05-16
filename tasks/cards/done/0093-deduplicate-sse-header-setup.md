@@ -1,6 +1,7 @@
 # Card 0093
 
 Priority: P3
+State: done
 
 Goal:
 - Eliminate the duplicated SSE header lines between `RespondWithSSE` and

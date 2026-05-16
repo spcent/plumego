@@ -3,7 +3,7 @@
 Milestone: cmd stable hardening
 Recipe: specs/change-recipes/refactor-small.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: cmd/plumego test and artifact hygiene
 Owned Files: cmd/plumego/README.md, cmd/plumego/commands/cli_e2e_test.go, cmd/plumego/commands/dev_test.go, .gitignore
 Depends On: 0750

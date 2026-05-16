@@ -3,7 +3,7 @@
 Milestone: v1-breaking-normalization
 Recipe: specs/change-recipes/stable-root-boundary-review.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: core
 Owned Files:
 - core/*

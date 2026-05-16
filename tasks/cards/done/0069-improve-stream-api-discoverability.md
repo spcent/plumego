@@ -1,6 +1,7 @@
 # Card 0069
 
 Priority: P1
+State: done
 
 Goal:
 - Replace the 15-method stream API explosion on `Ctx` with a composable

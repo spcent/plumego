@@ -1,6 +1,7 @@
 # Card 0109
 
 Priority: P3
+State: done
 
 Goal:
 - Replace the raw `APIError{}` struct literal in `ParseErrorFromResponse`'s

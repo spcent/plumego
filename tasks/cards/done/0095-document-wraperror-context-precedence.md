@@ -1,6 +1,7 @@
 # Card 0095
 
 Priority: P2
+State: done
 
 Goal:
 - Make `WrapError`'s context-precedence rule explicit in code and docs, or

@@ -1,6 +1,7 @@
 # Card 0085
 
 Priority: P2
+State: done
 
 Goal:
 - Make error logging consistent across all four `BindAndValidate*` methods.

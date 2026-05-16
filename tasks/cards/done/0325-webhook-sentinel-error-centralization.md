@@ -1,7 +1,9 @@
 # 0325 · x/webhook — sentinel error scatter and ErrInvalidHex triplication
 
+State: done
+
 ## Status
-active
+done
 
 ## Problem
 Sentinel error variables are spread across six files in the `x/webhook` package, with

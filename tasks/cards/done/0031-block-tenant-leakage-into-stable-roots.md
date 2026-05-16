@@ -1,6 +1,7 @@
 # Card 0031
 
 Priority: P1
+State: done
 
 Goal:
 - Tighten the rule that tenant-aware behavior must not leak back into stable `middleware` or `store`.

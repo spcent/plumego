@@ -1,6 +1,7 @@
 # Card 0106
 
 Priority: P2
+State: done
 
 Goal:
 - Make `validateStruct` recurse into nested and embedded struct fields so that

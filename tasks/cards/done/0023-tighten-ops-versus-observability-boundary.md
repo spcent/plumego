@@ -1,6 +1,7 @@
 # Card 0023
 
 Priority: P1
+State: done
 
 Goal:
 - Make `x/ops` and `x/observability` clearly non-overlapping in discovery guidance and module ownership language.

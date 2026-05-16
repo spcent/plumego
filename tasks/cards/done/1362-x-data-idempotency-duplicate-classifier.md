@@ -1,4 +1,6 @@
 ---
+
+State: done
 id: 1362
 title: x/data idempotency duplicate classifier
 status: done

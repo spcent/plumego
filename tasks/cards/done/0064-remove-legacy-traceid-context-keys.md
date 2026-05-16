@@ -1,6 +1,7 @@
 # Card 0064
 
 Priority: P0
+State: done
 
 Goal:
 - Remove the two legacy context-key types for TraceID/RequestContext and

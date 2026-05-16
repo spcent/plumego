@@ -1,7 +1,9 @@
 # 0327 · x/mq — 20 sentinel errors buried in types.go
 
+State: done
+
 ## Status
-active
+done
 
 ## Problem
 `x/mq/types.go` contains the package's Go type definitions **and** 20 sentinel error

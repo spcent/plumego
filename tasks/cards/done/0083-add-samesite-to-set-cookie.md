@@ -1,6 +1,7 @@
 # Card 0083
 
 Priority: P2
+State: done
 
 Goal:
 - Add `SameSite http.SameSite` support to `Ctx.SetCookie` to close a

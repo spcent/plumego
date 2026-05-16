@@ -1,7 +1,9 @@
 # 0331 · x/ipc — 6 sentinel errors defined in ipc.go
 
+State: done
+
 ## Status
-active
+done
 
 ## Problem
 `x/ipc/ipc.go` defines the package's interfaces, types, and constants — **and** 6 sentinel

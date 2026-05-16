@@ -1,6 +1,7 @@
 # Card 0120
 
 Priority: P3
+State: done
 
 Goal:
 - Either implement `TraceContext.Baggage` propagation or remove the field and

@@ -1,6 +1,7 @@
 # Card 0103
 
 Priority: P2
+State: done
 
 Goal:
 - Make `trace_id` appear at the same nesting level in both success and error

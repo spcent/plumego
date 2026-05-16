@@ -1,6 +1,7 @@
 # Card 0084
 
 Priority: P2
+State: done
 
 Goal:
 - Remove `ShouldBindJSON` and `ShouldBindQuery` from `contract/context_bind.go`.

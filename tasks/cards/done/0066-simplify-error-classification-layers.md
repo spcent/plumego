@@ -1,6 +1,7 @@
 # Card 0066
 
 Priority: P1
+State: done
 
 Goal:
 - Reduce the three-layer error classification system (ErrorCategory / ErrorType

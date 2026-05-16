@@ -1,6 +1,7 @@
 # Card 0666
 
 Priority: P0
+State: done
 
 Goal:
 - Add a checker for orphaned extension roots and empty misleading directories.

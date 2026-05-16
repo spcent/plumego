@@ -1,6 +1,7 @@
 # Card 0071
 
 Priority: P1
+State: done
 
 Goal:
 - Remove dead code, consolidate overlapping abstractions, and split the

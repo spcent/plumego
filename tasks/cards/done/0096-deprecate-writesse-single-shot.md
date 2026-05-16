@@ -1,6 +1,7 @@
 # Card 0096
 
 Priority: P2
+State: done
 
 Goal:
 - Deprecate `Ctx.WriteSSE` because it creates a new `SSEWriter` on every call

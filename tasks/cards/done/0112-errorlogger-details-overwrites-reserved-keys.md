@@ -1,6 +1,7 @@
 # Card 0112
 
 Priority: P2
+State: done
 
 Goal:
 - Prevent `ErrorLogger` from silently overwriting reserved log field keys

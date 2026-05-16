@@ -1,6 +1,7 @@
 # Card 0033
 
 Priority: P2
+State: done
 
 Goal:
 - Review and reduce the current migration-debt baselines under `specs/check-baseline/*` instead of letting them silently persist.

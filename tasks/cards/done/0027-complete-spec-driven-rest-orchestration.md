@@ -1,6 +1,7 @@
 # Card 0027
 
 Priority: P1
+State: done
 
 Goal:
 - Push `ResourceSpec` further toward a single orchestration surface for query, hooks, transformer, and controller defaults.

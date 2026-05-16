@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/extension-stability.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: x/websocket
 Owned Files: x/websocket/module.yaml, docs/extension-evidence/x-websocket.md, docs/extension-evidence/x-websocket-public-api-inventory.md
 Depends On: 0763, 0764, 0765, 0766, 0767, 0768

@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/new-extension-module.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: x/ai
 Owned Files:
 - docs/modules/x-ai/README.md

@@ -1,6 +1,7 @@
 # Card 0115
 
 Priority: P3
+State: done
 
 Goal:
 - Co-locate `SafeExecute` and `SafeExecuteWithResult` in the same file so that

@@ -1,7 +1,9 @@
 # 0330 · x/websocket — sentinel errors in security.go and validation.go
 
+State: done
+
 ## Status
-active
+done
 
 ## Problem
 `x/websocket/errors.go` centralises most connection/hub/auth errors, but **eight more**

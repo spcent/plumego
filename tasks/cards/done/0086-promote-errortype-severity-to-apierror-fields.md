@@ -1,6 +1,7 @@
 # Card 0086
 
 Priority: P2
+State: done
 
 Goal:
 - Add `Type ErrorType` and `Severity ErrorSeverity` as first-class fields on

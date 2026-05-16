@@ -1,6 +1,7 @@
 # Card 0026
 
 Priority: P1
+State: done
 
 Goal:
 - Add a canonical example showing `ResourceSpec -> repository -> RegisterContextResourceRoutes(...)`.

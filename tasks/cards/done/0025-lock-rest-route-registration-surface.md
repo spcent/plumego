@@ -1,6 +1,7 @@
 # Card 0025
 
 Priority: P1
+State: done
 
 Goal:
 - Add focused route-level tests that lock down `RegisterContextResourceRoutes(...)` and related public route registration behavior.

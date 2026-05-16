@@ -1,6 +1,7 @@
 # Card 0113
 
 Priority: P2
+State: done
 
 Goal:
 - Extend `setFieldFromQuery` to handle non-string slice types (`[]int`, `[]int64`,

@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: internal/checks
 Owned Files:
 - internal/checks/extension-maturity/main.go

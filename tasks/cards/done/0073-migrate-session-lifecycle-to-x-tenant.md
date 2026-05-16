@@ -1,6 +1,7 @@
 # Card 0073
 
 Priority: P1
+State: done
 
 Goal:
 - Move `Session`, `SessionStore`, `SessionValidator`, `RefreshManager`, and

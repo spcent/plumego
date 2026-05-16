@@ -1,4 +1,6 @@
 ---
+
+State: done
 id: 1363
 title: x/data sharding postgres sslmode config
 status: done

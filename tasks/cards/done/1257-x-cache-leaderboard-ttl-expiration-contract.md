@@ -2,6 +2,7 @@
 
 Status: active
 Priority: P1
+State: done
 Primary module: `x/cache`
 
 ## Problem

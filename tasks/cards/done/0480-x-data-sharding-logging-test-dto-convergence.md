@@ -3,7 +3,7 @@
 Milestone: none
 Recipe: specs/change-recipes/module-cleanup.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/data/sharding
 Owned Files:
 - `x/data/sharding/logging_test.go`

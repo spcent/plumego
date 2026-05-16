@@ -1,6 +1,7 @@
 # Card 0082
 
 Priority: P2
+State: done
 
 Goal:
 - Remove `BindOptions.Redact` from the binding configuration struct because

@@ -1,6 +1,7 @@
 # Card 0114
 
 Priority: P3
+State: done
 
 Goal:
 - Remove the `strings.TrimSpace` in `MustParam` so both `Param` and `MustParam`

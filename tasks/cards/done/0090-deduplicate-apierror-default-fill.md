@@ -1,6 +1,7 @@
 # Card 0090
 
 Priority: P3
+State: done
 
 Goal:
 - Remove the hand-rolled default-fill logic inside `toAPIError` by using

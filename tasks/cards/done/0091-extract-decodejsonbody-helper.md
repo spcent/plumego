@@ -1,6 +1,7 @@
 # Card 0091
 
 Priority: P2
+State: done
 
 Goal:
 - Extract a shared internal JSON decode helper to eliminate the duplicated

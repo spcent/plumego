@@ -1,6 +1,7 @@
 # Card 0668
 
 Priority: P0
+State: done
 
 Goal:
 - Add mechanical checks for module primer coverage and package hotspot metadata coverage.

@@ -1,6 +1,7 @@
 # Card 0117
 
 Priority: P2
+State: done
 
 Goal:
 - Clarify and fix the retry semantics in `streamFromGenWithRetry` so that

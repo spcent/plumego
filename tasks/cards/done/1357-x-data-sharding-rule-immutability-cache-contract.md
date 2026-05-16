@@ -1,4 +1,6 @@
 ---
+
+State: done
 id: 1357
 title: x/data sharding rule immutability and rewrite cache contract
 status: done

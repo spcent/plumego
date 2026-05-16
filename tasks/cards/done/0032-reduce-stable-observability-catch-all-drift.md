@@ -1,6 +1,7 @@
 # Card 0032
 
 Priority: P2
+State: done
 
 Goal:
 - Reduce ambiguity around observability catch-all behavior in stable roots and keep adapter-heavy observability work in the right extension layer.

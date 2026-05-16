@@ -1,6 +1,7 @@
 # Card 0669
 
 Priority: P0
+State: done
 
 Goal:
 - Add a mechanical check that fails when stable roots grow app-facing HTTP surface.

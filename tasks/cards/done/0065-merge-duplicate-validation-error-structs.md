@@ -1,6 +1,7 @@
 # Card 0065
 
 Priority: P0
+State: done
 
 Goal:
 - Eliminate the duplicate validation-error struct (`validationIssue` in

@@ -1,6 +1,7 @@
 # Card 0022
 
 Priority: P1
+State: done
 
 Goal:
 - Tighten the boundary between `x/gateway` and `x/rest` so edge transport and reusable resource-interface work never compete for the same discovery role.

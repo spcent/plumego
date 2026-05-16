@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/review-only.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: x/data
 Owned Files:
 - docs/modules/x-data/README.md

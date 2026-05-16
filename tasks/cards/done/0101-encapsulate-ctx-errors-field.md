@@ -1,6 +1,7 @@
 # Card 0101
 
 Priority: P2
+State: done
 
 Goal:
 - Make `Ctx.Errors` unexported (or read-only from the outside) so that the

@@ -1,6 +1,7 @@
 # Card 0094
 
 Priority: P3
+State: done
 
 Goal:
 - Remove the redundant second param-extraction loop from `logErrorWithContext`

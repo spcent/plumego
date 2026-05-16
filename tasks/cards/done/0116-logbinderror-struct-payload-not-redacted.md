@@ -1,6 +1,7 @@
 # Card 0116
 
 Priority: P2
+State: done
 
 Goal:
 - Fix `logBindError` so that struct fields in the logged payload are redacted

@@ -1,6 +1,7 @@
 # Card 0062
 
 Priority: P0
+State: done
 
 Goal:
 - Unify the fragmented Write* response API in the `contract` package so callers

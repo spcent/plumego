@@ -1,6 +1,7 @@
 # Card 0098
 
 Priority: P2
+State: done
 
 Goal:
 - Fix `WrapErrorf` so it produces a fully populated `WrappedErrorWithContext`,

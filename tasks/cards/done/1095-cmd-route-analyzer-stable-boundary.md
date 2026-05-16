@@ -3,7 +3,7 @@
 Milestone: cmd stable hardening
 Recipe: specs/change-recipes/refactor-small.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: cmd/plumego route analyzer
 Owned Files: cmd/plumego/commands/inspect.go, cmd/plumego/commands/routes.go, cmd/plumego/internal/routeanalyzer/analyzer.go, cmd/plumego/internal/routeanalyzer/analyzer_test.go
 Depends On: 0748

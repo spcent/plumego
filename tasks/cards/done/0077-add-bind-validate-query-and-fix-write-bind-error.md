@@ -1,6 +1,7 @@
 # Card 0077
 
 Priority: P1
+State: done
 
 Goal:
 - Add `BindAndValidateQuery` to complete bind-validate symmetry for query

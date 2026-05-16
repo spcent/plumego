@@ -1,6 +1,7 @@
 # Card 0127
 
 Priority: P3
+State: done
 
 Goal:
 - Clarify in `BindOptions` and `BindJSONWithOptions` that `MaxBodySize` is a

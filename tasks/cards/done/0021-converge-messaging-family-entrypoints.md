@@ -1,6 +1,7 @@
 # Card 0021
 
 Priority: P1
+State: done
 
 Goal:
 - Make the messaging family consistently discoverable from `x/messaging` while keeping sibling primitive packages explicitly subordinate.

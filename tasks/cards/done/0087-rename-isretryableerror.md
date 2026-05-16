@@ -1,6 +1,7 @@
 # Card 0087
 
 Priority: P2
+State: done
 
 Goal:
 - Rename `IsRetryableError(APIError) bool` to resolve the naming collision with

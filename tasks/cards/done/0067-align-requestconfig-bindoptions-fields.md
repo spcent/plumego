@@ -1,6 +1,7 @@
 # Card 0067
 
 Priority: P1
+State: done
 
 Goal:
 - Align field names between `RequestConfig` and `BindOptions`, and remove the

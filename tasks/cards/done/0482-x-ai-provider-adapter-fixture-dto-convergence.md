@@ -3,7 +3,7 @@
 Milestone: none
 Recipe: specs/change-recipes/module-cleanup.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/ai/provider
 Owned Files:
 - `x/ai/provider/adapters_test.go`

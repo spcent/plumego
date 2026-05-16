@@ -1,6 +1,7 @@
 # Card 0104
 
 Priority: P2
+State: done
 
 Goal:
 - Remove the use of the deprecated `Temporary() bool` interface from `IsRetryable`

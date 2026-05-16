@@ -1,6 +1,7 @@
 # Card 0070
 
 Priority: P2
+State: done
 
 Goal:
 - Establish a consistent convention for context-key types in the `contract`

@@ -1,6 +1,7 @@
 # Card 0092
 
 Priority: P3
+State: done
 
 Goal:
 - Remove the dead `validateChunkSize` function from `context_stream.go` and

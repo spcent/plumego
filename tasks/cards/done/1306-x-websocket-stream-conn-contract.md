@@ -3,7 +3,7 @@
 Milestone:
 Recipe: specs/change-recipes/extension-stability.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/websocket
 Owned Files: x/websocket/stream.go, x/websocket/conn.go, docs/modules/x-websocket/README.md, docs/extension-evidence/x-websocket-public-api-inventory.md
 Depends On:

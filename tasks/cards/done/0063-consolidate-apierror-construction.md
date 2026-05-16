@@ -1,6 +1,7 @@
 # Card 0063
 
 Priority: P0
+State: done
 
 Goal:
 - Reduce the five parallel paths for constructing an `APIError` to two:

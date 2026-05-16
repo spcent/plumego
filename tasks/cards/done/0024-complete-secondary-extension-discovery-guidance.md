@@ -1,6 +1,7 @@
 # Card 0024
 
 Priority: P2
+State: done
 
 Goal:
 - Finish the documentation-level convergence for `x/frontend`, `x/devtools`, and `x/discovery` so each has a stable discovery role without leaking into bootstrap or stable roots.

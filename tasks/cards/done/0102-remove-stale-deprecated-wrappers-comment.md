@@ -1,6 +1,7 @@
 # Card 0102
 
 Priority: P3
+State: done
 
 Goal:
 - Remove the stale "deprecated wrappers" comment from `context_stream.go:167`.

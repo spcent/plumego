@@ -1,6 +1,7 @@
 # Card 0068
 
 Priority: P1
+State: done
 
 Goal:
 - Prevent partially populated `APIError` values from reaching `WriteError` by

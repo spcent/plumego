@@ -154,6 +154,7 @@ func taskQueueLifecycleViolations(repoRoot string) ([]string, error) {
 	cardDirs := map[string]string{
 		"tasks/cards/active":  "active",
 		"tasks/cards/blocked": "blocked",
+		"tasks/cards/done":    "done",
 	}
 	for relDir, expectedState := range cardDirs {
 		dirViolations, err := taskCardStateViolations(repoRoot, relDir, expectedState)
