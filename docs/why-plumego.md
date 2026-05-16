@@ -103,9 +103,9 @@ app := core.New(cfg.Core, core.AppDependencies{
 })
 
 // Visible middleware order — explicit
-app.Use(middleware.RequestID())
-app.Use(middleware.Recovery(logger))
-app.Use(middleware.RequestLogger(logger))
+app.Use(requestid.Middleware())
+app.Use(recovery.Middleware(recovery.Config{Logger: logger}))
+app.Use(accesslog.Middleware(accesslog.Config{Logger: logger}))
 
 // Route registration in one file — explicit
 app.Get("/ping",  handlers.Ping)
