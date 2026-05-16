@@ -66,6 +66,29 @@ Because the request and handler shape should stay close to `net/http`. Plumego w
 
 ## Module Stability
 
+## Can I use Plumego in production right now?
+
+Yes — with one caveat per tier:
+
+- **Stable roots** (`core`, `router`, `contract`, `middleware`, `security`, `store`, `health`, `log`, `metrics`): production-ready today. Their APIs are frozen and will carry a formal compatibility promise at v1 release.
+- **Beta extensions** (`x/rest`, `x/websocket`, `x/gateway`, `x/observability`): safe to adopt in production. APIs are frozen between minor release refs; check release notes before upgrading.
+- **Experimental extensions** (all other `x/*`): APIs may change without a deprecation period. Wrap them behind an app-local interface before using in stable production paths.
+
+See [Stability](/stability) for the four-tier overview and [Releases](/releases) for the full module-by-module support matrix.
+
+## What is the router's performance overhead vs stdlib?
+
+Measured against Go 1.22+ `http.ServeMux` with `PathValue()` parameter extraction (the closest stdlib equivalent):
+
+| Route type | stdlib | plumego | Ratio |
+|---|---|---|---|
+| Static route | 110 ns | 367 ns | 3.3× |
+| Single `:param` + read | 186 ns | 807 ns | 4.3× |
+| Four `:param` deep path | 722 ns | 1,036 ns | 1.4× |
+| 70-route mixed table | 247 ns | 660 ns | 2.7× |
+
+The overhead covers per-request context injection (480 B, 5 allocs), parameter map construction, and middleware chain wiring. For typical handlers spending 1 ms–100 ms on I/O, router cost is 0.001%–0.1% of total request time. See the [full benchmark table on Releases](/releases) for all nine scenarios and methodology.
+
 ## Where should I start?
 
 Start from [Docs Home](/docs) if you still need help choosing the right first implementation page. From there, take one of these narrower paths:

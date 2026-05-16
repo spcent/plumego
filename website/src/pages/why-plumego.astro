@@ -293,25 +293,6 @@ const frameworkDecision = [
     </div>
   </section>
 
-  <section class="section">
-    <div class="section__intro reveal">
-      <h2>Use this page before committing to the technical details.</h2>
-      <p>
-        Architecture shows module organization. Releases shows what is stable versus experimental. This page comes first: it helps you decide whether Plumego is the right
-        model for your team before spending time on the technical layout.
-      </p>
-    </div>
-    <div class="signal-list reveal-stagger">
-      {guideCards.map((item) => (
-        <article class="signal-list__item">
-          <p class="signal-list__kicker">{item.kicker}</p>
-          <h3>{item.title}</h3>
-          <p>{item.body}</p>
-        </article>
-      ))}
-    </div>
-  </section>
-
   <section class="section section--tinted">
     <div class="section__intro reveal">
       <h2>Where Plumego is strongest.</h2>
@@ -500,15 +481,15 @@ const frameworkDecision = [
     </div>
     <div class="signal-list" style="margin-top: 2rem;">
       <article class="signal-list__item">
-        <p class="signal-list__kicker">stdlib performance</p>
-        <h3>Expected to be net/http-comparable — no overhead by design</h3>
+        <p class="signal-list__kicker">router overhead</p>
+        <h3>Measured: 1.4×–4.3× vs stdlib ServeMux — knowable and bounded</h3>
         <p>
-          Plumego's router is trie-based with no reflection. The middleware chain is a plain slice of
-          <code>http.Handler</code> wrappers. There is no global state and no <code>init()</code>
-          registration. Services built on stable roots are expected to run at net/http-comparable
-          throughput — reproducible benchmarks are not yet published; see the
-          <a class="text-link" href="https://github.com/spcent/plumego/issues">issue tracker</a> for
-          the benchmark roadmap.
+          Plumego's trie router adds per-request context injection, param map construction, and
+          middleware chain wiring on top of dispatch. Overhead vs Go 1.22+ <code>http.ServeMux</code>
+          ranges from <strong>1.4×</strong> for deep param routes to <strong>4.3×</strong> for
+          single-param routes — 110–1,036 ns absolute. For typical handlers spending 1 ms–100 ms
+          on I/O, router cost is 0.001%–0.1% of request time.
+          <a class="text-link" href="/releases">Full benchmark table on Releases →</a>
         </p>
       </article>
     </div>

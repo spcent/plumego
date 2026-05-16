@@ -282,24 +282,6 @@ const frameworkRows = [
     </div>
   </section>
 
-  <section class="section">
-    <div class="section__intro">
-      <h2>在深入技术细节之前先读这一页。</h2>
-      <p>
-        架构页解释模块如何组织，发布页说明哪些稳定、哪些还在实验阶段。这一页位于更早的一步：在你花时间了解技术布局之前，先帮你判断 Plumego 是否是你的团队真正需要的模型。
-      </p>
-    </div>
-    <div class="signal-list">
-      {guideCards.map((item) => (
-        <article class="signal-list__item">
-          <p class="signal-list__kicker">{item.kicker}</p>
-          <h3>{item.title}</h3>
-          <p>{item.body}</p>
-        </article>
-      ))}
-    </div>
-  </section>
-
   <section class="section section--tinted">
     <div class="section__intro">
       <h2>Plumego 最强的场景在哪里。</h2>
@@ -441,15 +423,14 @@ const frameworkRows = [
     </div>
     <div class="signal-list" style="margin-top: 2rem;">
       <article class="signal-list__item">
-        <p class="signal-list__kicker">标准库性能</p>
-        <h3>预期与 net/http 相当 — 设计上无额外开销</h3>
+        <p class="signal-list__kicker">router 开销</p>
+        <h3>实测：相比 stdlib ServeMux 为 1.4×–4.3×——可知且有界</h3>
         <p>
-          Plumego 的路由器基于 trie 树，不使用反射。中间件链是一组普通的
-          <code>http.Handler</code> 包装器。没有全局状态，没有 <code>init()</code>
-          注册逻辑。基于稳定根构建的服务，预期吞吐量与直接使用 net/http 相当——
-          可复现的 benchmark 尚未发布，请关注
-          <a class="text-link" href="https://github.com/spcent/plumego/issues">issue tracker</a>
-          了解 benchmark 计划。
+          Plumego 的 trie 路由器在分发之上增加了 per-request context 注入、参数映射构建和中间件链接线。
+          相比 Go 1.22+ <code>http.ServeMux</code> 的开销区间从深路径参数的 <strong>1.4×</strong>
+          到单参数路由的 <strong>4.3×</strong>——绝对值为 110–1,036 ns。
+          对于典型的 I/O 耗时 1 ms–100 ms 的 handler，router 开销占请求总时间的 0.001%–0.1%。
+          <a class="text-link" href="/zh/releases">在发布页查看完整 benchmark 表格 →</a>
         </p>
       </article>
     </div>

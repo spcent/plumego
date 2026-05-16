@@ -71,6 +71,13 @@ const xScenarios = [
     href: '/docs/modules/x-websocket',
     label: 'Open x/websocket primer',
   },
+  {
+    kicker: 'observability',
+    title: 'Traces, metrics, and structured logs wired at the service boundary',
+    body: 'x/observability adds exporter, tracer, collector, and adapter wiring without touching the stable routing model. Instrumentation stays outside the request kernel.',
+    href: '/docs/modules/x-observability',
+    label: 'Open x/observability primer',
+  },
 ] as const;
 
 const copy = ARCHITECTURE_COPY.en;
@@ -384,7 +391,7 @@ const repositorySignals = [
     <div class="section__intro">
       <h2>What you can build with x/* extension families.</h2>
       <p>
-        Extension families are not just module names — each one owns a concrete capability domain. Use these four scenarios to decide which x/* family is relevant before opening the module primer.
+        Extension families are not just module names — each one owns a concrete capability domain. Use these five scenarios to decide which x/* family is relevant before opening the module primer.
       </p>
     </div>
     <div class="page-grid">

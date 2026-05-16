@@ -48,6 +48,11 @@ function badgeClass(status: string): string {
 
   <JourneyBar steps={journeySteps} current="/stability" />
 
+  <div class="tier-nav-strip">
+    <span>This page: maturity tiers and promotion criteria.</span>
+    <a class="text-link" href="/releases">Full support matrix and router benchmarks →</a>
+  </div>
+
   <!-- Quick stat bar -->
   <section class="section">
     <div class="stat-hero">
@@ -235,6 +240,25 @@ make gates
 </MarketingLayout>
 
 <style>
+  .tier-nav-strip {
+    max-width: 64rem;
+    margin: 0 auto;
+    padding: 0.65rem 1.5rem;
+    background: var(--bg-elevated);
+    border: 1px solid var(--line);
+    border-radius: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    font-size: 0.84rem;
+    color: var(--fg-soft);
+  }
+
+  .tier-nav-strip .text-link {
+    margin-left: auto;
+    white-space: nowrap;
+  }
+
   .tier-table {
     max-width: 64rem;
     margin-inline: auto;
