@@ -32,6 +32,7 @@ Update this file when you add, complete, or reorder milestones.
 | M-004 | Stable root cleanup freeze | [→] | M-002 | Outcome recorded; reconcile in card 1429 |
 | M-005 | v1 release execution | [→] | M-001, M-002, M-003, M-004 | Sequential rc.1 to final v1/no-go plan |
 | M-006 | v1.0.1 maintenance lane | [→] | M-005 | Post-v1 maintenance cards for generated data, CI warnings, CLI onboarding truth, and release evidence index |
+| M-007 | extension v1 baseline evidence intake | [→] | M-006 | Uses `v1.0.0` as the first post-v1 release evidence point without promoting extensions |
 
 ---
 
@@ -52,7 +53,7 @@ M-001 ──► M-002 ──► M-003 ──┐
              └────► M-004 ──┼──► M-005
                               │
 M-001 ────────────────────────┘
-M-005 ───────────────────────────► M-006
+M-005 ───────────────────────────► M-006 ──► M-007
 ```
 
 ---

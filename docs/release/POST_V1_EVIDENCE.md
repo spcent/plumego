@@ -57,3 +57,14 @@ Run before any extension promotion:
 go run ./internal/checks/extension-beta-evidence
 go run ./internal/checks/extension-maturity
 ```
+
+## Extension v1 Baseline Intake
+
+- Milestone: `tasks/milestones/active/M-007.md`
+- Plan: `tasks/milestones/M-007.plan.md`
+- First card: `tasks/cards/active/1445-x-tenant-v1-baseline-evidence.md`
+
+M-007 may record the `v1.0.0` tag target as the first post-v1 release evidence
+point for remaining candidates. This is not a promotion lane: candidates still
+need a second release ref, release-backed API snapshots, and owner sign-off
+before beta status can be considered.
