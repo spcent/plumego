@@ -56,11 +56,11 @@ both release refs. Release-backed API snapshots are recorded in
 | Package | Parent family | Status | Risk | Owner | Recommended entrypoint | Signals | Validation | Blocker |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `x/cache` | `x/data` | experimental | medium | platform | Start from `x/data` unless cache topology is the direct task | docs:primer; coverage:topology | `go test -timeout 20s ./x/cache/...` | Evaluate with data topology maturity |
-| `x/ipc` | `x/gateway` | experimental | medium | edge | Start from `x/gateway` unless IPC transport is the direct task | docs:manifest; coverage:transport-primitive | `go test -timeout 20s ./x/ipc/...` | Subordinate edge primitive |
-| `x/mq` | `x/messaging` | experimental | medium | messaging | Start from `x/messaging` unless queue primitive work is direct | docs:manifest; coverage:queue-primitive | `go test -timeout 20s ./x/mq/...` | Subordinate messaging primitive |
-| `x/pubsub` | `x/messaging` | experimental | medium | messaging | Start from `x/messaging` unless pub/sub primitive work is direct | docs:manifest; coverage:broker-primitive | `go test -timeout 20s ./x/pubsub/...` | Subordinate messaging primitive |
-| `x/scheduler` | `x/messaging` | experimental | medium | messaging | Start from `x/messaging` unless scheduling primitive work is direct | docs:manifest; coverage:scheduler-primitive | `go test -timeout 20s ./x/scheduler/...` | Subordinate messaging primitive |
-| `x/webhook` | `x/messaging` | experimental | medium | integration | Start from `x/messaging` unless webhook transport is direct | docs:manifest; coverage:webhook-primitive | `go test -timeout 20s ./x/webhook/...` | Subordinate messaging/integration primitive |
+| `x/ipc` | `x/gateway` | experimental | medium | edge | Start from `x/gateway` unless IPC transport is the direct task | docs:primer; coverage:transport-primitive | `go test -timeout 20s ./x/ipc/...` | Subordinate edge primitive |
+| `x/mq` | `x/messaging` | experimental | medium | messaging | Start from `x/messaging` unless queue primitive work is direct | docs:primer; coverage:queue-primitive | `go test -timeout 20s ./x/mq/...` | Subordinate messaging primitive |
+| `x/pubsub` | `x/messaging` | experimental | medium | messaging | Start from `x/messaging` unless pub/sub primitive work is direct | docs:primer; coverage:broker-primitive | `go test -timeout 20s ./x/pubsub/...` | Subordinate messaging primitive |
+| `x/scheduler` | `x/messaging` | experimental | medium | messaging | Start from `x/messaging` unless scheduling primitive work is direct | docs:primer; coverage:scheduler-primitive | `go test -timeout 20s ./x/scheduler/...` | Subordinate messaging primitive |
+| `x/webhook` | `x/messaging` | experimental | medium | integration | Start from `x/messaging` unless webhook transport is direct | docs:primer; coverage:webhook-primitive | `go test -timeout 20s ./x/webhook/...` | Subordinate messaging/integration primitive |
 
 ## Promotion Rule
 

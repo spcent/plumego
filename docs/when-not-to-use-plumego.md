@@ -34,9 +34,10 @@ Plumego's shared canonical path adds friction without a corresponding benefit.
 
 ## You want to use packages without following a structured adoption model
 
-Plumego distinguishes between stable roots, supported references, and
-experimental extension families. That distinction matters: it determines what
-can be adopted for production use and what requires caution.
+Plumego distinguishes between stable roots, the canonical reference app,
+scenario references, and experimental extension families. That distinction
+matters: it determines what can be adopted for production use and what requires
+caution.
 
 If your team does not need to distinguish between stable and experimental
 modules — if package availability is sufficient signal for adoption — then

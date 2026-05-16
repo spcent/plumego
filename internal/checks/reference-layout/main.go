@@ -59,7 +59,6 @@ func requiredPathViolations(repoRoot string) []string {
 	required := []string{
 		"docs/CANONICAL_STYLE_GUIDE.md",
 		"docs/ADOPTION_PATH.md",
-		"docs/QUALITY_AUDIT_PLAN.md",
 		"docs/SCAFFOLD_REFERENCE_CONTRACT.md",
 		"docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md",
 		"docs/release/PRE_V1_RELEASE_CHECKLIST.md",

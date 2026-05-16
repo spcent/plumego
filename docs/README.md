@@ -65,7 +65,6 @@ layout or promote experimental `x/*` APIs to stable status.
 - `DEPRECATION.md` — compatibility and deprecation policy
 - `EXTENSION_MATURITY.md` — extension family maturity dashboard
 - `SCAFFOLD_REFERENCE_CONTRACT.md` — canonical scaffold and reference app alignment contract
-- `QUALITY_AUDIT_PLAN.md` — benchmark, negative-path audit, and adoption review plan
 - `release/PRE_V1_RELEASE_CHECKLIST.md` — evidence checklist before a pre-v1 release candidate
 
 Related execution surfaces live outside `docs/`:
