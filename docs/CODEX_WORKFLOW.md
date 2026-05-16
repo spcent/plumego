@@ -1,6 +1,6 @@
-# Codex Workflow — Plumego
+# Agent Workflow — Plumego
 
-This document defines the recommended way to use Codex in `plumego`.
+This document defines the recommended way for agents to work in `plumego`.
 
 It is a companion to:
 
@@ -18,7 +18,7 @@ when a task matches one of the standard shapes.
 
 ## 1. Default Operating Model
 
-Codex should work in one of three modes:
+The agent should work in one of three modes:
 
 ### Analysis Mode
 
@@ -74,7 +74,7 @@ For stable and predictable runs, every task should define:
 - Validation
 - Done Definition
 
-When humans omit these details, Codex should assume:
+When humans omit these details, the agent should assume:
 
 - one primary module per change
 - no stable public API changes
@@ -84,7 +84,7 @@ When humans omit these details, Codex should assume:
 
 ## 3. Stop Conditions
 
-Codex should stop and surface the issue before coding when:
+The agent should stop and surface the issue before coding when:
 
 - the owning module is unclear
 - the task would force a stable root to import `x/*`
@@ -264,7 +264,7 @@ gate when formatting is required.
 ## 8. Milestone Workflow
 
 Use the milestone path for multi-step, single-PR scopes with explicit human
-authorship and autonomous Codex execution.
+authorship and autonomous agent execution.
 
 Companion workflow assets:
 
@@ -274,11 +274,11 @@ Companion workflow assets:
 
 High-level loop:
 
-1. scaffold the spec with `make new-milestone`
+1. scaffold the spec with `make new-milestone N=NNN TITLE="..."`
 2. fill Goal, Architecture Decisions, Context, Tasks, Acceptance Criteria, and Out of Scope
-3. validate with `make check-spec`
+3. validate with `make check-spec M=active/M-NNN`
 4. launch with `make milestone M=active/M-NNN`
-5. let Codex execute autonomously on the milestone branch
+5. let the agent execute autonomously on the milestone branch
 6. review the PR as the only manual checkpoint
 7. archive the spec and update the roadmap
 
@@ -372,7 +372,7 @@ Representative cards:
 
 ## 10. Review Checklist for Humans
 
-When reviewing Codex output, check:
+When reviewing agent output, check:
 
 1. the owning module was correct
 2. the diff stayed inside scope
@@ -384,7 +384,7 @@ When reviewing Codex output, check:
 
 ## 11. Anti-Patterns
 
-Do not ask Codex to:
+Do not ask the agent to:
 
 - "optimize this" without a target module or success bar
 - "refactor broadly" across multiple primary modules in one pass
@@ -392,7 +392,7 @@ Do not ask Codex to:
 - preserve deprecated wrappers indefinitely
 - infer whether public APIs or dependencies may change
 
-Do not let Codex:
+Do not let the agent:
 
 - widen stable roots into feature catalogs
 - hide dependency flow in context or globals

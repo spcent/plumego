@@ -191,8 +191,8 @@ explicit additions to the canonical app wiring.
 
 For generated project scaffolds, keep `canonical` as the default template and
 select a scenario profile only when you want explicit optional capability
-wiring. Baseline templates are `canonical`, `minimal`, `api`, `fullstack`, and
-`microservice`. Scenario templates are `rest-api`, `tenant-api`, `gateway`,
+wiring. Baseline templates are `canonical`, `minimal`, `fullstack`, and
+`microservice`. Scenario templates are `api`, `rest-api`, `tenant-api`, `gateway`,
 `realtime`, `ai-service`, and `ops-service`; each is accepted by
 `plumego new --template`.
 

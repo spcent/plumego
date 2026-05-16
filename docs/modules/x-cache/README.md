@@ -4,10 +4,10 @@
 
 `x/data/cache` provides extension-layer cache adapters and topology-heavy cache implementations. It builds on the stable `store/cache` abstractions.
 
-## Status
+## v1 Status
 
-- `experimental` in the Plumego extension layer
-- Migrated from `store/cache/distributed` and `store/cache/redis` (Phase 4 stable-root debt reduction)
+- `experimental` in the Plumego v1 support matrix
+- Included in repository release scope, but compatibility is not frozen
 
 ## Use this module when
 

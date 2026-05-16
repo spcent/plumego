@@ -18,6 +18,12 @@ The canonical scaffold must preserve these properties:
 - No hidden `init` registration, global providers, or service-locator context
   patterns appear in generated canonical code.
 
+## Baseline Template Aliases
+
+`minimal`, `fullstack`, and `microservice` are accepted template names that
+produce the same output as `canonical`. They exist for discoverability but carry
+no distinct capability profile.
+
 ## Scenario Profiles
 
 Scenario templates keep the canonical bootstrap and add one explicit capability

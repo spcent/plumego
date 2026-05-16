@@ -41,9 +41,9 @@
 ## Architecture Decisions
 
 <!--
-  Human-authored. These are FIXED constraints Codex must not override.
-  List only non-obvious decisions — things Codex might reasonably choose differently.
-  Codex reads these before touching any code.
+  Human-authored. These are FIXED constraints the agent must not override.
+  List only non-obvious decisions — things the agent might reasonably choose differently.
+  The agent reads these before touching any code.
 -->
 
 - <!-- e.g. "ResourceHandler must embed http.Handler, not wrap it." -->
@@ -56,7 +56,7 @@
 
 <!-- Ordered. Specific file paths, not just module names. -->
 
-1. `AGENTS.md` (loaded automatically by Codex)
+1. `AGENTS.md`
 2. `specs/dependency-rules.yaml`
 3. `specs/task-routing.yaml`
 4. `<primary-module>/module.yaml`
@@ -127,7 +127,7 @@ Expected: all exit 0; `gofmt -l .` outputs nothing.
 
 ## Out of Scope
 
-<!-- Hard stops. Codex must not cross these even if it seems helpful. -->
+<!-- Hard stops. The agent must not cross these even if it seems helpful. -->
 
 - Do not change stable root public APIs unless this spec explicitly lists it.
 - Do not add entries to `go.mod` (main module stays stdlib-only).
@@ -136,13 +136,13 @@ Expected: all exit 0; `gofmt -l .` outputs nothing.
 
 ---
 
-## Open Questions → Codex
+## Open Questions
 
 <!--
   Questions the human could not answer upfront.
-  Codex fills this section during execution if it hits a decision point
+  The agent fills this section during execution if it hits a decision point
   that might deviate from the Architecture Decisions above.
-  Format: "Q: <question> → Decision: <what Codex did and why>"
+  Format: "Q: <question> → Decision: <what the agent did and why>"
   If a question requires human input, stop, push the branch, and open a
   draft PR with this section filled in.
 -->

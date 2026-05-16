@@ -308,7 +308,7 @@ Rules:
 
 ## 14. Prompt Contracts for AI Agents
 
-High-quality Codex tasks should specify:
+High-quality agent tasks should specify:
 
 - goal
 - in-scope paths
@@ -595,7 +595,7 @@ func TestCreateUser(t *testing.T) {
 
 ---
 
-## 18. Forbidden Patterns (Canonical Code)
+## 21. Forbidden Patterns (Canonical Code)
 
 - Mixing `Get`, `GetCtx`, `GetHandler` styles in one example
 - Binding request DTOs in middleware, reading from context in CRUD handlers
@@ -611,7 +611,7 @@ func TestCreateUser(t *testing.T) {
 
 ---
 
-## 19. Final Rule
+## 22. Final Rule
 
 If a reviewer cannot understand how a request is handled within a few minutes by reading only the route registration, middleware, and handler file — the code is not canonical enough.
 
@@ -619,7 +619,7 @@ Plumego's strength is one stable, explicit, stdlib-aligned style, not many style
 
 ---
 
-## Constructor Pattern Convergence
+## 23. Constructor Pattern Convergence
 
 New constructor work follows the same predictability rule as route registration:
 construction errors must be visible to the caller when invalid config or missing

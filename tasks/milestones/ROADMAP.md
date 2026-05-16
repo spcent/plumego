@@ -8,7 +8,7 @@ Update this file when you add, complete, or reorder milestones.
 | Symbol | Meaning |
 |--------|---------|
 | `[ ]`  | Not started |
-| `[→]`  | In execution (Codex running) |
+| `[→]`  | In execution (agent running) |
 | `[PR]` | PR open, awaiting review |
 | `[✓]`  | Merged |
 | `[✗]`  | Cancelled / superseded |
@@ -62,7 +62,7 @@ M-005 ────────────────────────�
 
 ### Sequencing Rules
 
-- A milestone may not start Codex execution until all its `Depends On`
+- A milestone may not start agent execution until all its `Depends On`
   milestones are **merged** to `main`.
 - Milestones marked `Parallel OK: yes` with no dependencies can run
   concurrently as long as their **Affected Modules** do not overlap.

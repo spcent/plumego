@@ -30,89 +30,32 @@ Frozen API decisions:
 - `kvengine.Options.AutoDetectMode` is the single format detection knob; do not
   reintroduce boolean double-switches before compatibility is frozen.
 
-Second stable-readiness gate on 2026-05-05 passed:
+Validated behavior (module gates passed on 2026-05-06):
 
-- `go test -timeout 20s ./x/data/...`
-- `go test -race -timeout 60s ./x/data/...`
-- `go vet ./x/data/...`
-- `go run ./internal/checks/dependency-rules`
-- `go run ./internal/checks/agent-workflow`
-- `go run ./internal/checks/module-manifests`
-- `go run ./internal/checks/reference-layout`
+- tenant-scoped metadata, WAL sync semantics, and observability redaction
+- S3/local file hardening: unified path validation, single PUT size limit, list
+  pagination, fail-closed misconfiguration
+- config validation and fail-closed boundaries for SQL rewriting and kvengine
+  format detection
+- rw balancer behavior, replica slice ownership, and lock-routing precision
+- idempotency duplicate classification and narrow scope
+- sharding: range resolvability, rule registry copy boundaries, cross-shard
+  policy semantics, sqlite-aware config validation, explicit
+  `CrossShardFirstSuccess` fan-out
+- `kvengine.Options.AutoDetectMode` replaces legacy boolean double-switches;
+  explicit PostgreSQL `ssl_mode` required in config
 
-Status remains `Experimental`: the second gate confirms the 0744-0750
-correctness and lifecycle fixes, but public API freeze decisions and
-large-object operational policy are still unresolved.
+Validation commands:
 
-Third stable-readiness gate on 2026-05-05 passed after cards 0752-0760:
-
-- `go test -timeout 20s ./x/data/...`
-- `go test -race -timeout 60s ./x/data/...`
-- `go vet ./x/data/...`
-- `go run ./internal/checks/dependency-rules`
-- `go run ./internal/checks/agent-workflow`
-- `go run ./internal/checks/module-manifests`
-- `go run ./internal/checks/reference-layout`
-
-Status remains `Experimental`: tenant-scoped metadata, WAL sync semantics,
-S3/local file hardening, config validation, SQL fail-closed boundaries, rw
-balancer behavior, idempotency scope, and observability redaction have been
-addressed. Promotion still needs API surface freeze decisions, explicit
-large-object S3 policy, and repo-wide gates. Card 0762 replaced the ambiguous
-legacy auto-detect boolean pair with one `AutoDetectMode` option.
-
-Fourth stable-readiness gate on 2026-05-05 passed after cards 0762-0771:
-
-- `go test -timeout 20s ./x/data/...`
-- `go test -race -timeout 60s ./x/data/...`
-- `go vet ./x/data/...`
-- `go run ./internal/checks/dependency-rules`
-- `go run ./internal/checks/agent-workflow`
-- `go run ./internal/checks/module-manifests`
-- `go run ./internal/checks/reference-layout`
-
-Status remains `Experimental`: the fourth gate confirms the auto-detect API
-freeze, compressed snapshot fail-closed behavior, sharding default safety,
-tenant metadata listing, local/S3 file boundary hardening, rw lock-routing
-precision, kvengine explicit default path, and sharding config docs/manifest
-sync. Promotion still needs the SQL support policy decision, explicit
-large-object S3 policy, and repo-wide gates.
-
-Fifth stable-readiness gate on 2026-05-06 passed after cards 0773-0779:
-
-- `go test -timeout 20s ./x/data/...`
-- `go test -race -timeout 60s ./x/data/...`
-- `go vet ./x/data/...`
-- `go run ./internal/checks/dependency-rules`
-- `go run ./internal/checks/agent-workflow`
-- `go run ./internal/checks/module-manifests`
-- `go run ./internal/checks/reference-layout`
-
-Status remains `Experimental`: the fifth gate confirms unified file path
-validation and cleanup behavior, fail-closed kvengine format detection,
-best-effort WAL flush on close timeout, sqlite-aware sharding config
-validation, fail-closed unresolved sharding reads, explicit
-`CrossShardFirstSuccess` fan-out semantics, and tighter SQL trailing-clause
-parsing. Promotion still needs repo-wide gates before changing the support
-matrix; multipart upload remains outside the current S3 provider guarantee.
-
-Sixth stable-readiness gate on 2026-05-06 passed after cards 0781-0788:
-
-- `go test -timeout 20s ./x/data/...`
-- `go test -race -timeout 60s ./x/data/...`
-- `go vet ./x/data/...`
-- `go run ./internal/checks/dependency-rules`
-- `go run ./internal/checks/agent-workflow`
-- `go run ./internal/checks/module-manifests`
-- `go run ./internal/checks/reference-layout`
-
-Status remains `Experimental`: the sixth gate confirms sharding range
-resolvability, rule registry copy boundaries, S3 list pagination and single PUT
-size policy, rw replica slice ownership, direct file metadata input validation,
-narrow idempotency duplicate classification, explicit PostgreSQL `ssl_mode`,
-and sharding manifest sync. Promotion still needs repo-wide `make gates` and an
-explicit decision that the documented narrow SQL parser and non-multipart S3
-policy are acceptable for the stable support matrix.
+```bash
+go test -timeout 20s ./x/data/...
+go test -race -timeout 60s ./x/data/...
+go vet ./x/data/...
+go run ./internal/checks/dependency-rules
+go run ./internal/checks/agent-workflow
+go run ./internal/checks/module-manifests
+go run ./internal/checks/reference-layout
+```
 
 ## Use this module when
 
