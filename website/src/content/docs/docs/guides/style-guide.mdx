@@ -32,7 +32,7 @@ Route matching, params, grouping, route tree/lookup, static mounting. Not allowe
 Transport-layer cross-cutting only: logging, recovery, timeout, request-id, CORS, auth adapters, rate-limiting, tracing, metrics. Not allowed: service injection, ORM lookup, business DTO assembly, hidden request binding, domain-policy branching.
 
 ### Extension packages
-`x/ai`, `x/ops`, `x/tenant`, `x/websocket`, `x/webhook`, `x/scheduler`, and sibling `x/*` packages are capability layers, not the core learning path. They must not define the primary coding style.
+`x/ai`, `x/observability/ops`, `x/tenant`, `x/websocket`, `x/messaging/webhook`, `x/messaging/scheduler`, and sibling `x/*` packages are capability layers, not the core learning path. They must not define the primary coding style.
 
 ### Reference and templates
 `reference/standard-service` is the only canonical application layout.

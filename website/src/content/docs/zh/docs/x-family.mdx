@@ -46,7 +46,7 @@ import GeneratedExtensionFacts from '../../../../components/docs/GeneratedExtens
 | 扩展家族 | 适合从这里开始的工作 | 如果真正问题是这些，就不该从这里开始 |
 | --- | --- | --- |
 | `x/rest` | 可复用 CRUD 传输行为、query parsing、pagination rule 与 repository-backed resource wiring | 服务启动、gateway topology、business repository 归属或领域验证 |
-| `x/messaging` | app-facing 的 queue、pubsub、scheduler、webhook 编排，以及家族级消息入口 | 最小可运行服务路径、稳定抽象，或一个已经明确只属于 `x/mq` / `x/pubsub` 的窄任务 |
+| `x/messaging` | app-facing 的 queue、pubsub、scheduler、webhook 编排，以及家族级消息入口 | 最小可运行服务路径、稳定抽象，或一个已经明确只属于 `x/messaging/mq` / `x/messaging/pubsub` 的窄任务 |
 | `x/observability` | exporter wiring、telemetry 适配器、buffered metrics inspection、rolling metrics helper 与更高层 diagnostics integration | request ID、tracing hook、access logging 这类传输层请求中间件原语 |
 
 这些例子的重要性在于：它们说明 `x/*` 不是单纯把代码从稳定根里挪走的地方。每个家族都应该成为一个可发现、可解释的主入口，并带着清晰 归属。
@@ -66,7 +66,7 @@ import GeneratedExtensionFacts from '../../../../components/docs/GeneratedExtens
 几个来自当前仓库的例子，会让分流方式更落地。
 
 - 当任务是“标准化 CRUD 或资源接口形态”时，从 `x/rest` 开始。显式路由绑定 仍保留在 应用本地接线，repository 归属仍归 仓储层，领域验证 也不应塞进 `x/rest`。
-- 当任务是应用侧的消息编排时，从 `x/messaging` 开始。只有在任务已经明确窄化后，才继续下钻到 `x/mq`、`x/pubsub`、`x/scheduler` 或 `x/webhook`。
+- 当任务是应用侧的消息编排时，从 `x/messaging` 开始。只有在任务已经明确窄化后，才继续下钻到 `x/messaging/mq`、`x/messaging/pubsub`、`x/messaging/scheduler` 或 `x/messaging/webhook`。
 - 当任务是 export wiring 或更高层的 telemetry integration 时，从 `x/observability` 开始；传输层请求观测原语仍保留在稳定 `middleware/*`。
 - 当问题是 proxy 或 边缘传输 行为，而不是可复用资源控制器行为时，应从 `x/gateway` 开始，而不是从 `x/rest` 开始。
 

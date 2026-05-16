@@ -46,7 +46,7 @@ app.Run()
 | 这些工作适合留在 `core` | 一旦变成这些问题就应移出 |
 | --- | --- |
 | 通过 `DefaultConfig()` / `AppConfig` 与 `AppDependencies` 做显式 app construction | 应归 app-local code 或扩展层的 feature-specific wiring |
-| 单一路径生命周期：`Prepare` + `Server` + `Shutdown` | `x/devtools` 中的 debug metadata transport 与 runtime snapshot payload |
+| 单一路径生命周期：`Prepare` + `Server` + `Shutdown` | `x/observability/devtools` 中的 debug metadata transport 与 runtime snapshot payload |
 | 通过 `App.AddRoute`、`App.Get`、`App.Post` 与命名路由 URL lookup 做 route binding | 原始 router 替换、feature catalog 或能力归属的运行时行为 |
 | logger 这类被动依赖注入 | logger 子系统 ownership、flush policy 或应保持 app-local 的 readiness policy |
 

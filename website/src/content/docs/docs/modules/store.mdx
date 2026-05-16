@@ -50,7 +50,7 @@ _ = contract.WriteResponse(w, r, http.StatusOK, user, nil)
 | `store/file` interfaces, shared file types, and errors | tenant-aware file backends and metadata persistence in `x/data/file`, or HTTP upload/download endpoints in `x/fileapi` |
 | `store/kv` file-backed KV CRUD, TTL-aware helpers, key scans, and basic stats | WAL, snapshots, serializer selection, compression, and shard tuning in `x/data/kvengine` |
 | `store/idempotency` records, statuses, errors, and the minimal `Store` interface | durable SQL or KV providers, SQL dialect policy, and duplicate-key handling in `x/data/idempotency` |
-| `store/cache` base cache primitives | distributed cache engines in `x/cache`, HTTP response caching in `x/gateway/cache`, and tenant-aware cache adapters in `x/tenant/store/cache` |
+| `store/cache` base cache primitives | distributed cache engines in `x/data/cache`, HTTP response caching in `x/gateway/cache`, and tenant-aware cache adapters in `x/tenant/store/cache` |
 | `store/db` helper execution with caller-owned `context.Context` | DB analytics and slow-query inspection in `x/observability/dbinsights` |
 
 ## Usage
@@ -75,7 +75,7 @@ kv.Delete("session:abc")
 exists := kv.Exists("session:abc")
 ```
 
-`KVStore` is safe for concurrent use. Use it for short-lived application state such as JWT keys, sessions, and rate-limit counters. For distributed or high-throughput scenarios, see `x/cache`.
+`KVStore` is safe for concurrent use. Use it for short-lived application state such as JWT keys, sessions, and rate-limit counters. For distributed or high-throughput scenarios, see `x/data/cache`.
 
 ### store/cache — in-memory cache
 

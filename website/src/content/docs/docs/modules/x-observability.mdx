@@ -12,7 +12,7 @@ sidebar:
 
 Open this page after [x/* Family](/docs/x-family) when the change is about broader observability infrastructure rather than the transport-layer primitives already in stable middleware: Prometheus exporters, OpenTelemetry wiring, record buffering, rolling-window aggregation, or DB analytics helpers.
 
-`x/observability` is the canonical and only app-facing entrypoint for this family. Two subordinate packages — `x/ops` (protected admin and diagnostics endpoints) and `x/devtools` (debug-only routes and local profiling) — are reached through `x/observability` first, not opened directly.
+`x/observability` is the canonical and only app-facing entrypoint for this family. Two subordinate packages — `x/observability/ops` (protected admin and diagnostics endpoints) and `x/observability/devtools` (debug-only routes and local profiling) — are reached through `x/observability` first, not opened directly.
 
 ## Stability and adoption
 
@@ -29,7 +29,7 @@ or admin/debug APIs in production.
 - you are adding DB analytics or query insight helpers (`dbinsights/`)
 - you are building feature-level metrics helpers that do not belong in the stable `metrics` root (`featuremetrics/`)
 - you need a testkit for metrics or log verification in extension tests (`testmetrics/`, `testlog/`)
-- the change involves subordinate admin endpoints (`x/ops`) or debug routes (`x/devtools`) — start here to confirm family placement
+- the change involves subordinate admin endpoints (`x/observability/ops`) or debug routes (`x/observability/devtools`) — start here to confirm family placement
 
 ## Do not start here when
 
@@ -46,8 +46,8 @@ or admin/debug APIs in production.
 4. `x/observability/otel.go`
 5. `x/observability/exporter.go`
 6. `x/observability/recordbuffer/` (if buffering is involved)
-7. `x/ops/` (if protected admin endpoints are involved)
-8. `x/devtools/` (if debug routes are involved)
+7. `x/observability/ops/` (if protected admin endpoints are involved)
+8. `x/observability/devtools/` (if debug routes are involved)
 
 ## Public entrypoints
 
@@ -69,12 +69,12 @@ Use these as the first concrete API surfaces:
 | `windowmetrics`: rolling-window aggregation for sliding metrics | business-specific product analytics logic |
 | `dbinsights`: query latency tracking and slow query surfacing | ORM or database driver internals |
 | `featuremetrics`: per-feature counter and histogram helpers | stable root-level metrics primitives |
-| protected admin endpoints → reach through `x/ops` | making `x/ops` a competing family entrypoint |
-| debug-only routes and profiling → reach through `x/devtools` | mounting devtools in production without an explicit gate |
+| protected admin endpoints → reach through `x/observability/ops` | making `x/observability/ops` a competing family entrypoint |
+| debug-only routes and profiling → reach through `x/observability/devtools` | mounting devtools in production without an explicit gate |
 
 ## Why this primer exists
 
-Observability spans both the transport layer (where stable middleware handles it) and the infrastructure layer (where this family handles it). The boundary exists to keep stable middleware focused on transport primitives only. `x/observability` is also a gatekeeper: `x/ops` and `x/devtools` are subordinates — opening them directly without confirming family placement leads to boundary drift.
+Observability spans both the transport layer (where stable middleware handles it) and the infrastructure layer (where this family handles it). The boundary exists to keep stable middleware focused on transport primitives only. `x/observability` is also a gatekeeper: `x/observability/ops` and `x/observability/devtools` are subordinates — opening them directly without confirming family placement leads to boundary drift.
 
 ## Read next
 

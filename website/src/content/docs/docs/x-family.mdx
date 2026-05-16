@@ -46,7 +46,7 @@ The current repository already exposes several clear family-level entry rules.
 | Extension family | Start here when the work is about | Do not start here when the work is really about |
 | --- | --- | --- |
 | `x/rest` | reusable CRUD transport behavior, query parsing, pagination rules, and repository-backed resource wiring | service bootstrap, gateway topology, business repository ownership, or domain validation |
-| `x/messaging` | app-facing queue, pubsub, scheduler, or webhook orchestration at the family level | the smallest runnable service path, stable abstractions, or a task already known to be only `x/mq` or `x/pubsub` |
+| `x/messaging` | app-facing queue, pubsub, scheduler, or webhook orchestration at the family level | the smallest runnable service path, stable abstractions, or a task already known to be only `x/messaging/mq` or `x/messaging/pubsub` |
 | `x/observability` | exporter wiring, telemetry adapters, buffered metrics inspection, rolling metrics helpers, and broader diagnostics integration | transport-only request middleware primitives such as request IDs, tracing hooks, or access logging |
 
 These examples matter because they show that `x/*` is not just a place to move code away from stable roots. Each family is supposed to become a discoverable entrypoint with a clear ownership story.
@@ -66,7 +66,7 @@ Once you know the work belongs to an extension family, continue with the most ho
 A few repository-backed examples make the split more practical.
 
 - Start in `x/rest` when the task is "standardize CRUD or resource API shape." Keep explicit route binding in app-local wiring, keep repository ownership in the repository layer, and keep domain validation outside `x/rest`.
-- Start in `x/messaging` when the task is app-facing messaging orchestration. Only drop into `x/mq`, `x/pubsub`, `x/scheduler`, or `x/webhook` after the task is already known to be that narrow.
+- Start in `x/messaging` when the task is app-facing messaging orchestration. Only drop into `x/messaging/mq`, `x/messaging/pubsub`, `x/messaging/scheduler`, or `x/messaging/webhook` after the task is already known to be that narrow.
 - Start in `x/observability` when the task is export wiring or broader telemetry integration. Leave transport-only request instrumentation in stable `middleware/*`.
 - Start in `x/gateway` when the problem is proxy or edge transport behavior, not reusable resource-controller behavior.
 

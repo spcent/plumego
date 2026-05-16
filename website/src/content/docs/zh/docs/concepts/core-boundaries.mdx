@@ -141,14 +141,14 @@ app.Mount("/_debug", authMiddleware(debugHandler))
 
 | 能力 | 正确位置 | 原因 |
 | --- | --- | --- |
-| Redis 缓存 | `x/cache` 或 `x/data` | 外部依赖 |
+| Redis 缓存 | `x/data/cache` 或 `x/data` | 外部依赖 |
 | 租户解析和策略 | `x/tenant` | 业务拓扑 |
 | WebSocket 集线器 | `x/websocket` | 非通用传输需求 |
-| 管理和运维路由 | `x/ops` | 需要显式认证边界 |
+| 管理和运维路由 | `x/observability/ops` | 需要显式认证边界 |
 | OpenTelemetry 导出器 | `x/observability` | 生态系统特定 |
 | REST 资源控制器 | `x/rest` | 约定层，非 HTTP 内核 |
 | 熔断器 | `x/resilience` | 可选可靠性原语 |
-| 消息队列集成 | `x/messaging` / `x/mq` | 外部系统依赖 |
+| 消息队列集成 | `x/messaging` / `x/messaging/mq` | 外部系统依赖 |
 
 ## 执行机制
 

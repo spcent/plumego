@@ -12,7 +12,7 @@ sidebar:
 
 当你已经通过 [x/* 家族](/zh/docs/x-family) 确认问题属于更广泛的可观测性基础设施，而不是稳定 middleware 已覆盖的传输层基础元语时，打开这一页：Prometheus 导出器、OpenTelemetry wiring、记录缓冲、滚动窗口聚合或 DB 分析助手。
 
-`x/observability` 是该家族面向应用的规范且唯一入口点。两个下级包——`x/ops`（受保护的管理员和诊断端点）和 `x/devtools`（仅调试路由和本地性能分析）——首先通过 `x/observability` 访问，而不是直接打开。
+`x/observability` 是该家族面向应用的规范且唯一入口点。两个下级包——`x/observability/ops`（受保护的管理员和诊断端点）和 `x/observability/devtools`（仅调试路由和本地性能分析）——首先通过 `x/observability` 访问，而不是直接打开。
 
 ## 稳定性与采用
 
@@ -25,7 +25,7 @@ sidebar:
 - 你正在添加 DB 分析或查询洞察助手（`dbinsights/`）
 - 你正在构建不属于稳定 `metrics` 根的功能级指标助手（`featuremetrics/`）
 - 你在扩展测试中需要指标或日志验证的 testkit（`testmetrics/`、`testlog/`）
-- 改动涉及下级管理端点（`x/ops`）或调试路由（`x/devtools`）— 先在此确认家族归属
+- 改动涉及下级管理端点（`x/observability/ops`）或调试路由（`x/observability/devtools`）— 先在此确认家族归属
 
 ## 什么时候不该从这里开始
 
@@ -42,8 +42,8 @@ sidebar:
 4. `x/observability/otel.go`
 5. `x/observability/exporter.go`
 6. `x/observability/recordbuffer/`（如果涉及缓冲）
-7. `x/ops/`（如果涉及受保护管理端点）
-8. `x/devtools/`（如果涉及调试路由）
+7. `x/observability/ops/`（如果涉及受保护管理端点）
+8. `x/observability/devtools/`（如果涉及调试路由）
 
 ## 公共入口点
 
@@ -65,12 +65,12 @@ sidebar:
 | `windowmetrics`：滑动指标的滚动窗口聚合 | 业务专属产品分析逻辑 |
 | `dbinsights`：查询延迟追踪和慢查询暴露 | ORM 或数据库驱动内部 |
 | `featuremetrics`：每功能计数器和直方图助手 | 稳定根级别的指标基础元语 |
-| 受保护管理端点 → 通过 `x/ops` 访问 | 让 `x/ops` 成为竞争性家族入口点 |
-| 仅调试路由和性能分析 → 通过 `x/devtools` 访问 | 没有显式门控就在生产环境挂载 devtools |
+| 受保护管理端点 → 通过 `x/observability/ops` 访问 | 让 `x/observability/ops` 成为竞争性家族入口点 |
+| 仅调试路由和性能分析 → 通过 `x/observability/devtools` 访问 | 没有显式门控就在生产环境挂载 devtools |
 
 ## 为什么单独写这一页
 
-可观测性同时跨越传输层（稳定 middleware 在此处理）和基础设施层（本家族在此处理）。边界的存在是为了使稳定 middleware 专注于传输基础元语。`x/observability` 也是守门人：`x/ops` 和 `x/devtools` 是下级包——不确认家族归属就直接打开它们会导致边界漂移。
+可观测性同时跨越传输层（稳定 middleware 在此处理）和基础设施层（本家族在此处理）。边界的存在是为了使稳定 middleware 专注于传输基础元语。`x/observability` 也是守门人：`x/observability/ops` 和 `x/observability/devtools` 是下级包——不确认家族归属就直接打开它们会导致边界漂移。
 
 ## 下一步阅读
 

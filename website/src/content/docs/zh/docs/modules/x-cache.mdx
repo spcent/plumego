@@ -1,18 +1,18 @@
 ---
-title: x/cache Primer
+title: x/data/cache Primer
 description: 当改动真正围绕 x/data 家族内的分布式缓存拓扑、Redis 适配器、一致性哈希复制或排行榜缓存时，先读这里。
 translationKey: modules-x-cache
 sidebar:
   order: 24
 ---
 
-# x/cache Primer
+# x/data/cache Primer
 
 > **实验性** — API 兼容性未冻结。采用前请先评估。查看[发布策略](/zh/docs/release-posture)了解当前成熟度。
 
 当你已经通过 [x/data Primer](/zh/docs/modules/x-data) 确认问题明确属于分布式或 Redis 缓存拓扑时，打开这一页：一致性哈希环、复制、故障转移、Redis 客户端适配器，或基于 `store/cache` 基础元语构建的排行榜缓存。
 
-`x/cache` 是 `x/data` 家族内的下级包。在直接打开本包之前，先在 `x/data` 中开始分布式缓存工作。对于简单的进程内缓存，导入 `github.com/spcent/plumego/store/cache` 后直接使用 `cache.MemoryCache`，无需打开 `x/cache`。
+`x/data/cache` 是 `x/data` 家族内的下级包。在直接打开本包之前，先在 `x/data` 中开始分布式缓存工作。对于简单的进程内缓存，导入 `github.com/spcent/plumego/store/cache` 后直接使用 `cache.MemoryCache`，无需打开 `x/data/cache`。
 
 ## 什么时候从这里开始
 
@@ -30,14 +30,14 @@ sidebar:
 
 ## 当前仓库里先读哪些文件
 
-1. `x/cache/module.yaml`
-2. `x/cache/distributed/`
-3. `x/cache/redis/`
-4. `x/cache/leaderboard/`
+1. `x/data/cache/module.yaml`
+2. `x/data/cache/distributed/`
+3. `x/data/cache/redis/`
+4. `x/data/cache/leaderboard/`
 
 ## 更具体的归属例子
 
-| 这些工作适合留在 `x/cache` | 一旦变成这些问题就应移出 |
+| 这些工作适合留在 `x/data/cache` | 一旦变成这些问题就应移出 |
 | --- | --- |
 | `distributed`：一致性哈希环、节点成员、复制因子、故障转移 | tenant 感知缓存范围化 — 使用 `x/tenant/store/cache` |
 | `redis`：实现 `store/cache.Cache` 的 Redis 客户端、pipeline 助手、TTL 管理 | Redis 集群管理或连接池配置 |
@@ -46,7 +46,7 @@ sidebar:
 
 ## 为什么单独写这一页
 
-`x/cache` 经常被直接打开，而正确的起点是简单情况用 `store/cache` 中的 `cache.MemoryCache`，或拓扑归属用 `x/data`。下级关系的存在是因为分布式缓存拓扑——分片键、环成员、故障转移——是属于 `x/data` 家族的拓扑关注点，而不是独立的顶级关注点。将它们放在一起维护了拓扑决策显式且可审计的不变量。
+`x/data/cache` 经常被直接打开，而正确的起点是简单情况用 `store/cache` 中的 `cache.MemoryCache`，或拓扑归属用 `x/data`。下级关系的存在是因为分布式缓存拓扑——分片键、环成员、故障转移——是属于 `x/data` 家族的拓扑关注点，而不是独立的顶级关注点。将它们放在一起维护了拓扑决策显式且可审计的不变量。
 
 ## 下一步阅读
 

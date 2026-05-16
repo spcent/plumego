@@ -1,30 +1,30 @@
 ---
-title: x/ipc Primer
+title: x/gateway/ipc Primer
 description: Read this when the task is explicit inter-process communication transport, not general messaging or application bootstrap.
 translationKey: modules-x-ipc
 sidebar:
   order: 28
 ---
 
-# x/ipc Primer
+# x/gateway/ipc Primer
 
 > **Experimental** — API compatibility is not frozen. Evaluate before adopting in production. Check [Release Posture](/docs/release-posture) for current maturity status.
 
 Open this page when the task is clearly about **explicit inter-process communication transport** between processes — not general messaging flows. Start from [`x/gateway`](/docs/modules/x-gateway) or [`x/messaging`](/docs/modules/x-messaging) if you are uncertain which extension applies.
 
-`x/ipc` is a subordinate primitive of `x/gateway`. It provides lower-level IPC helpers and explicit transport adapters. It is not an application bootstrap, a messaging abstraction, or a workflow orchestrator.
+`x/gateway/ipc` is a subordinate primitive of `x/gateway`. It provides lower-level IPC helpers and explicit transport adapters. It is not an application bootstrap, a messaging abstraction, or a workflow orchestrator.
 
 ## Stability and adoption
 
-`x/ipc` is **experimental**. API compatibility is not frozen. Before adopting in production:
+`x/gateway/ipc` is **experimental**. API compatibility is not frozen. Before adopting in production:
 
-1. Check `x/ipc/module.yaml` for current status, owner, and known blockers.
+1. Check `x/gateway/ipc/module.yaml` for current status, owner, and known blockers.
 2. Read [Release Posture](/docs/release-posture) for the support matrix.
 3. Consider whether `x/gateway` covers your use case at a higher level of abstraction.
 
 ## When to use this module
 
-Use `x/ipc` when:
+Use `x/gateway/ipc` when:
 
 - The task is explicit IPC transport behavior.
 - The task is client/server communication between processes.
@@ -32,37 +32,37 @@ Use `x/ipc` when:
 
 ## When not to use this module
 
-Do not use `x/ipc` for:
+Do not use `x/gateway/ipc` for:
 
 - Application bootstrap — use `core`.
 - General messaging family discovery — start from `x/messaging`.
-- Business workflow orchestration — use `x/scheduler` or `x/messaging`.
-- In-process communication — use `x/pubsub`.
-- Durable queues — use `x/mq`.
+- Business workflow orchestration — use `x/messaging/scheduler` or `x/messaging`.
+- In-process communication — use `x/messaging/pubsub`.
+- Durable queues — use `x/messaging/mq`.
 
 ## First files to read
 
-1. `x/ipc/module.yaml` — responsibilities, non-goals, and validation command
-2. `x/ipc/ipc.go` — primary transport contracts
+1. `x/gateway/ipc/module.yaml` — responsibilities, non-goals, and validation command
+2. `x/gateway/ipc/ipc.go` — primary transport contracts
 3. [`x/messaging Primer`](/docs/modules/x-messaging) — app-facing messaging entrypoint
 
 ## Boundary rules
 
-- `x/ipc` provides explicit IPC transport; do not use it as a substitute for in-process messaging (`x/pubsub`) or durable queues (`x/mq`).
+- `x/gateway/ipc` provides explicit IPC transport; do not use it as a substitute for in-process messaging (`x/messaging/pubsub`) or durable queues (`x/messaging/mq`).
 - Keep transport contracts and process-wide side effects explicit and reviewable; do not add implicit channel registration at import time.
-- Do not expose IPC connection strings or socket paths through stable roots; keep them local to `x/ipc` adapters.
-- Prefer `x/messaging` as the app-facing entrypoint for cross-process messaging before widening `x/ipc` callers.
+- Do not expose IPC connection strings or socket paths through stable roots; keep them local to `x/gateway/ipc` adapters.
+- Prefer `x/messaging` as the app-facing entrypoint for cross-process messaging before widening `x/gateway/ipc` callers.
 
 ## Canonical change shape
 
 - Keep transport contracts explicit.
 - Keep process-wide side effects reviewable.
-- Prefer family-level discovery in `x/gateway` or `x/messaging` before widening `x/ipc`.
+- Prefer family-level discovery in `x/gateway` or `x/messaging` before widening `x/gateway/ipc`.
 
 ## Validation
 
 ```bash
-go test -timeout 20s ./x/ipc/...
+go test -timeout 20s ./x/gateway/ipc/...
 ```
 
 ## Read next

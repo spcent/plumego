@@ -59,16 +59,16 @@ Once you know the change still belongs in the stable surface, continue with the 
 | --- | --- | --- |
 | lifecycle, explicit app construction, logger injection, and route attachment | [Core Primer](/docs/modules/core) | it turns the stable-root rule into the actual `core` lifecycle and kernel boundary |
 | transport wrappers, request IDs, tracing hooks, access logging, auth/security HTTP adapters, and rate-limit adapters | [Middleware Primer](/docs/modules/middleware) | it shows what still counts as transport-only and what must move to `x/tenant`, `x/rest`, or `x/gateway` |
-| file contracts, cache primitives, KV helpers, idempotency contracts, and DB helper boundaries | [Store Primer](/docs/modules/store) | it gives the clearest concrete split between stable persistence primitives and `x/data`, `x/cache`, `x/fileapi`, or `x/tenant` work |
+| file contracts, cache primitives, KV helpers, idempotency contracts, and DB helper boundaries | [Store Primer](/docs/modules/store) | it gives the clearest concrete split between stable persistence primitives and `x/data`, `x/data/cache`, `x/fileapi`, or `x/tenant` work |
 
 ## Concrete "keep it stable" cases
 
 A few recurring examples make the boundary clearer.
 
-- In `core`, explicit app construction and one canonical lifecycle path stay stable, but debug snapshots belong in `x/devtools` and feature-specific wiring belongs in app-local code or an extension.
+- In `core`, explicit app construction and one canonical lifecycle path stay stable, but debug snapshots belong in `x/observability/devtools` and feature-specific wiring belongs in app-local code or an extension.
 - In `middleware`, request IDs, tracing hooks, access logging, and HTTP metrics stay stable because they are still transport-only. API version negotiation moves to `x/rest/versioning`, while protocol adaptation moves to `x/gateway/*`.
 - In `store/file`, shared file contracts and errors stay stable, but tenant-aware storage backends and metadata persistence move to `x/data/file`, and upload/download HTTP endpoints move to `x/fileapi`.
-- In `store/cache`, base cache primitives stay stable, but distributed cache behavior moves to `x/cache`, HTTP response caching moves to `x/gateway/cache`, and tenant-aware cache adapters move to `x/tenant/store/cache`.
+- In `store/cache`, base cache primitives stay stable, but distributed cache behavior moves to `x/data/cache`, HTTP response caching moves to `x/gateway/cache`, and tenant-aware cache adapters move to `x/tenant/store/cache`.
 
 ## Common misreads to avoid
 
@@ -88,7 +88,7 @@ When a stable-root candidate starts learning extension semantics, use the owning
 - move protocol or gateway behavior to `x/gateway`
 - move reusable resource-interface transport to `x/rest`
 - move export wiring and broader telemetry adapters to `x/observability`
-- move topology-heavy data and storage implementations to `x/data`, `x/cache`, or `x/fileapi`
+- move topology-heavy data and storage implementations to `x/data`, `x/data/cache`, or `x/fileapi`
 
 ## Read next
 

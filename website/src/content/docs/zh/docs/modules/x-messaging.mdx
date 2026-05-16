@@ -16,8 +16,8 @@ sidebar:
 
 ## 稳定性与采用
 
-家族级判断先从 `x/messaging` 开始；直接依赖 `x/mq`、`x/pubsub`、`x/scheduler`
-或 `x/webhook` 前，再检查下级包成熟度。生产采用前请检查 `x/messaging/module.yaml`、
+家族级判断先从 `x/messaging` 开始；直接依赖 `x/messaging/mq`、`x/messaging/pubsub`、`x/messaging/scheduler`
+或 `x/messaging/webhook` 前，再检查下级包成熟度。生产采用前请检查 `x/messaging/module.yaml`、
 [发布策略](/zh/docs/release-posture) 和 [扩展成熟度](/zh/docs/concepts/extension-maturity)。
 
 ## 什么时候从这里开始
@@ -30,7 +30,7 @@ sidebar:
 
 - 任务真正是 application bootstrap
 - 工作是稳定根抽象设计
-- 任务已经明确窄化到 `x/mq`、`x/pubsub`、`x/scheduler` 或 `x/webhook` 中的低层问题
+- 任务已经明确窄化到 `x/messaging/mq`、`x/messaging/pubsub`、`x/messaging/scheduler` 或 `x/messaging/webhook` 中的低层问题
 
 ## 当前仓库里先读哪些文件
 
@@ -52,10 +52,10 @@ sidebar:
 
 | 这些问题应先从 `x/messaging` 开始 | 只有当任务已经明确窄化后，才继续下钻到这些 sibling |
 | --- | --- |
-| 家族级、应用侧的 queue、pubsub、scheduler 与 webhook 编排 | `x/mq` 中的 durable queue primitive 与 worker coordination |
-| 决定某个服务应该先打开哪个 messaging entrypoint | `x/pubsub` 中的 in-process broker primitive |
-| 在不重写 canonical app path 的前提下保持编排显式 | `x/scheduler` 中的 scheduling primitive |
-| 那些仍然比单一协议 primitive 更宽的 messaging-family ownership 问题 | `x/webhook` 中的 inbound verification 或 outbound delivery 机制 |
+| 家族级、应用侧的 queue、pubsub、scheduler 与 webhook 编排 | `x/messaging/mq` 中的 durable queue primitive 与 worker coordination |
+| 决定某个服务应该先打开哪个 messaging entrypoint | `x/messaging/pubsub` 中的 in-process broker primitive |
+| 在不重写 canonical app path 的前提下保持编排显式 | `x/messaging/scheduler` 中的 scheduling primitive |
+| 那些仍然比单一协议 primitive 更宽的 messaging-family ownership 问题 | `x/messaging/webhook` 中的 inbound verification 或 outbound delivery 机制 |
 
 ## 为什么单独写这一页
 

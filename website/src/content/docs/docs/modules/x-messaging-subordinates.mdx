@@ -1,20 +1,20 @@
 ---
-title: x/pubsub · x/mq Primer
+title: x/messaging/pubsub · x/messaging/mq Primer
 description: Read this when the change is really about in-process pub-sub broker primitives or durable queue task coordination within the x/messaging family.
 translationKey: modules-x-messaging-subordinates
 sidebar:
   order: 27
 ---
 
-# x/pubsub · x/mq Primer
+# x/messaging/pubsub · x/messaging/mq Primer
 
 > **Experimental** — API compatibility is not frozen. Evaluate before adopting in production. Check [Release Posture](/docs/release-posture) for current maturity status.
 
-Open this page after [x/messaging Primer](/docs/modules/x-messaging) when the change is narrowly about in-process publish-subscribe broker primitives (`x/pubsub`) or durable queue task coordination (`x/mq`). Both are subordinate packages within the `x/messaging` capability family.
+Open this page after [x/messaging Primer](/docs/modules/x-messaging) when the change is narrowly about in-process publish-subscribe broker primitives (`x/messaging/pubsub`) or durable queue task coordination (`x/messaging/mq`). Both are subordinate packages within the `x/messaging` capability family.
 
-## x/pubsub — Publish-Subscribe Broker Primitives
+## x/messaging/pubsub — Publish-Subscribe Broker Primitives
 
-`x/pubsub` owns in-process topic fan-out, broker primitives, and debug-friendly broker support. It is consumed by `x/messaging`, `x/webhook` (for pub-sub-to-HTTP bridging), and `x/devtools` (for local broker inspection).
+`x/messaging/pubsub` owns in-process topic fan-out, broker primitives, and debug-friendly broker support. It is consumed by `x/messaging`, `x/messaging/webhook` (for pub-sub-to-HTTP bridging), and `x/observability/devtools` (for local broker inspection).
 
 ### Start here when
 
@@ -27,21 +27,21 @@ Open this page after [x/messaging Primer](/docs/modules/x-messaging) when the ch
 ### Do not start here when
 
 - the work is app-facing messaging feature discovery — start from [x/messaging Primer](/docs/modules/x-messaging)
-- the change is about HTTP webhook delivery for pubsub events — that belongs in `x/webhook`
+- the change is about HTTP webhook delivery for pubsub events — that belongs in `x/messaging/webhook`
 - the work introduces a global broker registered via package init — brokers must be injected explicitly
 
 ### First files to read
 
-1. `x/pubsub/module.yaml`
-2. `x/pubsub/broker.go`
-3. `x/pubsub/consumergroup.go`
-4. `x/pubsub/ack.go`
+1. `x/messaging/pubsub/module.yaml`
+2. `x/messaging/pubsub/broker.go`
+3. `x/messaging/pubsub/consumergroup.go`
+4. `x/messaging/pubsub/ack.go`
 
 ---
 
-## x/mq — Durable Queue Primitives
+## x/messaging/mq — Durable Queue Primitives
 
-`x/mq` owns durable queue implementations, task persistence, worker coordination, dead-letter handling, and queue deduplication adapters. It provides the queue substrate that `x/messaging` and `x/scheduler` coordinate on top of.
+`x/messaging/mq` owns durable queue implementations, task persistence, worker coordination, dead-letter handling, and queue deduplication adapters. It provides the queue substrate that `x/messaging` and `x/messaging/scheduler` coordinate on top of.
 
 ### Start here when
 
@@ -54,26 +54,26 @@ Open this page after [x/messaging Primer](/docs/modules/x-messaging) when the ch
 ### Do not start here when
 
 - the work is app-facing messaging feature discovery — start from [x/messaging Primer](/docs/modules/x-messaging)
-- the change is about cron or delayed job scheduling — that belongs in `x/scheduler`
+- the change is about cron or delayed job scheduling — that belongs in `x/messaging/scheduler`
 - the work introduces business workflow orchestration — keep that in application code
 - the change requires stable root entrypoints
 
 ### First files to read
 
-1. `x/mq/module.yaml`
-2. `x/mq/broker.go`
-3. `x/mq/persistence.go`
-4. `x/mq/deadletter.go`
+1. `x/messaging/mq/module.yaml`
+2. `x/messaging/mq/broker.go`
+3. `x/messaging/mq/persistence.go`
+4. `x/messaging/mq/deadletter.go`
 
 ---
 
 ## Why this primer covers both packages
 
-Both `x/pubsub` and `x/mq` are subordinate to `x/messaging`. They are different layers: `x/pubsub` handles fan-out delivery semantics; `x/mq` handles durable task persistence and worker coordination. Separating them prevents coupling — an event that only needs fan-out does not require durable persistence, and a durable task queue does not need topic fan-out semantics unless explicitly bridged.
+Both `x/messaging/pubsub` and `x/messaging/mq` are subordinate to `x/messaging`. They are different layers: `x/messaging/pubsub` handles fan-out delivery semantics; `x/messaging/mq` handles durable task persistence and worker coordination. Separating them prevents coupling — an event that only needs fan-out does not require durable persistence, and a durable task queue does not need topic fan-out semantics unless explicitly bridged.
 
 ## Read next
 
 - [x/messaging Primer](/docs/modules/x-messaging)
-- [x/scheduler Primer](/docs/modules/x-scheduler)
-- [x/webhook Primer](/docs/modules/x-webhook)
+- [x/messaging/scheduler Primer](/docs/modules/x-scheduler)
+- [x/messaging/webhook Primer](/docs/modules/x-webhook)
 - [x/* Family](/docs/x-family)
