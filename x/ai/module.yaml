@@ -63,7 +63,7 @@ allowed_imports:
 forbidden_imports:
   - core/components/**
   - x/tenant/**
-  - x/webhook/**
+  - x/messaging/webhook/**
   - x/websocket/**
 
 test_commands:

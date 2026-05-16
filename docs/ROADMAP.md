@@ -112,17 +112,17 @@ Non-goals:
 - do not move tenant concerns into stable roots
 - do not turn `x/tenant` into application-specific tenant CRUD or onboarding logic
 
-## Phase 10: `x/discovery` Backend Expansion
+## Phase 10: `x/gateway/discovery` Backend Expansion
 
 Status: substantially complete
 
 Current state:
 
-- `x/discovery` exposes static, Consul, Kubernetes, and etcd backends
+- `x/gateway/discovery` exposes static, Consul, Kubernetes, and etcd backends
 - Kubernetes backend uses the Endpoints API with in-cluster auto-detection
 - etcd backend uses the v3 HTTP gateway with explicit registration and health management
 - all four backends implement the `Discovery` interface via explicit constructors
-- `docs/modules/x-discovery/README.md` documents backend selection guidance and standard validation
+- `docs/modules/x-gateway/README.md` documents `x/gateway/discovery` backend selection guidance and standard validation
 
 Next work:
 
@@ -176,7 +176,7 @@ Current state:
 - onboarding docs must stay aligned with the current `Makefile`, manifests, and reference app
 - `README.md` and `README_CN.md` are structurally aligned
 - `docs/getting-started.md` matches the actual API surface
-- `env.example` now includes `AUTH_TOKEN` (used by `x/ops` but previously missing)
+- `env.example` now includes `AUTH_TOKEN` (used by `x/observability/ops` but previously missing)
 - module primers for `x/tenant`, `x/ai`, and `middleware` updated with current test coverage
 - user-facing scenario entrypoint maps now identify the first reads for REST API,
   multi-tenant API, edge gateway, realtime, AI, and observability work without
@@ -276,7 +276,7 @@ Next work:
 3. Evaluate `x/ai` stable-tier subpackages individually after release-history evidence is available.
 4. Advance `x/tenant` production readiness.
 5. Clarify `x/data` and `x/fileapi` operational guidance.
-6. Expand `x/discovery` backends only when explicit adapters are ready.
+6. Expand `x/gateway/discovery` backends only when explicit adapters are ready.
 7. Raise `x/observability` and `x/gateway` test depth.
 
 ## What Not to Do

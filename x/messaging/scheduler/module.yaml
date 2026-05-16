@@ -1,0 +1,48 @@
+name: x/messaging/scheduler
+path: x/messaging/scheduler
+layer: extension
+status: experimental
+owner: messaging
+risk: medium
+summary: Subordinate in-process scheduling primitives for cron, delayed jobs, and retries within the broader x/messaging capability family.
+
+parent_family: x/messaging
+
+responsibilities:
+  - Scheduler primitives
+  - Delayed job execution
+  - Retry coordination
+  - Cron helpers
+
+non_goals:
+  - Core bootstrap ownership
+  - Stable root entrypoints
+  - Business workflow orchestration
+
+allowed_imports:
+  - log
+  - metrics
+  - store
+
+forbidden_imports:
+  - core/components/**
+  - x/tenant/**
+  - x/ai/**
+
+test_commands:
+  - go test -race -timeout 60s ./x/messaging/scheduler/...
+  - go test -timeout 20s ./x/messaging/scheduler/...
+  - go vet ./x/messaging/scheduler/...
+
+doc_paths:
+  - docs/modules/x-messaging/README.md
+
+review_checklist:
+  - Keep scheduling behavior explicit
+  - Avoid hidden process-wide state
+  - Preserve retry determinism
+
+agent_hints:
+  - Treat x/messaging/scheduler as a subordinate scheduling primitive; start app-facing messaging feature discovery in x/messaging
+  - Open x/messaging/scheduler directly only for narrow cron, delayed job, or retry coordination work
+  - Do not use x/messaging/scheduler as a competing family entrypoint for new messaging work or move it into core

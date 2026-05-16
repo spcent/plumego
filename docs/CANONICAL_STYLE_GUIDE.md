@@ -32,7 +32,7 @@ Not allowed: service injection, ORM lookup, business DTO assembly, hidden reques
 Prefer narrow packages such as `requestid`, `tracing`, `accesslog`, `recovery`, `timeout`.
 
 ### Extension packages
-`x/ai`, `x/ops`, `x/tenant`, `x/websocket`, `x/webhook`, `x/scheduler`, and sibling `x/*` packages are capability layers, not the core learning path. They must not define the primary coding style.
+`x/ai`, `x/observability/ops`, `x/tenant`, `x/websocket`, `x/messaging/webhook`, `x/messaging/scheduler`, and sibling `x/*` packages are capability layers, not the core learning path. They must not define the primary coding style.
 
 ### Reference and Templates
 `reference/standard-service` is the only canonical application layout.
@@ -647,7 +647,7 @@ Current inventory decision:
 |---|---|---|---|
 | Cannot-fail `New` | `core.New`, `router.NewRouter`, `metrics.NewNoopCollector` | canonical | Keep narrow and dependency-explicit |
 | Error-returning `New` | `store/kv.NewKVStore`, `x/frontend.NewMountFS`, `x/data/rw.New` | canonical | Prefer for new fallible constructors |
-| `New` panic wrapper plus `NewE` safe path | `x/gateway.New/NewE`, `x/mq.NewInProcBroker/NewInProcBrokerE`, `x/messaging.NewSMSPrometheusExporter/NewSMSPrometheusExporterE`, `x/observability.NewPrometheusExporter/NewPrometheusExporterE` | legacy-compatible | Do not remove casually; migrate call sites only in module-owned cards |
+| `New` panic wrapper plus `NewE` safe path | `x/gateway.New/NewE`, `x/messaging/mq.NewInProcBroker/NewInProcBrokerE`, `x/messaging.NewSMSPrometheusExporter/NewSMSPrometheusExporterE`, `x/observability.NewPrometheusExporter/NewPrometheusExporterE` | legacy-compatible | Do not remove casually; migrate call sites only in module-owned cards |
 | Extension family aliases | `x/gateway.NewGateway/NewGatewayE` | app-facing compatibility | Keep while experimental family entrypoints remain documented |
 | Fallible middleware constructor | `middleware/accesslog.Middleware(Config)`, `middleware/recovery.Middleware(Config)`, `middleware/security.Middleware(Config)` | canonical | Return `(middleware.Middleware, error)` when construction depends on injected dependencies or policy validation |
 

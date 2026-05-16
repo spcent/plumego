@@ -220,7 +220,7 @@ file metadata persistence behind the stable `store/file` contracts.
 **Boundary rule:**
 - Keep `store/idempotency` limited to records, statuses, errors, and the minimal store contract.
 - Keep SQL dialects, table policy, durable provider behavior, and duplicate-key handling in `x/data/idempotency`.
-- Keep domain-specific dedupe rules in the owning application or extension, such as `x/mq`.
+- Keep domain-specific dedupe rules in the owning application or extension, such as `x/messaging/mq`.
 - `SQLConfig.DuplicateError` is the explicit duplicate-key classifier hook for
   driver-specific error codes. The built-in string matcher remains only as
   compatibility fallback behavior for existing tests and simple drivers, and it

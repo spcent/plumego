@@ -38,10 +38,10 @@ open the relevant capability primer:
 | --- | --- |
 | REST API service | `getting-started.md`, `../reference/standard-service/README.md`, `../reference/with-rest/README.md`, `modules/x-rest/README.md` |
 | Multi-tenant API | `../reference/with-tenant/README.md`, `modules/x-tenant/README.md`, `architecture/X_TENANT_BLUEPRINT.md` |
-| Edge gateway | `modules/x-gateway/README.md`, `modules/x-discovery/README.md` when discovery is explicitly selected |
+| Edge gateway | `modules/x-gateway/README.md`, including `x/gateway/discovery` when discovery is explicitly selected |
 | Realtime service | `modules/x-websocket/README.md`, `modules/x-messaging/README.md` |
-| Messaging service | `../reference/with-messaging/README.md`, `modules/x-messaging/README.md`, then `modules/x-mq/README.md` or `modules/x-pubsub/README.md` only for narrow primitive work |
-| Webhook ingress or delivery | `../reference/with-webhook/README.md`, `modules/x-messaging/README.md`, `modules/x-webhook/README.md` |
+| Messaging service | `../reference/with-messaging/README.md`, `modules/x-messaging/README.md`, including `x/messaging/mq` or `x/messaging/pubsub` only for narrow primitive work |
+| Webhook ingress or delivery | `../reference/with-webhook/README.md`, `modules/x-messaging/README.md`, including `x/messaging/webhook` for narrow transport work |
 | File API service | `../reference/standard-service/README.md`, `modules/x-fileapi/README.md`, `modules/x-data/README.md` for storage and metadata backends |
 | AI service | `../reference/with-ai/README.md`, `modules/x-ai/README.md`, starting with provider, session, streaming, and tool subpackages |
 | Observability and ops | `../reference/with-ops/README.md`, `modules/x-observability/README.md`, `modules/x-ops/README.md`, `modules/x-devtools/README.md` |
@@ -80,8 +80,8 @@ Related execution surfaces live outside `docs/`:
   `security`, `store`, `health`, `log`, and `metrics`.
 - Extension primers cover the current `x/*` families declared in `specs/repo.yaml`.
   Start from the primary family primer when a subordinate package exists
-  (`x/messaging` before `x/mq` or `x/pubsub`, `x/data` before `x/cache`,
-  `x/observability` before `x/ops` or `x/devtools`).
+  (`x/messaging` before `x/messaging/mq` or `x/messaging/pubsub`, `x/data` before `x/data/cache`,
+  `x/observability` before `x/observability/ops` or `x/observability/devtools`).
 - Start from `modules/x-resilience/README.md` when the task is reusable
   circuit-breaker or rate-limit behavior shared across extension families.
 

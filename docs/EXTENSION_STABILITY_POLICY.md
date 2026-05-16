@@ -136,10 +136,10 @@ Extensions not yet evaluated or with clear open work:
   promote the whole family while orchestration, semantic cache, marketplace,
   distributed execution, and resilience wrappers still carry experimental
   contracts
-- `x/discovery` — new Kubernetes/etcd backends need two-release observation period
+- `x/gateway/discovery` — new Kubernetes/etcd backends need two-release observation period
 - `x/data` — sharding, rw, idempotency, kvengine, and file metadata coverage are
   improving; evaluate topology-heavy features as a unit
-- `x/scheduler`, `x/webhook`, `x/messaging`, `x/mq`, `x/pubsub` — subordinate
+- `x/messaging/scheduler`, `x/messaging/webhook`, `x/messaging`, `x/messaging/mq`, `x/messaging/pubsub` — subordinate
   family members; evaluate after canonical root stabilizes
 
 ---

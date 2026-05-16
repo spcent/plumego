@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/spcent/plumego/x/devtools"
+	"github.com/spcent/plumego/x/observability/devtools"
 )
 
 const (

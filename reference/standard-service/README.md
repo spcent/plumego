@@ -30,8 +30,8 @@ For operations, keep telemetry, admin, and debug surfaces separate:
 
 - request metrics, tracing, access logs, and request IDs stay in stable middleware
 - exporter and adapter wiring belongs in `x/observability`
-- protected admin and health orchestration surfaces belong in `x/ops`
-- local debug endpoints belong in `x/devtools` and are not mounted by default
+- protected admin and health orchestration surfaces belong in `x/observability/ops`
+- local debug endpoints belong in `x/observability/devtools` and are not mounted by default
 
 Canonical files:
 

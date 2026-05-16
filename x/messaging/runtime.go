@@ -3,8 +3,8 @@ package messaging
 import (
 	"time"
 
-	"github.com/spcent/plumego/x/mq"
-	"github.com/spcent/plumego/x/mq/store"
+	"github.com/spcent/plumego/x/messaging/mq"
+	"github.com/spcent/plumego/x/messaging/mq/store"
 )
 
 const (

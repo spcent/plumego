@@ -16,9 +16,9 @@ entrypoint_reads:
   - docs/modules/x-gateway/README.md
 
 subordinate_families:
-  - package: x/discovery
+  - package: x/gateway/discovery
     role: service instance discovery, resolver helpers, and discovery adapters
-  - package: x/ipc
+  - package: x/gateway/ipc
     role: inter-process communication transport helpers
 
 responsibilities:
@@ -72,7 +72,7 @@ stop_conditions:
   - The change introduces hidden proxy globals, auto-registration, or bootstrap ownership into x/gateway
   - The change mixes reusable resource APIs, tenant policy, or business-specific edge behavior into family-level gateway helpers
   - The change requires stable roots to learn discovery, IPC, or gateway cache topology details
-  - The change makes x/discovery or x/ipc compete with x/gateway as app-facing entrypoints
+  - The change makes x/gateway/discovery or x/gateway/ipc compete with x/gateway as app-facing entrypoints
 
 review_checklist:
   - Keep proxy behavior explicit
@@ -83,5 +83,5 @@ review_checklist:
 
 agent_hints:
   - Treat x/gateway as the only app-facing entrypoint for gateway and edge transport work
-  - x/discovery and x/ipc are subordinate packages; start discovery and IPC work here before opening them directly
+  - x/gateway/discovery and x/gateway/ipc are subordinate packages; start discovery and IPC work here before opening them directly
   - Route reusable resource-interface work to x/rest rather than mixing it into gateway

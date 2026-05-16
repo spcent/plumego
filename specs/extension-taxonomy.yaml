@@ -15,17 +15,17 @@ families:
     canonical_root: x/messaging
     roots:
       - x/messaging
-      - x/mq
-      - x/pubsub
-      - x/scheduler
-      - x/webhook
+      - x/messaging/mq
+      - x/messaging/pubsub
+      - x/messaging/scheduler
+      - x/messaging/webhook
 
   gateway:
     canonical_root: x/gateway
     roots:
       - x/gateway
-      - x/discovery
-      - x/ipc
+      - x/gateway/discovery
+      - x/gateway/ipc
 
   resource_api:
     canonical_root: x/rest
@@ -36,8 +36,8 @@ families:
     canonical_root: x/observability
     roots:
       - x/observability
-      - x/ops
-      - x/devtools
+      - x/observability/ops
+      - x/observability/devtools
 
   resilience:
     canonical_root: x/resilience
@@ -58,7 +58,7 @@ families:
     canonical_root: x/data
     roots:
       - x/data
-      - x/cache
+      - x/data/cache
 
   ai:
     canonical_root: x/ai

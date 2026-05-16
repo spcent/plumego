@@ -279,7 +279,7 @@ import (
     "context"
     "github.com/spcent/plumego/core"
     "github.com/spcent/plumego/x/gateway"
-    "github.com/spcent/plumego/x/discovery"
+    "github.com/spcent/plumego/x/gateway/discovery"
 )
 
 // Create Consul discovery client

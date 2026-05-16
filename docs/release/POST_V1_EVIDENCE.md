@@ -48,7 +48,7 @@ records two release refs, release-backed API snapshots, and owner sign-off:
 - `x/frontend`
 - `x/ai` stable-tier subpackages
 - selected `x/data` surfaces
-- `x/discovery:core-static`
+- `x/gateway/discovery:core-static`
 - `x/messaging:app-facing-service`
 
 Run before any extension promotion:

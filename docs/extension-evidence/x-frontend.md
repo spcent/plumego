@@ -153,10 +153,10 @@ boundary checks, vet, race tests, normal tests, stable-root coverage, CLI checks
 and website check/build. Re-run the same gate from the final candidate ref
 before any status promotion.
 
-The previously suspected non-frontend `x/mq` risk was rechecked with:
+The previously suspected non-frontend `x/messaging/mq` risk was rechecked with:
 
 ```bash
-go test -timeout 20s ./x/mq -run TestKVDeduperLifecycle -count=1
+go test -timeout 20s ./x/messaging/mq -run TestKVDeduperLifecycle -count=1
 ```
 
 The check currently passes, so `TestKVDeduperLifecycle` is not recorded as a

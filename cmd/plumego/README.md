@@ -141,10 +141,10 @@ capability wiring. They include runnable scenario routes plus
 | `gateway` | `x/gateway` loopback proxy under `/edge` |
 | `realtime` | `x/websocket` hub metrics under `/realtime/metrics`, plus `x/messaging` marker |
 | `ai-service` | offline `x/ai/provider`, `x/ai/session`, and `x/ai/tool` demo under `/ai/demo`, plus `x/ai/streaming` marker |
-| `ops-service` | protected `x/observability` metrics under `/ops/metrics` and protected admin boundary summary under `/ops/admin` using `x/ops` DTOs |
+| `ops-service` | protected `x/observability` metrics under `/ops/metrics` and protected admin boundary summary under `/ops/admin` using `x/observability/ops` DTOs |
 
 These profiles do not install secrets, live provider credentials, hidden
-globals, or default `x/devtools` routes.
+globals, or default `x/observability/devtools` routes.
 
 ### Generate Code
 

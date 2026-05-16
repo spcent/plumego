@@ -305,7 +305,7 @@ func TestScenarioProfiles_GenerateRunnableRoutes(t *testing.T) {
 	opsRoutes := getTemplateContent("internal/app/routes.go", "myapp", "example.com/myapp", "ops-service")
 	assertContainsAll(t, opsRoutes, []string{
 		`"github.com/spcent/plumego/x/observability"`,
-		`"github.com/spcent/plumego/x/ops"`,
+		`"github.com/spcent/plumego/x/observability/ops"`,
 		`observability.NewPrometheusCollector("app")`,
 		`auth.Authenticate(authn.StaticToken(os.Getenv("OPS_TOKEN"))`,
 		`a.Core.Get("/ops/metrics", opsAuth(metrics))`,
@@ -339,7 +339,7 @@ func TestScenarioProfiles_UseCanonicalScaffoldWithExplicitCapabilityProfile(t *t
 		}},
 		{template: "ops-service", want: []string{
 			`"github.com/spcent/plumego/x/observability"`,
-			`"github.com/spcent/plumego/x/ops"`,
+			`"github.com/spcent/plumego/x/observability/ops"`,
 		}},
 	}
 

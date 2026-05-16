@@ -15,7 +15,7 @@ import (
 	"time"
 
 	"github.com/spcent/plumego/contract"
-	"github.com/spcent/plumego/x/pubsub"
+	"github.com/spcent/plumego/x/messaging/pubsub"
 	"github.com/spcent/plumego/x/websocket"
 )
 

@@ -30,7 +30,7 @@ profile:
 | `gateway` | `x/gateway` proxy and rewrite |
 | `realtime` | `x/websocket` plus messaging marker |
 | `ai-service` | `x/ai/provider`, `x/ai/session`, `x/ai/streaming`, `x/ai/tool` |
-| `ops-service` | `x/observability` and protected `x/ops` DTOs |
+| `ops-service` | `x/observability` and protected `x/observability/ops` DTOs |
 
 Scenario profiles do not promote those extensions to stable status.
 

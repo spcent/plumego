@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/spcent/plumego/metrics"
-	"github.com/spcent/plumego/x/mq"
+	"github.com/spcent/plumego/x/messaging/mq"
 )
 
 type messagingMetrics interface {

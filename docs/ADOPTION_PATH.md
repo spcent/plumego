@@ -40,10 +40,10 @@ Keep `reference/standard-service` as the app shape. Add one capability family:
 | CRUD/resource conventions | `docs/modules/x-rest/README.md` |
 | Tenant resolution and isolation | `docs/modules/x-tenant/README.md` |
 | Edge proxy and rewrite | `docs/modules/x-gateway/README.md` |
-| Dynamic service discovery behind gateway or clients | `docs/modules/x-discovery/README.md` |
+| Dynamic service discovery behind gateway or clients | `docs/modules/x-gateway/README.md` (`x/gateway/discovery` section) |
 | WebSocket transport | `docs/modules/x-websocket/README.md` |
 | Messaging flows, queues, and webhook delivery | `docs/modules/x-messaging/README.md` |
-| Inbound webhook verification or outbound webhook transport | `docs/modules/x-webhook/README.md` |
+| Inbound webhook verification or outbound webhook transport | `docs/modules/x-messaging/README.md` (`x/messaging/webhook` section) |
 | File upload, download, and temporary URL transport | `docs/modules/x-fileapi/README.md` |
 | Observability exporters | `docs/modules/x-observability/README.md` |
 | Local debug routes, config snapshots, or pprof | `docs/modules/x-devtools/README.md` |

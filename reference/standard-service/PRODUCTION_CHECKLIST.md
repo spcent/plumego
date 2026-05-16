@@ -41,7 +41,7 @@ Each item is a conscious decision, not a default assumption.
   auth middleware or handler guard.
 
 - [ ] **No debug endpoints are mounted** by default.
-  `x/devtools` is explicitly excluded from this service. Verify that no debug
+  `x/observability/devtools` is explicitly excluded from this service. Verify that no debug
   routes have been added to `routes.go`.
 
 ---

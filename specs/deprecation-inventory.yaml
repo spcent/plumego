@@ -93,16 +93,16 @@ entries:
     decision: Provider capabilities may be unsupported and are represented by ErrNotSupported.
     replacement: provider-specific implementation
     paths:
-      - x/discovery/discovery.go
+      - x/gateway/discovery/discovery.go
 
   - id: x-cache-distributed-new-e-deprecation
     category: compatibility_behavior
     status: keep
     owner: cache
-    decision: Keep NewE as an experimental x/cache migration helper while NewWithConfig is the canonical constructor with construction errors.
+    decision: Keep NewE as an experimental x/data/cache migration helper while NewWithConfig is the canonical constructor with construction errors.
     replacement: distributed.NewWithConfig
     paths:
-      - x/cache/distributed/distributed.go
+      - x/data/cache/distributed/distributed.go
 
   - id: reference-workerfleet-unimplemented-registration
     category: reference_placeholder
@@ -139,7 +139,7 @@ entries:
     decision: Test text asserts old devtools legacy routes stay removed.
     replacement: none
     paths:
-      - x/devtools/devtools_test.go
+      - x/observability/devtools/devtools_test.go
 
   - id: x-devtools-pubsubdebug-test-double
     category: test_double
@@ -148,7 +148,7 @@ entries:
     decision: Test double returns not implemented for behavior outside the pubsub debug component test scope.
     replacement: none
     paths:
-      - x/devtools/pubsubdebug/component_test.go
+      - x/observability/devtools/pubsubdebug/component_test.go
 
   - id: x-ai-semanticcache-test-double
     category: test_double
@@ -199,10 +199,10 @@ entries:
     category: compatibility_behavior
     status: keep
     owner: ipc
-    decision: Keep as experimental x/ipc compatibility helper. It preserves migration ergonomics while Client.RemoteAddr remains the preferred typed API.
+    decision: Keep as experimental x/gateway/ipc compatibility helper. It preserves migration ergonomics while Client.RemoteAddr remains the preferred typed API.
     replacement: Client.RemoteAddr().String()
     paths:
-      - x/ipc/ipc.go
+      - x/gateway/ipc/ipc.go
 
   - id: x-webhook-provider-error-compatibility
     category: compatibility_behavior
@@ -211,15 +211,15 @@ entries:
     decision: Generic inbound verification errors map to provider-specific sentinels for compatibility.
     replacement: shared verification errors
     paths:
-      - x/webhook/inbound_github.go
-      - x/webhook/inbound_stripe.go
+      - x/messaging/webhook/inbound_github.go
+      - x/messaging/webhook/inbound_stripe.go
 
   - id: x-messaging-family-entrypoint-aliases
     category: public_alias
     status: keep
     owner: messaging
-    decision: Keep as experimental x/messaging family entrypoints. They reduce agent routing ambiguity for app-facing messaging work and do not promote x/pubsub or x/webhook to stable.
-    replacement: direct x/pubsub and x/webhook imports
+    decision: Keep as experimental x/messaging family entrypoints. They reduce agent routing ambiguity for app-facing messaging work and do not promote x/messaging/pubsub or x/messaging/webhook to stable.
+    replacement: direct x/messaging/pubsub and x/messaging/webhook imports
     paths:
       - x/messaging/entrypoints.go
 
@@ -230,29 +230,29 @@ entries:
     decision: Keep as explicit unsupported experimental behavior. MQTT and AMQP bridge configuration fails closed and remains documented as unavailable in v1.
     replacement: implemented protocol bridge or removed config surface
     paths:
-      - x/mq/broker_routes.go
-      - x/mq/broker.go
-      - x/mq/config.go
-      - x/mq/errors.go
-      - x/mq/mq_test.go
+      - x/messaging/mq/broker_routes.go
+      - x/messaging/mq/broker.go
+      - x/messaging/mq/config.go
+      - x/messaging/mq/errors.go
+      - x/messaging/mq/mq_test.go
 
   - id: x-mq-broker-compatibility-defaults
     category: compatibility_behavior
     status: keep
     owner: messaging
-    decision: Keep as experimental x/mq defaults. Ack support and trie matching remain opt-in to avoid changing broker behavior during v1 stable-root release.
+    decision: Keep as experimental x/messaging/mq defaults. Ack support and trie matching remain opt-in to avoid changing broker behavior during v1 stable-root release.
     replacement: explicit options
     paths:
-      - x/mq/config.go
+      - x/messaging/mq/config.go
 
   - id: x-mq-pubsub-reexports
     category: public_alias
     status: keep
     owner: messaging
-    decision: Keep as experimental x/mq compatibility aliases. Direct x/pubsub imports remain preferred for new low-level pubsub work, while x/mq keeps broker compatibility.
-    replacement: direct x/pubsub types
+    decision: Keep as experimental x/messaging/mq compatibility aliases. Direct x/messaging/pubsub imports remain preferred for new low-level pubsub work, while x/messaging/mq keeps broker compatibility.
+    replacement: direct x/messaging/pubsub types
     paths:
-      - x/mq/types.go
+      - x/messaging/mq/types.go
 
   - id: x-mq-test-doubles
     category: test_double
@@ -261,5 +261,5 @@ entries:
     decision: Tests use not-implemented stubs for behavior outside the current assertion scope.
     replacement: none
     paths:
-      - x/mq/priority_test.go
-      - x/mq/mq_test.go
+      - x/messaging/mq/priority_test.go
+      - x/messaging/mq/mq_test.go

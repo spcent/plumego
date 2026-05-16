@@ -10,9 +10,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/spcent/plumego/x/mq/store"
-	"github.com/spcent/plumego/x/pubsub"
-	"github.com/spcent/plumego/x/scheduler"
+	"github.com/spcent/plumego/x/messaging/mq/store"
+	"github.com/spcent/plumego/x/messaging/pubsub"
+	"github.com/spcent/plumego/x/messaging/scheduler"
 )
 
 // --- mock providers ---

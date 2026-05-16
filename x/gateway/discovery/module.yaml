@@ -1,0 +1,47 @@
+name: x/gateway/discovery
+path: x/gateway/discovery
+layer: extension
+status: experimental
+owner: edge
+risk: medium
+summary: Subordinate service discovery primitives and adapters within the x/gateway family.
+
+parent_family: x/gateway
+
+responsibilities:
+  - Service instance discovery
+  - Resolver helpers
+  - Discovery adapters
+
+non_goals:
+  - Core bootstrap ownership
+  - Stable root entrypoints
+  - Tenant policy orchestration
+
+allowed_imports:
+  - contract
+  - log
+  - metrics
+
+forbidden_imports:
+  - core/components/**
+  - x/tenant/**
+  - x/ai/**
+
+test_commands:
+  - go test -race -timeout 60s ./x/gateway/discovery/...
+  - go test -timeout 20s ./x/gateway/discovery/...
+  - go vet ./x/gateway/discovery/...
+
+doc_paths:
+  - docs/modules/x-gateway/README.md
+
+review_checklist:
+  - Keep discovery behavior explicit
+  - Avoid hidden background state
+  - Preserve deterministic resolution paths
+
+agent_hints:
+  - Treat x/gateway/discovery as a subordinate of x/gateway; start service discovery work in x/gateway before opening this package directly
+  - Keep transport concerns out of discovery
+  - Do not require core knowledge

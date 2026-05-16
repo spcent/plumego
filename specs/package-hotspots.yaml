@@ -86,6 +86,188 @@ packages:
       - reference/standard-service
     summary: App-facing gateway and edge transport entrypoint.
 
+  x/gateway/discovery:
+    module: x/gateway
+    layer: extension
+    role: primitive
+    task_families:
+      - gateway_edge_transport
+    start_with:
+      - x/gateway/module.yaml
+      - x/gateway/discovery/module.yaml
+      - x/gateway/discovery/discovery.go
+    avoid:
+      - core
+      - x/messaging
+    summary: Service discovery primitive under the gateway family; start from x/gateway unless the task is only backend discovery mechanics.
+
+  x/gateway/ipc:
+    module: x/gateway
+    layer: extension
+    role: primitive
+    task_families:
+      - gateway_edge_transport
+    start_with:
+      - x/gateway/module.yaml
+      - x/gateway/ipc/module.yaml
+      - x/gateway/ipc/ipc.go
+    avoid:
+      - x/messaging
+      - core
+    summary: Narrow IPC transport primitive under the gateway family, not a general workflow or eventing entrypoint.
+
+  x/messaging:
+    module: x/messaging
+    layer: extension
+    role: app_surface
+    task_families:
+      - messaging
+    start_with:
+      - x/messaging/module.yaml
+      - x/messaging/entrypoints.go
+      - x/messaging/service.go
+    avoid:
+      - x/messaging/mq
+      - x/messaging/pubsub
+      - x/messaging/scheduler
+      - x/messaging/webhook
+    summary: Canonical app-facing messaging family entrypoint for send, delivery, scheduling, queue, pubsub, and webhook orchestration.
+
+  x/messaging/mq:
+    module: x/messaging
+    layer: extension
+    role: primitive
+    task_families:
+      - messaging
+    start_with:
+      - x/messaging/module.yaml
+      - x/messaging/mq/module.yaml
+      - x/messaging/mq/queue.go
+    avoid:
+      - reference/standard-service
+      - core
+    summary: Durable queue primitive under x/messaging; do not start here for app-facing messaging flows.
+
+  x/messaging/pubsub:
+    module: x/messaging
+    layer: extension
+    role: primitive
+    task_families:
+      - messaging
+    start_with:
+      - x/messaging/module.yaml
+      - x/messaging/pubsub/module.yaml
+      - x/messaging/pubsub/pubsub.go
+    avoid:
+      - reference/standard-service
+      - core
+    summary: Pub/sub broker primitive under x/messaging; use only for broker mechanics after family-level routing is clear.
+
+  x/messaging/scheduler:
+    module: x/messaging
+    layer: extension
+    role: primitive
+    task_families:
+      - messaging
+    start_with:
+      - x/messaging/module.yaml
+      - x/messaging/scheduler/module.yaml
+      - x/messaging/scheduler/scheduler.go
+    avoid:
+      - core
+      - reference/standard-service
+    summary: Scheduling and retry primitive under x/messaging; app-facing scheduled messaging starts from x/messaging.
+
+  x/messaging/webhook:
+    module: x/messaging
+    layer: extension
+    role: adapter
+    task_families:
+      - messaging
+    start_with:
+      - x/messaging/module.yaml
+      - x/messaging/webhook/module.yaml
+      - x/messaging/webhook/in.go
+    avoid:
+      - core
+      - reference/standard-service
+    summary: Webhook inbound and outbound delivery adapter under x/messaging; direct starts are only for verification or delivery mechanics.
+
+  x/observability:
+    module: x/observability
+    layer: extension
+    role: app_surface
+    task_families:
+      - observability_admin
+    start_with:
+      - x/observability/module.yaml
+      - x/observability/observability.go
+      - x/observability/exporter.go
+    avoid:
+      - middleware/httpmetrics
+      - x/observability/ops
+      - x/observability/devtools
+    summary: Canonical observability adapter and exporter family entrypoint.
+
+  x/observability/ops:
+    module: x/observability
+    layer: extension
+    role: app_surface
+    task_families:
+      - observability_admin
+    start_with:
+      - x/observability/module.yaml
+      - x/observability/ops/module.yaml
+      - x/observability/ops/ops.go
+    avoid:
+      - middleware
+      - core
+    summary: Protected operations and diagnostics surface under x/observability; keep auth-gated mounting explicit.
+
+  x/observability/devtools:
+    module: x/observability
+    layer: extension
+    role: app_surface
+    task_families:
+      - observability_admin
+    start_with:
+      - x/observability/module.yaml
+      - x/observability/devtools/module.yaml
+      - x/observability/devtools/devtools.go
+    avoid:
+      - core
+      - reference/standard-service
+    summary: Local development diagnostics under x/observability; never treat as production bootstrap or core behavior.
+
+  x/data:
+    module: x/data
+    layer: extension
+    role: app_surface
+    task_families:
+      - store
+    start_with:
+      - x/data/module.yaml
+      - docs/modules/x-data/README.md
+    avoid:
+      - store
+      - x/data/cache
+    summary: Canonical advanced data topology family entrypoint.
+
+  x/data/cache:
+    module: x/data
+    layer: extension
+    role: implementation
+    task_families:
+      - store
+    start_with:
+      - x/data/module.yaml
+      - x/data/cache/module.yaml
+      - x/data/cache/doc.go
+    avoid:
+      - store/cache
+      - core
+    summary: Cache topology and provider implementations under x/data; stable cache contracts stay in store/cache.
+
   x/tenant/core:
     module: x/tenant
     layer: extension

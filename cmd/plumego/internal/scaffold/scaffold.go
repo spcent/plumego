@@ -847,7 +847,7 @@ import (
 	"github.com/spcent/plumego/middleware/auth"
 	"github.com/spcent/plumego/security/authn"
 	"github.com/spcent/plumego/x/observability"
-	"github.com/spcent/plumego/x/ops"
+	"github.com/spcent/plumego/x/observability/ops"
 )
 
 // RegisterRoutes wires all HTTP routes for the application.
@@ -1442,7 +1442,7 @@ package scenario
 
 import (
 	"github.com/spcent/plumego/x/observability"
-	"github.com/spcent/plumego/x/ops"
+	"github.com/spcent/plumego/x/observability/ops"
 )
 
 // Name identifies the scaffold profile.
@@ -1452,7 +1452,7 @@ const Name = "ops-service"
 func Capabilities() []string {
 	_ = observability.Configure
 	_ = ops.New
-	return []string{"x/observability", "x/ops"}
+	return []string{"x/observability", "x/observability/ops"}
 }
 `
 	default:

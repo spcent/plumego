@@ -1,6 +1,6 @@
 // Example: non-canonical
 //
-// This is a feature demo showing how to add x/webhook inbound receivers
+// This is a feature demo showing how to add x/messaging/webhook inbound receivers
 // to a service that follows the standard-service layout.
 //
 // It is NOT the canonical app layout. See reference/standard-service for that.

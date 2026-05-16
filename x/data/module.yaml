@@ -16,7 +16,7 @@ entrypoint_reads:
   - docs/modules/x-data/README.md
 
 subordinate_families:
-  - package: x/cache
+  - package: x/data/cache
     role: distributed cache with consistent hashing, replication, failover, and Redis adapter
 
 responsibilities:
@@ -75,7 +75,7 @@ stop_conditions:
   - The change introduces business repositories, HTTP transport behavior, or stable store primitives into x/data
   - The change hides topology routing, sharding, or rw-split decisions behind implicit registries or globals
   - The change requires stable store to learn topology ownership that belongs in x/data
-  - The change turns x/cache into a competing family entrypoint instead of a subordinate topology package
+  - The change turns x/data/cache into a competing family entrypoint instead of a subordinate topology package
 
 review_checklist:
   - Keep stable store primitives out of this module
@@ -87,4 +87,4 @@ review_checklist:
 agent_hints:
   - Move sharding and rw orchestration here instead of widening store
   - Keep business repositories and domain-specific dedupe rules in app code, not in x/data
-  - x/cache is a subordinate package for distributed/Redis cache topology; start cache work here before opening x/cache directly
+  - x/data/cache is a subordinate package for distributed/Redis cache topology; start cache work here before opening x/data/cache directly

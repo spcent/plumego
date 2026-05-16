@@ -1,0 +1,52 @@
+name: x/messaging/mq
+path: x/messaging/mq
+layer: extension
+status: experimental
+owner: messaging
+risk: medium
+summary: Subordinate durable queue primitives and worker coordination used by the broader x/messaging capability pack.
+
+parent_family: x/messaging
+
+responsibilities:
+  - Queue primitives
+  - Task persistence
+  - Worker coordination
+  - Dead-letter handling
+  - Queue task dedupe adapters
+
+non_goals:
+  - Core bootstrap ownership
+  - Stable root entrypoints
+  - Business workflow orchestration
+
+allowed_imports:
+  - contract
+  - log
+  - metrics
+  - store
+  - x/data/idempotency
+  - x/messaging/pubsub
+
+forbidden_imports:
+  - core/components/**
+  - x/tenant/**
+  - x/ai/**
+
+test_commands:
+  - go test -race -timeout 60s ./x/messaging/mq/...
+  - go test -timeout 20s ./x/messaging/mq/...
+  - go vet ./x/messaging/mq/...
+
+doc_paths:
+  - docs/modules/x-messaging/README.md
+
+review_checklist:
+  - Keep queue semantics explicit
+  - Avoid hidden background side effects
+  - Preserve persistence correctness
+
+agent_hints:
+  - Treat x/messaging/mq as a subordinate queue primitive; start app-facing feature discovery in x/messaging
+  - Keep queue adapters local with explicit worker wiring
+  - Do not use x/messaging/mq as a competing family entrypoint for new messaging work or move it into core

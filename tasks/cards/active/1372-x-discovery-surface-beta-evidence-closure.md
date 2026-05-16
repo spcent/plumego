@@ -4,7 +4,7 @@ Milestone: M-003
 Recipe: specs/change-recipes/analysis-only.yaml
 Priority: P2
 State: blocked
-Primary Module: x/discovery
+Primary Module: x/gateway/discovery
 Owned Files:
 - `specs/extension-beta-evidence.yaml`
 - `docs/extension-evidence/x-discovery.md`
@@ -12,10 +12,10 @@ Owned Files:
 Depends On: second release ref and owner sign-off
 
 Goal:
-- Complete beta evidence closure for the `x/discovery` core/static surface.
+- Complete beta evidence closure for the `x/gateway/discovery` core/static surface.
 
 Problem:
-The evidence ledger tracks `x/discovery:core-static` with a first `v1.0.0`
+The evidence ledger tracks `x/gateway/discovery:core-static` with a first `v1.0.0`
 release ref and checked-in baseline snapshot, but it still lacks a second
 release ref, complete release-backed snapshots, and owner sign-off.
 
@@ -43,7 +43,7 @@ Docs Sync:
 - Required when evidence is added.
 
 Done Definition:
-- `x/discovery:core-static` has checked-in snapshots, two release refs, release snapshots, and owner sign-off, or blockers remain explicit.
+- `x/gateway/discovery:core-static` has checked-in snapshots, two release refs, release snapshots, and owner sign-off, or blockers remain explicit.
 
 Outcome:
 -

@@ -41,7 +41,7 @@
 - `x/gateway` is the only app-facing surface for edge transport work; do not duplicate gateway routing logic in stable `router` or stable `middleware`
 - keep circuit breaker, retry, and balancer state instance-scoped; do not introduce package-level globals or implicit registration at import time
 - keep proxy rewrite, transform, and cache adapters contained within `x/gateway/*` subpackages; do not push edge-transport policy into stable roots
-- do not couple discovery (`x/discovery`) selection to gateway-only defaults; discovery backend choice belongs to the caller's wiring
+- do not couple discovery (`x/gateway/discovery`) selection to gateway-only defaults; discovery backend choice belongs to the caller's wiring
 - keep `RegisterRoute` and `RegisterProxy` explicit about invalid args: nil routers, blank paths, and nil handlers must return errors instead of hiding app wiring mistakes
 
 ## Current test coverage
@@ -86,3 +86,72 @@ backend selection remains caller-owned and must not become a gateway default.
   `NewGateway` for panic-compatible static wiring
 - route reusable resource-interface work to `x/rest`
 - protocol middleware default error responses use stable codes and safe stage details; raw adapter, transform, executor, encoder, and read errors remain available only to caller-provided error hooks
+
+## Subordinate packages
+
+Open subordinate packages only when the task is already narrower than the
+app-facing gateway entrypoint.
+
+### `x/gateway/discovery`
+
+Use `x/gateway/discovery` for service lookup, resolver behavior, and explicit
+discovery adapters selected by caller wiring. It is not an application
+bootstrap surface and does not install gateway defaults.
+
+Start with:
+
+- `x/gateway/discovery/module.yaml`
+- `specs/task-routing.yaml`
+- `specs/extension-taxonomy.yaml`
+
+Public constructors:
+
+- `NewStatic`
+- `NewConsul`
+- `NewKubernetes`
+- `NewEtcd`
+
+Available backends:
+
+| Backend | Constructor | Notes |
+| --- | --- | --- |
+| `Static` | `NewStatic(services)` | Fixed URL map for tests and simple deployments |
+| `Consul` | `NewConsul(address, ConsulConfig)` | HashiCorp Consul health API with long-poll watching |
+| `Kubernetes` | `NewKubernetes(KubernetesConfig)` | Kubernetes Endpoints API with in-cluster credential auto-detection |
+| `Etcd` | `NewEtcd(endpoints, EtcdConfig)` | etcd v3 HTTP gateway with explicit registration and health updates |
+
+All backends implement the `Discovery` interface. `Resolve` returns ready
+backend URLs, `Watch` delivers backend-list updates, and `Register`,
+`Deregister`, and `Health` are supported by etcd. Static and Kubernetes return
+`ErrNotSupported` for unsupported mutation operations.
+
+Validate narrow discovery work with:
+
+- `go test -race -timeout 60s ./x/gateway/discovery/...`
+- `go test -timeout 20s ./x/gateway/discovery/...`
+- `go vet ./x/gateway/discovery/...`
+
+### `x/gateway/ipc`
+
+Use `x/gateway/ipc` for explicit inter-process transport behavior and
+client/server communication between processes. Do not use it as a substitute
+for in-process messaging (`x/messaging/pubsub`) or durable queues
+(`x/messaging/mq`).
+
+Start with:
+
+- `x/gateway/ipc/module.yaml`
+- `x/gateway/ipc/ipc.go`
+- this primer
+
+Public entrypoints include `NewServer`, `NewHeartbeatClient`, `NewPool`,
+`NewFramedClient`, `NewStreamClient`, and `NewRateLimitedServer`.
+
+Keep IPC connection strings and socket paths out of stable roots. Transport
+contracts and process-wide side effects must stay explicit and reviewable.
+
+Validate narrow IPC work with:
+
+- `go test -race -timeout 60s ./x/gateway/ipc/...`
+- `go test -timeout 20s ./x/gateway/ipc/...`
+- `go vet ./x/gateway/ipc/...`

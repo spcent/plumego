@@ -32,12 +32,12 @@ aggregate health models.
 
 - `health/module.yaml`
 - `health/*.go`
-- `x/ops/healthhttp` when the task is HTTP exposure or check orchestration
+- `x/observability/ops/healthhttp` when the task is HTTP exposure or check orchestration
 
 ## Canonical change shape
 
 - keep health state transport-agnostic
-- keep execution policy in `x/ops/healthhttp`
+- keep execution policy in `x/observability/ops/healthhttp`
 - keep `HealthState.IsReady` as the readiness predicate for health states
 - expose HTTP handlers from reference or extensions, not from health itself
 - keep analytics and reporting in owning extensions, not in stable `health`
@@ -63,7 +63,7 @@ aggregate health models.
 ## Boundary with HTTP exposure
 
 - `health` owns state and models, not HTTP routes
-- `x/ops/healthhttp` owns health managers, check execution, retries, timeouts, history, metrics, and HTTP handlers
-- expose health endpoints from `reference/standard-service` or extension packages such as `x/ops/healthhttp`
+- `x/observability/ops/healthhttp` owns health managers, check execution, retries, timeouts, history, metrics, and HTTP handlers
+- expose health endpoints from `reference/standard-service` or extension packages such as `x/observability/ops/healthhttp`
 - do not let `health` grow transport helpers or endpoint registration APIs
-- keep build info, history export, and report-generation surfaces in `x/ops/healthhttp` or other owning extensions
+- keep build info, history export, and report-generation surfaces in `x/observability/ops/healthhttp` or other owning extensions

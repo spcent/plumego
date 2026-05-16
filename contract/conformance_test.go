@@ -233,7 +233,7 @@ func TestConformanceScanCoverageAndBudget(t *testing.T) {
 
 	required := map[string]bool{
 		"x/messaging/api.go":                                        false,
-		"x/ops/healthhttp/helpers.go":                               false,
+		"x/observability/ops/healthhttp/helpers.go":                 false,
 		"reference/workerfleet/internal/handler/worker_register.go": false,
 	}
 	for _, path := range paths {
@@ -299,8 +299,8 @@ func TestExternalTypedErrorsUseCanonicalContractCodes(t *testing.T) {
 	registeredCustomCodes := loadContractErrorCodeRegistry(t, repoRoot)
 	allowedDynamicCustomCodes := map[string]int{
 		"reference/workerfleet/internal/handler/worker_register.go#writeNotImplemented": 1,
-		"x/ops/ops.go#Handler.writeHookError":                                           1,
-		"x/ops/ops.go#writeNotImplemented":                                              1,
+		"x/observability/ops/ops.go#Handler.writeHookError":                             1,
+		"x/observability/ops/ops.go#writeNotImplemented":                                1,
 	}
 	actualDynamicCustomCodes := map[string]int{}
 	fset := token.NewFileSet()

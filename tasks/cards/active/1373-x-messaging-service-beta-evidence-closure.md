@@ -26,7 +26,7 @@ Scope:
 - Record owner sign-off from `messaging`.
 
 Non-goals:
-- Do not promote subordinate `x/mq`, `x/pubsub`, `x/scheduler`, or `x/webhook` primitives from this card.
+- Do not promote subordinate `x/messaging/mq`, `x/messaging/pubsub`, `x/messaging/scheduler`, or `x/messaging/webhook` primitives from this card.
 - Do not use `HEAD` as release-history evidence.
 - Do not change messaging runtime behavior.
 

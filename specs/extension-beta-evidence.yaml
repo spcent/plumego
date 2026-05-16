@@ -210,9 +210,9 @@ surface_candidates:
       - api_snapshot_missing
       - owner_signoff_missing
 
-  - module: x/discovery
+  - module: x/gateway/discovery
     surface: core-static
-    package: x/discovery
+    package: x/gateway/discovery
     owner: edge
     current_status: experimental
     evidence_doc: docs/extension-evidence/x-discovery.md

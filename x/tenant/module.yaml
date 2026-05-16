@@ -51,7 +51,7 @@ allowed_imports:
 forbidden_imports:
   - core/components/**
   - x/ai/**
-  - x/webhook/**
+  - x/messaging/webhook/**
   - x/websocket/**
 
 test_commands:

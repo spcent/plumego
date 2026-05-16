@@ -11,10 +11,10 @@ import (
 	"github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/metrics"
 	"github.com/spcent/plumego/security/input"
-	"github.com/spcent/plumego/x/mq"
-	"github.com/spcent/plumego/x/pubsub"
-	"github.com/spcent/plumego/x/scheduler"
-	"github.com/spcent/plumego/x/webhook"
+	"github.com/spcent/plumego/x/messaging/mq"
+	"github.com/spcent/plumego/x/messaging/pubsub"
+	"github.com/spcent/plumego/x/messaging/scheduler"
+	"github.com/spcent/plumego/x/messaging/webhook"
 )
 
 // Service is the central message-sending coordinator.
