@@ -3,7 +3,7 @@
 Milestone: M-006
 Recipe: specs/change-recipes/docs-only.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: release
 Owned Files:
 - `docs/release/`
@@ -42,3 +42,8 @@ Done Definition:
 - Agents have one evidence index for post-v1 release facts.
 - M-006 verify artifact exists.
 - Remaining extension blockers are still explicit.
+
+Outcome:
+- Added `docs/release/POST_V1_EVIDENCE.md`.
+- Added `tasks/milestones/M-006.verify.md`.
+- Extension beta blockers remain explicit; no extension status was promoted.
