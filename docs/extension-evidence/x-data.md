@@ -52,17 +52,29 @@ stability with `internal/checks/extension-release-evidence`.
 
 ## Required Release Evidence
 
-Missing. No selected `x/data` surface has two consecutive minor release refs
-with unchanged exported API.
+Partially recorded. The selected `x/data` surfaces have `v1.0.0` as their
+first post-v1 release-ref intake point. No selected surface has two consecutive
+minor release refs with unchanged exported API yet.
 
 Release refs:
 
-- none recorded
+- `6a99c5e0bc61c12378bcdab5a6a7c4d756b9fa96` (`v1.0.0` tag target) for
+  `x/data/file`
+- `6a99c5e0bc61c12378bcdab5a6a7c4d756b9fa96` (`v1.0.0` tag target) for
+  `x/data/idempotency`
 
 ## API Snapshot Evidence
 
-Not recorded. This inventory names likely `beta` surfaces, but no release-backed
-or current-head API snapshot pair is checked in for them yet.
+Partially recorded. The v1 baseline intake artifacts below are checked in. They
+are first-release baselines only and do not clear `api_snapshot_missing` until
+a second release-backed comparison is recorded.
+
+Snapshot refs:
+
+- `docs/extension-evidence/snapshots/v1-baseline/x-data-file/base.snapshot`
+- `docs/extension-evidence/snapshots/v1-baseline/x-data-file/head.snapshot`
+- `docs/extension-evidence/snapshots/v1-baseline/x-data-idempotency/base.snapshot`
+- `docs/extension-evidence/snapshots/v1-baseline/x-data-idempotency/head.snapshot`
 
 ## Release Evidence
 
@@ -71,14 +83,14 @@ or current-head API snapshot pair is checked in for them yet.
 - `x/data:file` covering package `x/data/file`
 - `x/data:idempotency` covering package `x/data/idempotency`
 
-Both surfaces remain blocked on release history, API snapshots, and owner
-sign-off. They do not imply root `x/data` promotion.
+Both surfaces remain blocked on release history, complete API snapshot evidence,
+and owner sign-off. They do not imply root `x/data` promotion.
 
 Current state:
 
 - Selected release candidate: not finalized
-- API snapshot comparison: not recorded
-- Release-history comparison: not recorded
+- API snapshot comparison: `v1.0.0` to `v1.0.0`, unchanged
+- Release-history comparison: first ref only
 
 ## Owner Sign-Off
 
@@ -88,7 +100,8 @@ Missing. No selected `x/data` surface has owner sign-off recorded.
 
 - Complete exported API inventories for the likely beta candidates:
   `x/data/file` and `x/data/idempotency`.
-- Generate API snapshots for the selected candidate surfaces.
+- Record second release-backed API snapshots for the selected candidate
+  surfaces.
 - Record release-history evidence after candidate surfaces are narrowed.
 - Keep `kvengine`, `rw`, and `sharding` experimental until their operational
   compatibility promises are narrower.

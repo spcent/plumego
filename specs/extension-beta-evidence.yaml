@@ -186,8 +186,10 @@ surface_candidates:
     owner: persistence
     current_status: experimental
     evidence_doc: docs/extension-evidence/x-data.md
-    release_refs: []
-    api_snapshots: []
+    release_refs:
+      - 6a99c5e0bc61c12378bcdab5a6a7c4d756b9fa96
+    api_snapshots:
+      - docs/extension-evidence/snapshots/v1-baseline/x-data-file/base.snapshot
     blockers:
       - release_history_missing
       - api_snapshot_missing
@@ -199,8 +201,10 @@ surface_candidates:
     owner: persistence
     current_status: experimental
     evidence_doc: docs/extension-evidence/x-data.md
-    release_refs: []
-    api_snapshots: []
+    release_refs:
+      - 6a99c5e0bc61c12378bcdab5a6a7c4d756b9fa96
+    api_snapshots:
+      - docs/extension-evidence/snapshots/v1-baseline/x-data-idempotency/base.snapshot
     blockers:
       - release_history_missing
       - api_snapshot_missing
@@ -212,8 +216,10 @@ surface_candidates:
     owner: edge
     current_status: experimental
     evidence_doc: docs/extension-evidence/x-discovery.md
-    release_refs: []
-    api_snapshots: []
+    release_refs:
+      - 6a99c5e0bc61c12378bcdab5a6a7c4d756b9fa96
+    api_snapshots:
+      - docs/extension-evidence/snapshots/v1-baseline/x-discovery/base.snapshot
     blockers:
       - release_history_missing
       - api_snapshot_missing
@@ -225,8 +231,10 @@ surface_candidates:
     owner: messaging
     current_status: experimental
     evidence_doc: docs/extension-evidence/x-messaging.md
-    release_refs: []
-    api_snapshots: []
+    release_refs:
+      - 6a99c5e0bc61c12378bcdab5a6a7c4d756b9fa96
+    api_snapshots:
+      - docs/extension-evidence/snapshots/v1-baseline/x-messaging/base.snapshot
     blockers:
       - release_history_missing
       - api_snapshot_missing

@@ -3,7 +3,7 @@
 Milestone: M-007
 Recipe: specs/change-recipes/docs-only.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: extension evidence
 Owned Files:
 - `specs/extension-beta-evidence.yaml`
@@ -57,4 +57,13 @@ Done Definition:
 - Card is moved to done with validation output.
 
 Outcome:
--
+- Added `v1.0.0` tag target
+  `6a99c5e0bc61c12378bcdab5a6a7c4d756b9fa96` as first release-ref intake
+  evidence for `x/data:file`, `x/data:idempotency`,
+  `x/discovery:core-static`, and `x/messaging:app-facing-service`.
+- Generated unchanged `v1.0.0` to `v1.0.0` snapshot artifacts under
+  `docs/extension-evidence/snapshots/v1-baseline/`.
+- Registered one baseline snapshot per surface in the ledger so
+  `api_snapshot_missing` remains true until the second release-backed snapshot
+  exists.
+- Kept all selected surfaces experimental.

@@ -49,31 +49,38 @@ Kubernetes, and etcd can remain experimental adapters behind that contract.
 
 ## Required Release Evidence
 
-Missing. No selected `x/discovery` surface has two consecutive minor release
-refs with unchanged exported API.
+Partially recorded. The `x/discovery:core-static` surface has `v1.0.0` as its
+first post-v1 release-ref intake point. It still needs a second release ref with
+unchanged exported API.
 
 Release refs:
 
-- none recorded
+- `6a99c5e0bc61c12378bcdab5a6a7c4d756b9fa96` (`v1.0.0` tag target)
 
 ## API Snapshot Evidence
 
-Not recorded. This inventory names the common contract plus static backend as
-the likely `beta` surface, but no checked-in release-backed or current-head API
-snapshot pair exists yet.
+Partially recorded. The v1 baseline intake artifacts below are checked in. They
+are first-release baselines only and do not clear `api_snapshot_missing` until
+a second release-backed comparison is recorded.
+
+Snapshot refs:
+
+- `docs/extension-evidence/snapshots/v1-baseline/x-discovery/base.snapshot`
+- `docs/extension-evidence/snapshots/v1-baseline/x-discovery/head.snapshot`
 
 ## Release Evidence
 
 `specs/extension-beta-evidence.yaml` tracks `x/discovery:core-static` as a
 `surface_candidate` covering the common contract and static backend package.
-It remains blocked on release history, API snapshots, and owner sign-off, and
-does not imply beta status for Consul, Kubernetes, or etcd adapters.
+It remains blocked on release history, complete API snapshot evidence, and
+owner sign-off, and does not imply beta status for Consul, Kubernetes, or etcd
+adapters.
 
 Current state:
 
 - Selected release candidate: `x/discovery:core-static`
-- API snapshot comparison: not recorded
-- Release-history comparison: not recorded
+- API snapshot comparison: `v1.0.0` to `v1.0.0`, unchanged
+- Release-history comparison: first ref only
 
 ## Owner Sign-Off
 
@@ -81,7 +88,8 @@ Missing. No selected `x/discovery` surface has owner sign-off recorded.
 
 ## Next Evidence Needed
 
-- Exported API snapshot for the core contract and static backend candidate.
+- Second release-backed exported API snapshot for the core contract and static
+  backend candidate.
 - Backend-level contract inventories for Consul, Kubernetes, and etcd.
 - Two consecutive minor release refs showing no exported API changes.
 - Owner sign-off after backend API shape is observed across releases.
