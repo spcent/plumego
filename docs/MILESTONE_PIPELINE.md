@@ -54,7 +54,7 @@ Use [`tasks/milestones/TEMPLATE.md`](../tasks/milestones/TEMPLATE.md) and keep t
 - `Tasks`
 - `Acceptance Criteria`
 - `Out of Scope`
-- `Open Questions -> Codex`
+- `Open Questions`
 - `Done Definition`
 
 Milestone should answer:
@@ -207,7 +207,7 @@ Packager rules:
 ## Tasks
 ## Acceptance Criteria
 ## Out of Scope
-## Open Questions -> Codex
+## Open Questions
 ## Done Definition
 ```
 

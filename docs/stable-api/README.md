@@ -1,11 +1,11 @@
 # Stable Root API Baseline
 
-This directory records the current exported API surface for Plumego stable root
-packages before a tagged v1 release.
+This directory records the exported API surface for Plumego stable root packages.
+Snapshots are updated alongside releases and are used to detect unintended API drift.
 
-The snapshots are baseline evidence, not a compatibility promise by themselves.
-The compatibility promise starts only when a release tag and release notes make
-that promise explicit.
+The snapshots are baseline evidence, not a standalone compatibility promise.
+The compatibility promise is governed by `docs/DEPRECATION.md` and tied to release
+tags and release notes.
 
 ## Stable Roots
 

@@ -16,16 +16,16 @@ Plumego already has the following in place:
 - repo-wide quality gates in `Makefile` and `.github/workflows/quality-gates.yml`
 - stable-root compatibility policy in `docs/DEPRECATION.md`
 - stable-root exported API baseline snapshots under `docs/stable-api/snapshots`
-- pre-v1 release evidence checklist under `docs/release/PRE_V1_RELEASE_CHECKLIST.md`
+- release evidence checklist under `docs/release/PRE_V1_RELEASE_CHECKLIST.md`
 - beta promotion checklist and card template under `docs/release/PROMOTION_CARD_TEMPLATE.md`
 - `x/rest`, `x/websocket`, `x/gateway`, and `x/observability` promoted to `beta`
   at v0.1.0–v0.2.0 with release-backed API snapshots and owner sign-off on record
+- `v1.0.0` tagged on May 15, 2026; release notes and evidence in `docs/release/v1.0.0.md`
 
 The next stages are about hardening extensions, improving examples, and keeping
 docs, manifests, specs, and references aligned.
 
-This roadmap does not claim a tagged v1 release. Release status must stay tied
-to repository tags and verifiable gate output.
+Release status is tied to repository tags and verifiable gate output.
 
 ## Roadmap Principles
 
@@ -240,9 +240,9 @@ Next work:
 ### Release Evidence
 
 - keep `docs/stable-api/README.md` and checked-in snapshots aligned with stable
-  root API freeze work
-- use `docs/release/PRE_V1_RELEASE_CHECKLIST.md` before tagging a pre-v1
-  release candidate
+  root API surface; compare against the previous release before each new release
+- use `docs/release/PRE_V1_RELEASE_CHECKLIST.md` as the base evidence checklist
+  before tagging any release candidate
 - keep extension beta blockers in `specs/extension-beta-evidence.yaml` until
   two concrete release refs, matching snapshots, and owner sign-off exist
 
