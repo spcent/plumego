@@ -507,10 +507,14 @@ func TestReadPackageIndexParsesPackagesAndStartPaths(t *testing.T) {
 	repo := t.TempDir()
 	writeFile(t, filepath.Join(repo, "specs", "package-hotspots.yaml"), `packages:
   x/fileapi:
+    task_families:
+      - file_api
     start_with:
       - x/fileapi/module.yaml
       - x/fileapi/handler.go
   contract:
+    task_families:
+      - http_endpoint
     start_with:
       - contract/module.yaml
 `)
@@ -521,6 +525,9 @@ func TestReadPackageIndexParsesPackagesAndStartPaths(t *testing.T) {
 	}
 	if len(entries) != 2 {
 		t.Fatalf("expected 2 package index entries, got %d: %v", len(entries), entries)
+	}
+	if got := entries["x/fileapi"].TaskFamilies; len(got) != 1 || got[0] != "file_api" {
+		t.Fatalf("expected file_api task family for x/fileapi, got %v", got)
 	}
 	if got := entries["x/fileapi"].StartWith; len(got) != 2 {
 		t.Fatalf("expected 2 start_with paths for x/fileapi, got %v", got)
@@ -555,6 +562,33 @@ func TestFindPackageIndexCoverageViolationsRequiresExistingPackageAndStartFiles(
 		`specs/package-hotspots.yaml package x/fileapi references missing start_with path x/fileapi/handler.go`,
 		`specs/package-hotspots.yaml package contract must declare at least one start_with path`,
 		`specs/package-hotspots.yaml package x/missing does not exist in the repository`,
+	} {
+		if !strings.Contains(joined, want) {
+			t.Fatalf("expected violation containing %q, got:\n%s", want, joined)
+		}
+	}
+}
+
+func TestFindPackageIndexTaskFamilyViolations(t *testing.T) {
+	violations := FindPackageIndexTaskFamilyViolations(
+		map[string]packageIndexEntry{
+			"x/fileapi": {
+				Path:         "x/fileapi",
+				TaskFamilies: []string{"file_api", "missing_family"},
+			},
+			"contract": {
+				Path: "contract",
+			},
+		},
+		map[string]taskRoutingEntry{
+			"file_api": {},
+		},
+	)
+
+	joined := strings.Join(violations, "\n")
+	for _, want := range []string{
+		`specs/package-hotspots.yaml package contract must declare at least one task_families entry`,
+		`specs/package-hotspots.yaml package x/fileapi references unknown task_families entry missing_family`,
 	} {
 		if !strings.Contains(joined, want) {
 			t.Fatalf("expected violation containing %q, got:\n%s", want, joined)

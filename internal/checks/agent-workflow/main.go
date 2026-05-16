@@ -137,6 +137,7 @@ func workflowViolations(repoRoot string) ([]string, error) {
 		return nil, err
 	}
 	violations = append(violations, packageIndexViolations...)
+	violations = append(violations, checkutil.FindPackageIndexTaskFamilyViolations(packageIndex, taskRouting)...)
 	violations = append(violations, checkutil.FindExtensionHotspotCoverageViolations(taxonomy, packageIndex)...)
 
 	httpSurfaceViolations, err := checkutil.FindStableHTTPSurfaceViolations(repoRoot)

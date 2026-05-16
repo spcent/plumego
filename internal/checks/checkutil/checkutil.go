@@ -629,8 +629,9 @@ type manifestDoc struct {
 }
 
 type packageIndexEntry struct {
-	Path      string
-	StartWith []string
+	Path         string
+	TaskFamilies []string
+	StartWith    []string
 }
 
 func ReadCanonicalExtensionEntrypoints(repoRoot string) ([]string, error) {
@@ -677,6 +678,7 @@ func ReadPackageIndex(repoRoot string) (map[string]packageIndexEntry, error) {
 	out := map[string]packageIndexEntry{}
 	scanner := NewLineScanner(file)
 	inPackages := false
+	inTaskFamilies := false
 	inStartWith := false
 	currentPath := ""
 
@@ -691,11 +693,13 @@ func ReadPackageIndex(repoRoot string) (map[string]packageIndexEntry, error) {
 		switch {
 		case indent == 0 && trimmed == "packages:":
 			inPackages = true
+			inTaskFamilies = false
 			inStartWith = false
 			currentPath = ""
 			continue
 		case indent == 0:
 			inPackages = false
+			inTaskFamilies = false
 			inStartWith = false
 			currentPath = ""
 		}
@@ -708,10 +712,12 @@ func ReadPackageIndex(repoRoot string) (map[string]packageIndexEntry, error) {
 		case indent == 2 && strings.HasSuffix(trimmed, ":"):
 			currentPath = strings.TrimSuffix(trimmed, ":")
 			out[currentPath] = packageIndexEntry{Path: currentPath}
+			inTaskFamilies = false
 			inStartWith = false
 			continue
 		case indent == 2:
 			currentPath = ""
+			inTaskFamilies = false
 			inStartWith = false
 		}
 
@@ -720,27 +726,36 @@ func ReadPackageIndex(repoRoot string) (map[string]packageIndexEntry, error) {
 		}
 
 		switch {
+		case indent == 4 && trimmed == "task_families:":
+			inTaskFamilies = true
+			inStartWith = false
+			continue
 		case indent == 4 && trimmed == "start_with:":
+			inTaskFamilies = false
 			inStartWith = true
 			continue
 		case indent == 4:
+			inTaskFamilies = false
 			inStartWith = false
 		}
 
-		if !inStartWith {
+		if !inTaskFamilies && !inStartWith {
 			continue
 		}
 		if indent < 6 || !strings.HasPrefix(trimmed, "- ") {
 			continue
 		}
-
 		value := strings.TrimSpace(strings.TrimPrefix(trimmed, "- "))
 		value = strings.Trim(value, "\"'")
 		if value == "" {
 			continue
 		}
 		entry := out[currentPath]
-		entry.StartWith = append(entry.StartWith, value)
+		if inTaskFamilies {
+			entry.TaskFamilies = append(entry.TaskFamilies, value)
+		} else {
+			entry.StartWith = append(entry.StartWith, value)
+		}
 		out[currentPath] = entry
 	}
 	if err := scanner.Err(); err != nil {
@@ -786,6 +801,24 @@ func FindPackageIndexCoverageViolations(repoRoot string, entries map[string]pack
 
 	sort.Strings(violations)
 	return violations, nil
+}
+
+func FindPackageIndexTaskFamilyViolations(entries map[string]packageIndexEntry, taskRouting map[string]taskRoutingEntry) []string {
+	var violations []string
+	for pkgPath, entry := range entries {
+		if len(entry.TaskFamilies) == 0 {
+			violations = append(violations, fmt.Sprintf("specs/package-hotspots.yaml package %s must declare at least one task_families entry", pkgPath))
+			continue
+		}
+		for _, family := range entry.TaskFamilies {
+			if _, ok := taskRouting[family]; ok {
+				continue
+			}
+			violations = append(violations, fmt.Sprintf("specs/package-hotspots.yaml package %s references unknown task_families entry %s", pkgPath, family))
+		}
+	}
+	sort.Strings(violations)
+	return violations
 }
 
 func FindExtensionHotspotCoverageViolations(doc extensionTaxonomyDoc, entries map[string]packageIndexEntry) []string {
