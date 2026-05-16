@@ -185,6 +185,14 @@ but they must be recorded as development evidence only. A stable promotion
 record must name the exact release refs used for comparison and store the
 release-backed snapshot output.
 
+## Release Evidence
+
+Not recorded.
+
+Release refs: none recorded
+
+API snapshot comparison: current-head baseline only
+
 ## Owner Sign-Off
 
 Missing. The `frontend` owner must confirm the beta criteria before any
@@ -208,6 +216,6 @@ Missing. The `frontend` owner must confirm the beta criteria before any
 - `api_snapshot_missing`
 - `owner_signoff_missing`
 
-## Promotion Decision
+## Promotion Posture
 
 Do not promote yet. `x/frontend` remains `experimental`.

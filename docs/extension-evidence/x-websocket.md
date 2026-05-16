@@ -24,6 +24,13 @@ Evidence state: complete
 - Large-message reads are bounded by `ReadLimit`; `ReadMessageReader` exposes a
   bounded reader for one message and does not claim true unbounded streaming.
 
+## Primer And Boundary State
+
+- Primer: `docs/modules/x-websocket/README.md`
+- Manifest: `x/websocket/module.yaml`
+- Boundary state: documented and aligned with explicit websocket transport
+  wiring outside stable roots.
+
 ## Runtime Stable-Readiness Gate
 
 Recorded on 2026-05-02 from current development head. This is runtime evidence,
@@ -47,16 +54,9 @@ validation, admin broadcast authorization, stop/broadcast lifecycle races,
 write deadlines, shutdown edge cases, bounded large-message reads, and RFC6455
 negative protocol corpus coverage.
 
-## Primer And Boundary State
-
-- Primer: `docs/modules/x-websocket/README.md`
-- Manifest: `x/websocket/module.yaml`
-- Boundary state: documented and aligned with explicit websocket transport
-  wiring outside stable roots.
-
 ## API Inventory State
 
-Current stable-candidate public symbols are recorded in
+Current release-frozen public symbols are recorded in
 `x/websocket/module.yaml`. The manifest now includes the server, hub,
 connection, auth, validation, opcode/close-code, and documented error surfaces
 that are still exported.
@@ -101,17 +101,18 @@ API cleanup recorded before stable:
 
 ## Required Release Evidence
 
-Missing. Promotion requires two consecutive minor release refs with no exported
-`x/websocket` API changes.
+Recorded. This promotion record uses two consecutive minor release refs with no
+exported `x/websocket` API changes.
 
 Release refs:
 
-- none recorded
+- `d2c25c3`
+- `ec70358`
 
-Stable-governance requirements:
+Promotion record requirements that were satisfied:
 
 - `older_minor_release_ref`: a real tag or immutable release ref that resolves
-  to a git commit and already includes the stable-candidate API surface.
+  to a git commit and already includes the release-frozen API surface.
 - `newer_minor_release_ref`: the next real minor release ref after
   `older_minor_release_ref`; it must also resolve to a git commit.
 - `api_delta`: the exported `x/websocket` API must be unchanged between those
@@ -120,9 +121,9 @@ Stable-governance requirements:
 
 ## API Snapshot Evidence
 
-One current-head baseline snapshot is recorded. It is useful for comparing the
-candidate surface during development, but it is not release evidence and does
-not clear `api_snapshot_missing` by itself.
+Release-backed API snapshots are recorded for the promotion pair below. A
+current-head baseline snapshot can still be useful during development, but it
+does not replace the release-backed comparison.
 
 Generate a fresh snapshot with:
 
@@ -132,7 +133,8 @@ go run ./internal/checks/extension-api-snapshot -module ./x/websocket/... -out /
 
 Snapshot refs:
 
-- `docs/extension-evidence/snapshots/first-batch/x-websocket-head.snapshot`
+- `docs/extension-evidence/snapshots/x-websocket/base.snapshot`
+- `docs/extension-evidence/snapshots/x-websocket/head.snapshot`
 
 Required release snapshot refs:
 
@@ -181,6 +183,6 @@ Signed off by `realtime` at v0.2.0:
 
 None. All promotion blockers cleared.
 
-## Promotion Decision
+## Promotion Posture
 
 Promoted to `beta` at v0.2.0. API stable across d2c25c3–ec70358.

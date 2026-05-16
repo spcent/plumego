@@ -1,7 +1,7 @@
 # Extension Release Evidence Artifacts
 
 This note defines how checked-in release evidence artifacts are recorded for
-`x/*` beta candidates.
+`x/*` `beta` candidates.
 
 Stable-root API baseline artifacts live separately under
 `docs/stable-api/snapshots/`. Use `docs/release/PRE_V1_RELEASE_CHECKLIST.md`
@@ -38,13 +38,14 @@ Validate the ledger with:
 go run ./internal/checks/extension-beta-evidence
 ```
 
-## Current Gap Map
+## Release Evidence Gap Map
 
 `go run ./internal/checks/extension-beta-evidence` currently reports the
-following blockers. The rows below map each blocker to module-owned follow-up
-work without changing maturity status.
+following blockers. The rows below map each candidate surface to its recorded
+evidence, open blockers, and module-owned follow-up work without changing
+maturity status.
 
-| Candidate | Existing evidence | Missing work | Follow-up |
+| Candidate | Recorded evidence | Open blockers | Follow-up |
 | --- | --- | --- | --- |
 | `x/rest` | evidence doc, current-head snapshot | release refs, release snapshots, owner sign-off | `tasks/cards/active/1365-x-rest-beta-evidence-closure.md` |
 | `x/websocket` | evidence doc, current-head snapshot | release refs, release snapshots, owner sign-off | `tasks/cards/active/1366-x-websocket-beta-evidence-closure.md` |

@@ -6,9 +6,9 @@ Owner: `persistence`
 
 Current status: `experimental`
 
-Candidate status: not selected
+Candidate status: `not selected`
 
-Evidence state: initial triage
+Evidence state: surface inventory
 
 ## Current Coverage
 
@@ -22,14 +22,14 @@ Evidence state: initial triage
 - `x/data/sharding` covers routing, strategies, parser, resolver, rewriter,
   config, logging, metrics, and tracing behavior.
 
-## Boundary State
+## Primer And Boundary State
 
 - Primer: `docs/modules/x-data/README.md`
 - Manifest: `x/data/module.yaml`
 - Boundary state: topology-heavy behavior is documented as extension-owned and
   kept outside stable `store`.
 
-## Why This Is Not A Beta Candidate Yet
+## Why No `beta` Candidate Is Selected Yet
 
 `x/data` is a broad umbrella over several topology-heavy capabilities. A single
 root-level beta promise would mix file metadata, idempotency providers, embedded
@@ -50,7 +50,21 @@ Do not promote the root `x/data` package from this inventory. Promotion work
 should select one surface, snapshot only that surface, and then prove release
 stability with `internal/checks/extension-release-evidence`.
 
-## Evidence Ledger Surfaces
+## Required Release Evidence
+
+Missing. No selected `x/data` surface has two consecutive minor release refs
+with unchanged exported API.
+
+Release refs:
+
+- none recorded
+
+## API Snapshot Evidence
+
+Not recorded. This inventory names likely `beta` surfaces, but no release-backed
+or current-head API snapshot pair is checked in for them yet.
+
+## Release Evidence
 
 `specs/extension-beta-evidence.yaml` tracks `surface_candidates` for:
 
@@ -59,6 +73,16 @@ stability with `internal/checks/extension-release-evidence`.
 
 Both surfaces remain blocked on release history, API snapshots, and owner
 sign-off. They do not imply root `x/data` promotion.
+
+Current state:
+
+- Selected release candidate: not finalized
+- API snapshot comparison: not recorded
+- Release-history comparison: not recorded
+
+## Owner Sign-Off
+
+Missing. No selected `x/data` surface has owner sign-off recorded.
 
 ## Next Evidence Needed
 
@@ -69,6 +93,13 @@ sign-off. They do not imply root `x/data` promotion.
 - Keep `kvengine`, `rw`, and `sharding` experimental until their operational
   compatibility promises are narrower.
 
-## Current Decision
+## Blockers
+
+- No selected `beta` surface is release-frozen yet.
+- `release_history_missing`
+- `api_snapshot_missing`
+- `owner_signoff_missing`
+
+## Promotion Posture
 
 Keep `x/data` experimental.

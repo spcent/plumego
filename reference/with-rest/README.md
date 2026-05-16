@@ -1,12 +1,12 @@
-# with-rest Feature Demo
+# with-rest Scenario Reference
 
-`reference/with-rest` is a non-canonical feature demo.
+`reference/with-rest` is a non-canonical scenario reference.
 
 It shows how to add `x/rest` resource controllers to a service that still starts
 from Plumego's canonical application shape.
 
 `x/rest` remains experimental until beta promotion evidence is complete. Use
-this demo as wiring guidance, not as a compatibility claim.
+this scenario reference as wiring guidance, not as a compatibility claim.
 
 ## What It Demonstrates
 

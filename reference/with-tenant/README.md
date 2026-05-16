@@ -1,12 +1,12 @@
-# with-tenant Feature Demo
+# with-tenant Scenario Reference
 
-`reference/with-tenant` is a non-canonical feature demo.
+`reference/with-tenant` is a non-canonical scenario reference.
 
 It shows how to add `x/tenant` resolution, policy, quota, and rate limiting to a
 small API while keeping Plumego route registration explicit.
 
 `x/tenant` remains experimental until beta promotion evidence is complete. Use
-this demo as wiring guidance, not as a compatibility claim.
+this scenario reference as wiring guidance, not as a compatibility claim.
 
 ## What It Demonstrates
 

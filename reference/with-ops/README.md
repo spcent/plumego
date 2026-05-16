@@ -1,6 +1,6 @@
-# with-ops Feature Demo
+# with-ops Scenario Reference
 
-`reference/with-ops` is a non-canonical feature demo.
+`reference/with-ops` is a non-canonical scenario reference.
 
 It shows how to mount protected `x/ops` routes and stable request-observability
 middleware without treating debug tools as production defaults.

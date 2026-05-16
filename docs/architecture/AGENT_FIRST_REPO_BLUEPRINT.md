@@ -70,7 +70,7 @@ This split is intentional and should remain stable:
 - do not move `specs/` under `docs/`; that would blur executable rules with explanatory prose
 - keep machine-readable repository contracts at the top level so discovery and checks stay simple
 - keep task cards outside `docs/` when they are meant to drive execution rather than serve as archival prose
-- keep `reference/standard-service` as the only canonical application layout; feature demos must not replace it
+- keep `reference/standard-service` as the only canonical application layout; scenario reference apps must not replace it
 
 ## Agent Control Plane
 
@@ -108,7 +108,7 @@ Rules:
 
 - `reference/standard-service` is the only canonical application layout
 - `reference/standard-service` must depend only on stable root packages and the standard library
-- extension or feature demos must live outside `reference/standard-service`
+- extension or scenario reference apps must live outside `reference/standard-service`
 - each extension family must publish one canonical discovery entrypoint
 - constructor policy follows `docs/CANONICAL_STYLE_GUIDE.md`: new fallible
   constructors return errors, existing panic convenience wrappers are

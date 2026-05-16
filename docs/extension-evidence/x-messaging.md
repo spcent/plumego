@@ -6,9 +6,9 @@ Owner: `messaging`
 
 Current status: `experimental`
 
-Candidate status: not selected
+Candidate status: `not selected`
 
-Evidence state: initial triage
+Evidence state: surface inventory
 
 ## Current Coverage
 
@@ -19,14 +19,14 @@ Evidence state: initial triage
 - HTTP response guidance is already aligned with `contract.WriteResponse` and
   safe error messages.
 
-## Boundary State
+## Primer And Boundary State
 
 - Primer: `docs/modules/x-messaging/README.md`
 - Manifest: `x/messaging/module.yaml`
 - Boundary state: app-facing entrypoint is documented; subordinate primitive
   ownership still needs release observation before family promotion.
 
-## Why This Is Not A Beta Candidate Yet
+## Why No `beta` Candidate Is Selected Yet
 
 `x/messaging` depends on sibling primitives whose public contracts still need
 family-level evaluation. Promoting the root before `x/mq`, `x/pubsub`,
@@ -47,13 +47,38 @@ broad.
 primitive promotion work must not turn `x/mq`, `x/pubsub`, `x/scheduler`, or
 `x/webhook` into competing app-facing family roots.
 
-## Evidence Ledger Surfaces
+## Required Release Evidence
+
+Missing. No selected `x/messaging` surface has two consecutive minor release
+refs with unchanged exported API.
+
+Release refs:
+
+- none recorded
+
+## API Snapshot Evidence
+
+Not recorded. The app-facing service is the leading `beta` candidate, but no
+release-backed or current-head API snapshot pair is checked in for that surface
+yet.
+
+## Release Evidence
 
 `specs/extension-beta-evidence.yaml` tracks
 `x/messaging:app-facing-service` as a `surface_candidate` covering the
 app-facing service package. It remains blocked on release history, API
 snapshots, and owner sign-off. Queue, pub/sub, scheduler, and webhook
 primitives are intentionally excluded from that surface.
+
+Current state:
+
+- Selected release candidate: `x/messaging:app-facing-service`
+- API snapshot comparison: not recorded
+- Release-history comparison: not recorded
+
+## Owner Sign-Off
+
+Missing. No selected `x/messaging` surface has owner sign-off recorded.
 
 ## Next Evidence Needed
 
@@ -63,6 +88,13 @@ primitives are intentionally excluded from that surface.
 - Exported API snapshots after the selected surface inventory is complete.
 - Release-history evidence for the selected API surface.
 
-## Current Decision
+## Blockers
+
+- The app-facing service surface is not release-frozen yet.
+- `release_history_missing`
+- `api_snapshot_missing`
+- `owner_signoff_missing`
+
+## Promotion Posture
 
 Keep `x/messaging` experimental.

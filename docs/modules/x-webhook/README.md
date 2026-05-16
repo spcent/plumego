@@ -6,7 +6,7 @@
 
 ## v1 Status
 
-- `Experimental` in the Plumego v1 support matrix
+- `experimental` in the Plumego v1 support matrix
 - Included in repository release scope, but compatibility is not frozen
 
 ## Use this module when
@@ -28,6 +28,8 @@
 ## Public entrypoints
 
 - `NewService`
+- `NewInbound`
+- `NewOutbound`
 - `NewMemStore`
 - `VerifyHMAC`
 - `VerifyGitHub`
@@ -60,3 +62,9 @@
 - keep secrets and HMAC keys out of logs and error messages; treat them as transport-local credentials
 - delivery retry state must remain instance-scoped; do not introduce package-level global delivery queues
 - do not expose provider-specific webhook envelope formats (`GitHub`, `Stripe`) through the shared `x/messaging` API surface
+
+## Validation commands
+
+- `go test -race -timeout 60s ./x/webhook/...`
+- `go test -timeout 20s ./x/webhook/...`
+- `go vet ./x/webhook/...`

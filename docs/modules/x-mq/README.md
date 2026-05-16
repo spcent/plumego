@@ -6,7 +6,7 @@
 
 ## v1 Status
 
-- `Experimental` in the Plumego v1 support matrix
+- `experimental` in the Plumego v1 support matrix
 - Included in repository release scope, but compatibility is not frozen
 
 ## Use this module when
@@ -25,6 +25,21 @@
 - `x/mq/module.yaml`
 - the owning package under `x/mq/*`
 - `docs/modules/x-messaging/README.md`
+
+## Public entrypoints
+
+- `NewTaskQueue`
+- `NewWorker`
+- `NewInProcBrokerE`
+- `store.NewMemory`
+- `store.NewSQL`
+- `NewKVPersistence`
+
+## Main risks when changing this module
+
+- queue durability regression
+- dedupe or dead-letter regression
+- worker retry behavior drift
 
 ## Canonical change shape
 
@@ -45,3 +60,9 @@ MQTT and AMQP server bridges are not implemented. `Config.Validate` fails closed
 when `EnableMQTT` or `EnableAMQP` is true, wrapping `ErrNotImplemented`.
 `StartMQTTServer` and `StartAMQPServer` remain compatibility stubs only; callers
 must not enable those protocol flags until a future implementation card lands.
+
+## Validation commands
+
+- `go test -race -timeout 60s ./x/mq/...`
+- `go test -timeout 20s ./x/mq/...`
+- `go vet ./x/mq/...`

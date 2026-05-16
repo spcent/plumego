@@ -68,6 +68,14 @@ go run ./internal/checks/extension-release-evidence \
 Do not clear `release_history_missing` or `api_snapshot_missing` until the
 recorded refs and snapshot files come from real releases.
 
+## Release Evidence
+
+Not recorded.
+
+Release refs: none recorded
+
+API snapshot comparison: current-head baseline only
+
 ## Owner Sign-Off
 
 Missing. The `multitenancy` owner must confirm the beta criteria before any
@@ -79,6 +87,6 @@ Missing. The `multitenancy` owner must confirm the beta criteria before any
 - `api_snapshot_missing`
 - `owner_signoff_missing`
 
-## Promotion Decision
+## Promotion Posture
 
 Do not promote yet. `x/tenant` remains `experimental`.

@@ -8,7 +8,7 @@ trace metadata carriers.
 
 ## v1 Status
 
-- `GA` in the Plumego v1 support matrix
+- `ga` in the Plumego v1 support matrix
 - Public surface is intentionally small and stdlib-compatible
 
 ## Use this module when

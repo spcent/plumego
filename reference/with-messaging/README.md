@@ -1,6 +1,6 @@
-# with-messaging Feature Demo
+# with-messaging Scenario Reference
 
-`reference/with-messaging` is a **non-canonical feature demo**.
+`reference/with-messaging` is a **non-canonical scenario reference**.
 
 It shows how to add `x/messaging` (in-process pub/sub broker) to a service
 that follows the same bootstrap structure as `reference/standard-service`.
@@ -17,7 +17,7 @@ that follows the same bootstrap structure as `reference/standard-service`.
 ## Design constraints
 
 - depends on the same stable roots as `reference/standard-service`
-- also imports `x/messaging` for the broker (intentional — this is a feature demo)
+- also imports `x/messaging` for the broker (intentional — this is a scenario reference)
 - keeps `x/messaging` wiring in `internal/app/app.go`, not in `main.go`
 - keeps route registration explicit in `internal/app/routes.go`
 

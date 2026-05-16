@@ -6,7 +6,7 @@
 
 ## v1 Status
 
-- `GA` in the Plumego v1 support matrix
+- `ga` in the Plumego v1 support matrix
 - Public compatibility is expected for the stable package surface
 
 ## Use this module when

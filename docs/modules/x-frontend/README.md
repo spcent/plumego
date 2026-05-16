@@ -6,7 +6,7 @@
 
 ## v1 Status
 
-- `Experimental` in the Plumego v1 support matrix
+- `experimental` in the Plumego v1 support matrix
 - Included in repository release scope, but compatibility is not frozen
 - Hardened coverage exists for path safety, symlink escape rejection,
   precompressed negotiation, cache variance, custom page policy, navigation-only

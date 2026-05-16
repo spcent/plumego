@@ -6,7 +6,7 @@
 
 ## v1 Status
 
-- `Experimental` in the Plumego v1 support matrix
+- `experimental` in the Plumego v1 support matrix
 - Included in repository release scope, but compatibility is not frozen
 
 ## Use this module when
@@ -26,6 +26,12 @@
 - `x/devtools/module.yaml`
 - `x/devtools/devtools.go`
 - `README.md`
+
+## Public entrypoints
+
+- `New`
+- `NewDevCollector`
+- `pubsubdebug.New`
 
 ## Main risks when changing this module
 
@@ -75,3 +81,9 @@ For production operations:
 - use `x/observability` for exporter and adapter wiring
 - use `x/ops` for protected admin and health HTTP orchestration
 - leave `/_debug/*` routes unmounted unless the application owner has added an explicit access gate
+
+## Validation commands
+
+- `go test -race -timeout 60s ./x/devtools/...`
+- `go test -timeout 20s ./x/devtools/...`
+- `go vet ./x/devtools/...`

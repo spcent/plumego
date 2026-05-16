@@ -10,9 +10,9 @@ packages, and configuration surfaces across stable releases.
 This policy applies to:
 
 - **Stable library roots** (`core`, `router`, `contract`, `middleware`,
-  `security`, `store`, `health`, `log`, `metrics`) — GA compatibility promise
+  `security`, `store`, `health`, `log`, `metrics`) — `ga` compatibility promise
   starting at v1.
-- **Canonical reference** (`reference/standard-service`) — kept aligned with
+- **Canonical reference app** (`reference/standard-service`) — kept aligned with
   stable-root API, not a reusable extension catalog.
 - **CLI** (`cmd/plumego`) — supported command-line tool; not a Go import
   surface.
@@ -109,7 +109,7 @@ the migration guide for that major version.
 
 ## Extension Packages (`x/*`) — No Compatibility Freeze
 
-Extension packages are Experimental. They may:
+Extension packages are `experimental`. They may:
 
 - Change API signatures between minor releases.
 - Be renamed, split, merged, or removed without a major version bump.

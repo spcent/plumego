@@ -6,7 +6,7 @@
 
 ## v1 Status
 
-- `Experimental` in the Plumego v1 support matrix
+- `experimental` in the Plumego v1 support matrix
 - Included in repository release scope, but compatibility is not frozen
 
 ## Use this module when
@@ -27,6 +27,13 @@
 - `x/fileapi/module.yaml`
 - `x/fileapi/handler.go`
 - `specs/task-routing.yaml`
+
+## Public entrypoints
+
+- `Handler`
+- `NewHandler`
+- `WithUserID`
+- `UserIDFromContext`
 
 ## Main risks when changing this module
 
@@ -62,3 +69,9 @@ authorization it delegates to `MetadataManager.Delete` and does not call
 `Storage.Delete` directly. Object lifecycle policy, hard deletion, background
 cleanup, and backend-specific retention behavior belong in `x/data/file` or the
 application wiring around it.
+
+## Validation commands
+
+- `go test -race -timeout 60s ./x/fileapi/...`
+- `go test -timeout 20s ./x/fileapi/...`
+- `go vet ./x/fileapi/...`

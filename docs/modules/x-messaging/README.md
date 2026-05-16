@@ -6,7 +6,7 @@
 
 ## v1 Status
 
-- `Experimental` in the Plumego v1 support matrix
+- `experimental` in the Plumego v1 support matrix
 - Included in repository release scope, but compatibility is not frozen
 
 ## Use this module when
@@ -59,3 +59,9 @@ Open sibling packages only when the task is already known to be narrow:
 - `x/pubsub`: in-process broker primitives
 - `x/scheduler`: scheduling primitives
 - `x/webhook`: inbound verification or outbound delivery mechanics
+
+## Validation commands
+
+- `go test -race -timeout 60s ./x/messaging/...`
+- `go test -timeout 20s ./x/messaging/...`
+- `go vet ./x/messaging/...`

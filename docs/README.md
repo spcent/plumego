@@ -40,8 +40,12 @@ open the relevant capability primer:
 | Multi-tenant API | `../reference/with-tenant/README.md`, `modules/x-tenant/README.md`, `architecture/X_TENANT_BLUEPRINT.md` |
 | Edge gateway | `modules/x-gateway/README.md`, `modules/x-discovery/README.md` when discovery is explicitly selected |
 | Realtime service | `modules/x-websocket/README.md`, `modules/x-messaging/README.md` |
+| Messaging service | `../reference/with-messaging/README.md`, `modules/x-messaging/README.md`, then `modules/x-mq/README.md` or `modules/x-pubsub/README.md` only for narrow primitive work |
+| Webhook ingress or delivery | `../reference/with-webhook/README.md`, `modules/x-messaging/README.md`, `modules/x-webhook/README.md` |
+| File API service | `../reference/standard-service/README.md`, `modules/x-fileapi/README.md`, `modules/x-data/README.md` for storage and metadata backends |
 | AI service | `../reference/with-ai/README.md`, `modules/x-ai/README.md`, starting with provider, session, streaming, and tool subpackages |
 | Observability and ops | `../reference/with-ops/README.md`, `modules/x-observability/README.md`, `modules/x-ops/README.md`, `modules/x-devtools/README.md` |
+| Cross-family resilience primitives | `modules/x-resilience/README.md`, and `architecture/x-ai-resilience-boundary.md` when AI wrappers are involved |
 
 These paths identify first reads. They do not replace the canonical bootstrap
 layout or promote experimental `x/*` APIs to stable status.
@@ -79,6 +83,22 @@ Related execution surfaces live outside `docs/`:
   Start from the primary family primer when a subordinate package exists
   (`x/messaging` before `x/mq` or `x/pubsub`, `x/data` before `x/cache`,
   `x/observability` before `x/ops` or `x/devtools`).
+- Start from `modules/x-resilience/README.md` when the task is reusable
+  circuit-breaker or rate-limit behavior shared across extension families.
+
+## Reference Apps
+
+- `../reference/standard-service/README.md` — canonical application layout and the default first read
+- `../reference/production-service/README.md` — production-oriented explicit wiring beyond the minimal canonical path
+- `../reference/with-rest/README.md` — explicit `x/rest` mounting pattern
+- `../reference/with-tenant/README.md` — explicit `x/tenant` mounting pattern
+- `../reference/with-gateway/README.md` — explicit `x/gateway` mounting pattern
+- `../reference/with-websocket/README.md` — explicit `x/websocket` mounting pattern
+- `../reference/with-ai/README.md` — explicit stable-tier `x/ai` mounting pattern
+- `../reference/with-ops/README.md` — explicit observability and protected admin surface mounting pattern
+- `../reference/with-messaging/README.md` — explicit app-facing messaging mounting pattern
+- `../reference/with-webhook/README.md` — explicit webhook ingress and outbound delivery mounting pattern
+- `../reference/workerfleet/README.md` — separate worker-oriented reference, not part of the canonical web-service path
 
 ## Reference Assets
 
@@ -86,6 +106,15 @@ Related execution surfaces live outside `docs/`:
 - `github-workflows/milestone-gates.yml` — example milestone-only workflow for downstream or copied setups
 
 The live repository CI workflow is `.github/workflows/quality-gates.yml`.
+
+## Release And Evidence
+
+- `EXTENSION_STABILITY_POLICY.md` — promotion criteria for `experimental` → `beta` → `ga`
+- `EXTENSION_MATURITY.md` — current extension status and blocker dashboard
+- `extension-evidence/` — per-family evidence ledgers and snapshot-backed promotion notes
+- `stable-api/README.md` — stable-root exported API baseline workflow
+- `release/PRE_V1_RELEASE_CHECKLIST.md` — release gate checklist
+- `release/v1.0.0-rc.1.md` and `release/v1.0.0.md` — release notes and evidence summaries
 
 ## Authority Order
 

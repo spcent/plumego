@@ -6,7 +6,7 @@
 
 ## v1 Status
 
-- `GA` in the Plumego v1 support matrix
+- `ga` in the Plumego v1 support matrix
 - The stable package surface should stay small and expose one canonical
   constructor path per middleware.
 

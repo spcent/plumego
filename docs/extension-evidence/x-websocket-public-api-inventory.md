@@ -2,13 +2,13 @@
 
 Module: `x/websocket`
 
-Status: inventory current as of 2026-05-06
+Inventory status: current as of 2026-05-06
 
 Source snapshot:
 `docs/extension-evidence/snapshots/first-batch/x-websocket-head.snapshot`
 
-This inventory classifies the exported surface that was reviewed before beta
-promotion. The beta promotion source of truth is
+This inventory classifies the exported surface that was reviewed before `beta`
+promotion. The promotion source of truth is
 `docs/extension-evidence/x-websocket.md` plus
 `specs/extension-beta-evidence.yaml`; this file remains a supporting inventory.
 
@@ -21,10 +21,10 @@ promotion. The beta promotion source of truth is
 - Vars: 38
 - Methods: 48
 
-## Keep For Beta Surface
+## Included In Reviewed `beta` Surface
 
 These symbols are part of the reviewed websocket transport surface covered by
-the beta evidence.
+the recorded `beta` evidence.
 
 - Server wiring: `New`, `DefaultWebSocketConfig`, `Server`,
   `WebSocketConfig`, `Server.RegisterRoutes`, `Server.Shutdown`,
@@ -53,12 +53,12 @@ the beta evidence.
   `UserInfo`, `ExtractUserInfo`
 - Sentinel behavior errors: exported `Err*` values in `module.yaml`
 
-## Keep With Explicit Stable Scope
+## Included Only With Explicit Scope Confirmation
 
-These symbols are acceptable only if the owner confirms the stable module should
-include built-in simple security helpers in addition to transport primitives.
-They are implemented and tested, but they widen the public surface beyond the
-minimal websocket transport core.
+These symbols are acceptable only if the owner confirms that the stable module
+should include built-in simple security helpers in addition to transport
+primitives. They are implemented and tested, but they widen the public surface
+beyond the minimal websocket transport core.
 
 - `NewSimpleRoomAuth`, `SimpleRoomAuth`, `SimpleRoomAuth.SetRoomPassword`,
   `SimpleRoomAuth.AuthorizeRoom`
@@ -72,9 +72,9 @@ minimal websocket transport core.
   `ValidateRoomPassword`, `ValidateSecurityConfig`
 - `GenerateSecureSecret`
 
-## Review Before Stable
+## Needs Scope Decision Before Stable Promise
 
-These symbols are useful today but should receive an owner decision before a
+These symbols are useful today but should receive an owner decision before any
 stable promise because they look more like helper or diagnostic API than core
 websocket transport.
 
@@ -83,9 +83,10 @@ websocket transport.
   `ValidationError`
 - Utility helpers: `SanitizeForLogging`, `IsTemporary`
 
-## Current Decision
+## Promotion Posture
 
 - `x/websocket/module.yaml` is `beta`.
+- Blocker state: none in the promotion evidence record.
 - Server route registration is explicit through `Server.RegisterRoutes`.
 - `SecurityConfig` no longer carries Hub runtime fields; queue-full behavior and
   connection-rate limits remain on `HubConfig` and `WebSocketConfig`.
@@ -108,6 +109,6 @@ websocket transport.
   masked client frames and write unmasked server frames. `ReadMessageStream` is
   a bounded reader over buffered frames, not a low-memory or zero-copy streaming
   API.
-- Beta promotion is complete. Release refs `d2c25c3` and `ec70358`, matching
+- `beta` promotion is complete. Release refs `d2c25c3` and `ec70358`, matching
   release API snapshots, and `realtime` owner sign-off are recorded in
   `docs/extension-evidence/x-websocket.md`.

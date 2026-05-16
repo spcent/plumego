@@ -23,12 +23,38 @@ Create `main.go`:
 
 ```go
 package main
-import ("log"; "net/http"; "github.com/spcent/plumego/contract"; "github.com/spcent/plumego/core")
+
+import (
+	"log"
+	"net/http"
+
+	"github.com/spcent/plumego/contract"
+	"github.com/spcent/plumego/core"
+)
+
 func main() {
-	cfg := core.DefaultConfig(); cfg.Addr = ":8080"; app := core.New(cfg, core.AppDependencies{})
-	if err := app.Get("/ping", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { _ = contract.WriteResponse(w, r, http.StatusOK, map[string]string{"message": "pong"}, nil) })); err != nil { panic(err) }
-	if err := app.Prepare(); err != nil { panic(err) }
-	srv, err := app.Server(); if err != nil { panic(err) }
+	cfg := core.DefaultConfig()
+	cfg.Addr = ":8080"
+
+	app := core.New(cfg, core.AppDependencies{})
+	if err := app.Get("/ping", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := contract.WriteResponse(w, r, http.StatusOK, map[string]string{
+			"message": "pong",
+		}, nil); err != nil {
+			http.Error(w, "write response", http.StatusInternalServerError)
+		}
+	})); err != nil {
+		log.Fatalf("register route: %v", err)
+	}
+
+	if err := app.Prepare(); err != nil {
+		log.Fatalf("prepare server: %v", err)
+	}
+	srv, err := app.Server()
+	if err != nil {
+		log.Fatalf("get server: %v", err)
+	}
+
 	log.Println("server started at :8080")
 	log.Fatal(srv.ListenAndServe())
 }
@@ -151,11 +177,14 @@ After the smallest example works, keep the app layout from
 | Standard JSON API with explicit handlers | stable roots: `core`, `router`, `contract`, `middleware` |
 | Reusable CRUD/resource conventions | `x/rest` |
 | Tenant resolution, policy, quota, and isolation | `x/tenant` |
-| Reverse proxy, rewrite, balancing, and edge transport | `x/gateway` |
+| Reverse proxy, rewrite, balancing, and edge transport | `x/gateway`, then `x/discovery` only when dynamic backend lookup is required |
 | WebSocket transport | `x/websocket` |
 | Messaging workflows | `x/messaging` |
+| Inbound webhook verification or outbound webhook delivery | `x/webhook`, starting from `x/messaging` when the task is broader than transport mechanics |
+| File upload, download, and temporary URL transport | `x/fileapi`, with storage and metadata implementations in `x/data/file` |
+| Reusable circuit breaker or rate-limit primitives | `x/resilience` |
 | AI providers, sessions, streaming, and tools | `x/ai/provider`, `x/ai/session`, `x/ai/streaming`, `x/ai/tool` |
-| Observability export or protected diagnostics | `x/observability`, `x/ops`, or `x/devtools` depending on the surface |
+| Observability export, protected diagnostics, or local debug endpoints | `x/observability`, `x/ops`, or `x/devtools` depending on the surface |
 
 Do not start a new application layout from an `x/*` package. Treat extensions as
 explicit additions to the canonical app wiring.

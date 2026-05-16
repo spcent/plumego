@@ -30,18 +30,19 @@ Evidence state: complete
 
 ## Required Release Evidence
 
-Missing. Promotion requires two consecutive minor release refs with no exported
-`x/observability/*` API changes.
+Recorded. This promotion record uses two consecutive minor release refs with no
+exported `x/observability/*` API changes.
 
 Release refs:
 
-- none recorded
+- `d2c25c3`
+- `ec70358`
 
 ## API Snapshot Evidence
 
-One current-head baseline snapshot is recorded. It is useful for comparing the
-candidate surface during development, but it is not release evidence and does
-not clear `api_snapshot_missing` by itself.
+Release-backed API snapshots are recorded for the promotion pair below. A
+current-head baseline snapshot can still be useful during development, but it
+does not replace the release-backed comparison.
 
 Generate a fresh snapshot with:
 
@@ -51,7 +52,8 @@ go run ./internal/checks/extension-api-snapshot -module ./x/observability/... -o
 
 Snapshot refs:
 
-- `docs/extension-evidence/snapshots/first-batch/x-observability-head.snapshot`
+- `docs/extension-evidence/snapshots/x-observability/base.snapshot`
+- `docs/extension-evidence/snapshots/x-observability/head.snapshot`
 
 ## Release Comparison Workflow
 
@@ -91,6 +93,6 @@ Signed off by `observability` at v0.2.0:
 
 None. All promotion blockers cleared.
 
-## Promotion Decision
+## Promotion Posture
 
 Promoted to `beta` at v0.2.0. API stable across d2c25c3–ec70358.

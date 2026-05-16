@@ -6,7 +6,7 @@
 
 ## v1 Status
 
-- `Experimental` in the Plumego v1 support matrix
+- `experimental` in the Plumego v1 support matrix
 - Included in repository release scope, but compatibility is not frozen
 - Stable readiness review on 2026-05-04: core correctness blockers from the
   follow-up cards are addressed, but the module remains experimental until the

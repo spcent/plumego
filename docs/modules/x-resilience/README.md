@@ -6,7 +6,7 @@
 
 ## v1 Status
 
-- `Experimental` in the Plumego v1 support matrix
+- `experimental` in the Plumego v1 support matrix
 - Included in repository release scope, but compatibility is not frozen
 
 ## Use this module when
@@ -28,6 +28,20 @@
 - `x/resilience/circuitbreaker`
 - `specs/extension-taxonomy.yaml`
 
+## Public entrypoints
+
+- `circuitbreaker.New`
+- `circuitbreaker.NewMiddleware`
+- `ratelimit.New`
+- `ratelimit.NewKeyed`
+
+## Main risks when changing this module
+
+- breaker threshold regression
+- keyed limiter behavior drift
+- adapter behavior regression
+- hidden shared state between callers
+
 ## Canonical change shape
 
 - keep reusable resilience primitives here instead of in stable roots
@@ -42,6 +56,12 @@
 - keep HTTP or transport adapters local to the owning extension when they are generic; do not push them into stable roots
 - feature-specific orchestration (retry strategies tied to business rules) belongs in the owning extension, not in `x/resilience`
 - `x/ai/circuitbreaker` and `x/ai/ratelimit` remain AI compatibility surfaces; do not move their exported symbols here without a dedicated symbol-change card
+
+## Validation commands
+
+- `go test -race -timeout 60s ./x/resilience/...`
+- `go test -timeout 20s ./x/resilience/...`
+- `go vet ./x/resilience/...`
 
 For the detailed AI boundary decision, see
 `docs/architecture/x-ai-resilience-boundary.md`.

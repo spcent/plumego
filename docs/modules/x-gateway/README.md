@@ -6,7 +6,7 @@
 
 ## v1 Status
 
-- `Beta` in the Plumego v1 support matrix
+- `beta` in the Plumego v1 support matrix
 - Included in repository release scope with beta compatibility obligations
 - Promoted at `v0.2.0` after release-backed evidence showed no exported
   `x/gateway/*` API changes across refs `d2c25c3` and `ec70358`, with `edge`

@@ -6,7 +6,7 @@
 
 ## v1 Status
 
-- `GA` in the Plumego v1 support matrix
+- `ga` in the Plumego v1 support matrix
 - v1 normalization removes compatibility aliases and no-error wrappers before
   the final stable surface is frozen
 

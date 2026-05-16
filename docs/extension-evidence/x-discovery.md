@@ -6,9 +6,9 @@ Owner: `edge`
 
 Current status: `experimental`
 
-Candidate status: not selected
+Candidate status: `not selected`
 
-Evidence state: initial triage
+Evidence state: surface inventory
 
 ## Current Coverage
 
@@ -20,14 +20,14 @@ Evidence state: initial triage
   behavior.
 - The primer documents backend selection and standard validation commands.
 
-## Boundary State
+## Primer And Boundary State
 
 - Primer: `docs/modules/x-discovery/README.md`
 - Manifest: `x/discovery/module.yaml`
 - Boundary state: discovery is a secondary capability root, not bootstrap or
   gateway-only policy.
 
-## Why This Is Not A Beta Candidate Yet
+## Why No `beta` Candidate Is Selected Yet
 
 The backend set expanded recently and needs release observation. Kubernetes and
 etcd behavior in particular should hold a stable constructor/config/API shape
@@ -47,12 +47,37 @@ Root `x/discovery` should only become a beta target after the common contract
 and at least the static backend have matching release evidence. Consul,
 Kubernetes, and etcd can remain experimental adapters behind that contract.
 
-## Evidence Ledger Surfaces
+## Required Release Evidence
+
+Missing. No selected `x/discovery` surface has two consecutive minor release
+refs with unchanged exported API.
+
+Release refs:
+
+- none recorded
+
+## API Snapshot Evidence
+
+Not recorded. This inventory names the common contract plus static backend as
+the likely `beta` surface, but no checked-in release-backed or current-head API
+snapshot pair exists yet.
+
+## Release Evidence
 
 `specs/extension-beta-evidence.yaml` tracks `x/discovery:core-static` as a
 `surface_candidate` covering the common contract and static backend package.
 It remains blocked on release history, API snapshots, and owner sign-off, and
 does not imply beta status for Consul, Kubernetes, or etcd adapters.
+
+Current state:
+
+- Selected release candidate: `x/discovery:core-static`
+- API snapshot comparison: not recorded
+- Release-history comparison: not recorded
+
+## Owner Sign-Off
+
+Missing. No selected `x/discovery` surface has owner sign-off recorded.
 
 ## Next Evidence Needed
 
@@ -61,6 +86,14 @@ does not imply beta status for Consul, Kubernetes, or etcd adapters.
 - Two consecutive minor release refs showing no exported API changes.
 - Owner sign-off after backend API shape is observed across releases.
 
-## Current Decision
+## Blockers
+
+- The common contract plus static backend surface still lacks checked-in API
+  snapshots.
+- `release_history_missing`
+- `api_snapshot_missing`
+- `owner_signoff_missing`
+
+## Promotion Posture
 
 Keep `x/discovery` experimental.

@@ -84,11 +84,11 @@ This matrix describes the current repository state before a tagged v1 release. C
 | Area | Status | Compatibility promise | Modules |
 | --- | --- | --- | --- |
 | Stable library roots | Stable-root candidate | Public package surface is intended to remain the long-term stable API after v1 hardening | `core`, `router`, `contract`, `middleware`, `security`, `store`, `health`, `log`, `metrics` |
-| Canonical reference app | Supported reference | Kept aligned with the canonical bootstrap and stable-root usage, but not treated as a reusable extension catalog | `reference/standard-service` |
+| Canonical reference app | supported reference | Kept aligned with the canonical bootstrap and stable-root usage, but not treated as a reusable extension catalog | `reference/standard-service` |
 | CLI | v1 hardening scope | Supported as a command-line tool, not as a Go import surface; command behavior and generated output must stay aligned with canonical docs | `cmd/plumego` |
-| Beta extension families | Beta | API surface frozen between minor release refs; promoted after two consecutive tagged refs with no exported API changes and owner sign-off | `x/gateway`, `x/observability`, `x/rest`, `x/websocket` |
-| App-facing extension families | Experimental | Included in repo quality gates and release scope, but API/config compatibility is not frozen | `x/ai`, `x/data`, `x/fileapi`, `x/frontend`, `x/messaging`, `x/resilience`, `x/tenant` |
-| Subordinate extension primitives | Experimental | Maintained and tested, but discovery should start from the owning family entrypoint and compatibility is not frozen | `x/cache`, `x/devtools`, `x/discovery`, `x/ipc`, `x/mq`, `x/ops`, `x/pubsub`, `x/scheduler`, `x/webhook` |
+| Beta extension families | `beta` | API surface frozen between minor release refs; promoted after two consecutive tagged refs with no exported API changes and owner sign-off | `x/gateway`, `x/observability`, `x/rest`, `x/websocket` |
+| App-facing extension families | `experimental` | Included in repo quality gates and release scope, but API/config compatibility is not frozen | `x/ai`, `x/data`, `x/fileapi`, `x/frontend`, `x/messaging`, `x/resilience`, `x/tenant` |
+| Subordinate extension primitives | `experimental` | Maintained and tested, but discovery should start from the owning family entrypoint and compatibility is not frozen | `x/cache`, `x/devtools`, `x/discovery`, `x/ipc`, `x/mq`, `x/ops`, `x/pubsub`, `x/scheduler`, `x/webhook` |
 
 ## Highlights
 - **Router with Groups and Parameters**: Trie-based matcher supporting `/:param` segments, route freezing, and per-route/group middleware stacks.
@@ -139,30 +139,46 @@ Smallest runnable example:
 package main
 
 import (
+    "log"
     "net/http"
 
     "github.com/spcent/plumego/contract"
     "github.com/spcent/plumego/core"
-    plog "github.com/spcent/plumego/log"
 )
 
 func main() {
-    app := core.New(core.DefaultConfig(),
-        core.AppDependencies{Logger: plog.NewLogger()})
+    cfg := core.DefaultConfig()
+    cfg.Addr = ":8080"
 
-    _ = app.Get("/ping", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-        _ = contract.WriteResponse(w, r, http.StatusOK,
-            map[string]string{"message": "pong"}, nil)
-    }))
+    app := core.New(cfg, core.AppDependencies{})
+    if err := app.Get("/ping", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        if err := contract.WriteResponse(w, r, http.StatusOK, map[string]string{
+            "message": "pong",
+        }, nil); err != nil {
+            http.Error(w, "write response", http.StatusInternalServerError)
+        }
+    })); err != nil {
+        log.Fatalf("register route: %v", err)
+    }
 
-    app.Run() // combined prepare + listen on :8080
+    if err := app.Prepare(); err != nil {
+        log.Fatalf("prepare server: %v", err)
+    }
+    srv, err := app.Server()
+    if err != nil {
+        log.Fatalf("get server: %v", err)
+    }
+
+    log.Println("server started at :8080")
+    log.Fatal(srv.ListenAndServe())
 }
 ```
 
-`app.Run()` is the combined path. For explicit lifecycle control — inspecting or wrapping the
-`*http.Server` before it starts, TLS configuration, or custom shutdown handling — use
-`app.Prepare()` + `app.Server()` instead. See
-[`docs/getting-started.md`](./docs/getting-started.md) for both patterns side by side.
+Use `app.Run()` when you want the combined prepare-and-serve path. Use
+`app.Prepare()` + `app.Server()` when you need explicit lifecycle control, such
+as inspecting or wrapping the `*http.Server`, changing TLS policy, or managing
+custom shutdown behavior. See [`docs/getting-started.md`](./docs/getting-started.md)
+for both patterns side by side.
 
 ## Configuration Basics
 - Environment variables should be loaded explicitly in your `main` package. Keep `.env` path ownership in app-local config, for example `cfg.App.EnvFile` in the reference layout, when tooling such as devtools reload needs to know which file is active.
@@ -214,10 +230,10 @@ App-facing extension families:
 - [x/gateway](./docs/modules/x-gateway/README.md) and [x/discovery](./docs/modules/x-discovery/README.md) — edge transport and service discovery
 - [x/frontend](./docs/modules/x-frontend/README.md) — frontend asset serving
 - [x/observability](./docs/modules/x-observability/README.md), [x/ops](./docs/modules/x-ops/README.md), and [x/devtools](./docs/modules/x-devtools/README.md) — observability, protected admin surfaces, and local debug tools
-- [x/data](./docs/modules/x-data/README.md), [x/cache](./docs/modules/x-cache/README.md), and [x/ai](./docs/modules/x-ai/README.md) — topology-heavy data features, cache adapters, and AI capabilities
+- [x/data](./docs/modules/x-data/README.md), [x/cache](./docs/modules/x-cache/README.md), [x/resilience](./docs/modules/x-resilience/README.md), and [x/ai](./docs/modules/x-ai/README.md) — topology-heavy data features, cache adapters, reusable resilience primitives, and AI capabilities
 
 ## Reference App
-`reference/standard-service` is the canonical reference application. It depends only on stable root packages and demonstrates:
+`reference/standard-service` is the canonical reference app. It depends only on stable root packages and demonstrates:
 
 - default application layout
 - explicit bootstrap flow in `main.go`
@@ -234,7 +250,7 @@ go run ./reference/standard-service
 ## Further Reading
 
 - [`docs/getting-started.md`](./docs/getting-started.md) — smallest runnable example
-- [`reference/standard-service`](./reference/standard-service) — canonical reference application
+- [`reference/standard-service`](./reference/standard-service) — canonical reference app
 - [`docs/README.md`](./docs/README.md) — docs entrypoint
 - [`env.example`](./env.example) — environment variable reference
 - [`cmd/plumego/DEV_SERVER.md`](./cmd/plumego/DEV_SERVER.md) — dev server and dashboard details

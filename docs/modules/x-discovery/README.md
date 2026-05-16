@@ -6,7 +6,7 @@
 
 ## v1 Status
 
-- `Experimental` in the Plumego v1 support matrix
+- `experimental` in the Plumego v1 support matrix
 - Included in repository release scope, but compatibility is not frozen
 
 ## Use this module when
@@ -26,6 +26,13 @@
 - `x/discovery/module.yaml`
 - `specs/task-routing.yaml`
 - `specs/extension-taxonomy.yaml`
+
+## Public entrypoints
+
+- `NewStatic`
+- `NewConsul`
+- `NewKubernetes`
+- `NewEtcd`
 
 ## Main risks when changing this module
 
@@ -68,6 +75,7 @@ All backends implement the `Discovery` interface:
 
 ## Standard validation
 
+- `go test -race -timeout 60s ./x/discovery/...`
 - `go test -timeout 20s ./x/discovery/...`
 - `go vet ./x/discovery/...`
 - backend tests use `httptest.NewServer` for offline verification; no live Consul, K8s, or etcd required

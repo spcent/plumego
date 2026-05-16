@@ -107,7 +107,7 @@ Complete in this order within a single promotion card:
 - `api_snapshot_missing`
 - `owner_signoff_missing`
 
-## Promotion Decision
+## Promotion Posture
 
 Do not promote while any blocker remains. Do not change `module.yaml` status
 in the same commit that creates incomplete evidence.

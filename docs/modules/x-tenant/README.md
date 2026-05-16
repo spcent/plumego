@@ -6,9 +6,9 @@
 
 ## v1 Status
 
-- `Experimental` in the Plumego v1 support matrix
+- `experimental` in the Plumego v1 support matrix
 - Included in repository release scope, but compatibility is not frozen
-- Beta candidate once the extension stability policy's two-release API freeze
+- A `beta` candidate once the extension stability policy's two-release API freeze
   evidence is available. Current blocker: no repository release history proves
   two consecutive minor releases without exported `x/tenant/*` API changes.
 

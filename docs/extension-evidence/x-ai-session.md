@@ -71,12 +71,20 @@ go run ./internal/checks/extension-release-evidence \
 Do not clear `release_history_missing` or `api_snapshot_missing` until the
 recorded refs and snapshot files come from real releases.
 
+## Release Evidence
+
+Not recorded.
+
+Release refs: none recorded
+
+API snapshot comparison: current-head baseline only
+
 ## Owner Sign-Off
 
 Missing. The `ai-gateway` owner must confirm the subpackage beta criteria before
 any manifest or dashboard status change.
 
-## Experimental Exclusions
+## Scope Exclusions
 
 This record does not cover orchestration state machines, semantic cache state,
 distributed execution persistence, or any session behavior owned by another
@@ -88,7 +96,7 @@ extension family.
 - `api_snapshot_missing`
 - `owner_signoff_missing`
 
-## Promotion Decision
+## Promotion Posture
 
 Do not promote the root `x/ai` family. Treat `x/ai/session` as stable-tier only,
 with beta promotion still blocked by missing release and snapshot evidence.

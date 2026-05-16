@@ -1,7 +1,7 @@
 # Extension Stability Policy
 
 This document defines the criteria for advancing an `x/*` extension module from
-`experimental` to `beta` (stable-candidate), and from `beta` to `ga`.
+`experimental` to `beta`, and from `beta` to `ga`.
 
 It does **not** override the stable-root compatibility promise defined in
 `docs/DEPRECATION.md`. Stable roots (`core`, `router`, `contract`, `middleware`,

@@ -6,7 +6,7 @@
 
 ## v1 Status
 
-- `Experimental` in the Plumego v1 support matrix
+- `experimental` in the Plumego v1 support matrix
 - Included in repository release scope, but compatibility is not frozen
 
 ## Use this module when
@@ -28,6 +28,21 @@
 - `x/scheduler/*.go`
 - `docs/modules/x-messaging/README.md`
 
+## Public entrypoints
+
+- `New`
+- `NewAdminHandler`
+- `NewMemoryStore`
+- `NewKVStore`
+- `RetryFixed`
+- `RetryExponential`
+
+## Main risks when changing this module
+
+- delayed job ordering regression
+- retry policy drift
+- hidden scheduler lifecycle state
+
 ## Canonical change shape
 
 - keep job wiring explicit
@@ -43,3 +58,9 @@
 - keep scheduler state instance-scoped; do not introduce process-wide job registries or implicit registration at import time
 - retry determinism and failure visibility must stay explicit in `x/scheduler`; do not add hidden retry policies
 - do not push scheduling-specific business rules (e.g. cron expressions tied to domain logic) into stable roots
+
+## Validation commands
+
+- `go test -race -timeout 60s ./x/scheduler/...`
+- `go test -timeout 20s ./x/scheduler/...`
+- `go vet ./x/scheduler/...`

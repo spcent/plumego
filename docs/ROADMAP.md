@@ -283,7 +283,7 @@ Next work:
 
 - do not reintroduce component-style compatibility APIs
 - do not add new broad legacy roots for short-term convenience
-- do not let feature demos replace the canonical app path
+- do not let scenario reference apps replace the canonical app path
 - do not move tenant or topology-heavy logic back into stable roots
 - do not leave stale historical drafts inside the active docs surface
 - do not mark `x/*` packages as GA without explicit policy, tests, and docs

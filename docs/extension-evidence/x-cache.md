@@ -6,9 +6,9 @@ Owner: `platform`
 
 Current status: `experimental`
 
-Candidate status: not selected
+Candidate status: `not selected`
 
-Evidence state: stability blocker inventory
+Evidence state: surface inventory
 
 ## Current Coverage
 
@@ -78,14 +78,14 @@ Evidence state: stability blocker inventory
   documenting package-provided `With*` options as the future stable frozen
   constructor contract.
 
-## Boundary State
+## Primer And Boundary State
 
 - Primer: `docs/modules/x-cache/README.md`
 - Manifest: `x/cache/module.yaml`
 - Boundary state: topology-heavy and provider-specific cache behavior remains
   extension-owned and outside stable `store/cache`.
 
-## Why This Is Not A Beta Candidate Yet
+## Why No `beta` Candidate Is Selected Yet
 
 `x/cache` still mixes distributed topology, in-process ranked-data behavior, and
 provider adapter contracts. Those surfaces need separate release-history
@@ -103,6 +103,41 @@ Do not promote `x/cache` as a root module from this inventory. Promotion work
 should select one surface, snapshot only that surface, and then prove release
 stability with `internal/checks/extension-release-evidence`.
 
+## Required Release Evidence
+
+Missing. No selected `x/cache` surface has two consecutive minor release refs
+with unchanged exported API.
+
+Release refs:
+
+- none recorded
+
+## API Snapshot Evidence
+
+Current-head snapshots are recorded for the candidate surfaces below. They are
+useful development baselines, but they are not release evidence and do not
+clear `api_snapshot_missing` by themselves.
+
+- `docs/extension-evidence/snapshots/x-cache/x-cache-distributed-head.snapshot`
+- `docs/extension-evidence/snapshots/x-cache/x-cache-leaderboard-head.snapshot`
+- `docs/extension-evidence/snapshots/x-cache/x-cache-redis-head.snapshot`
+
+## Release Evidence
+
+Not recorded. `specs/extension-beta-evidence.yaml` does not name a selected
+`x/cache` release candidate yet, and no real release-ref comparison has been
+checked in.
+
+Current state:
+
+- Selected release candidate: none
+- API snapshot comparison: current-head only
+- Release-history comparison: not recorded
+
+## Owner Sign-Off
+
+Missing. No selected `x/cache` surface has owner sign-off recorded.
+
 ## Next Evidence Needed
 
 - Compare checked-in current-head API snapshots against real release refs after
@@ -118,16 +153,6 @@ stability with `internal/checks/extension-release-evidence`.
 - Document owner sign-off for the selected surface.
 - Keep `x/cache/module.yaml` status as `experimental` until the promotion
   process in `docs/EXTENSION_STABILITY_POLICY.md` is complete.
-
-## Current Head API Snapshots
-
-These snapshots record the current exported API shape only. They are not
-release-history evidence and do not clear the two-release or owner sign-off
-promotion blockers.
-
-- `docs/extension-evidence/snapshots/x-cache/x-cache-distributed-head.snapshot`
-- `docs/extension-evidence/snapshots/x-cache/x-cache-leaderboard-head.snapshot`
-- `docs/extension-evidence/snapshots/x-cache/x-cache-redis-head.snapshot`
 
 ## Ninth Stabilization Pass Validation
 
@@ -150,7 +175,7 @@ promotion blockers.
   verified the release-evidence tool path only; it is not release-history
   evidence because no real release refs were supplied.
 
-## Remaining Stable Blockers By Surface
+## Blockers
 
 - Distributed: async secondary failures have bounded queue/drop visibility but
   no durable repair contract has been selected.
@@ -163,6 +188,6 @@ promotion blockers.
 - Release governance: no selected surface has release refs, historical API
   snapshot comparisons, or owner sign-off.
 
-## Current Decision
+## Promotion Posture
 
 Keep `x/cache` experimental.

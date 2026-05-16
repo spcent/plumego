@@ -6,7 +6,7 @@
 
 ## v1 Status
 
-- `Experimental` in the Plumego v1 support matrix
+- `experimental` in the Plumego v1 support matrix
 - Included in repository release scope, but compatibility is not frozen
 
 ## Use this module when
@@ -25,6 +25,21 @@
 - `x/pubsub/module.yaml`
 - `x/pubsub/*.go`
 - `docs/modules/x-messaging/README.md`
+
+## Public entrypoints
+
+- `New`
+- `NewPersistent`
+- `NewDistributed`
+- `NewReplayStore`
+- `NewBackpressureController`
+- `NewPrometheusExporter`
+
+## Main risks when changing this module
+
+- fan-out ordering regression
+- broker lifecycle leaks
+- backpressure or replay semantics drift
 
 ## Canonical change shape
 
@@ -52,3 +67,9 @@ create the context with the package-local lifecycle helper, stop workers through
 `Close`, and make repeated `Close` calls safe. Background workers must observe
 the wrapper context instead of creating unrelated package-level or global
 contexts.
+
+## Validation commands
+
+- `go test -race -timeout 60s ./x/pubsub/...`
+- `go test -timeout 20s ./x/pubsub/...`
+- `go vet ./x/pubsub/...`
