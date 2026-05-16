@@ -1579,6 +1579,21 @@ li {
   background: color-mix(in srgb, var(--accent) 26%, transparent);
 }
 
+.page-hero-visual__illustration {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem 0;
+  color: var(--accent-strong, var(--accent));
+}
+
+.phv-svg {
+  width: 100%;
+  max-width: 260px;
+  height: auto;
+  display: block;
+}
+
 .page-hero__links,
 .page-links {
   display: flex;

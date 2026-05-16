@@ -76,7 +76,7 @@ const ANNOTATIONS = {
   },
   zh: {
     add_rate_limiting: {
-      chipLabel: '加入站限流',
+      chipLabel: '加入入站限流',
       taskDescription: '给某个入站 HTTP 端点加入限流（如 greet 路由）。',
       classificationReason:
         '"入站" 映射到传输层。请求边界的限流是中间件工作，不是出站熔断（x/resilience）。目标：middleware/。',

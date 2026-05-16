@@ -57,6 +57,16 @@ const fitChecks = [
     title: 'agent-ready',
     evidence: 'machine-readable specs, per-module manifests, and standardized check commands give code agents a clear operating model',
   },
+  {
+    label: '05',
+    title: 'stdlib-first',
+    evidence: 'handler signature is func(w http.ResponseWriter, r *http.Request) — no custom context, all net/http middleware works without adapters',
+  },
+  {
+    label: '06',
+    title: 'zero deps',
+    evidence: 'the stable core imports only the Go standard library — no transitive dependency risk in the kernel layer',
+  },
 ] as const;
 
 const fitProfiles = [
@@ -276,7 +286,9 @@ const frameworkDecision = [
         <pre class="code-block__pre"><code>- route registration stays visible
 - middleware order is reviewable
 - reference app is the canonical service shape
-- release posture limits adoption assumptions</code></pre>
+- release posture limits adoption assumptions
+- stdlib handler signature — no adapters needed
+- zero external deps in the stable core</code></pre>
       </div>
     </div>
   </section>
