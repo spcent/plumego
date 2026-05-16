@@ -48,6 +48,16 @@ const fitChecks = [
     title: 'agent-ready',
     evidence: '机器可读规范、每模块 manifest 和标准化检查命令，为代码 Agent 提供清晰的操作模型',
   },
+  {
+    label: '05',
+    title: 'stdlib-first',
+    evidence: 'handler 签名是 func(w http.ResponseWriter, r *http.Request)——无自定义 context，所有 net/http 中间件零改造复用',
+  },
+  {
+    label: '06',
+    title: 'zero deps',
+    evidence: '稳定核心只导入 Go 标准库——内核层无任何传递性外部依赖风险',
+  },
 ] as const;
 
 const fitProfiles = [
@@ -265,7 +275,9 @@ const frameworkRows = [
         <pre class="code-block__pre"><code>- route registration stays visible
 - middleware order is reviewable
 - reference app is the canonical service shape
-- release posture limits adoption assumptions</code></pre>
+- release posture limits adoption assumptions
+- stdlib handler signature — no adapters needed
+- zero external deps in the stable core</code></pre>
       </div>
     </div>
   </section>
