@@ -21,13 +21,19 @@ plumego dev
 - 监听文件变更并触发重建
 - 配置地址、监听模式和构建命令
 
-## 第一步 — 安装 CLI
+## 第一步 — 从源码 checkout 构建 CLI
 
 ```sh
-go install github.com/spcent/plumego/cmd/plumego@latest
+git clone https://github.com/spcent/plumego.git
+cd plumego/cmd/plumego
+go build -o ../../bin/plumego .
+export PATH="$(pwd)/../../bin:$PATH"
 ```
 
-验证安装：
+CLI 当前位于嵌套 Go module 中；在某个具体 tag 的 release checklist 通过
+前，不把 tagged `go install` 作为受支持安装路径宣传。
+
+验证构建：
 
 ```sh
 plumego --help

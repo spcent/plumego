@@ -21,13 +21,20 @@ plumego dev
 - Watching file changes and triggering a rebuild
 - Configuring address, watch patterns, and build commands
 
-## Step 1 — Install the CLI
+## Step 1 — Build the CLI from a source checkout
 
 ```sh
-go install github.com/spcent/plumego/cmd/plumego@latest
+git clone https://github.com/spcent/plumego.git
+cd plumego/cmd/plumego
+go build -o ../../bin/plumego .
+export PATH="$(pwd)/../../bin:$PATH"
 ```
 
-Verify the install:
+The CLI currently lives in a nested Go module, so tagged `go install` is not
+advertised as a supported install path until a release checklist verifies that
+exact tag.
+
+Verify the build:
 
 ```sh
 plumego --help

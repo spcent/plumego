@@ -3,7 +3,7 @@
 Milestone: M-006
 Recipe: specs/change-recipes/docs-only.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: docs
 Owned Files:
 - `docs/release/v1.0.0.md`
@@ -40,3 +40,17 @@ Docs Sync:
 Done Definition:
 - CLI install/onboarding docs no longer overclaim tagged install support.
 - CLI tests and docs snippets pass.
+
+Outcome:
+- Updated website dev-server guides in English and Chinese to describe
+  source-checkout CLI builds instead of tagged `go install`.
+- Updated `docs/release/v1.0.0.md` to record that v1 CLI validation remains
+  source-checkout based.
+- Validation passed:
+  - `bash scripts/check-doc-snippets-compile.sh`
+  - `cd website && pnpm check`
+  - `cd cmd/plumego && TMPDIR=/private/tmp GOCACHE=/private/tmp/plumego-gocache go test -timeout 60s ./...`
+- `cd cmd/plumego && go test -timeout 20s ./...` was not reliable in the local
+  sandbox because the default Go cache path was not writable and the retry hit
+  the 20s timeout during temp cleanup. The same test set passed with writable
+  temp/cache paths and a 60s timeout.
