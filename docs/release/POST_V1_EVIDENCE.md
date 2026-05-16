@@ -18,7 +18,7 @@ minor release lane.
 
 ## Post-v1 Maintenance Lane
 
-- Milestone: `tasks/milestones/active/M-006.md`
+- Milestone: `tasks/milestones/done/M-006.md`
 - Plan: `tasks/milestones/M-006.plan.md`
 - Verify artifact: `tasks/milestones/M-006.verify.md`
 - First maintenance CI run after action-runtime cleanup: `25954419567`
@@ -60,7 +60,7 @@ go run ./internal/checks/extension-maturity
 
 ## Extension v1 Baseline Intake
 
-- Milestone: `tasks/milestones/active/M-007.md`
+- Milestone: `tasks/milestones/done/M-007.md`
 - Plan: `tasks/milestones/M-007.plan.md`
 - Verify artifact: `tasks/milestones/M-007.verify.md`
 

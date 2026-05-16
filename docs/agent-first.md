@@ -154,7 +154,9 @@ Available recipes:
 ### 6. `tasks/cards/` — scoped, verifiable work units
 
 Task cards in `tasks/cards/active/` define bounded work units that agents can
-execute without widening scope. Each card specifies:
+execute without widening scope. Cards waiting on external prerequisites belong
+in `tasks/cards/blocked/`, so agents do not mistake evidence waits for
+executable work. Each card specifies:
 
 - `Goal`: the single objective
 - `Scope`: which files and modules are in scope

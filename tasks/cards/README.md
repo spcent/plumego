@@ -5,6 +5,7 @@
 Directory layout:
 
 - `tasks/cards/active/` — current working queue
+- `tasks/cards/blocked/` — relevant cards waiting on external prerequisites
 - `tasks/cards/done/` — completed card archive
 - `tasks/cards/TEMPLATE.md` — canonical field template for new cards
 
@@ -22,11 +23,10 @@ Lifecycle states:
 
 Current operating rule:
 
-- `active` and `done` are the implemented physical directories
-- until dedicated `blocked/` or `superseded/` directories are introduced, non-actionable cards must not quietly remain mixed into the live queue
-- if a card becomes blocked or superseded, update its title or body to say so immediately and either:
-  - keep it in `active/` only while it is still part of the immediate queue
-  - or replace it with a clearer active card and archive the obsolete one once the queue has been cleaned up
+- `active`, `blocked`, and `done` are implemented physical directories
+- non-actionable cards must not remain mixed into the live queue
+- if a card becomes blocked, move it to `blocked/` and keep the blocker explicit in the card body
+- if a card becomes superseded, replace it with a clearer active card and archive or remove the obsolete execution unit intentionally
 
 ## Purpose
 
@@ -84,6 +84,7 @@ Optional operational fields when useful:
 - `active/` is ordered by execution intent, not by historical id alone
 - the first card in the queue should be the best next action, not merely the oldest open card
 - when a card finishes, move it to `done/` and record the actual outcome and validations that ran
+- when a card is waiting on a release, owner sign-off, external decision, or unavailable dependency, move it to `blocked/`
 - when a card moves to `done/`, update the top-level header to `State: done` and do not leave or append a second `State:` line under `Outcome`
 - when a card is no longer the best execution unit, replace or retire it explicitly instead of leaving stale work in the queue
 - do not keep roadmap-scale planning items in `active/`; split them before queueing them

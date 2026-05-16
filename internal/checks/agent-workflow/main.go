@@ -70,6 +70,12 @@ func workflowViolations(repoRoot string) ([]string, error) {
 	}
 	violations = append(violations, qualityViolations...)
 
+	taskQueueViolations, err := taskQueueLifecycleViolations(repoRoot)
+	if err != nil {
+		return nil, err
+	}
+	violations = append(violations, taskQueueViolations...)
+
 	for _, recipePath := range recipePaths {
 		if !strings.Contains(repoSpec, recipePath) {
 			violations = append(violations, fmt.Sprintf("specs/repo.yaml does not reference workflow recipe %s", recipePath))
@@ -140,6 +146,149 @@ func workflowViolations(repoRoot string) ([]string, error) {
 	violations = append(violations, httpSurfaceViolations...)
 
 	return violations, nil
+}
+
+func taskQueueLifecycleViolations(repoRoot string) ([]string, error) {
+	var violations []string
+
+	cardDirs := map[string]string{
+		"tasks/cards/active":  "active",
+		"tasks/cards/blocked": "blocked",
+	}
+	for relDir, expectedState := range cardDirs {
+		dirViolations, err := taskCardStateViolations(repoRoot, relDir, expectedState)
+		if err != nil {
+			return nil, err
+		}
+		violations = append(violations, dirViolations...)
+	}
+
+	activeMilestoneViolations, err := activeMilestoneOutcomeViolations(repoRoot)
+	if err != nil {
+		return nil, err
+	}
+	violations = append(violations, activeMilestoneViolations...)
+
+	doneMilestoneViolations, err := doneMilestoneOutcomeViolations(repoRoot)
+	if err != nil {
+		return nil, err
+	}
+	violations = append(violations, doneMilestoneViolations...)
+
+	sort.Strings(violations)
+	return violations, nil
+}
+
+func taskCardStateViolations(repoRoot, relDir, expectedState string) ([]string, error) {
+	dir := filepath.Join(repoRoot, filepath.FromSlash(relDir))
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return []string{fmt.Sprintf("%s is missing from the task card lifecycle control plane", relDir)}, nil
+		}
+		return nil, err
+	}
+
+	var violations []string
+	for _, entry := range entries {
+		name := entry.Name()
+		if entry.IsDir() || !strings.HasSuffix(name, ".md") || name == "README.md" {
+			continue
+		}
+		relPath := filepath.ToSlash(filepath.Join(relDir, name))
+		content, err := os.ReadFile(filepath.Join(dir, name))
+		if err != nil {
+			return nil, err
+		}
+		state, ok := markdownField(string(content), "State")
+		if !ok {
+			violations = append(violations, fmt.Sprintf("%s is missing State: %s", relPath, expectedState))
+			continue
+		}
+		if state != expectedState {
+			violations = append(violations, fmt.Sprintf("%s has State: %s but lives under %s", relPath, state, relDir))
+		}
+	}
+	return violations, nil
+}
+
+func activeMilestoneOutcomeViolations(repoRoot string) ([]string, error) {
+	const relDir = "tasks/milestones/active"
+	dir := filepath.Join(repoRoot, filepath.FromSlash(relDir))
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return []string{relDir + " is missing from the milestone lifecycle control plane"}, nil
+		}
+		return nil, err
+	}
+
+	var violations []string
+	for _, entry := range entries {
+		name := entry.Name()
+		if entry.IsDir() || !strings.HasPrefix(name, "M-") || !strings.HasSuffix(name, ".md") {
+			continue
+		}
+		content, err := os.ReadFile(filepath.Join(dir, name))
+		if err != nil {
+			return nil, err
+		}
+		if hasMarkdownHeading(string(content), "Outcome") {
+			relPath := filepath.ToSlash(filepath.Join(relDir, name))
+			violations = append(violations, fmt.Sprintf("%s has an Outcome section but still lives under tasks/milestones/active", relPath))
+		}
+	}
+	return violations, nil
+}
+
+func doneMilestoneOutcomeViolations(repoRoot string) ([]string, error) {
+	const relDir = "tasks/milestones/done"
+	dir := filepath.Join(repoRoot, filepath.FromSlash(relDir))
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return []string{relDir + " is missing from the milestone lifecycle control plane"}, nil
+		}
+		return nil, err
+	}
+
+	var violations []string
+	for _, entry := range entries {
+		name := entry.Name()
+		if entry.IsDir() || !strings.HasPrefix(name, "M-") || !strings.HasSuffix(name, ".md") {
+			continue
+		}
+		content, err := os.ReadFile(filepath.Join(dir, name))
+		if err != nil {
+			return nil, err
+		}
+		if !hasMarkdownHeading(string(content), "Outcome") {
+			relPath := filepath.ToSlash(filepath.Join(relDir, name))
+			violations = append(violations, fmt.Sprintf("%s is archived but has no Outcome section", relPath))
+		}
+	}
+	return violations, nil
+}
+
+func markdownField(content, field string) (string, bool) {
+	prefix := field + ":"
+	for _, line := range strings.Split(content, "\n") {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, prefix) {
+			return strings.TrimSpace(strings.TrimPrefix(line, prefix)), true
+		}
+	}
+	return "", false
+}
+
+func hasMarkdownHeading(content, heading string) bool {
+	want := "## " + heading
+	for _, line := range strings.Split(content, "\n") {
+		if strings.TrimSpace(line) == want {
+			return true
+		}
+	}
+	return false
 }
 
 func agentQualityControlPlaneViolations(repoRoot string) ([]string, error) {

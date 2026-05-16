@@ -48,6 +48,48 @@ func TestAgentQualityControlPlaneViolationsReportsMissingReference(t *testing.T)
 	}
 }
 
+func TestTaskQueueLifecycleViolationsPass(t *testing.T) {
+	repoRoot := t.TempDir()
+	writeFile(t, repoRoot, "tasks/cards/active/README.md", "# Active\n")
+	writeFile(t, repoRoot, "tasks/cards/active/0001-ready.md", "# Card 0001\nState: active\n")
+	writeFile(t, repoRoot, "tasks/cards/blocked/0002-waiting.md", "# Card 0002\nState: blocked\n")
+	writeFile(t, repoRoot, "tasks/milestones/active/.gitkeep", "")
+	writeFile(t, repoRoot, "tasks/milestones/active/M-002.md", "# M-002\n")
+	writeFile(t, repoRoot, "tasks/milestones/done/M-001.md", "# M-001\n\n## Outcome\n\nDone.\n")
+
+	violations, err := taskQueueLifecycleViolations(repoRoot)
+	if err != nil {
+		t.Fatalf("taskQueueLifecycleViolations returned error: %v", err)
+	}
+	if len(violations) != 0 {
+		t.Fatalf("expected no violations, got %v", violations)
+	}
+}
+
+func TestTaskQueueLifecycleViolationsReportDirectoryDrift(t *testing.T) {
+	repoRoot := t.TempDir()
+	writeFile(t, repoRoot, "tasks/cards/active/0001-waiting.md", "# Card 0001\nState: blocked\n")
+	writeFile(t, repoRoot, "tasks/cards/blocked/0002-ready.md", "# Card 0002\nState: active\n")
+	writeFile(t, repoRoot, "tasks/milestones/active/M-001.md", "# M-001\n\n## Outcome\n\nDone.\n")
+	writeFile(t, repoRoot, "tasks/milestones/done/M-002.md", "# M-002\n")
+
+	violations, err := taskQueueLifecycleViolations(repoRoot)
+	if err != nil {
+		t.Fatalf("taskQueueLifecycleViolations returned error: %v", err)
+	}
+	expected := []string{
+		"tasks/cards/active/0001-waiting.md has State: blocked but lives under tasks/cards/active",
+		"tasks/cards/blocked/0002-ready.md has State: active but lives under tasks/cards/blocked",
+		"tasks/milestones/active/M-001.md has an Outcome section but still lives under tasks/milestones/active",
+		"tasks/milestones/done/M-002.md is archived but has no Outcome section",
+	}
+	for _, want := range expected {
+		if !slices.Contains(violations, want) {
+			t.Fatalf("expected violation %q, got %v", want, violations)
+		}
+	}
+}
+
 func writeAgentQualityControlPlane(t *testing.T, repoRoot string, omit []string) {
 	t.Helper()
 

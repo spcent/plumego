@@ -5,15 +5,15 @@ truth matrix for agents; it does not mark a milestone complete by itself.
 
 ## Current State
 
-| Milestone | Active file | Roadmap relationship | Current action |
+| Milestone | Milestone file | Roadmap relationship | Current action |
 | --- | --- | --- | --- |
-| M-001 v1 trust baseline | `tasks/milestones/active/M-001.md` | Reflected in current docs and CLI template smoke tests | Verify artifact exists; rc tag remains downstream card 1430 |
-| M-002 stable roots freeze | `tasks/milestones/active/M-002.md` | Stable API inventory and focused stable-root checks are recorded | Verify artifact exists; final race/vet release evidence moves to card 1431 |
-| M-003 extension evidence pipeline | `tasks/milestones/active/M-003.md` | Implemented through extension evidence docs, snapshots, checks, and beta evidence template | Verify artifact exists; remaining experimental blockers are explicit |
-| M-004 stable root cleanup freeze | `tasks/milestones/active/M-004.md` | Outcome section says cards 1394-1401 and stable cleanup gates are complete | Reconcile in card 1429 before archiving or leaving active |
-| M-005 v1 release execution | `tasks/milestones/active/M-005.md` | New sequential release execution plan from rc.1 to final v1/no-go | Start with card 1429, then card 1430 for `v1.0.0-rc.1` evidence |
-| M-006 v1.0.1 maintenance lane | `tasks/milestones/active/M-006.md` | Starts after the published `v1.0.0` tag and remote gates | Start with card 1440 to resolve generated release data drift |
-| M-007 extension v1 baseline evidence intake | `tasks/milestones/active/M-007.md` | Starts after M-006 post-v1 evidence index | Start with card 1445 to record first `v1.0.0` release-ref intake evidence for `x/tenant` |
+| M-001 v1 trust baseline | `tasks/milestones/done/M-001.md` | Reflected in current docs and CLI template smoke tests | Archived; verify artifact exists |
+| M-002 stable roots freeze | `tasks/milestones/done/M-002.md` | Stable API inventory and focused stable-root checks are recorded | Archived; final race/vet release evidence moved to M-005 |
+| M-003 extension evidence pipeline | `tasks/milestones/done/M-003.md` | Implemented through extension evidence docs, snapshots, checks, and beta evidence template | Archived; remaining experimental blockers are explicit |
+| M-004 stable root cleanup freeze | `tasks/milestones/done/M-004.md` | Outcome section records cards 1394-1401 and stable cleanup gates | Archived |
+| M-005 v1 release execution | `tasks/milestones/done/M-005.md` | rc.1 to final v1/no-go execution completed | Archived; `v1.0.0` evidence recorded |
+| M-006 v1.0.1 maintenance lane | `tasks/milestones/done/M-006.md` | Post-v1 maintenance cards completed | Archived |
+| M-007 extension v1 baseline evidence intake | `tasks/milestones/done/M-007.md` | First `v1.0.0` release-ref intake completed | Archived; remaining beta closures are blocked |
 
 ## Reconciliation Rules
 
@@ -23,9 +23,9 @@ truth matrix for agents; it does not mark a milestone complete by itself.
   milestone active until the remaining blocker is explicit.
 - Prefer adding a verify artifact over editing historical task wording.
 
-## Next Verify Artifacts
+## Verify Artifacts
 
-Create these before archiving any active milestone:
+These artifacts back the archived milestones:
 
 - `tasks/milestones/M-001.verify.md`: created by card 1429; contains template
   truth matrix, release tag check, and CLI smoke output.
