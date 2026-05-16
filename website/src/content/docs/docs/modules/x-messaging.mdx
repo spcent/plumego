@@ -17,8 +17,8 @@ Open this page after [x/* Family](/docs/x-family) when the work is clearly about
 ## Stability and adoption
 
 Start from `x/messaging` for family-level decisions, then verify subordinate
-package maturity before depending on `x/mq`, `x/pubsub`, `x/scheduler`, or
-`x/webhook` directly. Check `x/messaging/module.yaml`,
+package maturity before depending on `x/messaging/mq`, `x/messaging/pubsub`, `x/messaging/scheduler`, or
+`x/messaging/webhook` directly. Check `x/messaging/module.yaml`,
 [Release Posture](/docs/release-posture), and
 [Extension Maturity](/docs/concepts/extension-maturity) before production use.
 
@@ -32,7 +32,7 @@ package maturity before depending on `x/mq`, `x/pubsub`, `x/scheduler`, or
 
 - the task is application bootstrap
 - the work is really stable-root abstraction design
-- the task is already known to be narrow low-level work in `x/mq`, `x/pubsub`, `x/scheduler`, or `x/webhook`
+- the task is already known to be narrow low-level work in `x/messaging/mq`, `x/messaging/pubsub`, `x/messaging/scheduler`, or `x/messaging/webhook`
 
 ## First files to read in the current repository
 
@@ -54,10 +54,10 @@ Use the family-level aliases and constructors before opening subordinate package
 
 | Start in `x/messaging` when the work is about | Drop into a narrower sibling only when the work is already about |
 | --- | --- |
-| family-level app-facing queue, pubsub, scheduler, or webhook orchestration | durable queue primitives and worker coordination in `x/mq` |
-| deciding the messaging entrypoint a service should open first | in-process broker primitives in `x/pubsub` |
-| keeping orchestration explicit without redefining the canonical app path | scheduling primitives in `x/scheduler` |
-| messaging-family ownership questions that are still broader than one protocol primitive | inbound verification or outbound delivery mechanics in `x/webhook` |
+| family-level app-facing queue, pubsub, scheduler, or webhook orchestration | durable queue primitives and worker coordination in `x/messaging/mq` |
+| deciding the messaging entrypoint a service should open first | in-process broker primitives in `x/messaging/pubsub` |
+| keeping orchestration explicit without redefining the canonical app path | scheduling primitives in `x/messaging/scheduler` |
+| messaging-family ownership questions that are still broader than one protocol primitive | inbound verification or outbound delivery mechanics in `x/messaging/webhook` |
 
 ## Why this primer exists
 

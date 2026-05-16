@@ -11,8 +11,8 @@ import (
 	"github.com/spcent/plumego/x/ai/orchestration"
 	"github.com/spcent/plumego/x/ai/provider"
 	"github.com/spcent/plumego/x/ai/tokenizer"
-	"github.com/spcent/plumego/x/mq"
-	"github.com/spcent/plumego/x/pubsub"
+	"github.com/spcent/plumego/x/messaging/mq"
+	"github.com/spcent/plumego/x/messaging/pubsub"
 )
 
 // mockProvider for testing

@@ -59,16 +59,16 @@ import GeneratedStableRootFacts from '../../../../components/docs/GeneratedStabl
 | --- | --- | --- |
 | lifecycle、显式 应用构造、logger injection 与 路由挂载 | [Core Primer](/zh/docs/modules/core) | 它会把稳定根规则继续落到 `core` 的实际生命周期与内核边界 |
 | transport wrapper、request ID、tracing hook、access logging、auth/security HTTP适配器与 rate-limit适配器| [Middleware Primer](/zh/docs/modules/middleware) | 它会继续说明哪些仍然属于 传输层，哪些必须移动到 `x/tenant`、`x/rest` 或 `x/gateway` |
-| 文件 contract、cache primitive、KV helper、幂等合约 与 DB helper 边界 | [Store Primer](/zh/docs/modules/store) | 它给出了稳定持久化原语与 `x/data`、`x/cache`、`x/fileapi`、`x/tenant` 之间最清楚的具体拆分 |
+| 文件 contract、cache primitive、KV helper、幂等合约 与 DB helper 边界 | [Store Primer](/zh/docs/modules/store) | 它给出了稳定持久化原语与 `x/data`、`x/data/cache`、`x/fileapi`、`x/tenant` 之间最清楚的具体拆分 |
 
 ## 更具体的“留在稳定层”例子
 
 几个反复出现的例子会让判断更清楚。
 
-- 在 `core` 中，显式应用构造与单一路径生命周期应该保留在稳定层，但 debug snapshot 应进入 `x/devtools`，feature-specific wiring 应留在应用本地代码或扩展层。
+- 在 `core` 中，显式应用构造与单一路径生命周期应该保留在稳定层，但 debug snapshot 应进入 `x/observability/devtools`，feature-specific wiring 应留在应用本地代码或扩展层。
 - 在 `middleware` 中，request ID、tracing hook、access logging 与 HTTP metrics 仍然属于稳定层，因为它们依旧是 传输层。API version negotiation 应移动到 `x/rest/versioning`，协议适配应移动到 `x/gateway/*`。
 - 在 `store/file` 中，共享文件 contract 与错误类型留在稳定层，但 租户感知 storage backend 与 metadata persistence 应移动到 `x/data/file`，而 upload/download HTTP endpoint 应移动到 `x/fileapi`。
-- 在 `store/cache` 中，基础 cache primitive 留在稳定层，但 distributed cache 行为应移动到 `x/cache`，HTTP response caching 应移动到 `x/gateway/cache`，租户感知 cache适配器应移动到 `x/tenant/store/cache`。
+- 在 `store/cache` 中，基础 cache primitive 留在稳定层，但 distributed cache 行为应移动到 `x/data/cache`，HTTP response caching 应移动到 `x/gateway/cache`，租户感知 cache适配器应移动到 `x/tenant/store/cache`。
 
 ## 需要避免的常见误判
 
@@ -88,7 +88,7 @@ import GeneratedStableRootFacts from '../../../../components/docs/GeneratedStabl
 - 协议或 gateway 行为转去 `x/gateway`
 - 可复用资源接口传输层转去 `x/rest`
 - export wiring 与更高层 telemetry 适配器转去 `x/observability`
-- 拓扑较重的数据与存储实现转去 `x/data`、`x/cache` 或 `x/fileapi`
+- 拓扑较重的数据与存储实现转去 `x/data`、`x/data/cache` 或 `x/fileapi`
 
 ## 下一步阅读
 

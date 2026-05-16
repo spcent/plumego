@@ -34,7 +34,7 @@ your service code.
 ## Do not start here when
 
 - the change is about HTTP request-response transport — that belongs in stable roots (`router`, `middleware`)
-- the work is generic event fan-out without WebSocket framing — start from `x/pubsub`
+- the work is generic event fan-out without WebSocket framing — start from `x/messaging/pubsub`
 - the change introduces business-specific channel semantics or domain events — keep that in application code
 - the work needs tenant-specific connection policy or per-tenant room management — coordinate with `x/tenant`
 
@@ -52,14 +52,14 @@ your service code.
 | Keep it in `x/websocket` when the work is about | Move out when the work becomes |
 | --- | --- |
 | `New`, `ServeWSWithConfig`: HTTP-to-WebSocket upgrade and route mounting | HTTP route matching or path parameter extraction — that belongs in `router` |
-| `NewHub`, `NewHubWithConfigE`: connection pool management and lifecycle | generic publish-subscribe fan-out without WebSocket framing — use `x/pubsub` |
+| `NewHub`, `NewHubWithConfigE`: connection pool management and lifecycle | generic publish-subscribe fan-out without WebSocket framing — use `x/messaging/pubsub` |
 | `ServeWSWithConfig`: authenticating the upgrade request before accepting the connection | JWT issuance or token verification — that belongs in `security/jwt` |
 | `BroadcastRoom`, `BroadcastAll`, `Conn.WriteMessage`: pushing messages to connected clients | business-specific message schemas or domain event payloads |
 | `DefaultWebSocketConfig`: buffer sizes, deadlines, origin validation policy | tenant-specific origin allowlists or per-tenant rate limits |
 
 ## Why this primer exists
 
-WebSocket connections are stateful and long-lived, which makes them meaningfully different from the request-response handlers that stable roots cover. Route registration, connection upgrades, hub lifecycle, and authentication all happen at the transport layer, and keeping them explicit in `x/websocket` prevents this statefulness from leaking into `router` or `core`. `x/pubsub` covers the event-fan-out concern; this package covers only the WebSocket transport surface.
+WebSocket connections are stateful and long-lived, which makes them meaningfully different from the request-response handlers that stable roots cover. Route registration, connection upgrades, hub lifecycle, and authentication all happen at the transport layer, and keeping them explicit in `x/websocket` prevents this statefulness from leaking into `router` or `core`. `x/messaging/pubsub` covers the event-fan-out concern; this package covers only the WebSocket transport surface.
 
 ## Read next
 

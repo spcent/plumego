@@ -156,14 +156,15 @@ func TestFindMissingModuleManifestsHonorsBaseline(t *testing.T) {
 	writeFile(t, filepath.Join(repo, "log", "module.yaml"), validManifest("log", "stable"))
 	writeFile(t, filepath.Join(repo, "metrics", "module.yaml"), validManifest("metrics", "stable"))
 	writeFile(t, filepath.Join(repo, "x", "ai", "module.yaml"), validManifest("x/ai", "extension"))
-	if err := os.MkdirAll(filepath.Join(repo, "x", "ops"), 0o755); err != nil {
-		t.Fatalf("mkdir x/ops: %v", err)
+	writeFile(t, filepath.Join(repo, "x", "observability", "module.yaml"), validManifest("x/observability", "extension"))
+	if err := os.MkdirAll(filepath.Join(repo, "x", "observability", "ops"), 0o755); err != nil {
+		t.Fatalf("mkdir x/observability/ops: %v", err)
 	}
 	if err := os.MkdirAll(filepath.Join(repo, "x", "scheduler"), 0o755); err != nil {
 		t.Fatalf("mkdir x/scheduler: %v", err)
 	}
 
-	missing, err := FindMissingModuleManifests(repo, map[string]struct{}{"x/ops": {}})
+	missing, err := FindMissingModuleManifests(repo, map[string]struct{}{"x/observability/ops": {}})
 	if err != nil {
 		t.Fatalf("FindMissingModuleManifests: %v", err)
 	}
@@ -229,7 +230,7 @@ func TestValidateModuleManifestsRequiresDeclaredDocPathsToExist(t *testing.T) {
 		t.Fatalf("expected no violations for existing doc_paths, got %v", violations)
 	}
 
-	writeFile(t, filepath.Join(repo, "x", "webhook", "module.yaml"), validManifestWithDocPaths("x/webhook", "extension", "docs/modules/x-webhook/README.md"))
+	writeFile(t, filepath.Join(repo, "x", "messaging", "webhook", "module.yaml"), validManifestWithDocPaths("x/messaging/webhook", "extension", "docs/modules/x-webhook/README.md"))
 
 	violations, err = ValidateModuleManifests(repo)
 	if err != nil {
@@ -313,29 +314,33 @@ func TestValidateXFamilyTaxonomyDetectsViolations(t *testing.T) {
 	// x/messaging lacks subordinate_families → violation
 	writeFile(t, filepath.Join(repo, "x", "messaging", "module.yaml"), validManifest("x/messaging", "extension"))
 
-	// x/mq declares an unknown parent_family → violation
-	writeFile(t, filepath.Join(repo, "x", "mq", "module.yaml"), validManifestWithParentFamily("x/mq", "extension", "x/nonexistent"))
+	// x/messaging/mq declares an unknown parent_family → violation
+	writeFile(t, filepath.Join(repo, "x", "messaging", "mq", "module.yaml"), validManifestWithParentFamily("x/messaging/mq", "extension", "x/nonexistent"))
 
 	// x/gateway has subordinate_families → no violation
 	writeFile(t, filepath.Join(repo, "x", "gateway", "module.yaml"), validManifestWithSubordinateFamilies("x/gateway", "extension"))
 
-	// x/pubsub declares a valid parent_family → no violation
-	writeFile(t, filepath.Join(repo, "x", "pubsub", "module.yaml"), validManifestWithParentFamily("x/pubsub", "extension", "x/messaging"))
+	// x/messaging/pubsub declares a valid parent_family → no violation
+	writeFile(t, filepath.Join(repo, "x", "messaging", "pubsub", "module.yaml"), validManifestWithParentFamily("x/messaging/pubsub", "extension", "x/messaging"))
 
 	violations, err := ValidateXFamilyTaxonomy(repo)
 	if err != nil {
 		t.Fatalf("ValidateXFamilyTaxonomy: %v", err)
 	}
-	// expect exactly 2: x/messaging missing subordinate_families, x/mq unknown parent
-	if len(violations) != 2 {
-		t.Fatalf("expected 2 violations, got %d: %v", len(violations), violations)
+	// expect exactly 3: x/messaging missing subordinate_families,
+	// x/messaging/mq points at the wrong parent, and that parent is unknown.
+	if len(violations) != 3 {
+		t.Fatalf("expected 3 violations, got %d: %v", len(violations), violations)
 	}
 	joined := strings.Join(violations, "\n")
 	if !strings.Contains(joined, "x/messaging/module.yaml") || !strings.Contains(joined, "subordinate_families") {
 		t.Fatalf("expected subordinate_families violation for x/messaging, got:\n%s", joined)
 	}
-	if !strings.Contains(joined, "x/mq/module.yaml") || !strings.Contains(joined, "x/nonexistent") {
-		t.Fatalf("expected parent_family violation for x/mq, got:\n%s", joined)
+	if !strings.Contains(joined, `parent_family "x/nonexistent" must be "x/messaging"`) {
+		t.Fatalf("expected exact parent_family violation for x/messaging/mq, got:\n%s", joined)
+	}
+	if !strings.Contains(joined, "x/messaging/mq/module.yaml") || !strings.Contains(joined, "x/nonexistent") {
+		t.Fatalf("expected parent_family violation for x/messaging/mq, got:\n%s", joined)
 	}
 }
 
@@ -344,7 +349,7 @@ func TestValidateXFamilyTaxonomyPassesForValidSetup(t *testing.T) {
 	writeExtensionTaxonomySpec(t, repo)
 
 	writeFile(t, filepath.Join(repo, "x", "messaging", "module.yaml"), validManifestWithSubordinateFamilies("x/messaging", "extension"))
-	writeFile(t, filepath.Join(repo, "x", "mq", "module.yaml"), validManifestWithParentFamily("x/mq", "extension", "x/messaging"))
+	writeFile(t, filepath.Join(repo, "x", "messaging", "mq", "module.yaml"), validManifestWithParentFamily("x/messaging/mq", "extension", "x/messaging"))
 	writeFile(t, filepath.Join(repo, "x", "rest", "module.yaml"), validManifest("x/rest", "extension"))
 
 	violations, err := ValidateXFamilyTaxonomy(repo)
@@ -353,6 +358,31 @@ func TestValidateXFamilyTaxonomyPassesForValidSetup(t *testing.T) {
 	}
 	if len(violations) != 0 {
 		t.Fatalf("expected no violations, got: %v", violations)
+	}
+}
+
+func TestFindExtensionHotspotCoverageViolationsRequiresFamilyEntries(t *testing.T) {
+	doc := extensionTaxonomyDoc{
+		RootsByFamily: map[string][]string{
+			"messaging": {"x/messaging", "x/messaging/mq", "x/messaging/pubsub"},
+			"rest":      {"x/rest"},
+		},
+		RootToCanonical: map[string]string{
+			"x/messaging":        "x/messaging",
+			"x/messaging/mq":     "x/messaging",
+			"x/messaging/pubsub": "x/messaging",
+			"x/rest":             "x/rest",
+		},
+	}
+
+	violations := FindExtensionHotspotCoverageViolations(doc, map[string]packageIndexEntry{
+		"x/messaging":    {Path: "x/messaging", StartWith: []string{"x/messaging/module.yaml"}},
+		"x/messaging/mq": {Path: "x/messaging/mq", StartWith: []string{"x/messaging/mq/module.yaml"}},
+	})
+
+	joined := strings.Join(violations, "\n")
+	if len(violations) != 1 || !strings.Contains(joined, "x/messaging/pubsub") {
+		t.Fatalf("expected missing x/messaging/pubsub hotspot violation, got:\n%s", joined)
 	}
 }
 
@@ -723,7 +753,7 @@ func writeExtensionTaxonomySpec(t *testing.T, repo string) {
     canonical_root: x/messaging
     roots:
       - x/messaging
-      - x/mq
+      - x/messaging/mq
   resource_api:
     canonical_root: x/rest
     roots:

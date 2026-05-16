@@ -18,6 +18,12 @@ The canonical scaffold must preserve these properties:
 - No hidden `init` registration, global providers, or service-locator context
   patterns appear in generated canonical code.
 
+## Baseline Template Aliases
+
+`minimal`, `fullstack`, and `microservice` are accepted template names that
+produce the same output as `canonical`. They exist for discoverability but carry
+no distinct capability profile.
+
 ## Scenario Profiles
 
 Scenario templates keep the canonical bootstrap and add one explicit capability
@@ -30,7 +36,7 @@ profile:
 | `gateway` | `x/gateway` proxy and rewrite |
 | `realtime` | `x/websocket` plus messaging marker |
 | `ai-service` | `x/ai/provider`, `x/ai/session`, `x/ai/streaming`, `x/ai/tool` |
-| `ops-service` | `x/observability` and protected `x/ops` DTOs |
+| `ops-service` | `x/observability` and protected `x/observability/ops` DTOs |
 
 Scenario profiles do not promote those extensions to stable status.
 

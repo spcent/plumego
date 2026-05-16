@@ -246,14 +246,14 @@ extension family. Common examples:
 
 | Capability | Correct location | Reason |
 |---|---|---|
-| Redis cache | `x/cache` or `x/data` | External dependency |
+| Redis cache | `x/data/cache` or `x/data` | External dependency |
 | Tenant resolution and policy | `x/tenant` | Business topology |
 | WebSocket hub | `x/websocket` | Not universal transport need |
-| Admin and ops routes | `x/ops` | Requires explicit auth boundary |
+| Admin and ops routes | `x/observability/ops` | Requires explicit auth boundary |
 | OpenTelemetry exporters | `x/observability` | Ecosystem-specific |
 | REST resource controllers | `x/rest` | Convention layer, not HTTP kernel |
 | Circuit breaker | `x/resilience` | Optional reliability primitive |
-| Message queue integration | `x/messaging` / `x/mq` | External system dependency |
+| Message queue integration | `x/messaging` / `x/messaging/mq` | External system dependency |
 
 The test: if removing the capability from `x/*` leaves the stable root intact
 and all service code still compiles against the stable root, the separation is

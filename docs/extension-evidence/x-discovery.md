@@ -1,6 +1,6 @@
-# x/discovery Maturity Evidence
+# x/gateway/discovery Maturity Evidence
 
-Module: `x/discovery`
+Module: `x/gateway/discovery`
 
 Owner: `edge`
 
@@ -22,8 +22,8 @@ Evidence state: surface inventory
 
 ## Primer And Boundary State
 
-- Primer: `docs/modules/x-discovery/README.md`
-- Manifest: `x/discovery/module.yaml`
+- Primer: `docs/modules/x-gateway/README.md`
+- Manifest: `x/gateway/discovery/module.yaml`
 - Boundary state: discovery is a secondary capability root, not bootstrap or
   gateway-only policy.
 
@@ -31,57 +31,65 @@ Evidence state: surface inventory
 
 The backend set expanded recently and needs release observation. Kubernetes and
 etcd behavior in particular should hold a stable constructor/config/API shape
-before `x/discovery` receives a beta compatibility promise.
+before `x/gateway/discovery` receives a beta compatibility promise.
 
 ## Candidate Surface Inventory
 
 | Surface | Package/file | Current decision | Why | Next blocker |
 | --- | --- | --- | --- | --- |
-| Core discovery contract | `x/discovery/discovery.go` | Likely beta candidate after inventory | Small common service, instance, watcher, and resolver contract | Freeze interface and error semantics across release refs |
-| Static backend | `x/discovery/static.go` | Likely beta candidate after inventory | Deterministic fixed instance lookup with narrow behavior | Snapshot constructor/config behavior with the core contract |
-| Consul backend | `x/discovery/consul.go` | Experimental | External HTTP API adapter behavior and health mapping need observation | Prove config, registration, watch, and health behavior across releases |
-| Kubernetes backend | `x/discovery/kubernetes.go` | Experimental | Endpoint discovery and port selection behavior expanded recently | Freeze config, port selection, watch, and unsupported operation behavior |
-| etcd backend | `x/discovery/etcd.go` | Experimental | HTTP gateway registration, lookup, watch, and health behavior need release history | Observe constructor/config and watch semantics across release refs |
+| Core discovery contract | `x/gateway/discovery/discovery.go` | Likely beta candidate after inventory | Small common service, instance, watcher, and resolver contract | Freeze interface and error semantics across release refs |
+| Static backend | `x/gateway/discovery/static.go` | Likely beta candidate after inventory | Deterministic fixed instance lookup with narrow behavior | Snapshot constructor/config behavior with the core contract |
+| Consul backend | `x/gateway/discovery/consul.go` | Experimental | External HTTP API adapter behavior and health mapping need observation | Prove config, registration, watch, and health behavior across releases |
+| Kubernetes backend | `x/gateway/discovery/kubernetes.go` | Experimental | Endpoint discovery and port selection behavior expanded recently | Freeze config, port selection, watch, and unsupported operation behavior |
+| etcd backend | `x/gateway/discovery/etcd.go` | Experimental | HTTP gateway registration, lookup, watch, and health behavior need release history | Observe constructor/config and watch semantics across release refs |
 
-Root `x/discovery` should only become a beta target after the common contract
+Root `x/gateway/discovery` should only become a beta target after the common contract
 and at least the static backend have matching release evidence. Consul,
 Kubernetes, and etcd can remain experimental adapters behind that contract.
 
 ## Required Release Evidence
 
-Missing. No selected `x/discovery` surface has two consecutive minor release
-refs with unchanged exported API.
+Partially recorded. The `x/gateway/discovery:core-static` surface has `v1.0.0` as its
+first post-v1 release-ref intake point. It still needs a second release ref with
+unchanged exported API.
 
 Release refs:
 
-- none recorded
+- `6a99c5e0bc61c12378bcdab5a6a7c4d756b9fa96` (`v1.0.0` tag target)
 
 ## API Snapshot Evidence
 
-Not recorded. This inventory names the common contract plus static backend as
-the likely `beta` surface, but no checked-in release-backed or current-head API
-snapshot pair exists yet.
+Partially recorded. The v1 baseline intake artifacts below are checked in. They
+are first-release baselines only and do not clear `api_snapshot_missing` until
+a second release-backed comparison is recorded.
+
+Snapshot refs:
+
+- `docs/extension-evidence/snapshots/v1-baseline/x-discovery/base.snapshot`
+- `docs/extension-evidence/snapshots/v1-baseline/x-discovery/head.snapshot`
 
 ## Release Evidence
 
-`specs/extension-beta-evidence.yaml` tracks `x/discovery:core-static` as a
+`specs/extension-beta-evidence.yaml` tracks `x/gateway/discovery:core-static` as a
 `surface_candidate` covering the common contract and static backend package.
-It remains blocked on release history, API snapshots, and owner sign-off, and
-does not imply beta status for Consul, Kubernetes, or etcd adapters.
+It remains blocked on release history, complete API snapshot evidence, and
+owner sign-off, and does not imply beta status for Consul, Kubernetes, or etcd
+adapters.
 
 Current state:
 
-- Selected release candidate: `x/discovery:core-static`
-- API snapshot comparison: not recorded
-- Release-history comparison: not recorded
+- Selected release candidate: `x/gateway/discovery:core-static`
+- API snapshot comparison: `v1.0.0` to `v1.0.0`, unchanged
+- Release-history comparison: first ref only
 
 ## Owner Sign-Off
 
-Missing. No selected `x/discovery` surface has owner sign-off recorded.
+Missing. No selected `x/gateway/discovery` surface has owner sign-off recorded.
 
 ## Next Evidence Needed
 
-- Exported API snapshot for the core contract and static backend candidate.
+- Second release-backed exported API snapshot for the core contract and static
+  backend candidate.
 - Backend-level contract inventories for Consul, Kubernetes, and etcd.
 - Two consecutive minor release refs showing no exported API changes.
 - Owner sign-off after backend API shape is observed across releases.
@@ -96,4 +104,4 @@ Missing. No selected `x/discovery` surface has owner sign-off recorded.
 
 ## Promotion Posture
 
-Keep `x/discovery` experimental.
+Keep `x/gateway/discovery` experimental.

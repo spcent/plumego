@@ -788,6 +788,41 @@ func FindPackageIndexCoverageViolations(repoRoot string, entries map[string]pack
 	return violations, nil
 }
 
+func FindExtensionHotspotCoverageViolations(doc extensionTaxonomyDoc, entries map[string]packageIndexEntry) []string {
+	var violations []string
+	for family, roots := range doc.RootsByFamily {
+		if len(roots) <= 1 {
+			continue
+		}
+
+		canonicalRoot := ""
+		for _, root := range roots {
+			if doc.RootToCanonical[root] == root {
+				canonicalRoot = root
+				break
+			}
+		}
+		if canonicalRoot == "" {
+			continue
+		}
+		if _, ok := entries[canonicalRoot]; !ok {
+			violations = append(violations, fmt.Sprintf("specs/package-hotspots.yaml must index canonical extension family %s for taxonomy family %s", canonicalRoot, family))
+		}
+
+		for _, root := range roots {
+			if root == canonicalRoot {
+				continue
+			}
+			if _, ok := entries[root]; ok {
+				continue
+			}
+			violations = append(violations, fmt.Sprintf("specs/package-hotspots.yaml must index subordinate extension root %s under canonical family %s", root, canonicalRoot))
+		}
+	}
+	sort.Strings(violations)
+	return violations
+}
+
 func FindTaskRoutingCoverageViolations(repoRoot string, entries map[string]taskRoutingEntry) ([]string, error) {
 	var violations []string
 	for taskName, entry := range entries {
@@ -1196,6 +1231,7 @@ func ValidateStableBoundaryDeclarations(repoRoot string) ([]string, error) {
 
 // ValidateXFamilyTaxonomy checks that:
 //   - x/* primary families that coordinate subordinates declare subordinate_families
+//   - x/* subordinate roots declare the exact canonical parent_family
 //   - x/* packages that declare parent_family reference a recognized primary family
 func ValidateXFamilyTaxonomy(repoRoot string) ([]string, error) {
 	taxonomy, err := ReadExtensionTaxonomy(repoRoot)
@@ -1222,29 +1258,27 @@ func ValidateXFamilyTaxonomy(repoRoot string) ([]string, error) {
 		}
 	}
 
-	xDir := filepath.Join(repoRoot, "x")
-	entries, err := os.ReadDir(xDir)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, nil
-		}
-		return nil, err
-	}
-
 	var violations []string
-	for _, entry := range entries {
-		if !entry.IsDir() {
-			continue
+	xDir := filepath.Join(repoRoot, "x")
+	err = filepath.WalkDir(xDir, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
 		}
-		pkg := "x/" + entry.Name()
-		manifestPath := filepath.Join(xDir, entry.Name(), "module.yaml")
-		if _, err := os.Stat(manifestPath); err != nil {
-			continue // missing manifest is reported by FindMissingModuleManifests
+		if d.IsDir() || d.Name() != "module.yaml" {
+			return nil
+		}
+		doc, err := parseManifest(path)
+		if err != nil {
+			return err
 		}
 
-		doc, err := parseManifest(manifestPath)
-		if err != nil {
-			return nil, err
+		pkg := strings.TrimSpace(doc.Scalars["path"])
+		if pkg == "" {
+			rel, err := filepath.Rel(repoRoot, filepath.Dir(path))
+			if err != nil {
+				return err
+			}
+			pkg = filepath.ToSlash(rel)
 		}
 
 		if _, ok := familiesWithSubordinates[pkg]; ok {
@@ -1253,11 +1287,27 @@ func ValidateXFamilyTaxonomy(repoRoot string) ([]string, error) {
 			}
 		}
 
-		if parentFamily := strings.TrimSpace(doc.Scalars["parent_family"]); parentFamily != "" {
+		parentFamily := strings.TrimSpace(doc.Scalars["parent_family"])
+		if expectedParent := taxonomy.RootToCanonical[pkg]; expectedParent != "" && expectedParent != pkg {
+			if parentFamily == "" {
+				violations = append(violations, pkg+"/module.yaml: subordinate family must declare parent_family "+strconv.Quote(expectedParent))
+			} else if parentFamily != expectedParent {
+				violations = append(violations, pkg+"/module.yaml: parent_family "+strconv.Quote(parentFamily)+" must be "+strconv.Quote(expectedParent))
+			}
+		}
+
+		if parentFamily != "" {
 			if _, ok := primaryFamilies[parentFamily]; !ok {
 				violations = append(violations, pkg+"/module.yaml: parent_family "+strconv.Quote(parentFamily)+" is not a recognized primary x/* family")
 			}
 		}
+		return nil
+	})
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, err
 	}
 
 	sort.Strings(violations)

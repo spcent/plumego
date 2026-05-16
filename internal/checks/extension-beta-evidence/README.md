@@ -5,7 +5,8 @@
 
 It checks that each candidate:
 
-- is declared as an extension root in `specs/repo.yaml`
+- is declared as an extension root in `specs/repo.yaml` or as a canonical or
+  subordinate root in `specs/extension-taxonomy.yaml`
 - matches the owner and status in the target `module.yaml`
 - points to an existing evidence document
 - lists release refs that resolve to git commits when refs are present

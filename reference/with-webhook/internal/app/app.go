@@ -1,5 +1,5 @@
 // Package app wires the with-webhook demo dependencies.
-// Non-canonical: this demo extends the standard-service layout with x/webhook.
+// Non-canonical: this demo extends the standard-service layout with x/messaging/webhook.
 package app
 
 import (
@@ -12,8 +12,8 @@ import (
 	"github.com/spcent/plumego/middleware/recovery"
 	"github.com/spcent/plumego/middleware/requestid"
 	"github.com/spcent/plumego/reference/with-webhook/internal/config"
-	"github.com/spcent/plumego/x/pubsub"
-	"github.com/spcent/plumego/x/webhook"
+	"github.com/spcent/plumego/x/messaging/pubsub"
+	"github.com/spcent/plumego/x/messaging/webhook"
 )
 
 // App holds application-wide dependencies including the inbound webhook receiver.

@@ -1,30 +1,30 @@
 ---
-title: x/ipc 入门
+title: x/gateway/ipc 入门
 description: 当任务明确涉及进程间通信传输时阅读本页，而不是通用消息或应用启动场景。
 translationKey: modules-x-ipc
 sidebar:
   order: 28
 ---
 
-# x/ipc 入门
+# x/gateway/ipc 入门
 
 > **实验性** — API 兼容性未冻结。在生产环境采用前请先评估。当前成熟度状态见 [发布策略](/zh/docs/release-posture)。
 
 当任务明确涉及进程之间**显式的进程间通信传输**时，打开本页——而不是通用消息流场景。如果不确定哪个扩展适用，请从 [`x/gateway`](/zh/docs/modules/x-gateway) 或 [`x/messaging`](/zh/docs/modules/x-messaging) 开始。
 
-`x/ipc` 是 `x/gateway` 的下级原语，提供底层 IPC 辅助函数和显式传输适配器。它不是应用启动工具、消息抽象或工作流编排器。
+`x/gateway/ipc` 是 `x/gateway` 的下级原语，提供底层 IPC 辅助函数和显式传输适配器。它不是应用启动工具、消息抽象或工作流编排器。
 
 ## 稳定性与采用
 
-`x/ipc` 处于**实验性**状态，API 兼容性未冻结。在生产环境采用前：
+`x/gateway/ipc` 处于**实验性**状态，API 兼容性未冻结。在生产环境采用前：
 
-1. 检查 `x/ipc/module.yaml` 了解当前状态、所有者和已知阻塞项。
+1. 检查 `x/gateway/ipc/module.yaml` 了解当前状态、所有者和已知阻塞项。
 2. 阅读 [发布策略](/zh/docs/release-posture) 查看支持矩阵。
 3. 考虑 `x/gateway` 是否能在更高抽象层级上覆盖你的使用场景。
 
 ## 适用场景
 
-以下情况使用 `x/ipc`：
+以下情况使用 `x/gateway/ipc`：
 
 - 任务涉及显式的 IPC 传输行为。
 - 任务涉及进程之间的客户端/服务器通信。
@@ -32,37 +32,37 @@ sidebar:
 
 ## 不适用场景
 
-以下情况不要使用 `x/ipc`：
+以下情况不要使用 `x/gateway/ipc`：
 
 - 应用启动——使用 `core`。
 - 通用消息家族发现——从 `x/messaging` 开始。
-- 业务工作流编排——使用 `x/scheduler` 或 `x/messaging`。
-- 进程内通信——使用 `x/pubsub`。
-- 持久化队列——使用 `x/mq`。
+- 业务工作流编排——使用 `x/messaging/scheduler` 或 `x/messaging`。
+- 进程内通信——使用 `x/messaging/pubsub`。
+- 持久化队列——使用 `x/messaging/mq`。
 
 ## 首先阅读的文件
 
-1. `x/ipc/module.yaml` — 职责、非目标和验证命令
-2. `x/ipc/ipc.go` — 主要传输契约
+1. `x/gateway/ipc/module.yaml` — 职责、非目标和验证命令
+2. `x/gateway/ipc/ipc.go` — 主要传输契约
 3. [`x/messaging 入门`](/zh/docs/modules/x-messaging) — 面向应用的消息入口
 
 ## 边界规则
 
-- `x/ipc` 提供显式 IPC 传输；不要用它替代进程内消息（`x/pubsub`）或持久化队列（`x/mq`）。
+- `x/gateway/ipc` 提供显式 IPC 传输；不要用它替代进程内消息（`x/messaging/pubsub`）或持久化队列（`x/messaging/mq`）。
 - 保持传输契约和进程级副作用的显式性和可审查性；不要在导入时添加隐式通道注册。
-- 不要通过稳定根暴露 IPC 连接字符串或 socket 路径；将它们保留在 `x/ipc` 适配器的本地范围内。
-- 在扩大 `x/ipc` 调用方之前，优先使用 `x/messaging` 作为跨进程消息的面向应用入口。
+- 不要通过稳定根暴露 IPC 连接字符串或 socket 路径；将它们保留在 `x/gateway/ipc` 适配器的本地范围内。
+- 在扩大 `x/gateway/ipc` 调用方之前，优先使用 `x/messaging` 作为跨进程消息的面向应用入口。
 
 ## 规范变更形态
 
 - 保持传输契约显式。
 - 保持进程级副作用的可审查性。
-- 在扩大 `x/ipc` 范围前，优先在 `x/gateway` 或 `x/messaging` 中进行家族级发现。
+- 在扩大 `x/gateway/ipc` 范围前，优先在 `x/gateway` 或 `x/messaging` 中进行家族级发现。
 
 ## 验证命令
 
 ```bash
-go test -timeout 20s ./x/ipc/...
+go test -timeout 20s ./x/gateway/ipc/...
 ```
 
 ## 下一步阅读

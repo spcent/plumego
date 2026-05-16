@@ -1,6 +1,6 @@
 # Production Checklist — with-ops
 
-Run through this list before deploying a service with `x/ops` routes.
+Run through this list before deploying a service with `x/observability/ops` routes.
 
 ---
 

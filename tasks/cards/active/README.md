@@ -19,9 +19,9 @@ State model:
 
 Current implementation:
 
-- only `active/` and `done/` exist as physical directories today
-- if a card is blocked or superseded, do not leave it looking active by omission
-- mark the state in the card body until a dedicated blocked or superseded queue is introduced
+- `active/`, `blocked/`, and `done/` exist as physical directories today
+- if a card is blocked, move it to `tasks/cards/blocked/`
+- if a card is superseded, replace it with a clearer active card and retire the stale unit intentionally
 - remove stale items from the front of the queue quickly so the live queue stays trustworthy
 
 Maintenance rules:
@@ -46,11 +46,7 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| [1367](1367-x-tenant-beta-evidence-closure.md) | P2 | x/tenant | Complete beta evidence closure for `x/tenant` when real release refs and owner sign-off are available |
-| [1370](1370-x-ai-stable-tier-beta-evidence-closure.md) | P2 | x/ai | Complete beta evidence closure for `x/ai` stable-tier subpackages |
-| [1371](1371-x-data-surface-beta-evidence-closure.md) | P2 | x/data | Complete beta evidence closure for selected `x/data` surfaces |
-| [1372](1372-x-discovery-surface-beta-evidence-closure.md) | P2 | x/discovery | Complete beta evidence closure for the `x/discovery` core/static surface |
-| [1373](1373-x-messaging-service-beta-evidence-closure.md) | P2 | x/messaging | Complete beta evidence closure for the `x/messaging` app-facing service surface |
+| _None_ | - | - | No executable cards are queued right now. Blocked evidence cards live in `tasks/cards/blocked/`. |
 
 ## Execution Completeness Checklist
 

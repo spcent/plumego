@@ -16,16 +16,16 @@ Plumego already has the following in place:
 - repo-wide quality gates in `Makefile` and `.github/workflows/quality-gates.yml`
 - stable-root compatibility policy in `docs/DEPRECATION.md`
 - stable-root exported API baseline snapshots under `docs/stable-api/snapshots`
-- pre-v1 release evidence checklist under `docs/release/PRE_V1_RELEASE_CHECKLIST.md`
+- release evidence checklist under `docs/release/PRE_V1_RELEASE_CHECKLIST.md`
 - beta promotion checklist and card template under `docs/release/PROMOTION_CARD_TEMPLATE.md`
 - `x/rest`, `x/websocket`, `x/gateway`, and `x/observability` promoted to `beta`
   at v0.1.0–v0.2.0 with release-backed API snapshots and owner sign-off on record
+- `v1.0.0` tagged on May 15, 2026; release notes and evidence in `docs/release/v1.0.0.md`
 
 The next stages are about hardening extensions, improving examples, and keeping
 docs, manifests, specs, and references aligned.
 
-This roadmap does not claim a tagged v1 release. Release status must stay tied
-to repository tags and verifiable gate output.
+Release status is tied to repository tags and verifiable gate output.
 
 ## Roadmap Principles
 
@@ -112,17 +112,17 @@ Non-goals:
 - do not move tenant concerns into stable roots
 - do not turn `x/tenant` into application-specific tenant CRUD or onboarding logic
 
-## Phase 10: `x/discovery` Backend Expansion
+## Phase 10: `x/gateway/discovery` Backend Expansion
 
 Status: substantially complete
 
 Current state:
 
-- `x/discovery` exposes static, Consul, Kubernetes, and etcd backends
+- `x/gateway/discovery` exposes static, Consul, Kubernetes, and etcd backends
 - Kubernetes backend uses the Endpoints API with in-cluster auto-detection
 - etcd backend uses the v3 HTTP gateway with explicit registration and health management
 - all four backends implement the `Discovery` interface via explicit constructors
-- `docs/modules/x-discovery/README.md` documents backend selection guidance and standard validation
+- `docs/modules/x-gateway/README.md` documents `x/gateway/discovery` backend selection guidance and standard validation
 
 Next work:
 
@@ -176,7 +176,7 @@ Current state:
 - onboarding docs must stay aligned with the current `Makefile`, manifests, and reference app
 - `README.md` and `README_CN.md` are structurally aligned
 - `docs/getting-started.md` matches the actual API surface
-- `env.example` now includes `AUTH_TOKEN` (used by `x/ops` but previously missing)
+- `env.example` now includes `AUTH_TOKEN` (used by `x/observability/ops` but previously missing)
 - module primers for `x/tenant`, `x/ai`, and `middleware` updated with current test coverage
 - user-facing scenario entrypoint maps now identify the first reads for REST API,
   multi-tenant API, edge gateway, realtime, AI, and observability work without
@@ -240,9 +240,9 @@ Next work:
 ### Release Evidence
 
 - keep `docs/stable-api/README.md` and checked-in snapshots aligned with stable
-  root API freeze work
-- use `docs/release/PRE_V1_RELEASE_CHECKLIST.md` before tagging a pre-v1
-  release candidate
+  root API surface; compare against the previous release before each new release
+- use `docs/release/PRE_V1_RELEASE_CHECKLIST.md` as the base evidence checklist
+  before tagging any release candidate
 - keep extension beta blockers in `specs/extension-beta-evidence.yaml` until
   two concrete release refs, matching snapshots, and owner sign-off exist
 
@@ -276,8 +276,7 @@ Next work:
 3. Evaluate `x/ai` stable-tier subpackages individually after release-history evidence is available.
 4. Advance `x/tenant` production readiness.
 5. Clarify `x/data` and `x/fileapi` operational guidance.
-6. Expand `x/discovery` backends only when explicit adapters are ready.
-7. Raise `x/observability` and `x/gateway` test depth.
+6. Expand `x/gateway/discovery` backends only when explicit adapters are ready.
 
 ## What Not to Do
 

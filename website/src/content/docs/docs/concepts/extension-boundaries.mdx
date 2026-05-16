@@ -53,7 +53,7 @@ Direct application entrypoints for common service patterns. These are the primar
 | `x/messaging` | App-facing messaging flows |
 | `x/frontend` | Static and embedded asset serving, SPA fallback |
 | `x/resilience` | Circuit breaker and rate-limit primitives for extension-layer use |
-| `x/ops` | Protected admin routes, runtime diagnostics |
+| `x/observability/ops` | Protected admin routes, runtime diagnostics |
 
 Start from the app-facing family before going deeper into subordinate primitives.
 
@@ -63,13 +63,13 @@ Lower-level building blocks consumed by category A families or by application co
 
 | Package | Parent family | Role |
 | --- | --- | --- |
-| `x/cache` | `x/data` | Cache topology and Redis-backed implementations |
-| `x/discovery` | `x/gateway` | Service discovery backend contracts and adapters |
-| `x/mq` | `x/messaging` | Message queue primitive |
-| `x/pubsub` | `x/messaging` | Pub/sub broker primitive |
-| `x/scheduler` | `x/messaging` | In-process cron, delayed jobs, retryable tasks |
-| `x/webhook` | `x/messaging` | Outbound webhook dispatch |
-| `x/ipc` | `x/gateway` | Inter-process communication transport primitive |
+| `x/data/cache` | `x/data` | Cache topology and Redis-backed implementations |
+| `x/gateway/discovery` | `x/gateway` | Service discovery backend contracts and adapters |
+| `x/messaging/mq` | `x/messaging` | Message queue primitive |
+| `x/messaging/pubsub` | `x/messaging` | Pub/sub broker primitive |
+| `x/messaging/scheduler` | `x/messaging` | In-process cron, delayed jobs, retryable tasks |
+| `x/messaging/webhook` | `x/messaging` | Outbound webhook dispatch |
+| `x/gateway/ipc` | `x/gateway` | Inter-process communication transport primitive |
 | `x/data` | — | Persistence surface: file, idempotency, advanced topology |
 
 Discovery starts from the owning family entrypoint, not from the subordinate primitive directly.
@@ -80,8 +80,8 @@ Packages that must never be exposed in production without explicit auth gating.
 
 | Package | Role |
 | --- | --- |
-| `x/devtools` | Debug endpoints, request inspector, local-only diagnostics |
-| `x/ops` | Protected admin and runtime diagnostics routes |
+| `x/observability/devtools` | Debug endpoints, request inspector, local-only diagnostics |
+| `x/observability/ops` | Protected admin and runtime diagnostics routes |
 
 Both require the caller to mount them explicitly under an authenticated path. Neither self-registers or defaults to a public route.
 

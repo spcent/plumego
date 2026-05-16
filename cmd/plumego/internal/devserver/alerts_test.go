@@ -3,7 +3,7 @@ package devserver
 import (
 	"testing"
 
-	"github.com/spcent/plumego/x/devtools"
+	"github.com/spcent/plumego/x/observability/devtools"
 	windowmetrics "github.com/spcent/plumego/x/observability/windowmetrics"
 )
 

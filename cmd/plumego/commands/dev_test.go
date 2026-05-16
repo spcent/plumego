@@ -10,7 +10,7 @@ import (
 
 	"github.com/spcent/plumego/cmd/plumego/internal/devserver"
 	"github.com/spcent/plumego/cmd/plumego/internal/output"
-	"github.com/spcent/plumego/x/pubsub"
+	"github.com/spcent/plumego/x/messaging/pubsub"
 )
 
 type fakeDashboard struct {

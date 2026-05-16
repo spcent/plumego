@@ -24,9 +24,9 @@ import (
 	"github.com/spcent/plumego/middleware/recovery"
 	"github.com/spcent/plumego/middleware/requestid"
 	mwtracing "github.com/spcent/plumego/middleware/tracing"
-	"github.com/spcent/plumego/x/devtools"
 	"github.com/spcent/plumego/x/frontend"
-	"github.com/spcent/plumego/x/pubsub"
+	"github.com/spcent/plumego/x/messaging/pubsub"
+	"github.com/spcent/plumego/x/observability/devtools"
 	"github.com/spcent/plumego/x/websocket"
 )
 

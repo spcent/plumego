@@ -50,7 +50,7 @@ _ = contract.WriteResponse(w, r, http.StatusOK, user, nil)
 | `store/file` 接口、共享文件类型与错误 | `x/data/file` 中的 tenant-aware file backend 与 metadata persistence，或 `x/fileapi` 中的 HTTP upload/download endpoint |
 | `store/kv` 的 file-backed KV CRUD、TTL-aware helper、key scan 与 basic stats | `x/data/kvengine` 中的 WAL、snapshot、serializer selection、compression 与 shard tuning |
 | `store/idempotency` 的 record、status、error 与最小 `Store` 接口 | `x/data/idempotency` 中的 SQL/KV provider、SQL dialect policy 与 duplicate-key handling |
-| `store/cache` 的基础 cache primitive | `x/cache` 中的 distributed cache engine、`x/gateway/cache` 中的 HTTP response caching，以及 `x/tenant/store/cache` 中的 tenant-aware cache adapter |
+| `store/cache` 的基础 cache primitive | `x/data/cache` 中的 distributed cache engine、`x/gateway/cache` 中的 HTTP response caching，以及 `x/tenant/store/cache` 中的 tenant-aware cache adapter |
 | `store/db` 中依赖调用方 `context.Context` 的 helper 执行 | `x/observability/dbinsights` 中的 DB analytics 与 slow-query inspection |
 
 ## 使用方式
@@ -75,7 +75,7 @@ kv.Delete("session:abc")
 exists := kv.Exists("session:abc")
 ```
 
-`KVStore` 并发安全。适合短期应用状态，如 JWT 密钥、会话和限流计数器。高吞吐或分布式场景请用 `x/cache`。
+`KVStore` 并发安全。适合短期应用状态，如 JWT 密钥、会话和限流计数器。高吞吐或分布式场景请用 `x/data/cache`。
 
 ### store/cache — 内存缓存
 

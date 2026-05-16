@@ -87,18 +87,18 @@ Plumego 的采用路径应保持收敛：
 | CLI | v1 稳定化范围 | 作为命令行工具受支持，而不是 Go import 面；命令行为和生成产物必须与规范文档保持一致 | `cmd/plumego` |
 | Beta 扩展族 | `beta` | API 表面在次版本发布引用之间已冻结；通过两个连续打标引用无导出 API 变化并经负责人签字后晋升 | `x/gateway`、`x/observability`、`x/rest`、`x/websocket` |
 | 面向应用的扩展族 | 实验性 | 纳入仓库质量门禁和发布范围，但 API / 配置兼容性尚未冻结 | `x/ai`、`x/data`、`x/fileapi`、`x/frontend`、`x/messaging`、`x/resilience`、`x/tenant` |
-| 从属扩展原语 | 实验性 | 保持维护和测试，但发现入口应先从所属能力族开始，兼容性尚未冻结 | `x/cache`、`x/devtools`、`x/discovery`、`x/ipc`、`x/mq`、`x/ops`、`x/pubsub`、`x/scheduler`、`x/webhook` |
+| 从属扩展原语 | 实验性 | 保持维护和测试，但发现入口应先从所属能力族开始，兼容性尚未冻结 | `x/cache`、`x/devtools`、`x/gateway/discovery`、`x/gateway/ipc`、`x/messaging/mq`、`x/messaging/pubsub`、`x/messaging/scheduler`、`x/messaging/webhook`、`x/ops` |
 
 ## 亮点
 - **路由器支持分组和参数**：基于 Trie 的匹配器，支持 `/:param` 段、路由冻结，以及每路由/分组的中件栈。
 - **中间件链**：日志、恢复、gzip、CORS、超时（默认缓冲上限 10 MiB）、限流、并发限制、请求体大小限制、安全头，以及认证辅助工具，全部包装标准 `http.Handler`。
 - **安全辅助**：JWT + 密码工具、安全头策略、输入安全校验与基础防滥用组件，便于进行安全基线加固。
-- **集成扩展**：提供 `database/sql`、Redis 缓存，以及扩展层的服务发现与消息能力。优先从 `x/data`、`x/gateway` 与 `x/messaging` 入手；只有在需要直接操作对应原语时才进入 `x/cache`、`x/discovery` 或 `x/mq`。
+- **集成扩展**：提供 `database/sql`、Redis 缓存，以及扩展层的服务发现与消息能力。优先从 `x/data`、`x/gateway` 与 `x/messaging` 入手；只有在需要直接操作对应原语时才进入 `x/cache`、`x/gateway/discovery` 或 `x/messaging/mq`。
 - **幂等工具**：`store/idempotency` 保留稳定幂等记录与接口；KV/SQL 持久化 provider 位于 `x/data/idempotency`。
 - **结构化日志钩子**：接入自定义日志器，并通过中间件钩子收集指标/链路追踪。
 - **优雅生命周期**：显式的准备、启动与关闭流程，包含连接排水，以及可选的 TLS/HTTP2 配置，带有合理默认值。
 - **可选服务**：WebSocket、Webhook、前端托管、网关、消息等能力都位于 `x/*`，并且有意不进入规范应用路径。
-- **任务调度**：通过 `x/scheduler` 包提供进程内 cron、延迟任务与可重试任务。
+- **任务调度**：通过 `x/messaging/scheduler` 提供进程内 cron、延迟任务与可重试任务。
 
 新代码应在应用自己的装配包中显式注册路由、中间件和后台任务。Plumego 已经移除了 `core` 中的兼容组件层。
 
@@ -178,7 +178,7 @@ func main() {
 - 模块负责人、风险级别和默认验证入口统一写在各自的 `<模块>/module.yaml` 中。
 - 标准变更配方位于 `specs/change-recipes/*`。
 - 模块导读文档位于 `docs/modules/*`，并应与各模块清单的 `doc_paths` 保持一致。
-- 次级任务族入口也已固定：前端静态资源从 `x/frontend` 开始，本地调试能力从 `x/devtools` 开始，服务发现从 `x/discovery` 开始，受保护管理端点从 `x/ops` 开始。
+- 次级任务族入口也已固定：前端静态资源从 `x/frontend` 开始，本地调试能力从 `x/devtools` 开始，服务发现通过 `x/gateway` 能力族进入 `x/gateway/discovery`，受保护管理端点从 `x/ops` 开始。
 - 这些次级扩展根是能力入口，不是应用启动面。
 
 ## 能力导览
@@ -203,7 +203,7 @@ func main() {
 - [x/websocket](./docs/modules/x-websocket/README.md) — WebSocket 传输
 - [x/messaging](./docs/modules/x-messaging/README.md) — 消息能力入口
 - [x/fileapi](./docs/modules/x-fileapi/README.md) — 文件上传/下载传输
-- [x/gateway](./docs/modules/x-gateway/README.md) 与 [x/discovery](./docs/modules/x-discovery/README.md) — 边缘传输与服务发现
+- [x/gateway](./docs/modules/x-gateway/README.md) — 边缘传输、IPC 辅助与服务发现
 - [x/frontend](./docs/modules/x-frontend/README.md) — 前端静态资源托管
 - [x/observability](./docs/modules/x-observability/README.md)、[x/ops](./docs/modules/x-ops/README.md) 与 [x/devtools](./docs/modules/x-devtools/README.md) — 可观测性、受保护运维面与本地调试工具
 - [x/data](./docs/modules/x-data/README.md)、[x/cache](./docs/modules/x-cache/README.md)、[x/resilience](./docs/modules/x-resilience/README.md) 与 [x/ai](./docs/modules/x-ai/README.md) — 拓扑型数据能力、缓存适配器、可复用韧性原语与 AI 能力

@@ -1,7 +1,7 @@
 <!--
   Milestone PR Body Template
   ──────────────────────────
-  Codex fills this template when opening the milestone PR.
+  The agent fills this template when opening the milestone PR.
   Replace every <placeholder> with actual content.
   Delete comment blocks before submitting.
 
@@ -27,7 +27,7 @@
 ### Approach
 
 <!--
-  Codex-authored. 3–5 bullets describing WHAT was done and any non-obvious
+  Agent-authored. 3–5 bullets describing WHAT was done and any non-obvious
   choices made during implementation. This is the "方案确认" surface for the
   human reviewer — they confirm the approach matches intent.
   Focus on decisions, not file lists.
@@ -74,9 +74,9 @@
 ### Open Questions Resolved
 
 <!--
-  Copy from the spec's ## Open Questions → Codex section.
+  Copy from the spec's ## Open Questions section.
   If the section was empty, write "(none)".
-  If Codex surfaced new questions and resolved them autonomously, list them.
+  If the agent surfaced new questions and resolved them autonomously, list them.
   If any question required human input and is STILL OPEN, mark the PR as Draft.
 -->
 

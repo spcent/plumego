@@ -8,7 +8,7 @@ import (
 	"strconv"
 
 	"github.com/spcent/plumego/contract"
-	"github.com/spcent/plumego/x/mq"
+	"github.com/spcent/plumego/x/messaging/mq"
 )
 
 type sendAcceptedResponse struct {

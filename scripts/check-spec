@@ -6,6 +6,7 @@
 #   scripts/check-spec tasks/milestones/M-001.plan.md
 #   scripts/check-spec tasks/milestones/M-001.verify.md
 #   scripts/check-spec tasks/cards/active/C-001-my-card.md
+#   scripts/check-spec tasks/cards/blocked/C-002-waiting-on-release.md
 #
 # Exits 0 if the artifact is structurally valid, 1 if it has structural problems.
 # Does NOT check content quality — that is still the author's responsibility.
@@ -22,6 +23,7 @@ usage() {
   echo "    $0 tasks/milestones/M-001.plan.md"
   echo "    $0 tasks/milestones/M-001.verify.md"
   echo "    $0 tasks/cards/active/C-001-slice-router-work.md"
+  echo "    $0 tasks/cards/blocked/C-002-waiting-on-release.md"
   exit 1
 }
 
@@ -178,11 +180,15 @@ validate_milestone() {
     verify_path="tasks/milestones/${milestone_id}.verify.md"
     if [ -f "$plan_path" ]; then
       ok_message "Companion plan exists: $plan_path"
+    elif [[ "$TARGET" == */done/* ]]; then
+      ok_message "Companion plan not required for archived milestone"
     else
       warn_message "Companion plan missing — scaffold with: make new-plan M=active/${milestone_id}"
     fi
     if [ -f "$verify_path" ]; then
       ok_message "Companion verify exists: $verify_path"
+    elif [[ "$TARGET" == */done/* ]]; then
+      warn_message "Archived milestone has no companion verify artifact"
     else
       warn_message "Companion verify missing — scaffold with: make new-verify M=active/${milestone_id}"
     fi
@@ -200,8 +206,10 @@ validate_milestone() {
   echo ""
   if [[ "$TARGET" == */active/* ]]; then
     ok_message "Spec is in active/ directory"
+  elif [[ "$TARGET" == */done/* ]]; then
+    ok_message "Spec is in done/ directory"
   else
-    warn_message "Spec is not in active/ — confirm it is ready for execution"
+    warn_message "Spec is not in active/ or done/ — confirm its lifecycle state"
   fi
 }
 
@@ -314,6 +322,7 @@ validate_card() {
   local recipe_path recipe_value recipe_name
   local primary_module primary_module_path
   local expected_modules expected_desc
+  local card_state expected_state
 
   echo "Required card fields:"
   check "Title (# Card)"               "^# Card "
@@ -368,6 +377,26 @@ validate_card() {
       if [ ! -f "$primary_module_path" ]; then
         warn_message "Primary Module path has no module.yaml: $primary_module"
       fi
+    fi
+
+    card_state="$(extract_field_value "State")"
+    expected_state=""
+    case "$TARGET" in
+      */tasks/cards/active/*|tasks/cards/active/*)
+        expected_state="active"
+        ;;
+      */tasks/cards/blocked/*|tasks/cards/blocked/*)
+        expected_state="blocked"
+        ;;
+      */tasks/cards/done/*|tasks/cards/done/*)
+        expected_state="done"
+        ;;
+    esac
+    if [ -n "$expected_state" ] && [ "$card_state" != "$expected_state" ]; then
+      echo -e "  ${RED}MISS${RESET}  Card directory matches State ($expected_state)"
+      FAILED=1
+    elif [ -n "$expected_state" ]; then
+      ok_message "Card directory matches State: $expected_state"
     fi
 
     if [ -n "${recipe_name:-}" ] && [ -n "$primary_module" ]; then

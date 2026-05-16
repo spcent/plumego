@@ -77,7 +77,7 @@ check-verify: ## Validate a milestone verify report: make check-verify M=active/
 
 check-card: ## Validate a task card: make check-card C=active/0001-slice-router-work
 	@if [ -z "$(C)" ]; then \
-	  echo "Error: C is required. Example: make check-card C=active/0001-slice-router-work"; \
+	  echo "Error: C is required. Example: make check-card C=active/0001-slice-router-work or C=blocked/0001-waiting-on-release"; \
 	  exit 1; \
 	fi
 	@scripts/check-spec tasks/cards/$(C).md

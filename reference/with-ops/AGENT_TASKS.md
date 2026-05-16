@@ -4,7 +4,7 @@ Operating guide for AI coding agents working in this feature demo.
 
 Read `AGENTS.md` (repository root) for the full operating contract.
 Read `ARCHITECTURE.md` (this directory) for layout rationale.
-Read `docs/modules/x-ops/README.md` for the `x/ops` API.
+Read `docs/modules/x-ops/README.md` for the `x/observability/ops` API.
 
 ---
 
@@ -26,9 +26,9 @@ Read `docs/modules/x-ops/README.md` for the `x/ops` API.
 
 ### Frozen
 
-- Do not mount `x/devtools`. This demo explicitly excludes it.
+- Do not mount `x/observability/devtools`. This demo explicitly excludes it.
 - Do not expose `/ops/*` routes without the `ops.AuthConfig` token check.
-- Do not add `x/*` imports beyond `x/ops` without justification.
+- Do not add `x/*` imports beyond `x/observability/ops` without justification.
 
 ---
 
@@ -90,8 +90,8 @@ make gates
 ## Non-goals
 
 - Do not refactor this demo to use `core.App`. The direct router pattern is
-  intentional for `x/ops` route registration (see ARCHITECTURE.md).
+  intentional for `x/observability/ops` route registration (see ARCHITECTURE.md).
 - Do not add domain models or business logic.
-- Do not mount `x/devtools` — it is intentionally excluded from this demo.
+- Do not mount `x/observability/devtools` — it is intentionally excluded from this demo.
 - Do not use this demo as a starting point for services without reading the
   production checklist on ops token security and network restriction.

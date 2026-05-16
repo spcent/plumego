@@ -41,17 +41,17 @@
       "type": "TypeInternal"
     },
     {
-      "path": "x/ops/healthhttp/handlers.go",
+      "path": "x/observability/ops/healthhttp/handlers.go",
       "symbol": "literal:COMPONENT_NOT_FOUND",
       "type": "TypeNotFound"
     },
     {
-      "path": "x/ops/healthhttp/helpers.go",
+      "path": "x/observability/ops/healthhttp/helpers.go",
       "symbol": "literal:HEALTH_MANAGER_UNAVAILABLE",
       "type": "TypeUnavailable"
     },
     {
-      "path": "x/ops/healthhttp/helpers.go",
+      "path": "x/observability/ops/healthhttp/helpers.go",
       "symbol": "literal:HEALTH_TRACKER_UNAVAILABLE",
       "type": "TypeUnavailable"
     },
@@ -86,17 +86,17 @@
       "type": "TypeInvalidFormat"
     },
     {
-      "path": "x/webhook/in.go",
+      "path": "x/messaging/webhook/in.go",
       "symbol": "httpCodeMissingSecret",
       "type": "TypeInternal"
     },
     {
-      "path": "x/webhook/in.go",
+      "path": "x/messaging/webhook/in.go",
       "symbol": "httpCodeInvalidSignature",
       "type": "TypeUnauthorized"
     },
     {
-      "path": "x/webhook/in.go",
+      "path": "x/messaging/webhook/in.go",
       "symbol": "httpCodePublishFailed",
       "type": "TypeInternal"
     },

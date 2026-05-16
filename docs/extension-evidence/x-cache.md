@@ -1,6 +1,6 @@
-# x/cache Maturity Evidence
+# x/data/cache Maturity Evidence
 
-Module: `x/cache`
+Module: `x/data/cache`
 
 Owner: `platform`
 
@@ -12,7 +12,7 @@ Evidence state: surface inventory
 
 ## Current Coverage
 
-- `x/cache/distributed` covers hash-ring routing, node management, replication,
+- `x/data/cache/distributed` covers hash-ring routing, node management, replication,
   failover strategies, lifecycle idempotency, invalid construction inputs, and
   concurrent operation smoke tests. The second stabilization pass also covers
   hash-collision handling, weighted virtual nodes, replication failure metrics,
@@ -41,7 +41,7 @@ Evidence state: surface inventory
   callbacks. It also gives synchronous `Set` the same primary-first ordering as
   `Incr`/`Append` and adds a separately named sync fanout concurrency setting
   with an async-field compatibility fallback.
-- `x/cache/leaderboard` covers skiplist ordering, sorted-set operations,
+- `x/data/cache/leaderboard` covers skiplist ordering, sorted-set operations,
   expiration, metrics, context/key validation, invalid members, and duplicate
   update regressions. The second stabilization pass also covers idempotent
   close, concurrent `MaxLeaderboards` enforcement, invalid range errors, and
@@ -62,7 +62,7 @@ Evidence state: surface inventory
   sorted-set mutation while preserving approximate operational metrics, then
   splits internal metrics counters from the exported metrics snapshot DTO and
   documents custom-config `EnableMetrics` zero-value behavior.
-- `x/cache/redis` covers minimal adapter operations, key validation, optional
+- `x/data/cache/redis` covers minimal adapter operations, key validation, optional
   atomic interfaces, disabled flush behavior, unsupported atomic clients,
   option-based construction, and namespaced clear selection. The third pass adds
   constructor-owned option behavior for new call sites and stable key-error
@@ -81,13 +81,13 @@ Evidence state: surface inventory
 ## Primer And Boundary State
 
 - Primer: `docs/modules/x-cache/README.md`
-- Manifest: `x/cache/module.yaml`
+- Manifest: `x/data/cache/module.yaml`
 - Boundary state: topology-heavy and provider-specific cache behavior remains
   extension-owned and outside stable `store/cache`.
 
 ## Why No `beta` Candidate Is Selected Yet
 
-`x/cache` still mixes distributed topology, in-process ranked-data behavior, and
+`x/data/cache` still mixes distributed topology, in-process ranked-data behavior, and
 provider adapter contracts. Those surfaces need separate release-history
 evidence before a single module-level compatibility promise is credible.
 
@@ -95,17 +95,17 @@ evidence before a single module-level compatibility promise is credible.
 
 | Surface | Package | Current decision | Why | Next blocker |
 | --- | --- | --- | --- | --- |
-| Distributed cache | `x/cache/distributed` | Experimental | Replication, failover, post-close lifecycle, fail-closed paths, caller byte ownership on reads and writes, primary-first synchronous mutation ordering, separately named sync fanout concurrency, non-mutating constructor config normalization, bounded weighted hash-ring placement, and health-probe fallback/callback isolation guidance are covered; partial synchronous write outcomes are documented; failover retry tuning is configurable; async scheduling has bounded workers, a bounded queue, metrics, close-time drops, and optional drop callbacks, but async replication remains best-effort without durable repair | Record exported API snapshots and decide whether best-effort async failure visibility is stable enough |
-| Leaderboard cache | `x/cache/leaderboard` | Possible beta candidate after inventory | In-process sorted-set behavior has focused correctness, lifecycle, limits, explicit no-expiration TTL, instance-owned skiplist randomness, Plumego-local missing-key, validation, clean exported metrics snapshots, deadlock-safe approximate metrics, eventually-expired cleanup semantics, and score-range baseline coverage | Snapshot the exported sorted-set API and decide whether the bounded in-process range baseline is acceptable |
-| Redis adapter | `x/cache/redis` | Experimental | New option-based call sites have constructor-owned behavior, a validation-capable constructor, adapter byte ownership, capability reporting, cache-miss mapping tests, compatibility-field boundaries, frozen clear policy tests, effective custom-option validation, and a dependency-free compatibility matrix, but no concrete driver integration evidence is recorded | Validate at least one real Redis driver binding outside the dependency-free adapter package |
+| Distributed cache | `x/data/cache/distributed` | Experimental | Replication, failover, post-close lifecycle, fail-closed paths, caller byte ownership on reads and writes, primary-first synchronous mutation ordering, separately named sync fanout concurrency, non-mutating constructor config normalization, bounded weighted hash-ring placement, and health-probe fallback/callback isolation guidance are covered; partial synchronous write outcomes are documented; failover retry tuning is configurable; async scheduling has bounded workers, a bounded queue, metrics, close-time drops, and optional drop callbacks, but async replication remains best-effort without durable repair | Record exported API snapshots and decide whether best-effort async failure visibility is stable enough |
+| Leaderboard cache | `x/data/cache/leaderboard` | Possible beta candidate after inventory | In-process sorted-set behavior has focused correctness, lifecycle, limits, explicit no-expiration TTL, instance-owned skiplist randomness, Plumego-local missing-key, validation, clean exported metrics snapshots, deadlock-safe approximate metrics, eventually-expired cleanup semantics, and score-range baseline coverage | Snapshot the exported sorted-set API and decide whether the bounded in-process range baseline is acceptable |
+| Redis adapter | `x/data/cache/redis` | Experimental | New option-based call sites have constructor-owned behavior, a validation-capable constructor, adapter byte ownership, capability reporting, cache-miss mapping tests, compatibility-field boundaries, frozen clear policy tests, effective custom-option validation, and a dependency-free compatibility matrix, but no concrete driver integration evidence is recorded | Validate at least one real Redis driver binding outside the dependency-free adapter package |
 
-Do not promote `x/cache` as a root module from this inventory. Promotion work
+Do not promote `x/data/cache` as a root module from this inventory. Promotion work
 should select one surface, snapshot only that surface, and then prove release
 stability with `internal/checks/extension-release-evidence`.
 
 ## Required Release Evidence
 
-Missing. No selected `x/cache` surface has two consecutive minor release refs
+Missing. No selected `x/data/cache` surface has two consecutive minor release refs
 with unchanged exported API.
 
 Release refs:
@@ -125,7 +125,7 @@ clear `api_snapshot_missing` by themselves.
 ## Release Evidence
 
 Not recorded. `specs/extension-beta-evidence.yaml` does not name a selected
-`x/cache` release candidate yet, and no real release-ref comparison has been
+`x/data/cache` release candidate yet, and no real release-ref comparison has been
 checked in.
 
 Current state:
@@ -136,7 +136,7 @@ Current state:
 
 ## Owner Sign-Off
 
-Missing. No selected `x/cache` surface has owner sign-off recorded.
+Missing. No selected `x/data/cache` surface has owner sign-off recorded.
 
 ## Next Evidence Needed
 
@@ -151,27 +151,27 @@ Missing. No selected `x/cache` surface has owner sign-off recorded.
   compatibility matrix before treating the adapter as stable.
 - Record scale and performance expectations for each selected surface.
 - Document owner sign-off for the selected surface.
-- Keep `x/cache/module.yaml` status as `experimental` until the promotion
+- Keep `x/data/cache/module.yaml` status as `experimental` until the promotion
   process in `docs/EXTENSION_STABILITY_POLICY.md` is complete.
 
 ## Ninth Stabilization Pass Validation
 
-- `go test -race -timeout 60s ./x/cache/...`
-- `go test -timeout 20s ./x/cache/...`
-- `go vet ./x/cache/...`
-- `go test -race -timeout 60s ./x/cache/distributed`
-- `go test -race -timeout 60s ./x/cache/leaderboard`
-- `go test -race -timeout 60s ./x/cache/redis`
+- `go test -race -timeout 60s ./x/data/cache/...`
+- `go test -timeout 20s ./x/data/cache/...`
+- `go vet ./x/data/cache/...`
+- `go test -race -timeout 60s ./x/data/cache/distributed`
+- `go test -race -timeout 60s ./x/data/cache/leaderboard`
+- `go test -race -timeout 60s ./x/data/cache/redis`
 - `go test -timeout 20s ./...`
 - `go vet ./...`
 - `env GOCACHE=/private/tmp/plumego-gocache go run ./internal/checks/dependency-rules`
 - `env GOCACHE=/private/tmp/plumego-gocache go run ./internal/checks/agent-workflow`
 - `env GOCACHE=/private/tmp/plumego-gocache go run ./internal/checks/module-manifests`
 - `env GOCACHE=/private/tmp/plumego-gocache go run ./internal/checks/reference-layout`
-- `env GOCACHE=/private/tmp/plumego-gocache go run ./internal/checks/extension-api-snapshot -module ./x/cache/distributed -out docs/extension-evidence/snapshots/x-cache/x-cache-distributed-head.snapshot`
-- `env GOCACHE=/private/tmp/plumego-gocache go run ./internal/checks/extension-api-snapshot -module ./x/cache/leaderboard -out docs/extension-evidence/snapshots/x-cache/x-cache-leaderboard-head.snapshot`
-- `env GOCACHE=/private/tmp/plumego-gocache go run ./internal/checks/extension-api-snapshot -module ./x/cache/redis -out docs/extension-evidence/snapshots/x-cache/x-cache-redis-head.snapshot`
-- `env GOCACHE=/private/tmp/plumego-gocache go run ./internal/checks/extension-release-evidence -module ./x/cache/... -base HEAD -head HEAD`
+- `env GOCACHE=/private/tmp/plumego-gocache go run ./internal/checks/extension-api-snapshot -module ./x/data/cache/distributed -out docs/extension-evidence/snapshots/x-cache/x-cache-distributed-head.snapshot`
+- `env GOCACHE=/private/tmp/plumego-gocache go run ./internal/checks/extension-api-snapshot -module ./x/data/cache/leaderboard -out docs/extension-evidence/snapshots/x-cache/x-cache-leaderboard-head.snapshot`
+- `env GOCACHE=/private/tmp/plumego-gocache go run ./internal/checks/extension-api-snapshot -module ./x/data/cache/redis -out docs/extension-evidence/snapshots/x-cache/x-cache-redis-head.snapshot`
+- `env GOCACHE=/private/tmp/plumego-gocache go run ./internal/checks/extension-release-evidence -module ./x/data/cache/... -base HEAD -head HEAD`
   verified the release-evidence tool path only; it is not release-history
   evidence because no real release refs were supplied.
 
@@ -190,4 +190,4 @@ Missing. No selected `x/cache` surface has owner sign-off recorded.
 
 ## Promotion Posture
 
-Keep `x/cache` experimental.
+Keep `x/data/cache` experimental.

@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/spcent/plumego/log"
-	"github.com/spcent/plumego/x/mq/store"
-	"github.com/spcent/plumego/x/scheduler"
+	"github.com/spcent/plumego/x/messaging/mq/store"
+	"github.com/spcent/plumego/x/messaging/scheduler"
 )
 
 // registerScheduledJobs sets up periodic maintenance tasks on the scheduler.

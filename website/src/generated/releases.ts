@@ -36,7 +36,7 @@ export const RELEASE_FACTS = {
       "area": "Subordinate extension primitives",
       "status": "experimental",
       "promise": "Maintained and tested, but discovery should start from the owning family entrypoint and compatibility is not frozen",
-      "modules": "x/cache, x/devtools, x/discovery, x/ipc, x/mq, x/ops, x/pubsub, x/scheduler, x/webhook"
+      "modules": "x/cache, x/devtools, x/gateway/discovery, x/gateway/ipc, x/messaging/mq, x/messaging/pubsub, x/messaging/scheduler, x/messaging/webhook, x/ops"
     }
   ]
 } as const;

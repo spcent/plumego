@@ -174,7 +174,7 @@ tasks:
     avoid:
       - x/rest
       - x/gateway
-      - x/webhook
+      - x/messaging/webhook
 
   http_endpoint:
     start_with:
@@ -237,9 +237,9 @@ tasks:
       - x/messaging/entrypoints.go
       - specs/extension-taxonomy.yaml
     avoid:
-      - x/mq
-      - x/pubsub
-      - x/webhook
+      - x/messaging/mq
+      - x/messaging/pubsub
+      - x/messaging/webhook
 
   tenant:
     start_with:
@@ -272,8 +272,8 @@ tasks:
 
   devtools_local_debug:
     start_with:
-      - x/devtools/module.yaml
-      - x/devtools/devtools.go
+      - x/observability/devtools/module.yaml
+      - x/observability/devtools/devtools.go
       - README.md
     avoid:
       - core
@@ -281,7 +281,7 @@ tasks:
 
   service_discovery:
     start_with:
-      - x/discovery/module.yaml
+      - x/gateway/discovery/module.yaml
       - specs/extension-taxonomy.yaml
       - specs/repo.yaml
     avoid:
@@ -290,7 +290,7 @@ tasks:
 
   ops_admin_surface:
     start_with:
-      - x/ops/module.yaml
+      - x/observability/ops/module.yaml
       - x/observability/module.yaml
       - specs/extension-taxonomy.yaml
     avoid:
@@ -300,7 +300,7 @@ tasks:
   observability_admin:
     start_with:
       - x/observability/module.yaml
-      - x/ops/module.yaml
+      - x/observability/ops/module.yaml
     avoid:
       - core
       - health

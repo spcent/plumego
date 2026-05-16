@@ -9,12 +9,12 @@ This document explains the structural choices in this feature demo.
 `reference/standard-service` uses `core.App` as the application root, which
 wires stable-root middleware and provides `Get/Post/Put/Delete` helpers.
 
-This demo bypasses `core.App` intentionally. `x/ops` registers its own route
+This demo bypasses `core.App` intentionally. `x/observability/ops` registers its own route
 set via `opsHandler.RegisterRoutes(r *router.Router)`, which requires access
 to the underlying router. The demo uses `router.NewRouter()` directly to keep
 the wiring simple and explicit for a focused capability demo.
 
-This is the correct choice for a demo; production services that combine `x/ops`
+This is the correct choice for a demo; production services that combine `x/observability/ops`
 with full `core.App` wiring should inject the router or use `core.App.AddRoute`.
 
 ---
@@ -34,7 +34,7 @@ All wiring lives in `main.go`. There is no `internal/` sub-package because:
 
 ## Key components
 
-### `x/ops` handler
+### `x/observability/ops` handler
 
 ```go
 opsHandler := ops.New(ops.Options{

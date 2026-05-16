@@ -28,9 +28,10 @@ type dependencyRulesDoc struct {
 }
 
 type extensionTaxonomyDoc struct {
-	CanonicalRoots []string
-	CoveredRoots   map[string]struct{}
-	RootsByFamily  map[string][]string
+	CanonicalRoots  []string
+	CoveredRoots    map[string]struct{}
+	RootsByFamily   map[string][]string
+	RootToCanonical map[string]string
 }
 
 type taskRoutingEntry struct {
@@ -277,12 +278,14 @@ func ReadExtensionTaxonomy(repoRoot string) (extensionTaxonomyDoc, error) {
 	defer file.Close()
 
 	out := extensionTaxonomyDoc{
-		CoveredRoots:  map[string]struct{}{},
-		RootsByFamily: map[string][]string{},
+		CoveredRoots:    map[string]struct{}{},
+		RootsByFamily:   map[string][]string{},
+		RootToCanonical: map[string]string{},
 	}
 
 	inFamilies := false
 	currentFamily := ""
+	currentCanonical := ""
 	inRoots := false
 	scanner := NewLineScanner(file)
 	for scanner.Scan() {
@@ -297,11 +300,13 @@ func ReadExtensionTaxonomy(repoRoot string) (extensionTaxonomyDoc, error) {
 		case indent == 0 && trimmed == "families:":
 			inFamilies = true
 			currentFamily = ""
+			currentCanonical = ""
 			inRoots = false
 			continue
 		case indent == 0:
 			inFamilies = false
 			currentFamily = ""
+			currentCanonical = ""
 			inRoots = false
 		}
 
@@ -312,10 +317,12 @@ func ReadExtensionTaxonomy(repoRoot string) (extensionTaxonomyDoc, error) {
 		switch {
 		case indent == 2 && strings.HasSuffix(trimmed, ":"):
 			currentFamily = strings.TrimSuffix(trimmed, ":")
+			currentCanonical = ""
 			inRoots = false
 			continue
 		case indent == 2:
 			currentFamily = ""
+			currentCanonical = ""
 			inRoots = false
 		}
 
@@ -327,8 +334,10 @@ func ReadExtensionTaxonomy(repoRoot string) (extensionTaxonomyDoc, error) {
 		case indent == 4 && strings.HasPrefix(trimmed, "canonical_root:"):
 			value := cleanScalar(strings.TrimPrefix(trimmed, "canonical_root:"))
 			if value != "" {
+				currentCanonical = value
 				out.CanonicalRoots = append(out.CanonicalRoots, value)
 				out.CoveredRoots[value] = struct{}{}
+				out.RootToCanonical[value] = value
 			}
 			inRoots = false
 		case indent == 4 && trimmed == "roots:":
@@ -342,6 +351,9 @@ func ReadExtensionTaxonomy(repoRoot string) (extensionTaxonomyDoc, error) {
 			}
 			out.RootsByFamily[currentFamily] = append(out.RootsByFamily[currentFamily], value)
 			out.CoveredRoots[value] = struct{}{}
+			if currentCanonical != "" {
+				out.RootToCanonical[value] = currentCanonical
+			}
 		}
 	}
 	if err := scanner.Err(); err != nil {

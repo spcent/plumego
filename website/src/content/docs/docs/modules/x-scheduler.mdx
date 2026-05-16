@@ -1,18 +1,18 @@
 ---
-title: x/scheduler Primer
+title: x/messaging/scheduler Primer
 description: Read this when the change is really about in-process cron jobs, delayed task execution, or retry coordination within the x/messaging family.
 translationKey: modules-x-scheduler
 sidebar:
   order: 21
 ---
 
-# x/scheduler Primer
+# x/messaging/scheduler Primer
 
 > **Experimental** — API compatibility is not frozen. Evaluate before adopting in production. Check [Release Posture](/docs/release-posture) for current maturity status.
 
 Open this page after [x/messaging Primer](/docs/modules/x-messaging) when the change is narrowly about in-process scheduling: cron expressions, delayed job execution, retry coordination, or dead-letter queue handling for scheduled tasks.
 
-`x/scheduler` is a subordinate scheduling primitive within the `x/messaging` capability family. Start new messaging feature discovery in `x/messaging` before opening this package directly.
+`x/messaging/scheduler` is a subordinate scheduling primitive within the `x/messaging` capability family. Start new messaging feature discovery in `x/messaging` before opening this package directly.
 
 ## Start here when
 
@@ -26,21 +26,21 @@ Open this page after [x/messaging Primer](/docs/modules/x-messaging) when the ch
 
 - the work is a new app-facing messaging capability — start from [x/messaging Primer](/docs/modules/x-messaging) to confirm family placement
 - the change is about business workflow orchestration or domain-specific job logic — keep that in application code
-- the work needs pub-sub fan-out for scheduled events — coordinate with `x/pubsub`
+- the work needs pub-sub fan-out for scheduled events — coordinate with `x/messaging/pubsub`
 - the change introduces core bootstrap ownership or stable root entrypoints
 
 ## First files to read in the current repository
 
-1. `x/scheduler/module.yaml`
-2. `x/scheduler/scheduler.go`
-3. `x/scheduler/cron.go`
-4. `x/scheduler/scheduler_executor.go`
-5. `x/scheduler/dlq.go`
-6. `x/scheduler/store.go`
+1. `x/messaging/scheduler/module.yaml`
+2. `x/messaging/scheduler/scheduler.go`
+3. `x/messaging/scheduler/cron.go`
+4. `x/messaging/scheduler/scheduler_executor.go`
+5. `x/messaging/scheduler/dlq.go`
+6. `x/messaging/scheduler/store.go`
 
 ## Concrete ownership examples
 
-| Keep it in `x/scheduler` when the work is about | Move out when the work becomes |
+| Keep it in `x/messaging/scheduler` when the work is about | Move out when the work becomes |
 | --- | --- |
 | `cron`: expression parsing, schedule evaluation, tick generation | business-specific job definitions or domain handlers |
 | `heap`: priority-based job ordering and delayed execution queue | generic in-memory priority queue outside scheduling context |
@@ -50,7 +50,7 @@ Open this page after [x/messaging Primer](/docs/modules/x-messaging) when the ch
 
 ## Why this primer exists
 
-Scheduling is a cross-cutting concern that is easy to scatter across application code. Keeping scheduling primitives in `x/scheduler` — with explicit cron, retry, and DLQ ownership — prevents each service from reimplementing the same patterns differently. The key rule is that scheduling coordination stays explicit: no hidden process-wide state and no cron registration via package init.
+Scheduling is a cross-cutting concern that is easy to scatter across application code. Keeping scheduling primitives in `x/messaging/scheduler` — with explicit cron, retry, and DLQ ownership — prevents each service from reimplementing the same patterns differently. The key rule is that scheduling coordination stays explicit: no hidden process-wide state and no cron registration via package init.
 
 ## Read next
 

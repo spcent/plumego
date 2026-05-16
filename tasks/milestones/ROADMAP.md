@@ -8,7 +8,7 @@ Update this file when you add, complete, or reorder milestones.
 | Symbol | Meaning |
 |--------|---------|
 | `[ ]`  | Not started |
-| `[→]`  | In execution (Codex running) |
+| `[→]`  | In execution (agent running) |
 | `[PR]` | PR open, awaiting review |
 | `[✓]`  | Merged |
 | `[✗]`  | Cancelled / superseded |
@@ -26,12 +26,13 @@ Update this file when you add, complete, or reorder milestones.
 
 | Milestone | Title | Status | Depends On | Notes |
 |-----------|-------|--------|------------|-------|
-| M-001 | v1 trust baseline | [→] | — | Verify artifact created; archival remains separate |
-| M-002 | Stable roots freeze and reliability | [→] | M-001 | Verify artifact created; final release gates move to M-005 |
-| M-003 | Extension evidence pipeline | [→] | M-002 | Verify artifact created; remaining blockers are explicit |
-| M-004 | Stable root cleanup freeze | [→] | M-002 | Outcome recorded; reconcile in card 1429 |
-| M-005 | v1 release execution | [→] | M-001, M-002, M-003, M-004 | Sequential rc.1 to final v1/no-go plan |
-| M-006 | v1.0.1 maintenance lane | [→] | M-005 | Post-v1 maintenance cards for generated data, CI warnings, CLI onboarding truth, and release evidence index |
+| M-001 | v1 trust baseline | [✓] | — | Verify artifact created; archived |
+| M-002 | Stable roots freeze and reliability | [✓] | M-001 | Verify artifact created; final release gates moved to M-005 |
+| M-003 | Extension evidence pipeline | [✓] | M-002 | Verify artifact created; remaining blockers are explicit |
+| M-004 | Stable root cleanup freeze | [✓] | M-002 | Outcome recorded and archived |
+| M-005 | v1 release execution | [✓] | M-001, M-002, M-003, M-004 | `v1.0.0` release evidence recorded |
+| M-006 | v1.0.1 maintenance lane | [✓] | M-005 | Post-v1 maintenance evidence recorded |
+| M-007 | extension v1 baseline evidence intake | [✓] | M-006 | First `v1.0.0` release-ref intake recorded without promoting extensions |
 
 ---
 
@@ -52,7 +53,7 @@ M-001 ──► M-002 ──► M-003 ──┐
              └────► M-004 ──┼──► M-005
                               │
 M-001 ────────────────────────┘
-M-005 ───────────────────────────► M-006
+M-005 ───────────────────────────► M-006 ──► M-007
 ```
 
 ---
@@ -61,7 +62,7 @@ M-005 ────────────────────────�
 
 ### Sequencing Rules
 
-- A milestone may not start Codex execution until all its `Depends On`
+- A milestone may not start agent execution until all its `Depends On`
   milestones are **merged** to `main`.
 - Milestones marked `Parallel OK: yes` with no dependencies can run
   concurrently as long as their **Affected Modules** do not overlap.

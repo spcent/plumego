@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/spcent/plumego/log"
-	"github.com/spcent/plumego/x/pubsub"
-	"github.com/spcent/plumego/x/webhook"
+	"github.com/spcent/plumego/x/messaging/pubsub"
+	"github.com/spcent/plumego/x/messaging/webhook"
 )
 
 // WebhookNotifier subscribes to "messaging.result" events on the pubsub bus

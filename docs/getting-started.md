@@ -177,22 +177,22 @@ After the smallest example works, keep the app layout from
 | Standard JSON API with explicit handlers | stable roots: `core`, `router`, `contract`, `middleware` |
 | Reusable CRUD/resource conventions | `x/rest` |
 | Tenant resolution, policy, quota, and isolation | `x/tenant` |
-| Reverse proxy, rewrite, balancing, and edge transport | `x/gateway`, then `x/discovery` only when dynamic backend lookup is required |
+| Reverse proxy, rewrite, balancing, and edge transport | `x/gateway`, then `x/gateway/discovery` only when dynamic backend lookup is required |
 | WebSocket transport | `x/websocket` |
 | Messaging workflows | `x/messaging` |
-| Inbound webhook verification or outbound webhook delivery | `x/webhook`, starting from `x/messaging` when the task is broader than transport mechanics |
+| Inbound webhook verification or outbound webhook delivery | `x/messaging/webhook`, starting from `x/messaging` when the task is broader than transport mechanics |
 | File upload, download, and temporary URL transport | `x/fileapi`, with storage and metadata implementations in `x/data/file` |
 | Reusable circuit breaker or rate-limit primitives | `x/resilience` |
 | AI providers, sessions, streaming, and tools | `x/ai/provider`, `x/ai/session`, `x/ai/streaming`, `x/ai/tool` |
-| Observability export, protected diagnostics, or local debug endpoints | `x/observability`, `x/ops`, or `x/devtools` depending on the surface |
+| Observability export, protected diagnostics, or local debug endpoints | `x/observability`, `x/observability/ops`, or `x/observability/devtools` depending on the surface |
 
 Do not start a new application layout from an `x/*` package. Treat extensions as
 explicit additions to the canonical app wiring.
 
 For generated project scaffolds, keep `canonical` as the default template and
 select a scenario profile only when you want explicit optional capability
-wiring. Baseline templates are `canonical`, `minimal`, `api`, `fullstack`, and
-`microservice`. Scenario templates are `rest-api`, `tenant-api`, `gateway`,
+wiring. Baseline templates are `canonical`, `minimal`, `fullstack`, and
+`microservice`. Scenario templates are `api`, `rest-api`, `tenant-api`, `gateway`,
 `realtime`, `ai-service`, and `ops-service`; each is accepted by
 `plumego new --template`.
 

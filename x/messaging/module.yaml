@@ -16,13 +16,13 @@ entrypoint_reads:
   - docs/modules/x-messaging/README.md
 
 subordinate_families:
-  - package: x/mq
+  - package: x/messaging/mq
     role: durable queue primitive and worker coordination
-  - package: x/pubsub
+  - package: x/messaging/pubsub
     role: in-process publish-subscribe broker primitives
-  - package: x/scheduler
+  - package: x/messaging/scheduler
     role: cron, delayed job, and retry coordination
-  - package: x/webhook
+  - package: x/messaging/webhook
     role: inbound verification and outbound delivery
 
 responsibilities:
@@ -50,10 +50,10 @@ allowed_imports:
   - log
   - metrics
   - store
-  - x/mq
-  - x/pubsub
-  - x/scheduler
-  - x/webhook
+  - x/messaging/mq
+  - x/messaging/pubsub
+  - x/messaging/scheduler
+  - x/messaging/webhook
   - x/tenant
 
 forbidden_imports:
@@ -89,4 +89,4 @@ review_checklist:
 agent_hints:
   - Start all new app-facing messaging discovery here before opening sibling x/* packages
   - Keep orchestration inside x/messaging with explicit service wiring and family-level entrypoints
-  - Treat x/mq, x/pubsub, x/scheduler, and x/webhook as subordinate packages under this family, not competing entrypoints
+  - Treat x/messaging/mq, x/messaging/pubsub, x/messaging/scheduler, and x/messaging/webhook as subordinate packages under this family, not competing entrypoints

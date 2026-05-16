@@ -32,7 +32,7 @@ sidebar:
 ## 什么时候不该从这里开始
 
 - 改动关于 HTTP 请求-响应传输 — 那属于稳定根（`router`、`middleware`）
-- 工作是没有 WebSocket 帧的通用事件扇出 — 从 `x/pubsub` 开始
+- 工作是没有 WebSocket 帧的通用事件扇出 — 从 `x/messaging/pubsub` 开始
 - 改动引入了业务专属频道语义或领域事件 — 保留在应用代码中
 - 工作需要 tenant 专属连接策略或每租户房间管理 — 与 `x/tenant` 协调
 
@@ -50,14 +50,14 @@ sidebar:
 | 这些工作适合留在 `x/websocket` | 一旦变成这些问题就应移出 |
 | --- | --- |
 | `New`、`ServeWSWithConfig`：HTTP 到 WebSocket 的升级与路由挂载 | HTTP 路由匹配或路径参数提取 — 那属于 `router` |
-| `NewHub`、`NewHubWithConfigE`：连接池管理与生命周期 | 无 WebSocket 帧的通用发布订阅扇出 — 使用 `x/pubsub` |
+| `NewHub`、`NewHubWithConfigE`：连接池管理与生命周期 | 无 WebSocket 帧的通用发布订阅扇出 — 使用 `x/messaging/pubsub` |
 | `ServeWSWithConfig`：在接受连接前对升级请求做认证 | JWT 签发或令牌验证 — 那属于 `security/jwt` |
 | `BroadcastRoom`、`BroadcastAll`、`Conn.WriteMessage`：向已连接客户端推送消息 | 业务专属消息 schema 或领域事件 payload |
 | `DefaultWebSocketConfig`：缓冲区大小、截止时间、origin 验证策略 | tenant 专属 origin 允许列表或每租户限流 |
 
 ## 为什么单独写这一页
 
-WebSocket 连接是有状态且长期存在的，这使它与稳定根覆盖的请求-响应 handler 有本质区别。路由注册、连接升级、hub 生命周期和认证都在传输层发生，将它们明确保留在 `x/websocket` 可防止这种有状态性泄漏到 `router` 或 `core`。`x/pubsub` 覆盖事件扇出关注点；本包仅覆盖 WebSocket 传输表面。
+WebSocket 连接是有状态且长期存在的，这使它与稳定根覆盖的请求-响应 handler 有本质区别。路由注册、连接升级、hub 生命周期和认证都在传输层发生，将它们明确保留在 `x/websocket` 可防止这种有状态性泄漏到 `router` 或 `core`。`x/messaging/pubsub` 覆盖事件扇出关注点；本包仅覆盖 WebSocket 传输表面。
 
 ## 下一步阅读
 

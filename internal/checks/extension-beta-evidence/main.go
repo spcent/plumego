@@ -66,7 +66,7 @@ func main() {
 }
 
 func run(repoRoot string) ([]string, []string, error) {
-	roots, err := checkutil.ReadRepoExtensionRoots(repoRoot)
+	roots, err := readEvidenceCandidateRoots(repoRoot)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -228,7 +228,7 @@ func validateCandidate(repoRoot string, roots map[string]struct{}, cand candidat
 		return []string{"candidate missing module"}, nil
 	}
 	if _, ok := roots[cand.Module]; !ok {
-		violations = append(violations, fmt.Sprintf("%s is not declared in specs/repo.yaml extension paths", label))
+		violations = append(violations, fmt.Sprintf("%s is not declared in specs/repo.yaml or specs/extension-taxonomy.yaml extension roots", label))
 	}
 
 	manifest, err := readModuleManifest(filepath.Join(repoRoot, cand.Module, "module.yaml"))
@@ -293,6 +293,21 @@ func validateCandidate(repoRoot string, roots map[string]struct{}, cand candidat
 
 	violations = append(violations, blockerViolations(cand)...)
 	return violations, nil
+}
+
+func readEvidenceCandidateRoots(repoRoot string) (map[string]struct{}, error) {
+	roots, err := checkutil.ReadRepoExtensionRoots(repoRoot)
+	if err != nil {
+		return nil, err
+	}
+	taxonomy, err := checkutil.ReadExtensionTaxonomy(repoRoot)
+	if err != nil {
+		return nil, err
+	}
+	for root := range taxonomy.RootToCanonical {
+		roots[root] = struct{}{}
+	}
+	return roots, nil
 }
 
 func releaseRefViolations(repoRoot string, cand candidate) []string {

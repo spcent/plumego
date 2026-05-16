@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/spcent/plumego/x/mq/store"
+	"github.com/spcent/plumego/x/messaging/mq/store"
 )
 
 // TestEndToEnd_ReceiptTracking verifies that receipts are created on enqueue

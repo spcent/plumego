@@ -142,7 +142,7 @@ names are stable diagnostic context, not a typed lifecycle error taxonomy.
 - keep readiness ownership out of `core`; callers own the outer serve loop, so readiness signaling must stay app-local instead of pretending the kernel knows when traffic can flow
 - keep logger subsystem ownership out of `core`; `core.AppDependencies{Logger: ...}` injects a passive dependency and callers own logger initialization and flushing
 - keep app-local debug flags and env-file metadata outside `core`; the kernel owns HTTP runtime state, not devtools metadata transport
-- keep debug/runtime snapshot payloads in `x/devtools`; `core` owns lifecycle state, not tooling response contracts
+- keep debug/runtime snapshot payloads in `x/observability/devtools`; `core` owns lifecycle state, not tooling response contracts
 - keep the app logger kernel-owned on `App.Logger()`; `router` stays logger-free and does not mirror app logger state
 - keep router behavior policy in typed config, not in ad hoc constructor options
 - push feature-specific wiring back to app-local code or the owning extension

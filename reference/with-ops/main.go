@@ -1,7 +1,7 @@
 // Example: non-canonical
 //
-// This demo mounts protected x/ops routes and stable request observability
-// middleware without mounting x/devtools.
+// This demo mounts protected x/observability/ops routes and stable request observability
+// middleware without mounting x/observability/devtools.
 package main
 
 import (
@@ -21,7 +21,7 @@ import (
 	"github.com/spcent/plumego/middleware/recovery"
 	"github.com/spcent/plumego/middleware/requestid"
 	"github.com/spcent/plumego/router"
-	"github.com/spcent/plumego/x/ops"
+	"github.com/spcent/plumego/x/observability/ops"
 )
 
 func main() {

@@ -1,18 +1,18 @@
 ---
-title: x/devtools Primer
+title: x/observability/devtools Primer
 description: Read this when the change is really about debug-only HTTP routes, local profiling endpoints, env reload helpers, or development metrics surfacing within the x/observability family.
 translationKey: modules-x-devtools
 sidebar:
   order: 25
 ---
 
-# x/devtools Primer
+# x/observability/devtools Primer
 
 > **Experimental** — API compatibility is not frozen. Evaluate before adopting in production. Check [Release Posture](/docs/release-posture) for current maturity status.
 
 Open this page after [x/observability Primer](/docs/modules/x-observability) when the change is narrowly about development-time debug routes: local profiling endpoints, environment snapshot payloads, development metrics surfacing, or pubsub debug helpers.
 
-`x/devtools` is a subordinate debug-only package within the `x/observability` family. Start broader observability work in `x/observability` before opening this package directly. Devtools must never be mounted in production without an explicit gate.
+`x/observability/devtools` is a subordinate debug-only package within the `x/observability` family. Start broader observability work in `x/observability` before opening this package directly. Devtools must never be mounted in production without an explicit gate.
 
 ## Start here when
 
@@ -25,33 +25,33 @@ Open this page after [x/observability Primer](/docs/modules/x-observability) whe
 ## Do not start here when
 
 - the work is broader observability infrastructure such as Prometheus exporters or OTel wiring — start from [x/observability Primer](/docs/modules/x-observability)
-- the change is about protected admin endpoints in production — that belongs in `x/ops`
+- the change is about protected admin endpoints in production — that belongs in `x/observability/ops`
 - the work needs stable root entrypoints or core bootstrap changes
 - you intend to mount devtools routes in a production binary without an explicit development gate
 
 ## First files to read in the current repository
 
-1. `x/devtools/module.yaml`
-2. `x/devtools/devtools.go`
-3. `x/devtools/devcollector.go`
-4. `x/devtools/pubsubdebug/`
+1. `x/observability/devtools/module.yaml`
+2. `x/observability/devtools/devtools.go`
+3. `x/observability/devtools/devcollector.go`
+4. `x/observability/devtools/pubsubdebug/`
 
 ## Concrete ownership examples
 
-| Keep it in `x/devtools` when the work is about | Move out when the work becomes |
+| Keep it in `x/observability/devtools` when the work is about | Move out when the work becomes |
 | --- | --- |
-| `devtools.go`: debug route registration and handler wiring | production admin endpoints — that belongs in `x/ops` |
+| `devtools.go`: debug route registration and handler wiring | production admin endpoints — that belongs in `x/observability/ops` |
 | `devcollector.go`: collecting and surfacing runtime snapshots and config state | stable metrics or log root interface changes |
 | Environment reload endpoints for local hot-reload workflows | production configuration management or runtime config API |
 | `pubsubdebug`: inspecting in-process broker state during local development | production broker monitoring or operational diagnostics |
 
 ## Why this primer exists
 
-Debug tooling is valuable in development but dangerous in production. `x/devtools` is the explicit home for debug-only routes so that they cannot accidentally migrate into `x/ops`, `x/observability`, or core. The invariant is opt-in mounting: devtools routes must be registered explicitly in a development-only wiring path, never via package init or automatic discovery.
+Debug tooling is valuable in development but dangerous in production. `x/observability/devtools` is the explicit home for debug-only routes so that they cannot accidentally migrate into `x/observability/ops`, `x/observability`, or core. The invariant is opt-in mounting: devtools routes must be registered explicitly in a development-only wiring path, never via package init or automatic discovery.
 
 ## Read next
 
 - [x/observability Primer](/docs/modules/x-observability)
-- [x/ops Primer](/docs/modules/x-ops)
+- [x/observability/ops Primer](/docs/modules/x-ops)
 - [x/* Family](/docs/x-family)
 - [Repository Boundaries](/docs/concepts/repo-control-plane)

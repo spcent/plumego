@@ -1,18 +1,18 @@
 ---
-title: x/cache Primer
+title: x/data/cache Primer
 description: Read this when the change is really about distributed cache topology, Redis adapters, consistent-hashing replication, or leaderboard cache within the x/data family.
 translationKey: modules-x-cache
 sidebar:
   order: 24
 ---
 
-# x/cache Primer
+# x/data/cache Primer
 
 > **Experimental** — API compatibility is not frozen. Evaluate before adopting in production. Check [Release Posture](/docs/release-posture) for current maturity status.
 
 Open this page after [x/data Primer](/docs/modules/x-data) when the change is narrowly about distributed or Redis-backed cache topology: consistent-hashing rings, replication, failover, Redis client adapters, or leaderboard caching built on `store/cache` primitives.
 
-`x/cache` is a subordinate package within the `x/data` family. Start distributed cache work in `x/data` before opening this package directly. For simple in-process caching, import `github.com/spcent/plumego/store/cache` and use `cache.MemoryCache` without opening `x/cache` at all.
+`x/data/cache` is a subordinate package within the `x/data` family. Start distributed cache work in `x/data` before opening this package directly. For simple in-process caching, import `github.com/spcent/plumego/store/cache` and use `cache.MemoryCache` without opening `x/data/cache` at all.
 
 ## Start here when
 
@@ -30,14 +30,14 @@ Open this page after [x/data Primer](/docs/modules/x-data) when the change is na
 
 ## First files to read in the current repository
 
-1. `x/cache/module.yaml`
-2. `x/cache/distributed/`
-3. `x/cache/redis/`
-4. `x/cache/leaderboard/`
+1. `x/data/cache/module.yaml`
+2. `x/data/cache/distributed/`
+3. `x/data/cache/redis/`
+4. `x/data/cache/leaderboard/`
 
 ## Concrete ownership examples
 
-| Keep it in `x/cache` when the work is about | Move out when the work becomes |
+| Keep it in `x/data/cache` when the work is about | Move out when the work becomes |
 | --- | --- |
 | `distributed`: consistent-hashing ring, node membership, replication factor, failover | tenant-aware cache scoping — use `x/tenant/store/cache` |
 | `redis`: Redis client implementing `store/cache.Cache`, pipeline helpers, TTL management | Redis cluster administration or connection pooling configuration |
@@ -46,7 +46,7 @@ Open this page after [x/data Primer](/docs/modules/x-data) when the change is na
 
 ## Why this primer exists
 
-`x/cache` is often opened directly when the right starting point is `cache.MemoryCache` from `store/cache` for simple cases or `x/data` for topology placement. The subordinate relationship exists because distributed cache topology — sharding keys, ring membership, failover — is a topology concern that belongs in the `x/data` family rather than a separate top-level concern. Keeping them together preserves the invariant that topology decisions are explicit and reviewable.
+`x/data/cache` is often opened directly when the right starting point is `cache.MemoryCache` from `store/cache` for simple cases or `x/data` for topology placement. The subordinate relationship exists because distributed cache topology — sharding keys, ring membership, failover — is a topology concern that belongs in the `x/data` family rather than a separate top-level concern. Keeping them together preserves the invariant that topology decisions are explicit and reviewable.
 
 ## Read next
 

@@ -1,15 +1,15 @@
 # Milestone Specs
 
-This directory is the human input surface for Codex-driven autonomous evolution.
+This directory is the human input surface for agent-driven autonomous evolution.
 
 ## Model
 
 ```
-Human writes Milestone Spec  →  codex --yolo  →  Milestone PR  →  Human review
+Human writes Milestone Spec  →  agent execution  →  Milestone PR  →  Human review
 ```
 
 One spec file = one coherent feature or refactor scope = one PR.  
-Codex executes; you review the result at the PR boundary only.
+The agent executes; you review the result at the PR boundary only.
 
 ## Directory Layout
 
@@ -17,23 +17,20 @@ Codex executes; you review the result at the PR boundary only.
 tasks/milestones/
 ├── README.md         ← this file
 ├── TEMPLATE.md       ← copy this for every new milestone
-├── active/           ← specs ready for Codex execution
+├── active/           ← specs ready for agent execution
 │   └── M-001.md
 └── done/             ← completed milestones with outcome notes
     └── M-000.md
 ```
 
-## How to Invoke Codex
+## How to Invoke
 
 ```bash
 # Single milestone
 make milestone M=active/M-001
-
-# Or directly
-codex --yolo "$(cat tasks/milestones/active/M-001.md)"
 ```
 
-Codex reads `AGENTS.md` automatically on startup for behavior boundaries.  
+The agent reads `AGENTS.md` for behavior boundaries before touching any code.
 The milestone spec is the task prompt — it provides goal, scope, ordered steps,
 and acceptance criteria.
 
@@ -56,7 +53,7 @@ make check-verify M=active/M-001
 A good spec has five parts:
 
 1. **Goal** — one sentence stating what should be true when done.
-2. **Context** — which files Codex must read before touching anything.
+2. **Context** — which files the agent must read before touching anything.
 3. **Tasks** — ordered, atomic steps small enough to verify individually.
 4. **Acceptance Criteria** — the exact commands that must pass (maps to quality gates).
 5. **Out of Scope** — hard stops to prevent scope creep.

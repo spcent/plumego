@@ -14,23 +14,14 @@ export const MODULE_FACTS = {
   "allExtensionPaths": [
     "x/tenant",
     "x/ai",
-    "x/cache",
     "x/data",
-    "x/devtools",
-    "x/discovery",
     "x/fileapi",
     "x/frontend",
     "x/gateway",
-    "x/ipc",
     "x/messaging",
-    "x/mq",
     "x/observability",
-    "x/ops",
-    "x/pubsub",
     "x/resilience",
     "x/rest",
-    "x/scheduler",
-    "x/webhook",
     "x/websocket"
   ],
   "betaExtensionFamilies": [

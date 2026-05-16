@@ -27,24 +27,15 @@ Stable packages stay at the repository root:
 Optional or fast-moving capabilities live under `x/`:
 
 - `x/ai`
-- `x/cache`
 - `x/data`
-- `x/devtools`
-- `x/discovery`
 - `x/fileapi`
 - `x/frontend`
 - `x/gateway`
-- `x/ipc`
 - `x/messaging`
-- `x/mq`
 - `x/observability`
-- `x/ops`
-- `x/pubsub`
 - `x/resilience`
 - `x/rest`
-- `x/scheduler`
 - `x/tenant`
-- `x/webhook`
 - `x/websocket`
 
 Non-library areas stay out of import-path design:
@@ -194,6 +185,14 @@ Required metadata lives under `specs/`:
 - `specs/package-hotspots.yaml`: ambiguity hotspot packages and first-read paths
 - `specs/change-recipes/*.yaml`: standard task recipes for common change shapes
 
+For extension families with subordinate roots, the taxonomy and hotspot index
+are an executable pair. The canonical family root and every subordinate root in
+`specs/extension-taxonomy.yaml` must have a bounded entry in
+`specs/package-hotspots.yaml`, and subordinate root manifests must declare the
+exact `parent_family`. This lets agents route through the family entrypoint
+before opening primitive packages such as queue, pub/sub, discovery, or cache
+implementations.
+
 Human-readable module primers live under `docs/modules/` and should mirror
 manifest-declared `doc_paths`.
 
@@ -226,31 +225,20 @@ The default agent loop is:
 If step 1 or 2 leaves the owning module unclear, the agent should stop in
 analysis mode instead of coding through ambiguity.
 
-## Migration Direction
-
-Near-term restructuring follows this order:
-
-1. Add specs and module manifests.
-2. Freeze the canonical app path: reference app plus matching template root.
-3. Introduce and harden `x/tenant` as the first extension boundary.
-4. Remove the root package facade.
-5. Move feature catalogs and topology-heavy capabilities out of stable roots.
-6. Replace broad legacy top-level roots such as `net`, `utils`, `validator`, `rest`, and `pubsub` with stable roots or explicit `x/*` families.
-
 ## Extension Discovery Defaults
 
 Agents should prefer these entrypoints when multiple related `x/*` packages exist:
 
-- Start messaging-related work in `x/messaging`; open `x/mq` or `x/pubsub` only when you already know the task is a queue primitive or broker primitive.
-- Treat `x/webhook` as a messaging sub-capability by default; start directly in `x/webhook` only for narrow webhook verification or delivery mechanics.
-- Start gateway and edge transport work in `x/gateway`; treat `x/ipc` as a narrow primitive.
+- Start messaging-related work in `x/messaging`; open `x/messaging/mq` or `x/messaging/pubsub` only when you already know the task is a queue primitive or broker primitive.
+- Treat `x/messaging/webhook` as a messaging sub-capability by default; start directly in `x/messaging/webhook` only for narrow webhook verification or delivery mechanics.
+- Start gateway and edge transport work in `x/gateway`; treat `x/gateway/ipc` as a narrow primitive.
 - Start reusable resource-interface and CRUD-standardization work in `x/rest`; keep bootstrap shape in `reference/standard-service` and edge proxy topology in `x/gateway`.
-- Start broader observability adapter and export work in `x/observability`; use `x/ops` only for protected admin endpoints and auth-gated diagnostics surfaces.
+- Start broader observability adapter and export work in `x/observability`; use `x/observability/ops` only for protected admin endpoints and auth-gated diagnostics surfaces.
 - Start reusable resilience primitives in `x/resilience`; do not park them under stable `security` or a feature package unless the behavior is truly feature-specific.
 - Start app-facing file upload and download transport work in `x/fileapi`; keep tenant-aware storage implementations in `x/data/file` and pure storage interfaces in `store/file`.
 - Start frontend asset-serving work in `x/frontend`, but do not let frontend helpers define the canonical app path.
-- Start local debug and developer-only route work in `x/devtools`; do not treat debug surfaces as part of `core`.
-- Start service discovery work in `x/discovery`; do not spread discovery concerns across stable roots.
+- Start local debug and developer-only route work in `x/observability/devtools`; do not treat debug surfaces as part of `core`.
+- Start service discovery work in `x/gateway/discovery`; do not spread discovery concerns across stable roots.
 - Start transport observability work in stable `middleware/*` packages; use `x/observability` only for higher-level adapter or export wiring.
 - Do not start new app structure from `x/rest`; prefer `reference/standard-service` and explicit route binding.
-- Treat `x/ipc` as a narrow transport helper, not the default home for general eventing or workflow features.
+- Treat `x/gateway/ipc` as a narrow transport helper, not the default home for general eventing or workflow features.

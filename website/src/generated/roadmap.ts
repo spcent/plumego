@@ -22,7 +22,7 @@ export const ROADMAP_FACTS = {
     "Evaluate `x/ai` stable-tier subpackages individually after release-history evidence is available.",
     "Advance `x/tenant` production readiness.",
     "Clarify `x/data` and `x/fileapi` operational guidance.",
-    "Expand `x/discovery` backends only when explicit adapters are ready.",
+    "Expand `x/gateway/discovery` backends only when explicit adapters are ready.",
     "Raise `x/observability` and `x/gateway` test depth."
   ]
 } as const;

@@ -29,10 +29,9 @@ release refs, exported API snapshot refs, owner sign-off state, and current
 blockers. A module remains `experimental` until both the evidence file and the
 module manifest are updated in a promotion card.
 
-Pre-v1 release evidence is tracked separately through
-`docs/release/PRE_V1_RELEASE_CHECKLIST.md`. Head snapshots are useful
-development baselines, but they do not satisfy the two-release history
-requirement for beta promotion.
+Release gate evidence is tracked in `docs/release/PRE_V1_RELEASE_CHECKLIST.md`.
+Head snapshots are useful development baselines, but they do not satisfy the
+two-release history requirement for beta promotion.
 
 Use `docs/extension-evidence/BETA_EVIDENCE_TEMPLATE.md` for new candidate
 evidence documents.
@@ -136,10 +135,10 @@ Extensions not yet evaluated or with clear open work:
   promote the whole family while orchestration, semantic cache, marketplace,
   distributed execution, and resilience wrappers still carry experimental
   contracts
-- `x/discovery` — new Kubernetes/etcd backends need two-release observation period
+- `x/gateway/discovery` — new Kubernetes/etcd backends need two-release observation period
 - `x/data` — sharding, rw, idempotency, kvengine, and file metadata coverage are
   improving; evaluate topology-heavy features as a unit
-- `x/scheduler`, `x/webhook`, `x/messaging`, `x/mq`, `x/pubsub` — subordinate
+- `x/messaging/scheduler`, `x/messaging/webhook`, `x/messaging`, `x/messaging/mq`, `x/messaging/pubsub` — subordinate
   family members; evaluate after canonical root stabilizes
 
 ---

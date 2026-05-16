@@ -1,13 +1,13 @@
-# x/cache
+# x/data/cache
 
 ## Purpose
 
-`x/cache` provides extension-layer cache adapters and topology-heavy cache implementations. It builds on the stable `store/cache` abstractions.
+`x/data/cache` provides extension-layer cache adapters and topology-heavy cache implementations. It builds on the stable `store/cache` abstractions.
 
-## Status
+## v1 Status
 
-- `experimental` in the Plumego extension layer
-- Migrated from `store/cache/distributed` and `store/cache/redis` (Phase 4 stable-root debt reduction)
+- `experimental` in the Plumego v1 support matrix
+- Included in repository release scope, but compatibility is not frozen
 
 ## Use this module when
 
@@ -24,9 +24,9 @@
 
 ## Sub-packages
 
-- `x/cache/distributed` — consistent-hashing distributed cache with replication modes and failover strategies
-- `x/cache/leaderboard` — in-memory ranked-data cache on top of stable `store/cache` primitives
-- `x/cache/redis` — minimal Redis client adapter implementing `store/cache.Cache`
+- `x/data/cache/distributed` — consistent-hashing distributed cache with replication modes and failover strategies
+- `x/data/cache/leaderboard` — in-memory ranked-data cache on top of stable `store/cache` primitives
+- `x/data/cache/redis` — minimal Redis client adapter implementing `store/cache.Cache`
 
 ## Distributed constructor notes
 
@@ -158,8 +158,8 @@ callback failures do not terminate the checker loop.
   members per leaderboard.
 - Skiplist level generation is owned by each in-memory skiplist instance.
   Performance baselines for the bounded score-range contract live in
-  `x/cache/leaderboard/leaderboard_bench_test.go`; run
-  `go test -run '^$' -bench 'LeaderboardCache(ZRangeByScore|ZCount|ScoreRangeFullScanBaseline)' ./x/cache/leaderboard`
+  `x/data/cache/leaderboard/leaderboard_bench_test.go`; run
+  `go test -run '^$' -bench 'LeaderboardCache(ZRangeByScore|ZCount|ScoreRangeFullScanBaseline)' ./x/data/cache/leaderboard`
   when changing range behavior.
 - `Close` is nil-safe and idempotent.
 - After `Close`, leaderboard-specific operations and leaderboard `Clear` return
@@ -249,7 +249,7 @@ DB-wide clear opt-in, atomic mutation, and append support.
 ## Stable-readiness blockers
 
 - No two-release exported API stability evidence has been recorded for
-  `x/cache`; promotion should select one child surface rather than the whole
+  `x/data/cache`; promotion should select one child surface rather than the whole
   module root.
 - Distributed cache async replication remains best-effort and has no durable
   repair contract. Async writes are bounded by timeout, worker concurrency, and
@@ -271,15 +271,15 @@ DB-wide clear opt-in, atomic mutation, and append support.
   still missing.
 
 Eighth-pass stabilization evidence is recorded in
-`docs/extension-evidence/x-cache.md`. `x/cache/module.yaml` remains
+`docs/extension-evidence/x-cache.md`. `x/data/cache/module.yaml` remains
 `experimental` until the extension stability policy is satisfied.
 
 ## First files to read
 
-- `x/cache/module.yaml`
-- `x/cache/distributed/distributed.go`
-- `x/cache/leaderboard/leaderboard.go`
-- `x/cache/redis/redis.go`
+- `x/data/cache/module.yaml`
+- `x/data/cache/distributed/distributed.go`
+- `x/data/cache/leaderboard/leaderboard.go`
+- `x/data/cache/redis/redis.go`
 
 ## Canonical change shape
 
@@ -299,8 +299,8 @@ Eighth-pass stabilization evidence is recorded in
 
 ## Boundary rules
 
-- `x/cache` extends stable `store/cache` with topology-heavy or provider-specific backends; do not duplicate these in stable `store/cache`
-- keep consistent-hashing and replication logic inside `x/cache/distributed`; do not push topology decisions into stable roots
+- `x/data/cache` extends stable `store/cache` with topology-heavy or provider-specific backends; do not duplicate these in stable `store/cache`
+- keep consistent-hashing and replication logic inside `x/data/cache/distributed`; do not push topology decisions into stable roots
 - keep provider-specific client logic (Redis, future backends) isolated to their sub-packages; do not let provider details leak through the `store/cache.Cache` interface
-- tenant-aware cache scoping belongs in `x/tenant/store/cache`; do not add tenant logic to `x/cache`
-- do not add feature-specific ranked-data or leaderboard logic to stable `store/cache`; keep it in `x/cache/leaderboard`
+- tenant-aware cache scoping belongs in `x/tenant/store/cache`; do not add tenant logic to `x/data/cache`
+- do not add feature-specific ranked-data or leaderboard logic to stable `store/cache`; keep it in `x/data/cache/leaderboard`

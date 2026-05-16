@@ -12,7 +12,7 @@ sidebar:
 
 Open this page after [x/* Family](/docs/x-family) when the change is about high-level data topology that should not live in the stable `store` layer: read-write splitting orchestration, sharding and routing topology, durable KV engines beyond `store/kv`, or idempotency providers beyond `store/idempotency`.
 
-`x/data` is the canonical entrypoint for topology-heavy data capabilities. Its subordinate package — `x/cache` (distributed cache with consistent hashing, replication, failover, and Redis adapter) — is reached through `x/data` first, not opened directly.
+`x/data` is the canonical entrypoint for topology-heavy data capabilities. Its subordinate package — `x/data/cache` (distributed cache with consistent hashing, replication, failover, and Redis adapter) — is reached through `x/data` first, not opened directly.
 
 ## Start here when
 
@@ -21,7 +21,7 @@ Open this page after [x/* Family](/docs/x-family) when the change is about high-
 - you are building a durable KV engine implementation beyond the stable `store/kv` primitive (`kvengine/`)
 - you are implementing an idempotency provider with durable storage beyond `store/idempotency` (`idempotency/`)
 - you are adding tenant-aware topology adapters that scope data access by tenant
-- you need distributed or Redis-backed cache topology — confirm placement here before opening `x/cache`
+- you need distributed or Redis-backed cache topology — confirm placement here before opening `x/data/cache`
 
 ## Do not start here when
 
@@ -37,7 +37,7 @@ Open this page after [x/* Family](/docs/x-family) when the change is about high-
 3. `x/data/sharding/` (routing topology)
 4. `x/data/kvengine/` (durable KV)
 5. `x/data/idempotency/` (idempotency providers)
-6. `x/cache/` (if distributed or Redis cache topology is involved)
+6. `x/data/cache/` (if distributed or Redis cache topology is involved)
 
 ## Concrete ownership examples
 
@@ -47,11 +47,11 @@ Open this page after [x/* Family](/docs/x-family) when the change is about high-
 | `sharding`: shard key resolution, ring topology, shard-aware query routing | business-specific partition strategies baked into domain queries |
 | `kvengine`: durable KV implementations with WAL, compaction, or tiered storage | stable `store/kv` interface — that is a kernel contract |
 | `idempotency`: durable idempotency providers with TTL and storage backends | stable `store/idempotency` interface or business deduplication logic |
-| distributed or Redis cache topology → reach through `x/cache` | making `x/cache` a competing family entrypoint for new data work |
+| distributed or Redis cache topology → reach through `x/data/cache` | making `x/data/cache` a competing family entrypoint for new data work |
 
 ## Why this primer exists
 
-The stable `store` layer defines interfaces and simple primitives. Topology-heavy behaviors — sharding, read-write splitting, failover — belong here because they introduce complexity and optionality that the stable layer must not absorb. `x/cache` is a subordinate: starting directly there for new distributed cache work bypasses the family placement check that prevents boundary drift.
+The stable `store` layer defines interfaces and simple primitives. Topology-heavy behaviors — sharding, read-write splitting, failover — belong here because they introduce complexity and optionality that the stable layer must not absorb. `x/data/cache` is a subordinate: starting directly there for new distributed cache work bypasses the family placement check that prevents boundary drift.
 
 ## Read next
 

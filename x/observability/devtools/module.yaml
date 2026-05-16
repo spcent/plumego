@@ -1,0 +1,52 @@
+name: x/observability/devtools
+path: x/observability/devtools
+layer: extension
+status: experimental
+owner: observability
+risk: medium
+summary: Subordinate debug-only routes, env reload helpers, and local profiling within the x/observability family.
+
+parent_family: x/observability
+
+responsibilities:
+  - Debug route registration
+  - Debug runtime/config snapshot payloads
+  - Development metrics surfacing
+  - Env reload helpers
+  - Local profiling endpoints
+
+non_goals:
+  - Core bootstrap ownership
+  - Production admin policy
+  - Stable root entrypoints
+
+allowed_imports:
+  - contract
+  - health
+  - log
+  - metrics
+  - middleware
+  - router
+
+forbidden_imports:
+  - core/components/**
+  - x/tenant/**
+  - x/ai/**
+
+test_commands:
+  - go test -race -timeout 60s ./x/observability/devtools/...
+  - go test -timeout 20s ./x/observability/devtools/...
+  - go vet ./x/observability/devtools/...
+
+doc_paths:
+  - docs/modules/x-devtools/README.md
+
+review_checklist:
+  - Keep debug behavior opt-in
+  - Avoid hidden runtime side effects
+  - Keep handlers explicit
+
+agent_hints:
+  - Treat x/observability/devtools as a subordinate of x/observability; start debug work in x/observability before opening this package directly
+  - Devtools must stay debug-only and must not be mounted in production without an explicit gate
+  - Do not move debug routes into core

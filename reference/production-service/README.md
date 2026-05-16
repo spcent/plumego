@@ -43,7 +43,7 @@ context, then reads from an app-local in-memory store. The store is intentionall
 small and standard-library-only; real services should replace it with their own
 persistence layer while preserving the explicit route, auth, and tenant wiring.
 
-`x/devtools` is not mounted. If local debug routes are needed, wire them
+`x/observability/devtools` is not mounted. If local debug routes are needed, wire them
 explicitly and protect them outside production defaults. Do not expose
 `/_debug/*` as a replacement for production ops routes.
 

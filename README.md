@@ -88,18 +88,18 @@ This matrix describes the current repository state before a tagged v1 release. C
 | CLI | v1 hardening scope | Supported as a command-line tool, not as a Go import surface; command behavior and generated output must stay aligned with canonical docs | `cmd/plumego` |
 | Beta extension families | `beta` | API surface frozen between minor release refs; promoted after two consecutive tagged refs with no exported API changes and owner sign-off | `x/gateway`, `x/observability`, `x/rest`, `x/websocket` |
 | App-facing extension families | `experimental` | Included in repo quality gates and release scope, but API/config compatibility is not frozen | `x/ai`, `x/data`, `x/fileapi`, `x/frontend`, `x/messaging`, `x/resilience`, `x/tenant` |
-| Subordinate extension primitives | `experimental` | Maintained and tested, but discovery should start from the owning family entrypoint and compatibility is not frozen | `x/cache`, `x/devtools`, `x/discovery`, `x/ipc`, `x/mq`, `x/ops`, `x/pubsub`, `x/scheduler`, `x/webhook` |
+| Subordinate extension primitives | `experimental` | Maintained and tested, but discovery should start from the owning family entrypoint and compatibility is not frozen | `x/cache`, `x/devtools`, `x/gateway/discovery`, `x/gateway/ipc`, `x/messaging/mq`, `x/messaging/pubsub`, `x/messaging/scheduler`, `x/messaging/webhook`, `x/ops` |
 
 ## Highlights
 - **Router with Groups and Parameters**: Trie-based matcher supporting `/:param` segments, route freezing, and per-route/group middleware stacks.
 - **Middleware Chain**: Logging, recovery, gzip, CORS, timeout (buffers up to 10 MiB by default), rate limiting, concurrency limits, body size limits, security headers, and authentication helpers, all wrapping standard `http.Handler`.
 - **Security Helpers**: JWT + password utilities, security header policies, input-safety helpers, and abuse guard primitives for baseline hardening.
-- **Integration Helpers**: Lightweight adapters for `database/sql`, Redis-backed caches, and extension-backed discovery and messaging. Start from `x/data`, `x/gateway`, and `x/messaging`; use lower-level roots like `x/cache`, `x/discovery`, or `x/mq` only when you need those primitives directly.
+- **Integration Helpers**: Lightweight adapters for `database/sql`, Redis-backed caches, and extension-backed discovery and messaging. Start from `x/data`, `x/gateway`, and `x/messaging`; use lower-level packages like `x/cache`, `x/gateway/discovery`, or `x/messaging/mq` only when you need those primitives directly.
 - **Idempotency Utilities**: Stable idempotency records/contracts live in `store/idempotency`; durable KV/SQL providers live in `x/data/idempotency`.
 - **Structured Logging Hooks**: Hook into custom loggers and collect metrics/tracing through middleware hooks.
 - **Graceful Lifecycle**: Explicit prepare/server/shutdown flow, connection draining, and optional TLS/HTTP2 configuration with sensible defaults.
 - **Optional Services**: WebSocket, webhook, frontend, gateway, messaging, and other capability packs live under `x/*` and are intentionally excluded from the canonical app path.
-- **Task Scheduling**: In-process cron, delayed jobs, and retryable tasks via the `x/scheduler` package.
+- **Task Scheduling**: In-process cron, delayed jobs, and retryable tasks via `x/messaging/scheduler`.
 
 Wire routes, middleware, and background tasks explicitly in your application package. Plumego no longer carries a compatibility component layer in `core`.
 
@@ -123,7 +123,7 @@ capability families explicitly:
 | --- | --- | --- |
 | REST API service | `core`, `router`, `contract`, `middleware`, `reference/standard-service` | `x/rest` for reusable resource controllers and CRUD route conventions |
 | Multi-tenant API | `reference/standard-service` plus explicit auth and transport middleware | `x/tenant` for resolution, policy, quota, rate limit, sessions, and tenant-aware stores |
-| Edge gateway | `reference/standard-service` for app wiring | `x/gateway` for proxying, rewrite, balancing, and gateway-local health; `x/discovery` only when the caller chooses a discovery backend |
+| Edge gateway | `reference/standard-service` for app wiring | `x/gateway` for proxying, rewrite, balancing, and gateway-local health; `x/gateway/discovery` only when the caller chooses a discovery backend |
 | Realtime service | `reference/standard-service` for HTTP bootstrap | `x/websocket` for websocket transport; `x/messaging` for app-facing messaging flows |
 | AI service | `reference/standard-service` for HTTP bootstrap | `x/ai/provider`, `x/ai/session`, `x/ai/streaming`, and `x/ai/tool` for the current stable-tier AI path |
 | Operations surface | `reference/standard-service` or `reference/production-service` for app wiring | `x/observability` for exporter/adapters and `x/ops` for protected admin routes; keep `x/devtools` opt-in |
@@ -202,7 +202,7 @@ for both patterns side by side.
 - Module ownership, risk, and default validation live in each `<module>/module.yaml`.
 - Standard change recipes live in `specs/change-recipes/*`.
 - Module primers live in `docs/modules/*` and should match each manifest's `doc_paths`.
-- Secondary task-family defaults are also explicit: frontend asset work starts in `x/frontend`, local debug work starts in `x/devtools`, service discovery starts in `x/discovery`, and protected admin surfaces start in `x/ops`.
+- Secondary task-family defaults are also explicit: frontend asset work starts in `x/frontend`, local debug work starts in `x/devtools`, service discovery starts in `x/gateway/discovery` through the `x/gateway` family, and protected admin surfaces start in `x/ops`.
 - These secondary extension roots are capability entrypoints, not application bootstrap surfaces.
 
 ## Capability Guides
@@ -227,7 +227,7 @@ App-facing extension families:
 - [x/websocket](./docs/modules/x-websocket/README.md) — WebSocket transport
 - [x/messaging](./docs/modules/x-messaging/README.md) — messaging entrypoint
 - [x/fileapi](./docs/modules/x-fileapi/README.md) — file upload/download transport
-- [x/gateway](./docs/modules/x-gateway/README.md) and [x/discovery](./docs/modules/x-discovery/README.md) — edge transport and service discovery
+- [x/gateway](./docs/modules/x-gateway/README.md) — edge transport, IPC helpers, and service discovery
 - [x/frontend](./docs/modules/x-frontend/README.md) — frontend asset serving
 - [x/observability](./docs/modules/x-observability/README.md), [x/ops](./docs/modules/x-ops/README.md), and [x/devtools](./docs/modules/x-devtools/README.md) — observability, protected admin surfaces, and local debug tools
 - [x/data](./docs/modules/x-data/README.md), [x/cache](./docs/modules/x-cache/README.md), [x/resilience](./docs/modules/x-resilience/README.md), and [x/ai](./docs/modules/x-ai/README.md) — topology-heavy data features, cache adapters, reusable resilience primitives, and AI capabilities

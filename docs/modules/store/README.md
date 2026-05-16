@@ -135,11 +135,11 @@
 
 ## Extension-layer cache implementations
 
-Topology-heavy and provider-specific cache implementations have been migrated out of the stable root and now live in `x/cache`:
+Topology-heavy and provider-specific cache implementations have been migrated out of the stable root and now live in `x/data/cache`:
 
-- `x/cache/distributed` — consistent-hashing distributed cache with replication and failover
-- `x/cache/leaderboard` — ranked-data cache built on top of stable `store/cache` primitives
-- `x/cache/redis` — Redis client adapter implementing `store/cache.Cache`
+- `x/data/cache/distributed` — consistent-hashing distributed cache with replication and failover
+- `x/data/cache/leaderboard` — ranked-data cache built on top of stable `store/cache` primitives
+- `x/data/cache/redis` — Redis client adapter implementing `store/cache.Cache`
 
 Current rule:
 
@@ -147,7 +147,7 @@ Current rule:
 - in-process cache cleanup scans all entries on each cleanup tick so expired entries do not remain solely because of a fixed scan cap
 - do not add HTTP response caching middleware or request-derived cache helpers under stable `store/cache`
 - do not add tenant-aware adapters or tenant-specific storage policy under stable `store`
-- route new topology-heavy cache capabilities to `x/cache`
+- route new topology-heavy cache capabilities to `x/data/cache`
 - route HTTP response caching to `x/gateway/cache`
 - route tenant-aware cache adapters to `x/tenant/store/cache`
 

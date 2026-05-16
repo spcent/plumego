@@ -8,8 +8,8 @@ import (
 	"github.com/spcent/plumego/metrics"
 	kv "github.com/spcent/plumego/store/kv"
 	"github.com/spcent/plumego/x/ai/orchestration"
-	"github.com/spcent/plumego/x/mq"
-	"github.com/spcent/plumego/x/pubsub"
+	"github.com/spcent/plumego/x/messaging/mq"
+	"github.com/spcent/plumego/x/messaging/pubsub"
 )
 
 func newTestInstrumentedEngine(t *testing.T) (*InstrumentedDistributedEngine, func()) {

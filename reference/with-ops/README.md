@@ -2,10 +2,10 @@
 
 `reference/with-ops` is a non-canonical scenario reference.
 
-It shows how to mount protected `x/ops` routes and stable request-observability
+It shows how to mount protected `x/observability/ops` routes and stable request-observability
 middleware without treating debug tools as production defaults.
 
-`x/ops` and `x/observability` remain experimental until promotion evidence is
+`x/observability/ops` and `x/observability` remain experimental until promotion evidence is
 complete.
 
 ## What It Demonstrates
@@ -13,7 +13,7 @@ complete.
 - protected `/ops/*` routes using a static admin token
 - stable request ID, recovery, access log, and HTTP metrics middleware
 - app-local `/metrics` route exposing in-process metrics stats
-- no `x/devtools` mounting
+- no `x/observability/devtools` mounting
 
 ## Routes
 

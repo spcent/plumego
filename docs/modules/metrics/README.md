@@ -52,7 +52,7 @@ other modules can depend on safely.
 - keep record-buffer inspection and retention tuning in `x/observability/recordbuffer`
 - keep rolling-window aggregation in `x/observability/windowmetrics`
 - keep metrics test helpers in `x/observability/testmetrics`
-- keep dev-only collectors in `x/devtools`
+- keep dev-only collectors in `x/observability/devtools`
 - keep feature-specific metrics ownership in the owning extension
 
 ## Stable behavior notes
