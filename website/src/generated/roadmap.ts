@@ -8,9 +8,10 @@ export const ROADMAP_FACTS = {
     "repo-wide quality gates in `Makefile` and `.github/workflows/quality-gates.yml`",
     "stable-root compatibility policy in `docs/DEPRECATION.md`",
     "stable-root exported API baseline snapshots under `docs/stable-api/snapshots`",
-    "pre-v1 release evidence checklist under `docs/release/PRE_V1_RELEASE_CHECKLIST.md`",
+    "release evidence checklist under `docs/release/PRE_V1_RELEASE_CHECKLIST.md`",
     "beta promotion checklist and card template under `docs/release/PROMOTION_CARD_TEMPLATE.md`",
-    "`x/rest`, `x/websocket`, `x/gateway`, and `x/observability` promoted to `beta`"
+    "`x/rest`, `x/websocket`, `x/gateway`, and `x/observability` promoted to `beta`",
+    "`v1.0.0` tagged on May 15, 2026; release notes and evidence in `docs/release/v1.0.0.md`"
   ],
   "inProgress": [
     "Phase 13: Docs and Onboarding Sync"
@@ -22,7 +23,6 @@ export const ROADMAP_FACTS = {
     "Evaluate `x/ai` stable-tier subpackages individually after release-history evidence is available.",
     "Advance `x/tenant` production readiness.",
     "Clarify `x/data` and `x/fileapi` operational guidance.",
-    "Expand `x/gateway/discovery` backends only when explicit adapters are ready.",
-    "Raise `x/observability` and `x/gateway` test depth."
+    "Expand `x/gateway/discovery` backends only when explicit adapters are ready."
   ]
 } as const;
