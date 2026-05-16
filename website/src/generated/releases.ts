@@ -10,7 +10,7 @@ export const RELEASE_FACTS = {
     },
     {
       "area": "Canonical reference app",
-      "status": "Supported reference",
+      "status": "supported reference",
       "promise": "Kept aligned with the canonical bootstrap and stable-root usage, but not treated as a reusable extension catalog",
       "modules": "reference/standard-service"
     },
@@ -22,19 +22,19 @@ export const RELEASE_FACTS = {
     },
     {
       "area": "Beta extension families",
-      "status": "Beta",
+      "status": "beta",
       "promise": "API surface frozen between minor release refs; promoted after two consecutive tagged refs with no exported API changes and owner sign-off",
       "modules": "x/gateway, x/observability, x/rest, x/websocket"
     },
     {
       "area": "App-facing extension families",
-      "status": "Experimental",
+      "status": "experimental",
       "promise": "Included in repo quality gates and release scope, but API/config compatibility is not frozen",
       "modules": "x/ai, x/data, x/fileapi, x/frontend, x/messaging, x/resilience, x/tenant"
     },
     {
       "area": "Subordinate extension primitives",
-      "status": "Experimental",
+      "status": "experimental",
       "promise": "Maintained and tested, but discovery should start from the owning family entrypoint and compatibility is not frozen",
       "modules": "x/cache, x/devtools, x/discovery, x/ipc, x/mq, x/ops, x/pubsub, x/scheduler, x/webhook"
     }

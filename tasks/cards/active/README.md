@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| [1440](1440-website-release-generated-data-sync.md) | P0 | website | Resolve generated release data drift before further v1.0.1 work |
 | [1441](1441-github-actions-node20-runtime-maintenance.md) | P1 | CI | Address or classify GitHub Actions Node runtime warnings |
 | [1442](1442-cli-install-onboarding-guidance-cleanup.md) | P1 | docs | Align CLI install/onboarding guidance with nested module reality |
 | [1443](1443-post-v1-release-evidence-index.md) | P2 | release | Add post-v1 evidence index and M-006 verify artifact |

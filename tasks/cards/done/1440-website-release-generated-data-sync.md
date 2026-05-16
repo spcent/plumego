@@ -3,7 +3,7 @@
 Milestone: M-006
 Recipe: specs/change-recipes/docs-only.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: website
 Owned Files:
 - `website/src/generated/releases.ts`
@@ -38,3 +38,10 @@ Docs Sync:
 Done Definition:
 - Generated release data is either committed or restored.
 - Workspace status is understood before the next maintenance card starts.
+
+Outcome:
+- `cd website && pnpm sync` passed and left the same
+  `website/src/generated/releases.ts` status normalization diff.
+- The generated drift is committed as source-of-truth output from the website
+  sync pipeline.
+- No release source docs or runtime code were changed.
