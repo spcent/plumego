@@ -3,7 +3,7 @@
 Milestone: M-007
 Recipe: specs/change-recipes/docs-only.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: tasks
 Owned Files:
 - `tasks/cards/active/README.md`
@@ -50,4 +50,7 @@ Done Definition:
 - Extension evidence blockers remain accurate.
 
 Outcome:
--
+- Added `tasks/milestones/M-007.verify.md`.
+- Removed completed M-007 cards from the front of the active queue.
+- Updated remaining blocked cards to reflect first `v1.0.0` evidence intake
+  and the remaining second-release/sign-off blockers.

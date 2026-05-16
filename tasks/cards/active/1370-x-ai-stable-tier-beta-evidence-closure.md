@@ -11,16 +11,21 @@ Owned Files:
 - `docs/extension-evidence/x-ai-session.md`
 - `docs/extension-evidence/x-ai-streaming.md`
 - `docs/extension-evidence/x-ai-tool.md`
-Depends On: release refs and owner sign-off
+Depends On: second release refs and owner sign-off
 
 Goal:
 - Complete beta evidence closure for `x/ai` stable-tier subpackages.
 
 Problem:
-The evidence ledger tracks `x/ai/provider`, `x/ai/session`, `x/ai/streaming`, and `x/ai/tool` with evidence docs and current-head snapshots, but each remains blocked by missing release history, matching release snapshots, and owner sign-off.
+The evidence ledger tracks `x/ai/provider`, `x/ai/session`, `x/ai/streaming`,
+and `x/ai/tool` with evidence docs, current-head snapshots, first `v1.0.0`
+release refs, and v1 baseline snapshot artifacts, but each remains blocked by
+missing second release refs, complete release-backed snapshots, and owner
+sign-off.
 
 Scope:
-- Add two real release refs only after tags or release commits exist.
+- Add the second real release ref only after the next qualifying tag or release
+  commit exists.
 - Generate release-to-release API snapshots for each stable-tier subpackage.
 - Record owner sign-off from `ai-gateway`.
 - Keep blockers until all evidence is present.

@@ -9,16 +9,20 @@ Owned Files:
 - `specs/extension-beta-evidence.yaml`
 - `docs/extension-evidence/x-tenant.md`
 - `docs/extension-evidence/release-artifacts.md`
-Depends On: release refs and owner sign-off
+Depends On: second release ref and owner sign-off
 
 Goal:
 - Complete beta evidence closure for `x/tenant` when real release refs and owner sign-off are available.
 
 Problem:
-The evidence ledger has an `x/tenant` evidence doc and current-head snapshot, but beta promotion remains blocked by missing release history, matching release snapshots, and owner sign-off.
+The evidence ledger has an `x/tenant` evidence doc, current-head snapshot, first
+`v1.0.0` release ref, and v1 baseline snapshot artifacts, but beta promotion
+remains blocked by the missing second release ref, complete release-backed
+snapshots, and owner sign-off.
 
 Scope:
-- Add two real release refs only after tags or release commits exist.
+- Add the second real release ref only after the next qualifying tag or release
+  commit exists.
 - Generate release-to-release API snapshots with `extension-release-evidence`.
 - Record owner sign-off from `multitenancy`.
 - Keep blockers until all evidence is present.

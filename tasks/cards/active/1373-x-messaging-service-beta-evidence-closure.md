@@ -9,17 +9,19 @@ Owned Files:
 - `specs/extension-beta-evidence.yaml`
 - `docs/extension-evidence/x-messaging.md`
 - `docs/extension-evidence/release-artifacts.md`
-Depends On: release refs and owner sign-off
+Depends On: second release ref and owner sign-off
 
 Goal:
 - Complete beta evidence closure for the `x/messaging` app-facing service surface.
 
 Problem:
-The evidence ledger tracks `x/messaging:app-facing-service`, but it currently lacks checked-in API snapshots, release history, release snapshots, and owner sign-off.
+The evidence ledger tracks `x/messaging:app-facing-service` with a first
+`v1.0.0` release ref and checked-in baseline snapshot, but it still lacks a
+second release ref, complete release-backed snapshots, and owner sign-off.
 
 Scope:
-- Generate a current-head snapshot for the app-facing messaging service surface when ready for candidate review.
-- Add two real release refs only after tags or release commits exist.
+- Add the second real release ref only after the next qualifying tag or release
+  commit exists.
 - Generate release-to-release API snapshots with `extension-release-evidence`.
 - Record owner sign-off from `messaging`.
 
