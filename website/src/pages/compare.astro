@@ -927,10 +927,21 @@ contract.<span class="hc-fn">WriteError</span>(w, r,
   /* ── Code compare grid ─────────────────────────────────────────────────── */
   .code-compare-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
+    grid-template-columns: 1fr 1fr;
     gap: 1rem;
     max-width: 72rem;
     margin-inline: auto;
+  }
+
+  /* Plumego card spans both columns so code has full width */
+  .code-compare-item--highlight {
+    grid-column: 1 / -1;
+  }
+
+  @media (max-width: 640px) {
+    .code-compare-grid {
+      grid-template-columns: 1fr;
+    }
   }
 
   .code-compare-item {
