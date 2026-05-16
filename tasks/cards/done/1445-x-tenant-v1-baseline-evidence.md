@@ -3,7 +3,7 @@
 Milestone: M-007
 Recipe: specs/change-recipes/docs-only.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/tenant
 Owned Files:
 - `specs/extension-beta-evidence.yaml`
@@ -50,4 +50,10 @@ Done Definition:
 - Card is moved to done with validation output.
 
 Outcome:
--
+- Added `v1.0.0` tag target
+  `6a99c5e0bc61c12378bcdab5a6a7c4d756b9fa96` as the first `x/tenant`
+  release-ref intake point.
+- Generated unchanged `v1.0.0` to `v1.0.0` snapshot artifacts under
+  `docs/extension-evidence/snapshots/v1-baseline/x-tenant/`.
+- Kept `release_history_missing`, `api_snapshot_missing`, and
+  `owner_signoff_missing`; `x/tenant` remains experimental.

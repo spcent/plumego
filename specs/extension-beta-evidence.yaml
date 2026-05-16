@@ -85,7 +85,8 @@ candidates:
     owner: multitenancy
     current_status: experimental
     evidence_doc: docs/extension-evidence/x-tenant.md
-    release_refs: []
+    release_refs:
+      - 6a99c5e0bc61c12378bcdab5a6a7c4d756b9fa96
     api_snapshots:
       - docs/extension-evidence/snapshots/first-batch/x-tenant-head.snapshot
     blockers:

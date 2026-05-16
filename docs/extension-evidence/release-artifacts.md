@@ -65,7 +65,7 @@ status.
 | `x/observability` | beta evidence complete | none | none |
 | `x/gateway` | beta evidence complete | none | none |
 | `x/frontend` | evidence doc, current-head snapshot | second-release evidence, release-backed snapshots, owner sign-off | future frontend-owned card |
-| `x/tenant` | evidence doc, current-head snapshot | release refs, release snapshots, owner sign-off | `tasks/cards/active/1445-x-tenant-v1-baseline-evidence.md`, then `tasks/cards/active/1367-x-tenant-beta-evidence-closure.md` |
+| `x/tenant` | evidence doc, current-head snapshot, first `v1.0.0` release ref, v1 baseline intake snapshot | second release ref, release-backed snapshots, owner sign-off | `tasks/cards/active/1367-x-tenant-beta-evidence-closure.md` |
 | `x/ai` stable-tier subpackages | evidence docs, current-head snapshots | release refs, release snapshots, owner sign-off | `tasks/cards/active/1446-x-ai-stable-tier-v1-baseline-evidence.md`, then `tasks/cards/active/1370-x-ai-stable-tier-beta-evidence-closure.md` |
 | `x/data` selected surfaces | evidence doc | snapshots, release refs, release snapshots, owner sign-off | `tasks/cards/active/1447-data-discovery-messaging-v1-baseline-gap-index.md`, then `tasks/cards/active/1371-x-data-surface-beta-evidence-closure.md` |
 | `x/discovery` core/static surface | evidence doc | snapshot, release refs, release snapshots, owner sign-off | `tasks/cards/active/1447-data-discovery-messaging-v1-baseline-gap-index.md`, then `tasks/cards/active/1372-x-discovery-surface-beta-evidence-closure.md` |
