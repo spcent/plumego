@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| [1446](1446-x-ai-stable-tier-v1-baseline-evidence.md) | P1 | x/ai | Record first `v1.0.0` release-ref intake evidence for stable-tier `x/ai` subpackages |
 | [1447](1447-data-discovery-messaging-v1-baseline-gap-index.md) | P1 | extension evidence | Add baseline snapshots for selected data, discovery, and messaging surfaces |
 | [1448](1448-post-v1-extension-evidence-queue-finalize.md) | P1 | tasks | Reconcile the post-v1 extension evidence queue |
 | [1367](1367-x-tenant-beta-evidence-closure.md) | P2 | x/tenant | Complete beta evidence closure for `x/tenant` when real release refs and owner sign-off are available |

@@ -34,12 +34,14 @@ Evidence state: incomplete
 
 ## Required Release Evidence
 
-Missing. Promotion requires two consecutive minor release refs with no exported
-`x/ai/streaming` API changes.
+Partially recorded. Promotion requires two consecutive minor release refs with
+no exported `x/ai/streaming` API changes. The `v1.0.0` tag target is the first
+post-v1 release-ref intake point only; it does not clear
+`release_history_missing` by itself.
 
 Release refs:
 
-- none recorded
+- `6a99c5e0bc61c12378bcdab5a6a7c4d756b9fa96` (`v1.0.0` tag target)
 
 ## API Snapshot Evidence
 
@@ -57,6 +59,11 @@ Snapshot refs:
 
 - `docs/extension-evidence/snapshots/ai-stable-tier/x-ai-streaming-head.snapshot`
 
+v1 baseline intake artifacts:
+
+- `docs/extension-evidence/snapshots/v1-baseline/x-ai-streaming/base.snapshot`
+- `docs/extension-evidence/snapshots/v1-baseline/x-ai-streaming/head.snapshot`
+
 ## Release Comparison Workflow
 
 Use the release-aware evidence tool when two concrete release refs are
@@ -70,16 +77,16 @@ go run ./internal/checks/extension-release-evidence \
   -out-dir /tmp/plumego-x-ai-streaming-release-evidence
 ```
 
-Do not clear `release_history_missing` or `api_snapshot_missing` until the
-recorded refs and snapshot files come from real releases.
+Do not clear `release_history_missing` or `api_snapshot_missing` until two
+release refs and release-backed snapshot evidence are recorded.
 
 ## Release Evidence
 
-Not recorded.
+First release-ref intake recorded.
 
-Release refs: none recorded
+Release refs: `v1.0.0`
 
-API snapshot comparison: current-head baseline only
+API snapshot comparison: `v1.0.0` to `v1.0.0`, unchanged
 
 ## Owner Sign-Off
 

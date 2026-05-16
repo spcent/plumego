@@ -128,7 +128,8 @@ subpackage_candidates:
     owner: ai-gateway
     current_tier: stable
     evidence_doc: docs/extension-evidence/x-ai-provider.md
-    release_refs: []
+    release_refs:
+      - 6a99c5e0bc61c12378bcdab5a6a7c4d756b9fa96
     api_snapshots:
       - docs/extension-evidence/snapshots/ai-stable-tier/x-ai-provider-head.snapshot
     blockers:
@@ -141,7 +142,8 @@ subpackage_candidates:
     owner: ai-gateway
     current_tier: stable
     evidence_doc: docs/extension-evidence/x-ai-session.md
-    release_refs: []
+    release_refs:
+      - 6a99c5e0bc61c12378bcdab5a6a7c4d756b9fa96
     api_snapshots:
       - docs/extension-evidence/snapshots/ai-stable-tier/x-ai-session-head.snapshot
     blockers:
@@ -154,7 +156,8 @@ subpackage_candidates:
     owner: ai-gateway
     current_tier: stable
     evidence_doc: docs/extension-evidence/x-ai-streaming.md
-    release_refs: []
+    release_refs:
+      - 6a99c5e0bc61c12378bcdab5a6a7c4d756b9fa96
     api_snapshots:
       - docs/extension-evidence/snapshots/ai-stable-tier/x-ai-streaming-head.snapshot
     blockers:
@@ -167,7 +170,8 @@ subpackage_candidates:
     owner: ai-gateway
     current_tier: stable
     evidence_doc: docs/extension-evidence/x-ai-tool.md
-    release_refs: []
+    release_refs:
+      - 6a99c5e0bc61c12378bcdab5a6a7c4d756b9fa96
     api_snapshots:
       - docs/extension-evidence/snapshots/ai-stable-tier/x-ai-tool-head.snapshot
     blockers:
