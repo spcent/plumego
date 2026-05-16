@@ -3,7 +3,7 @@
 Milestone: M-006
 Recipe: specs/change-recipes/analysis-only.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: CI
 Owned Files:
 - `.github/workflows/quality-gates.yml`
@@ -40,3 +40,10 @@ Docs Sync:
 Done Definition:
 - Node runtime warning has either a committed workflow fix or a documented
   blocker with remote evidence.
+
+Outcome:
+- `gh release list` showed v6 release lines for `actions/checkout`,
+  `actions/setup-node`, and `actions/setup-go`.
+- Updated `.github/workflows/quality-gates.yml` from checkout v4, setup-node
+  v4, and setup-go v5 to their v6 major tags.
+- Gate semantics were unchanged.

@@ -46,7 +46,6 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| [1441](1441-github-actions-node20-runtime-maintenance.md) | P1 | CI | Address or classify GitHub Actions Node runtime warnings |
 | [1442](1442-cli-install-onboarding-guidance-cleanup.md) | P1 | docs | Align CLI install/onboarding guidance with nested module reality |
 | [1443](1443-post-v1-release-evidence-index.md) | P2 | release | Add post-v1 evidence index and M-006 verify artifact |
 | [1367](1367-x-tenant-beta-evidence-closure.md) | P2 | x/tenant | Complete beta evidence closure for `x/tenant` when real release refs and owner sign-off are available |
