@@ -79,3 +79,45 @@ agent_hints:
   - Tenant middleware belongs in x/tenant; route API version negotiation to x/rest/versioning; protocol transformation to x/gateway/*; stateful policy and observability catch-all out of middleware; rate limiting stays a thin HTTP adapter over security/abuse primitives; coalesce is GA but high-risk and should be used only for bounded safe non-streaming responses with explicit KeyFunc coverage for sensitive variants; accesslog observer/tracer arguments are transport observability wiring only, while exporter catalogs, backend setup, sampling policy, and pipeline composition stay in x/observability or application code
   - Request ID generation defaults may use package-local state for convenience, but production callers that need control should wire requestid.WithGenerator explicitly. Each subpackage should expose one canonical constructor path and remain a thin http.Handler adapter over explicit dependencies
   - "Constructor naming convention for new configurable middleware: stateless packages use Middleware(config T); stateful packages use New(config T) *Type with a Middleware() method; exported Config or Options structs should provide WithDefaults() or Default() unless the stable package-specific constructor owns inline defaults. Existing package-specific stable constructors such as compression.Middleware, timeout.Middleware, ratelimit.AbuseGuard, and debug.Middleware remain canonical; do not add alias wrapper families. File names should match the package or behavior entrypoint (auth.go not contract.go)."
+
+task_affinity:
+  add-middleware: middleware/
+  middleware: middleware/
+  bugfix_triage: middleware/
+
+selection_guide:
+  logging_access_log: middleware/accesslog/
+  authentication_jwt: middleware/auth/
+  body_size_limit: middleware/bodylimit/
+  response_coalescing: middleware/coalesce/
+  compression_gzip: middleware/compression/
+  concurrency_limit: middleware/concurrencylimit/
+  cors: middleware/cors/
+  debug_inspection: middleware/debug/
+  http_metrics: middleware/httpmetrics/
+  rate_limiting: x/resilience/ratelimit/
+  panic_recovery: middleware/recovery/
+  request_id_tracing: middleware/requestid/
+  security_headers: middleware/security/
+  timeout: middleware/timeout/
+  distributed_tracing: middleware/tracing/
+  tenant_resolution: x/tenant/
+  circuit_breaker: x/resilience/circuitbreaker/
+  observability_pipeline: x/observability/
+
+landing_zones:
+  access_log: accesslog/
+  auth_adapter: auth/
+  body_limit: bodylimit/
+  coalesce: coalesce/
+  compression: compression/
+  concurrency: concurrencylimit/
+  cors: cors/
+  debug: debug/
+  metrics: httpmetrics/
+  rate_limit: ratelimit/
+  recovery: recovery/
+  request_id: requestid/
+  security_headers: security/
+  timeout: timeout/
+  tracing: tracing/

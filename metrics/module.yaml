@@ -80,3 +80,10 @@ agent_hints:
   - Observability capability packs, raw record retention, and transport-specific policy belong outside the stable layer
   - Use NewHTTPRecord for shared HTTP request records instead of duplicating metric names, label keys, or timestamp behavior
   - Use x/observability for exporters, tracing, record buffers, metrics test helpers, and non-HTTP feature record builders; use x/devtools for dev-only collectors
+
+task_affinity:
+  bugfix_triage: metrics/
+
+landing_zones:
+  collector_interface: collector.go
+  noop: noop.go

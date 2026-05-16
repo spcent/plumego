@@ -48,10 +48,7 @@ func main() {
 		return
 	}
 
-	fmt.Fprintln(os.Stderr, "reference-layout check failed:")
-	for _, violation := range violations {
-		fmt.Fprintf(os.Stderr, "- %s\n", violation)
-	}
+	fmt.Fprint(os.Stderr, checkutil.FormatViolations("reference-layout", violations))
 	os.Exit(1)
 }
 

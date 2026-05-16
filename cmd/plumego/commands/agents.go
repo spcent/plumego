@@ -42,7 +42,7 @@ func (c *AgentsCmd) Help() CommandHelp {
 
 func (c *AgentsCmd) Run(ctx *Context, args []string) error {
 	if len(args) == 0 {
-		return ctx.Out.Error("agents requires a subcommand: verify, explain, bundle", 1, map[string]any{
+		return ctx.Out.Error("agents requires a subcommand: verify, explain, bundle, validate-diff", 1, map[string]any{
 			"hint": "run plumego agents --help",
 		})
 	}

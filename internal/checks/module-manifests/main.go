@@ -37,13 +37,12 @@ func main() {
 		return
 	}
 
-	fmt.Fprintln(os.Stderr, "module-manifests check failed:")
+	all := make([]string, 0, len(missing)+len(violations))
 	for _, item := range missing {
-		fmt.Fprintf(os.Stderr, "- missing module.yaml for %s\n", item)
+		all = append(all, "missing module.yaml for "+item)
 	}
-	for _, item := range violations {
-		fmt.Fprintf(os.Stderr, "- %s\n", item)
-	}
+	all = append(all, violations...)
+	fmt.Fprint(os.Stderr, checkutil.FormatViolations("module-manifests", all))
 	os.Exit(1)
 }
 

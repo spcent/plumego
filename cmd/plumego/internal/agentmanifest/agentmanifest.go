@@ -40,6 +40,10 @@ type Manifest struct {
 	StopConditions  []string `yaml:"stop_conditions"`
 	ReviewChecklist []string `yaml:"review_checklist"`
 	AgentHints      []string `yaml:"agent_hints"`
+
+	TaskAffinity   map[string]string `yaml:"task_affinity,omitempty"`
+	LandingZones   map[string]string `yaml:"landing_zones,omitempty"`
+	SelectionGuide map[string]string `yaml:"selection_guide,omitempty"`
 }
 
 // Load reads the module.yaml at <repoRoot>/<modulePath>/module.yaml.
