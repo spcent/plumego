@@ -69,6 +69,13 @@ const xScenarios = [
     href: '/zh/docs/modules/x-websocket',
     label: '打开 x/websocket 模块手册',
   },
+  {
+    kicker: 'observability',
+    title: '在服务边界接线 trace、metrics 和结构化日志',
+    body: 'x/observability 提供 exporter、tracer、collector 和 adapter 接线，且不触及稳定路由模型。埋点逻辑留在请求内核之外。',
+    href: '/zh/docs/modules/x-observability',
+    label: '打开 x/observability 模块手册',
+  },
 ] as const;
 
 const copy = ARCHITECTURE_COPY.zh;
@@ -345,7 +352,7 @@ const repositorySignals = [
     <div class="section__intro">
       <h2>用 x/* 扩展家族可以构建什么。</h2>
       <p>
-        扩展家族不只是模块名——每个家族拥有一个具体的能力域。用下面四个场景判断哪个 x/* 家族最相关，再决定是否打开对应的模块手册。
+        扩展家族不只是模块名——每个家族拥有一个具体的能力域。用下面五个场景判断哪个 x/* 家族最相关，再决定是否打开对应的模块手册。
       </p>
     </div>
     <div class="page-grid">

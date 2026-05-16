@@ -66,6 +66,29 @@ Plumego 在标准库之上额外提供了：基于 trie 树的路由器、显式
 
 ## 模块稳定性
 
+## 现在可以在生产环境使用 Plumego 吗？
+
+可以——每个层级有一个对应的注意事项：
+
+- **稳定根**（`core`、`router`、`contract`、`middleware`、`security`、`store`、`health`、`log`、`metrics`）：今天即可用于生产。API 已冻结，v1 正式发布时兼容性承诺生效。
+- **Beta 扩展**（`x/rest`、`x/websocket`、`x/gateway`、`x/observability`）：可在生产中安全使用。API 在次版本 release ref 之间保持冻结；升级前查看发布说明。
+- **实验性扩展**（其余所有 `x/*`）：API 可能在无缓冲期的情况下发生变化。在稳定生产路径中引入之前，用 app-local 接口包装依赖。
+
+参见 [稳定性](/zh/stability) 了解四层分级概览，[发布](/zh/releases) 查看完整的逐模块支持矩阵。
+
+## Router 相对 stdlib 的性能开销是多少？
+
+以 Go 1.22+ `http.ServeMux` 配合 `PathValue()` 参数提取为对照（最接近的 stdlib 等价实现）：
+
+| 路由类型 | stdlib | plumego | 倍数 |
+|---|---|---|---|
+| 静态路由 | 110 ns | 367 ns | 3.3× |
+| 单 `:param` + 读取 | 186 ns | 807 ns | 4.3× |
+| 四 `:param` 深路径 | 722 ns | 1,036 ns | 1.4× |
+| 70 条路由混合表 | 247 ns | 660 ns | 2.7× |
+
+开销来源：per-request context 注入（480 B，5 次分配）、参数映射构建以及中间件链接线。对于典型的 handler（I/O 耗时 1 ms–100 ms），router 开销占总请求时间的 0.001%–0.1%。完整九个场景的数据和测试方法见 [发布页的 benchmark 表格](/zh/releases)。
+
 ## 我应该从哪里开始？
 
 如果你还需要判断“第一步到底该看什么”，请先从[文档首页](/zh/docs)开始。然后再按更窄的问题进入对应页面：

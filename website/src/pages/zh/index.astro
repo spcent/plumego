@@ -1,11 +1,9 @@
 ---
 import FinalCta from '../../components/home/FinalCta.astro';
 import Hero from '../../components/home/Hero.astro';
-import MinimalExample from '../../components/home/MinimalExample.astro';
 import ScenarioCards from '../../components/home/ScenarioCards.astro';
 import StabilityBand from '../../components/home/StabilityBand.astro';
 import ValueProps from '../../components/home/ValueProps.astro';
-import WiringContrast from '../../components/home/WiringContrast.astro';
 import MarketingLayout from '../../layouts/MarketingLayout.astro';
 import { HOME_COPY } from '../../data/site';
 
@@ -37,9 +35,6 @@ const copy = HOME_COPY.zh;
   </section>
 
   <ScenarioCards cards={copy.scenarioCards} />
-
-  <MinimalExample locale="zh" />
-  <WiringContrast copy={copy} />
 
   <StabilityBand
     title={copy.stabilityBandTitle}
