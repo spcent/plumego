@@ -12,6 +12,7 @@ truth matrix for agents; it does not mark a milestone complete by itself.
 | M-003 extension evidence pipeline | `tasks/milestones/active/M-003.md` | Implemented through extension evidence docs, snapshots, checks, and beta evidence template | Verify artifact exists; remaining experimental blockers are explicit |
 | M-004 stable root cleanup freeze | `tasks/milestones/active/M-004.md` | Outcome section says cards 1394-1401 and stable cleanup gates are complete | Reconcile in card 1429 before archiving or leaving active |
 | M-005 v1 release execution | `tasks/milestones/active/M-005.md` | New sequential release execution plan from rc.1 to final v1/no-go | Start with card 1429, then card 1430 for `v1.0.0-rc.1` evidence |
+| M-006 v1.0.1 maintenance lane | `tasks/milestones/active/M-006.md` | Starts after the published `v1.0.0` tag and remote gates | Start with card 1440 to resolve generated release data drift |
 
 ## Reconciliation Rules
 
