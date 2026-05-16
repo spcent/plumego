@@ -476,6 +476,106 @@ make gates
     </div>
   </section>
 
+  <!-- Router 开销基准测试 vs stdlib -->
+  <section class="section">
+    <div class="section__intro">
+      <h2>Router 开销基准测试。</h2>
+      <p>
+        Plumego 优化目标是清晰性与正确性，而非原始吞吐量。这组基准测试度量 <code>router.ServeHTTP</code> 的分发成本，
+        对比对象是 Go 1.22+ <code>http.ServeMux</code> 配合 <code>PathValue()</code> 参数提取——这是 stdlib 中最接近的等价参照。
+        数值为在同一台机器上五轮三秒运行的中位数。
+        来源：<code>router/stdlib_bench_test.go</code>，
+        运行命令：<code>go test -bench=BenchmarkCmp -benchmem -count=5 -benchtime=3s ./router/</code>。
+      </p>
+    </div>
+
+    <div class="support-table-wrap">
+      <table class="support-table">
+        <thead>
+          <tr>
+            <th>场景</th>
+            <th>stdlib ns/op</th>
+            <th>stdlib B/op</th>
+            <th>plumego ns/op</th>
+            <th>plumego B/op</th>
+            <th>倍数</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="row--ga">
+            <td>静态路由（注册 3 条）</td>
+            <td>110</td><td>0</td><td>367</td><td>480</td><td>3.3×</td>
+          </tr>
+          <tr class="row--ga">
+            <td>单 <code>:param</code> + 读取</td>
+            <td>186</td><td>16</td><td>807</td><td>1,104</td><td>4.3×</td>
+          </tr>
+          <tr class="row--ga">
+            <td>双 <code>:param</code> + 读取</td>
+            <td>332</td><td>48</td><td>870</td><td>1,112</td><td>2.6×</td>
+          </tr>
+          <tr class="row--ga">
+            <td>四 <code>:param</code> 深路径</td>
+            <td>722</td><td>112</td><td>1,036</td><td>1,184</td><td>1.4×</td>
+          </tr>
+          <tr class="row--ga">
+            <td>通配符 <code>*filepath</code> + 读取</td>
+            <td>392</td><td>56</td><td>813</td><td>1,112</td><td>2.1×</td>
+          </tr>
+          <tr class="row--ga">
+            <td>70 条路由混合表（50 静态 + 20 参数）循环</td>
+            <td>247</td><td>8</td><td>660</td><td>800</td><td>2.7×</td>
+          </tr>
+          <tr class="row--supported">
+            <td>并发静态（GOMAXPROCS 个 goroutine）</td>
+            <td>119</td><td>0</td><td>313</td><td>480</td><td>2.6×</td>
+          </tr>
+          <tr class="row--supported">
+            <td>并发单参数（GOMAXPROCS 个 goroutine）</td>
+            <td>128</td><td>16</td><td>1,029</td><td>1,104</td><td>8.0×</td>
+          </tr>
+          <tr class="row--supported">
+            <td>多方法路由（5 种 HTTP method，每个 1 个参数）</td>
+            <td>262</td><td>16</td><td>1,233</td><td>1,112</td><td>4.7×</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="control-grid control-grid--tight" style="margin-top: 2rem;">
+      <article class="control-grid__item">
+        <p class="signal-list__kicker">开销来源：上下文注入</p>
+        <h3>每个请求都要承担 request context 构建成本</h3>
+        <p>即使是静态路由，每次请求也会分配约 480 B 和 5 个对象，用于构建 per-request router context。这无法规避：context 需要存储路由元数据、param 槽位以及 response contract 助手，无论参数是否存在。</p>
+      </article>
+      <article class="control-grid__item">
+        <p class="signal-list__kicker">开销来源：参数映射构建</p>
+        <h3>参数路由需要 trie 遍历和 map 构建</h3>
+        <p>router 在 trie 遍历时收集参数值，在调用 handler 之前构建 <code>map[string]string</code>。stdlib <code>PathValue</code> 将值懒存储在 request 内部 context 中，直到第一次读取时才分配，避免了 map 提前创建。</p>
+      </article>
+      <article class="control-grid__item">
+        <p class="signal-list__kicker">开销来源：LRU 缓存争用</p>
+        <h3>并发参数路由因写锁串行出现 8× 差距</h3>
+        <p>每次分发都需要将命中条目提升到 LRU 头部位置。高并发下这需要持有写锁，导致 goroutine 串行化。LRU 缓存使单 goroutine 场景的参数路由吞吐量提升约 20%，但在高并发下引入了争用。如果参数路由处于持续高 QPS，需要评估缓存收益与争用代价之间的取舍。</p>
+      </article>
+      <article class="control-grid__item">
+        <p class="signal-list__kicker">数字放在上下文里</p>
+        <h3>Router 成本只是真实请求的极小部分</h3>
+        <p>在 1,000 req/s 下，1 μs 的 router 开销消耗 1 ms/sec CPU——远低于 0.1%。典型 handler 在 I/O 和业务逻辑上花费 1 ms–100 ms；router 占总请求时间的 0.001%–0.1%。成本有界且可预知。这一设计取舍的依据在 <a class="text-link" href="/zh/why-plumego">为什么选择 Plumego</a> 中有详细说明。</p>
+      </article>
+    </div>
+
+    <div class="hero-code" style="max-width: 44rem; margin: 2rem auto 0;">
+      <div class="hero-code__bar">
+        <span class="hero-code__dots"><span></span><span></span><span></span></span>
+        <span class="hero-code__filename">测试环境</span>
+      </div>
+      <pre class="hero-code__pre"><code><span class="hc-cm"># Go 1.24.7 · linux/amd64 · Intel Xeon @ 2.10 GHz</span>
+<span class="hc-cm"># 5 轮 · 每轮 3 秒 · 取中位数</span>
+go test -bench=BenchmarkCmp -benchmem -count=5 -benchtime=3s ./router/</code></pre>
+    </div>
+  </section>
+
   <section class="section section--tinted">
     <div class="section__intro">
       <h2>回到 canonical path 继续</h2>

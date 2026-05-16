@@ -439,6 +439,107 @@ make gates
     </div>
   </section>
 
+  <!-- Router overhead benchmarks vs stdlib -->
+  <section class="section">
+    <div class="section__intro">
+      <h2>Router overhead benchmarks.</h2>
+      <p>
+        Plumego optimizes for clarity and correctness, not raw throughput. These benchmarks measure the
+        dispatch cost of <code>router.ServeHTTP</code> against Go 1.22+ <code>http.ServeMux</code> with
+        <code>PathValue()</code> parameter extraction — the closest apples-to-apples comparison target in stdlib.
+        Results are medians across five three-second runs on a single machine.
+        Source: <code>router/stdlib_bench_test.go</code> — run with
+        <code>go test -bench=BenchmarkCmp -benchmem -count=5 -benchtime=3s ./router/</code>.
+      </p>
+    </div>
+
+    <div class="support-table-wrap">
+      <table class="support-table">
+        <thead>
+          <tr>
+            <th>Scenario</th>
+            <th>stdlib ns/op</th>
+            <th>stdlib B/op</th>
+            <th>plumego ns/op</th>
+            <th>plumego B/op</th>
+            <th>Ratio</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="row--ga">
+            <td>Static route (3 routes registered)</td>
+            <td>110</td><td>0</td><td>367</td><td>480</td><td>3.3×</td>
+          </tr>
+          <tr class="row--ga">
+            <td>Single <code>:param</code> + read</td>
+            <td>186</td><td>16</td><td>807</td><td>1,104</td><td>4.3×</td>
+          </tr>
+          <tr class="row--ga">
+            <td>Two <code>:param</code> + reads</td>
+            <td>332</td><td>48</td><td>870</td><td>1,112</td><td>2.6×</td>
+          </tr>
+          <tr class="row--ga">
+            <td>Four <code>:param</code> deep path</td>
+            <td>722</td><td>112</td><td>1,036</td><td>1,184</td><td>1.4×</td>
+          </tr>
+          <tr class="row--ga">
+            <td>Wildcard <code>*filepath</code> + read</td>
+            <td>392</td><td>56</td><td>813</td><td>1,112</td><td>2.1×</td>
+          </tr>
+          <tr class="row--ga">
+            <td>70-route table (50 static + 20 param), cycled</td>
+            <td>247</td><td>8</td><td>660</td><td>800</td><td>2.7×</td>
+          </tr>
+          <tr class="row--supported">
+            <td>Parallel static (GOMAXPROCS goroutines)</td>
+            <td>119</td><td>0</td><td>313</td><td>480</td><td>2.6×</td>
+          </tr>
+          <tr class="row--supported">
+            <td>Parallel single param (GOMAXPROCS goroutines)</td>
+            <td>128</td><td>16</td><td>1,029</td><td>1,104</td><td>8.0×</td>
+          </tr>
+          <tr class="row--supported">
+            <td>Method routing (5 HTTP methods, 1 param each)</td>
+            <td>262</td><td>16</td><td>1,233</td><td>1,112</td><td>4.7×</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="control-grid control-grid--tight" style="margin-top: 2rem;">
+      <article class="control-grid__item">
+        <p class="signal-list__kicker">overhead source: context injection</p>
+        <h3>Every request pays for request context setup</h3>
+        <p>Even a static route allocates ~480 B and 5 objects to build the per-request router context. This is unavoidable: the context stores route metadata, param slots, and the response contract helper regardless of whether params are present.</p>
+      </article>
+      <article class="control-grid__item">
+        <p class="signal-list__kicker">overhead source: param map build</p>
+        <h3>Param routes pay for trie traversal and map construction</h3>
+        <p>The router collects param values during trie traversal, then builds a <code>map[string]string</code> before invoking the handler. Stdlib <code>PathValue</code> stores values lazily in the request's internal context, avoiding the map allocation until the first read.</p>
+      </article>
+      <article class="control-grid__item">
+        <p class="signal-list__kicker">overhead source: LRU cache contention</p>
+        <h3>Parallel param routes show 8× gap due to write-lock serialization</h3>
+        <p>Each dispatch promotes the matched entry to the LRU front position. Under concurrent load this requires a write lock, serializing goroutines. The cache improves single-goroutine param throughput by ~20%, but adds contention at high concurrency. If param-heavy routes are under sustained high QPS, evaluate whether the cache benefit outweighs the contention cost.</p>
+      </article>
+      <article class="control-grid__item">
+        <p class="signal-list__kicker">numbers in context</p>
+        <h3>Router cost is a fraction of a real request</h3>
+        <p>At 1,000 req/s, 1 μs of router overhead consumes 1 ms/sec of CPU — well under 0.1%. Typical service handlers spend 1 ms–100 ms on I/O and business logic; the router's share is 0.001%–0.1% of request time. The cost is bounded and knowable. The rationale for this design is in <a class="text-link" href="/why-plumego">Why Plumego</a>.</p>
+      </article>
+    </div>
+
+    <div class="hero-code" style="max-width: 44rem; margin: 2rem auto 0;">
+      <div class="hero-code__bar">
+        <span class="hero-code__dots"><span></span><span></span><span></span></span>
+        <span class="hero-code__filename">environment</span>
+      </div>
+      <pre class="hero-code__pre"><code><span class="hc-cm"># Go 1.24.7 · linux/amd64 · Intel Xeon @ 2.10 GHz</span>
+<span class="hc-cm"># 5 runs · 3 s each · medians reported</span>
+go test -bench=BenchmarkCmp -benchmem -count=5 -benchtime=3s ./router/</code></pre>
+    </div>
+  </section>
+
   <section class="section section--tinted">
     <div class="section__intro">
       <h2>Continue with the canonical path</h2>
