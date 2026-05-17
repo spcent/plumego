@@ -922,12 +922,10 @@ func New%sService() %sService {
 }
 
 func (s *%sServiceImpl) Get(_ context.Context, _ string) (*%s, error) {
-	// TODO: implement
 	return nil, nil
 }
 
 func (s *%sServiceImpl) Create(_ context.Context, _ Create%sRequest) (*%s, error) {
-	// TODO: implement
 	return nil, nil
 }
 `,
