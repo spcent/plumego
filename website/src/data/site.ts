@@ -41,8 +41,9 @@ export const FOOTER_GROUPS: Record<Locale, Array<{ title: string; links: Array<{
       links: [
         { label: 'Docs', href: '/docs' },
         { label: 'Why Plumego', href: '/why-plumego' },
-        { label: 'Compare Frameworks', href: '/compare' },
+        { label: 'Use Cases', href: '/use-cases' },
         { label: 'Architecture', href: '/architecture' },
+        { label: 'Compare Frameworks', href: '/compare' },
         { label: 'Examples', href: '/examples' },
       ],
     },
@@ -73,8 +74,9 @@ export const FOOTER_GROUPS: Record<Locale, Array<{ title: string; links: Array<{
       links: [
         { label: '文档', href: '/zh/docs' },
         { label: '为什么选择 Plumego', href: '/zh/why-plumego' },
-        { label: '框架横向对比', href: '/zh/compare' },
+        { label: '使用场景', href: '/zh/use-cases' },
         { label: '架构', href: '/zh/architecture' },
+        { label: '框架横向对比', href: '/zh/compare' },
         { label: '示例', href: '/zh/examples' },
       ],
     },
@@ -156,7 +158,7 @@ api.Get("/data", tenant.Guard(data.List))
       { label: '4 beta extensions', detail: 'API frozen between refs', status: 'beta', href: '/stability' },
       { label: '16 experimental', detail: 'Evaluate before adopting', status: 'experimental', href: '/stability' },
     ],
-    stabilityBandCta: { label: 'Full stability matrix', href: '/stability' },
+    stabilityBandCta: { label: 'Project status & v1 checklist', href: '/status' },
     moduleTitle: 'Stable modules.',
     moduleLead: '9 packages with compatibility guarantees toward v1. The recommended starting scope for production evaluation.',
     moduleBaseImport: 'github.com/spcent/plumego',
@@ -177,7 +179,7 @@ api.Get("/data", tenant.Guard(data.List))
     extensionReleasesHref: '/releases',
     adoptionTitle: 'Where to go next.',
     adoptionBody:
-      'Start with Why Plumego if the question is fit. Start with Examples to run the reference service. Use Releases to check what is stable before widening adoption scope.',
+      'Start with Why if the question is fit. Start with Examples to run the reference service. Check Status for module maturity and v1 progress before widening adoption scope.',
     adoptionCards: [
       {
         kicker: 'fit',
@@ -195,10 +197,10 @@ api.Get("/data", tenant.Guard(data.List))
       },
       {
         kicker: 'maturity',
-        title: 'Releases',
-        body: 'Use the release page when the real question is not whether a module exists, but whether it is stable enough to adopt in production right now.',
-        href: '/releases',
-        label: 'Inspect releases',
+        title: 'Project Status',
+        body: 'Current version, module stability tiers, v1 readiness checklist, and active roadmap — all in one place before you widen adoption scope.',
+        href: '/status',
+        label: 'Check project status',
       },
       {
         kicker: 'questions',
@@ -208,11 +210,11 @@ api.Get("/data", tenant.Guard(data.List))
         label: 'Read FAQ',
       },
     ],
-    finalTitle: 'Start from the reference app. Check stability. Expand when boundaries are clear.',
+    finalTitle: 'Start from the reference app. Confirm maturity. Expand when boundaries are clear.',
     finalBody:
-      'The fastest path to production: clone reference/standard-service, confirm module maturity on the stability page, then extend only where the owning module is obvious.',
+      'The fastest path to production: clone reference/standard-service, confirm module maturity on the status page, then extend only where the owning module is obvious.',
     finalPrimary: { label: 'Read Docs', href: '/docs' },
-    finalSecondary: { label: 'Check Stability', href: '/stability' },
+    finalSecondary: { label: 'Project Status', href: '/status' },
     contrastTitle: 'The difference shows in code review.',
     contrastLead:
       'When routes are spread across packages, a reviewer has to open each one to understand what paths exist and what middleware runs. Plumego keeps the full route map in one explicit file — and adds a structured <code>contract</code> layer so error and success responses stay consistent across all handlers.',
@@ -273,7 +275,7 @@ api.Get("/data", tenant.Guard(data.List))
       { label: '4 个 beta 扩展', detail: 'ref 间 API 冻结', status: 'beta', href: '/zh/stability' },
       { label: '16 个实验性', detail: '采用前请先评估', status: 'experimental', href: '/zh/stability' },
     ],
-    stabilityBandCta: { label: '完整稳定性矩阵', href: '/zh/stability' },
+    stabilityBandCta: { label: '项目状态与 v1 清单', href: '/zh/status' },
     moduleTitle: '稳定模块。',
     moduleLead: '9 个包，具备向 v1 迈进的兼容性保证，是推荐的生产评估起点。',
     moduleBaseImport: 'github.com/spcent/plumego',
@@ -294,7 +296,7 @@ api.Get("/data", tenant.Guard(data.List))
     extensionReleasesHref: '/zh/releases',
     adoptionTitle: '下一步去哪里。',
     adoptionBody:
-      '如果问题是适用性，先看「为什么选择 Plumego」。如果要运行参考服务，先看示例。在扩大采用范围之前，用发布页确认模块成熟度。',
+      '如果问题是适用性，先看「为什么选择 Plumego」。如果要运行参考服务，先看示例。在扩大采用范围之前，用状态页确认模块成熟度和 v1 进度。',
     adoptionCards: [
       {
         kicker: 'fit',
@@ -312,10 +314,10 @@ api.Get("/data", tenant.Guard(data.List))
       },
       {
         kicker: 'maturity',
-        title: '发布',
-        body: '当真正的问题不是某个模块是否存在，而是它今天是否已经稳定到可以用于生产，就去看发布页。',
-        href: '/zh/releases',
-        label: '查看发布页',
+        title: '项目状态',
+        body: '当前版本、模块成熟度分级、v1 就绪清单与活跃路线图——扩大采用范围之前，从这里确认成熟度。',
+        href: '/zh/status',
+        label: '查看项目状态',
       },
       {
         kicker: 'questions',
@@ -325,10 +327,10 @@ api.Get("/data", tenant.Guard(data.List))
         label: '查看常见问题',
       },
     ],
-    finalTitle: '从 reference app 起步。确认稳定性。边界清晰后再扩展。',
-    finalBody: '到达生产最快路径：clone reference/standard-service，在稳定性页确认模块成熟度，然后只在归属明确的模块边界内向外延伸。',
+    finalTitle: '从 reference app 起步。确认成熟度。边界清晰后再扩展。',
+    finalBody: '到达生产最快路径：clone reference/standard-service，在状态页确认模块成熟度，然后只在归属明确的模块边界内向外延伸。',
     finalPrimary: { label: '阅读文档', href: '/zh/docs' },
-    finalSecondary: { label: '查看稳定性', href: '/zh/stability' },
+    finalSecondary: { label: '项目状态', href: '/zh/status' },
     contrastTitle: '差异在代码评审时最明显。',
     contrastLead:
       '当路由分散在各个包里时，评审者必须逐个打开才能知道有哪些路径和中间件在运行。Plumego 把完整路由表放在一个显式文件里——同时加入结构化的 <code>contract</code> 层，让所有 handler 的错误响应和成功响应保持一致。',
