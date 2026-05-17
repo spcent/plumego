@@ -1,4 +1,5 @@
 ---
+import AgentFirstShowcase from '../../components/home/AgentFirstShowcase.astro';
 import FinalCta from '../../components/home/FinalCta.astro';
 import Hero from '../../components/home/Hero.astro';
 import MinimalExample from '../../components/home/MinimalExample.astro';
@@ -46,6 +47,8 @@ const copy = HOME_COPY.zh;
   <MinimalExample locale="zh" />
 
   <ScenarioCards cards={copy.scenarioCards} />
+
+  <AgentFirstShowcase locale="zh" />
 
   <StabilityBand
     title={copy.stabilityBandTitle}
