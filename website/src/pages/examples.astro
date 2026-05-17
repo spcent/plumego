@@ -133,9 +133,9 @@ const readingOrder = [
   {
     label: '04',
     title: 'Check module maturity before expanding scope',
-    body: 'Once you understand the default path, use releases to decide whether the specific surface you care about is mature enough to adopt.',
-    href: '/releases',
-    cta: 'Inspect module maturity',
+    body: 'Once you understand the default path, use the status page to confirm module maturity and v1 readiness before widening adoption scope.',
+    href: '/status',
+    cta: 'Check project status',
   },
 ] as const;
 ---
@@ -425,10 +425,11 @@ const readingOrder = [
   <section class="section section--tinted">
     <div class="section__intro">
       <h2>Check module maturity before expanding.</h2>
-      <p>Once the default path makes sense, use Releases to verify which surfaces are stable enough to adopt in your service.</p>
+      <p>Once the default path makes sense, verify which surfaces are stable enough to adopt before widening scope.</p>
     </div>
     <div class="page-links">
-      <a class="text-link" href="/releases">Inspect module maturity →</a>
+      <a class="text-link" href="/status">Project status & v1 checklist →</a>
+      <a class="text-link" href="/stability">Detailed stability tiers →</a>
     </div>
   </section>
 </MarketingLayout>
