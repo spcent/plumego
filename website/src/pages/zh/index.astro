@@ -1,9 +1,11 @@
 ---
 import FinalCta from '../../components/home/FinalCta.astro';
 import Hero from '../../components/home/Hero.astro';
+import MinimalExample from '../../components/home/MinimalExample.astro';
 import ScenarioCards from '../../components/home/ScenarioCards.astro';
 import StabilityBand from '../../components/home/StabilityBand.astro';
 import ValueProps from '../../components/home/ValueProps.astro';
+import WiringContrast from '../../components/home/WiringContrast.astro';
 import MarketingLayout from '../../layouts/MarketingLayout.astro';
 import { HOME_COPY } from '../../data/site';
 
@@ -12,8 +14,8 @@ const copy = HOME_COPY.zh;
 
 <MarketingLayout
   locale="zh"
-  title="不挡你路的 Go HTTP 工具包。"
-  description="零外部依赖。9 个稳定模块，API 向 v1 冻结。代码评审里清晰可见的显式路由。从一个参考应用起步——只在边界清晰时向外扩展。"
+  title="显式 Go HTTP。为人类和 Agent 而生。"
+  description="在代码评审中清晰可见的显式路由。机器可读的规范与模块清单，让 AI 编程代理精准定位变更边界。零外部依赖。9 个稳定模块，API 向 v1 冻结。"
   currentPath="/zh"
 >
   <Hero copy={copy} />
@@ -33,6 +35,15 @@ const copy = HOME_COPY.zh;
       <a class="quick-spec-link quick-spec-item--pre" href="/zh/stability">pre-v1 · 哪些已经稳定？ →</a>
     </div>
   </section>
+
+  <WiringContrast copy={{
+    contrastTitle: copy.contrastTitle,
+    contrastLead: copy.contrastLead,
+    contrastBeforeLabel: copy.contrastBeforeLabel,
+    contrastAfterLabel: copy.contrastAfterLabel,
+  }} />
+
+  <MinimalExample locale="zh" />
 
   <ScenarioCards cards={copy.scenarioCards} />
 

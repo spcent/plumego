@@ -101,12 +101,12 @@ export const FOOTER_GROUPS: Record<Locale, Array<{ title: string; links: Array<{
 
 export const HOME_COPY = {
   en: {
-    eyebrow: 'Go HTTP toolkit · stdlib-only · pre-v1',
-    headline: 'The Go HTTP toolkit that stays out of your way.',
+    eyebrow: 'stdlib-only · explicit routing · agent-ready · pre-v1',
+    headline: 'Explicit Go HTTP. Built for humans and agents.',
     summary:
-      'Zero external dependencies. 9 stable modules, API frozen toward v1. Explicit routing that survives code review. Start from one reference app — expand only where boundaries are clear.',
+      'Explicit routing that survives code review. Machine-readable specs and per-module manifests give AI coding agents a clear operating model. Zero external dependencies. 9 stable modules, API frozen toward v1.',
     primaryCta: { label: 'Get Started', href: '/docs/getting-started' },
-    secondaryCta: { label: 'Why Plumego', href: '/why-plumego' },
+    secondaryCta: { label: 'See the difference', href: '#contrast' },
     scenarioCards: [
       {
         kicker: 'REST API',
@@ -218,12 +218,12 @@ api.Get("/data", tenant.Guard(data.List))
     contrastAfterLabel: 'plumego: one file, one contract',
   },
   zh: {
-    eyebrow: 'Go HTTP 工具包 · stdlib only · pre-v1',
-    headline: '不挡你路的 Go HTTP 工具包。',
+    eyebrow: 'stdlib only · 显式路由 · agent-ready · pre-v1',
+    headline: '显式 Go HTTP。为人类和 Agent 而生。',
     summary:
-      '零外部依赖。9 个稳定模块，API 向 v1 冻结。代码评审里清晰可见的显式路由。从一个参考应用起步——只在边界清晰时向外扩展。',
+      '在代码评审中清晰可见的显式路由。机器可读的规范与模块清单，让 AI 编程代理精准定位变更边界。零外部依赖。9 个稳定模块，API 向 v1 冻结。',
     primaryCta: { label: '开始使用', href: '/zh/docs/getting-started' },
-    secondaryCta: { label: '为什么选择', href: '/zh/why-plumego' },
+    secondaryCta: { label: '看看有什么不同', href: '#contrast' },
     scenarioCards: [
       {
         kicker: 'REST API',
