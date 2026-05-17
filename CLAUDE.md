@@ -4,65 +4,64 @@ Go module: `github.com/spcent/plumego`
 Go version: `go 1.24.0`, toolchain `go1.24.4`
 Main module policy: standard library only unless explicitly approved.
 
-Use `AGENTS.md` as the hard-rule entrypoint. For implementation detail, read the
-control plane in this order:
-
-1. `docs/CODEX_WORKFLOW.md` — operating modes and task recipes
-2. `docs/CANONICAL_STYLE_GUIDE.md` — code shape and canonical examples
-3. `docs/AGENT_CODE_QUALITY_RULES.md` — preflight checklist, gate selection, review output contract
-4. `docs/agent-first.md` — agent-first design rationale and mechanism reference
-5. `docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md` — repository layout
-6. `docs/architecture/core-boundary.md` — stable root package responsibilities
-7. `docs/architecture/extension-boundary.md` — x/* taxonomy, maturity ladder, promotion criteria
-8. `specs/repo.yaml` — current stable and extension roots
-9. `specs/task-routing.yaml` — task-to-entrypoint routing
-10. `specs/extension-taxonomy.yaml` — primary and subordinate extension families
-11. `specs/package-hotspots.yaml` — ambiguous package landing zones
-12. `specs/dependency-rules.yaml` — import boundaries
-13. `specs/agent-quality-rules.yaml` — machine-readable quality rules
-14. target `<module>/module.yaml` — module-local scope and checks
-15. `reference/standard-service` — canonical application wiring
+Use `AGENTS.md` as the hard-rule entrypoint. This file is a Claude-oriented
+quick reference for the current repository shape; do not treat it as a second
+source of truth.
 
 ---
 
 ## Repository Layout
 
-### Stable Roots (long-lived, narrow public API)
+### Stable Roots
 
-| Package | Responsibility |
-|---|---|
-| `core` | App kernel: lifecycle, route registration, middleware attachment, server startup |
-| `router` | Route matching, params, groups, reverse routing |
-| `contract` | Transport primitives: response/error helpers, context accessors, binding |
-| `middleware` | Transport-layer cross-cutting only (logging, recovery, timeout, CORS, auth adapters) |
-| `security` | Auth primitives: JWT, password hashing, headers, input safety, abuse guard |
-| `store` | Persistence primitives: DB, cache, file, KV, idempotency |
-| `health` | Health models, readiness helpers |
-| `log` | Logging contracts |
-| `metrics` | Metrics contracts |
+Long-lived public packages with narrow responsibilities:
 
-### Extension Families (`x/*`)
+- `core`: app kernel, lifecycle, route and middleware attachment, server startup
+- `router`: route matching, params, groups, reverse routing
+- `contract`: transport primitives, response/error helpers, context accessors, binding
+- `middleware`: transport-layer cross-cutting behavior only
+- `security`: auth, password, header, input-safety, and abuse primitives
+- `store`: persistence primitives for DB, cache, file, KV, idempotency
+- `health`, `log`, `metrics`: support contracts and base implementations
 
-App-facing: `x/tenant`, `x/ai`, `x/rest`, `x/websocket`, `x/gateway`, `x/fileapi`,
-`x/observability`, `x/messaging`, `x/frontend`, `x/resilience`, `x/ops`
+Stable roots must not import `x/*`.
 
-Supporting: `x/cache`, `x/data`, `x/discovery`, `x/mq`, `x/pubsub`,
-`x/scheduler`, `x/webhook`, `x/ipc`, `x/devtools`
+### Extension Roots
 
-Beta families (release-backed): `x/rest`, `x/websocket`, `x/gateway`, `x/observability`
+Current top-level extension roots:
 
-When choosing a landing zone, start with `specs/task-routing.yaml` and use the
-primary family entrypoint, not a subordinate package.
+- `x/ai`
+- `x/data`
+- `x/fileapi`
+- `x/frontend`
+- `x/gateway`
+- `x/messaging`
+- `x/observability`
+- `x/resilience`
+- `x/rest`
+- `x/tenant`
+- `x/websocket`
+
+Subordinate packages stay under their family root, for example
+`x/data/cache`, `x/gateway/discovery`, `x/messaging/mq`,
+`x/messaging/pubsub`, `x/messaging/scheduler`, `x/messaging/webhook`,
+`x/observability/devtools`, and `x/observability/ops`.
+
+Beta families are tracked in `docs/EXTENSION_MATURITY.md` and
+`specs/extension-maturity.yaml`. For landing zones, start with
+`specs/task-routing.yaml` and prefer the primary family entrypoint.
 
 ### Other Directories
 
 | Path | Purpose |
 |---|---|
-| `reference/standard-service` | Canonical application layout (only canonical layout) |
+| `reference/standard-service` | Canonical application layout |
+| `reference/production-service` | Production-oriented explicit wiring reference |
 | `reference/with-*` | Scenario-specific reference apps |
+| `reference/workerfleet` | Separate worker-oriented submodule reference |
 | `cmd/plumego/` | CLI: dev server, dashboard, scaffold |
 | `internal/checks/` | Boundary, manifest, workflow, and maturity validation |
-| `internal/testkit/` | Shared test helpers |
+| `internal/testutil/` | Shared test helpers |
 | `specs/` | Machine-readable authority: routing, taxonomy, dependency rules, quality rules |
 | `specs/change-recipes/` | Reusable prompt recipes for standard task shapes |
 | `tasks/milestones/` | Milestone specs and execution plans |
@@ -72,30 +71,7 @@ primary family entrypoint, not a subordinate package.
 
 ---
 
-## Operating Modes
-
-### Analysis Mode
-
-Use when scope, ownership, or architecture is unclear. Do not edit code.
-
-Expected output: owning module, in-scope paths, out-of-scope paths, likely
-touched files, main risks, validation plan.
-
-### Implementation Mode
-
-Use when the task contract is clear. Confirm owning module first, make the
-smallest coherent change, add focused tests, run validation before handoff.
-
-### Review Mode
-
-Use for review, audit, or risk assessment. Do not patch unless explicitly asked.
-Findings first, severity-ordered, with file references.
-
----
-
-## Claude Defaults
-
-### Non-Negotiables
+## Operating Defaults
 
 - Preserve `net/http` compatibility.
 - Keep the main module dependency-free beyond stdlib unless explicitly approved.
@@ -108,9 +84,6 @@ Findings first, severity-ordered, with file references.
   unexported zero-value structs inlined at the call site.
 - `contract` owns transport primitives only.
 - Deprecated symbols removed in the same PR that replaces their last caller.
-
-### Code Shape
-
 - Handler shape: `func(http.ResponseWriter, *http.Request)`
 - Route wiring: one method, one path, one handler per line
 - JSON decode: `json.NewDecoder(r.Body).Decode(...)`
@@ -120,20 +93,6 @@ Findings first, severity-ordered, with file references.
 - Middleware: `func(http.Handler) http.Handler`, transport-only, `next` called exactly once
 - No service injection, business DTO assembly, or domain-policy branching in middleware
 - Reference app: `reference/standard-service`
-
-### Application Structure
-
-```text
-cmd/myservice/main.go
-internal/httpapp/app.go
-internal/httpapp/routes.go
-internal/httpapp/handlers/<handler>.go
-internal/domain/<domain>/service.go
-internal/domain/<domain>/repository.go
-```
-
-Use constructor-based DI; wiring visible in the routes file. Do not mix routing,
-domain logic, persistence, and transport policy in one package.
 
 ---
 
@@ -227,28 +186,7 @@ gate if formatting is needed.
 | Single module behavior | `go test -race ./<module>/...`, `go vet ./<module>/...` |
 | Stable root change | Single-module gates + dependency-rules + agent-workflow + module-manifests |
 | router / middleware / security | Module gates + dependency-rules; confirm negative-path and ordering tests |
-| Cross-module, public API, release | Full `make gates` + all boundary checks + extension maturity/beta-evidence + `deprecation-inventory -strict` |
-
----
-
-## Change Recipes
-
-Before writing a bespoke prompt, check `specs/change-recipes/` for a matching
-standard shape:
-
-| Recipe | Task shape |
-|---|---|
-| `analysis-only.yaml` | Scope unknown; do not edit |
-| `fix-bug.yaml` | General bug fix |
-| `http-endpoint-bugfix.yaml` | Route/transport regression |
-| `review-only.yaml` | Audit without patching |
-| `add-http-endpoint.yaml` | New route + handler |
-| `add-middleware.yaml` | New transport middleware |
-| `new-stable-module.yaml` | New stable root package |
-| `new-extension-module.yaml` | New x/* extension |
-| `stable-root-boundary-review.yaml` | Stable root drift audit |
-| `symbol-change.yaml` | Exported symbol rename/remove |
-| `tenant-policy-change.yaml` | Tenant resolution, quota, isolation |
+| Cross-module, public API, release | Full `make gates` + extension maturity/beta-evidence + `deprecation-inventory -strict` |
 
 ---
 
@@ -274,15 +212,17 @@ Use milestones for multi-step work; use daily implementation prompts for small f
 
 ## Docs Sync Targets
 
-Update these when behavior, public API, config, security semantics, lifecycle, or
-boundaries change:
+Update only the docs affected by behavior, public API, config, security
+semantics, lifecycle, or boundary changes. Common targets:
 
 - `README.md`
 - `README_CN.md`
 - `AGENTS.md`
 - `CLAUDE.md`
-- `docs/ROADMAP.md`
 - `env.example`
+
+Also update module primers, `docs/EXTENSION_MATURITY.md`, `docs/ROADMAP.md`, or
+`docs/stable-api/` when the change specifically affects that surface.
 
 Document implemented behavior only.
 

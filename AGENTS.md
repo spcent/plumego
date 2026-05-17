@@ -8,24 +8,23 @@ review and reverse.
 
 ## 1. Authority
 
-Use this file for hard rules and validation order. Use the rest of the control
-plane for detail:
+Use this file for hard rules and validation order. Read only the control-plane
+files needed for the task:
 
-1. `docs/CODEX_WORKFLOW.md` - operating modes and task recipes
-2. `docs/CANONICAL_STYLE_GUIDE.md` - code shape and canonical examples
-3. `docs/AGENT_CODE_QUALITY_RULES.md` - agent quality preflight, review, and gate rules
-4. `docs/agent-first.md` - agent-first design rationale and mechanism reference
-5. `docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md` - repository layout
-6. `docs/architecture/core-boundary.md` - stable root package responsibilities and wiring rules
-7. `docs/architecture/extension-boundary.md` - x/* taxonomy, maturity ladder, promotion criteria
-8. `specs/repo.yaml` - current stable and extension roots
-9. `specs/task-routing.yaml` - task-to-entrypoint routing
-10. `specs/extension-taxonomy.yaml` - primary and subordinate extension families
-11. `specs/package-hotspots.yaml` - ambiguous package landing zones
-12. `specs/dependency-rules.yaml` - import boundaries
-13. `specs/agent-quality-rules.yaml` - machine-readable agent quality rules
-14. target `<module>/module.yaml` - module-local scope and checks
-15. `reference/standard-service` - canonical application wiring
+- Workflow: `docs/CODEX_WORKFLOW.md`, `docs/AGENT_CODE_QUALITY_RULES.md`,
+  `specs/agent-quality-rules.yaml`, and `specs/change-recipes/`
+- Style: `docs/CANONICAL_STYLE_GUIDE.md`
+- Architecture: `docs/agent-first.md`,
+  `docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md`,
+  `docs/architecture/core-boundary.md`,
+  `docs/architecture/extension-boundary.md`, and
+  `docs/EXTENSION_MATURITY.md`
+- Machine rules: `specs/repo.yaml`, `specs/task-routing.yaml`,
+  `specs/extension-taxonomy.yaml`, `specs/extension-maturity.yaml`,
+  `specs/package-hotspots.yaml`, `specs/dependency-rules.yaml`,
+  `specs/checks.yaml`, and `specs/module-manifest.schema.yaml`
+- Local scope: target `<module>/module.yaml`
+- Canonical app wiring: `reference/standard-service`
 
 When guidance conflicts, follow this order:
 
@@ -61,8 +60,16 @@ Stable roots are long-lived public packages:
 - `core`, `router`, `contract`, `middleware`, `security`, `store`, `health`,
   `log`, `metrics`
 
-Extension roots live under `x/*`; use `specs/task-routing.yaml` to start at the
-primary family rather than a subordinate package.
+Current top-level extension roots are:
+
+- `x/ai`, `x/data`, `x/fileapi`, `x/frontend`, `x/gateway`, `x/messaging`,
+  `x/observability`, `x/resilience`, `x/rest`, `x/tenant`, `x/websocket`
+
+Subordinate extension packages live under those roots, for example
+`x/data/cache`, `x/gateway/discovery`, `x/messaging/pubsub`, and
+`x/observability/devtools`. Use `specs/task-routing.yaml` and
+`specs/extension-taxonomy.yaml` to start at the primary family unless the task
+is already narrowed to a subordinate package.
 
 Default routing:
 
@@ -87,9 +94,9 @@ Hard boundaries:
   `x/observability`, not `contract`.
 - Session lifecycle belongs in `x/tenant` or an owning extension, not
   `contract`.
-- New library code must live under a stable root or `x/*`; avoid legacy broad
-  roots such as `net`, `utils`, `validator`, `tenant`, `ai`, `rest`, or
-  `pubsub`.
+- New library code must live under a stable root or `x/*`; avoid new broad
+  top-level roots such as `net`, `utils`, `validator`, `tenant`, `ai`, `rest`,
+  `frontend`, or `pubsub`.
 
 ## 4. Canonical Defaults
 
@@ -196,19 +203,22 @@ Use `specs/agent-quality-rules.yaml` to select the lightest sufficient gate
 profile: docs-only, single-module behavior, stable-root change,
 router/middleware/security, or cross-module/public-API/release-relevant.
 
-Do not expand `specs/check-baseline/` casually.
+Do not expand checked-in baselines or generated snapshots casually.
 
 ## 9. Docs Sync
 
-Update affected docs when behavior, public API, config, security semantics,
-lifecycle behavior, or boundaries change:
+Update affected docs only when behavior, public API, config, security
+semantics, lifecycle behavior, or boundaries change. Common sync targets:
 
 - `README.md`
 - `README_CN.md`
 - `AGENTS.md`
 - `CLAUDE.md`
-- `docs/ROADMAP.md`
 - `env.example`
+
+Also update module primers under `docs/modules/`, `docs/EXTENSION_MATURITY.md`,
+`docs/ROADMAP.md`, or `docs/stable-api/` when the change specifically affects
+that surface.
 
 Document implemented behavior only.
 

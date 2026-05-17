@@ -21,6 +21,7 @@ canonical_authority:
     - docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md
   maturity:
     - docs/EXTENSION_MATURITY.md
+    - specs/extension-maturity.yaml
   implementation:
     - reference/standard-service
   routing:
@@ -53,6 +54,7 @@ canonical_authority:
     - specs/change-recipes/tenant-policy-change.yaml
   task_queue:
     - tasks/cards
+    - tasks/milestones
 
 layers:
   stable:
@@ -88,8 +90,8 @@ layers:
     paths:
       - cmd
       - internal/checks
-      - internal/testkit
-      - internal/buildmeta
+      - internal/testutil
+      - internal/tools
       - scripts
 
   reference:
@@ -137,6 +139,7 @@ agent_workflow:
     - specs/change-recipes
   execution_queue:
     - tasks/cards
+    - tasks/milestones/active
   required_steps:
     - Identify target layer and module
     - Establish goal, in-scope paths, and out-of-scope paths before editing
