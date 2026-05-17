@@ -1,10 +1,35 @@
 # plumego — root Makefile
 # Minimal targets. Most work happens via codex --yolo or go toolchain directly.
 
-.PHONY: help milestone check-spec check-plan check-card check-verify new-milestone new-plan new-card new-verify gates fmt vet test test-race setup-hooks
+.PHONY: help bundle validate-diff validate-diff-dry milestone check-spec check-plan check-card check-verify new-milestone new-plan new-card new-verify gates fmt vet test test-race setup-hooks
 
 # Default: show help
 help:
+
+# ── Gate Profile Auto-Selection ───────────────────────────────────────────────
+
+validate-diff: ## Auto-select and run minimal gate profile for current git diff
+	@cd cmd/plumego && go run . agents validate-diff --dir ../..
+
+validate-diff-dry: ## Print gate commands validate-diff would run without executing them
+	@cd cmd/plumego && go run . agents validate-diff --dir ../.. --dry-run
+
+# ── Task Execution Bundle ─────────────────────────────────────────────────────
+
+bundle: ## Generate a task execution bundle: make bundle TASK=http_endpoint MODULE=x/tenant
+	@if [ -z "$(TASK)" ] || [ -z "$(MODULE)" ]; then \
+	  echo "Error: TASK and MODULE are required."; \
+	  echo "  Example: make bundle TASK=http_endpoint MODULE=x/tenant"; \
+	  echo "  Task types: http_endpoint, middleware, bugfix_triage, symbol_change,"; \
+	  echo "              tenant_policy_change, stable_root_boundary_review, control_plane"; \
+	  exit 1; \
+	fi
+	@cd cmd/plumego && go run . agents bundle \
+	  --task $(TASK) \
+	  --module $(MODULE) \
+	  --dir ../.. \
+	  --output ../../.agent-bundle.yaml
+	@echo "Bundle written to .agent-bundle.yaml"
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
 	  awk 'BEGIN {FS = ":.*?## "}; {printf "  %-20s %s\n", $$1, $$2}'
 

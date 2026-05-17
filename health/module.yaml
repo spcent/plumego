@@ -78,3 +78,10 @@ agent_hints:
   - Health is a support package, not an app feature catalog or ops surface
   - Health manager execution and health HTTP surfaces belong in reference apps or the owning ops extensions
   - Keep build info, history export, analytics, and reporting in owning extensions rather than stable health
+
+task_affinity:
+  bugfix_triage: health/
+
+landing_zones:
+  health_check: health.go
+  readiness: readiness.go

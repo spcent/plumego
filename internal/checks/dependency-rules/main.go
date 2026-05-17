@@ -32,10 +32,7 @@ func main() {
 		return
 	}
 
-	fmt.Fprintln(os.Stderr, "dependency-rules check failed:")
-	for _, violation := range violations {
-		fmt.Fprintf(os.Stderr, "- %s\n", violation)
-	}
+	fmt.Fprint(os.Stderr, checkutil.FormatViolations("dependency-rules", violations))
 	os.Exit(1)
 }
 

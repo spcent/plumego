@@ -5,38 +5,57 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 	"time"
 
 	"github.com/spcent/plumego/cmd/plumego/internal/agentmanifest"
 	"github.com/spcent/plumego/cmd/plumego/internal/executil"
+	"github.com/spcent/plumego/cmd/plumego/internal/taskbundle"
+	"gopkg.in/yaml.v3"
 )
 
-// AgentsCmd provides agent-oriented subcommands: verify and explain.
+// AgentsCmd provides agent-oriented subcommands for the agent workflow.
 type AgentsCmd struct{}
 
-func (c *AgentsCmd) Name() string  { return "agents" }
-func (c *AgentsCmd) Short() string { return "Agent workflow helpers: verify and explain" }
+func (c *AgentsCmd) Name() string { return "agents" }
+func (c *AgentsCmd) Short() string {
+	return "Agent workflow helpers: verify, explain, bundle, validate-diff, route, list-modules"
+}
 
 func (c *AgentsCmd) Help() CommandHelp {
 	return CommandHelp{
-		Args: "<verify|explain> [command-flags]",
+		Args: "<verify|explain|bundle|validate-diff|route|list-modules> [command-flags]",
 		Subcommands: []HelpItem{
 			{"verify --changed <module>", "Run validation gates for a changed module"},
 			{"explain --module <module>", "Print module manifest: responsibilities, boundaries, agent hints"},
+			{"bundle --task <type> --module <path>", "Generate a single-file task execution context (YAML)"},
+			{"validate-diff [--base <ref>] [--dry-run]", "Auto-select and run the minimal gate profile for current git diff"},
+			{"route --task <type>", "Routing oracle: start_with docs, avoid paths, and suggested recipe for a task type"},
+			{"list-modules [--layer stable|extension]", "List all known modules with layer, status, risk, and summary"},
 		},
 		Examples: []string{
 			"plumego agents verify --changed log",
 			"plumego agents verify --changed middleware --dir /path/to/repo",
 			"plumego agents explain --module core",
 			"plumego agents explain --module x/rest",
+			"plumego agents bundle --task http_endpoint --module x/tenant",
+			"plumego agents bundle --task middleware --module middleware --output .agent-bundle.yaml",
+			"plumego agents validate-diff",
+			"plumego agents validate-diff --base origin/main",
+			"plumego agents validate-diff --dry-run",
+			"plumego agents route --task http_endpoint",
+			"plumego agents route --task add-middleware",
+			"plumego agents route --path middleware/timeout/timeout.go",
+			"plumego agents list-modules",
+			"plumego agents list-modules --layer stable",
 		},
 	}
 }
 
 func (c *AgentsCmd) Run(ctx *Context, args []string) error {
 	if len(args) == 0 {
-		return ctx.Out.Error("agents requires a subcommand: verify, explain", 1, map[string]any{
+		return ctx.Out.Error("agents requires a subcommand: verify, explain, bundle, validate-diff, route, list-modules", 1, map[string]any{
 			"hint": "run plumego agents --help",
 		})
 	}
@@ -49,6 +68,14 @@ func (c *AgentsCmd) Run(ctx *Context, args []string) error {
 		return runAgentsVerify(ctx, rest)
 	case "explain":
 		return runAgentsExplain(ctx, rest)
+	case "bundle":
+		return runAgentsBundle(ctx, rest)
+	case "validate-diff":
+		return runAgentsValidateDiff(ctx, rest)
+	case "route":
+		return runAgentsRoute(ctx, rest)
+	case "list-modules":
+		return runAgentsListModules(ctx, rest)
 	default:
 		return ctx.Out.Error(fmt.Sprintf("unknown agents subcommand: %s", sub), 1, map[string]any{
 			"hint": "run plumego agents --help",
@@ -211,4 +238,76 @@ func runAgentsExplain(ctx *Context, args []string) error {
 	}
 
 	return ctx.Out.Success(fmt.Sprintf("module manifest: %s", m.Name), payload)
+}
+
+// ─── bundle ───────────────────────────────────────────────────────────────────
+
+func runAgentsBundle(ctx *Context, args []string) error {
+	fs := flag.NewFlagSet("agents bundle", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+
+	taskType := fs.String("task", "", "Task type from task-routing.yaml (e.g. http_endpoint, middleware, bugfix_triage)")
+	modulePath := fs.String("module", "", "Module path to work in (e.g. x/tenant, middleware, core)")
+	dir := fs.String("dir", ".", "Repository root directory")
+	output := fs.String("output", "", "Write bundle to file instead of stdout (e.g. .agent-bundle.yaml)")
+
+	positionals, err := parseInterspersedFlags(fs, args)
+	if err != nil {
+		return ctx.Out.Error(fmt.Sprintf("invalid flags: %v", err), 1)
+	}
+	if len(positionals) > 0 {
+		return ctx.Out.Error(fmt.Sprintf("unexpected arguments: %v", positionals), 1)
+	}
+	if *taskType == "" {
+		return ctx.Out.Error("--task is required", 1, map[string]any{
+			"hint":    "plumego agents bundle --task <type> --module <path>",
+			"example": "plumego agents bundle --task http_endpoint --module x/tenant",
+		})
+	}
+	if *modulePath == "" {
+		return ctx.Out.Error("--module is required", 1, map[string]any{
+			"hint":    "plumego agents bundle --task <type> --module <path>",
+			"example": "plumego agents bundle --task http_endpoint --module x/tenant",
+		})
+	}
+
+	repoRoot, err := agentmanifest.FindRepoRoot(*dir)
+	if err != nil {
+		return ctx.Out.Error(err.Error(), 1)
+	}
+
+	b, err := taskbundle.Generate(repoRoot, *taskType, *modulePath)
+	if err != nil {
+		return ctx.Out.Error(fmt.Sprintf("generate bundle: %v", err), 1)
+	}
+
+	enc := yaml.NewEncoder(os.Stdout)
+	enc.SetIndent(2)
+	dest := os.Stdout
+	if *output != "" {
+		f, err := os.Create(*output)
+		if err != nil {
+			return ctx.Out.Error(fmt.Sprintf("create output file: %v", err), 1)
+		}
+		defer f.Close()
+		dest = f
+		enc = yaml.NewEncoder(f)
+		enc.SetIndent(2)
+	}
+	_ = dest
+	if err := enc.Encode(b); err != nil {
+		return ctx.Out.Error(fmt.Sprintf("encode bundle: %v", err), 1)
+	}
+	if err := enc.Close(); err != nil {
+		return ctx.Out.Error(fmt.Sprintf("flush bundle: %v", err), 1)
+	}
+
+	if *output != "" {
+		return ctx.Out.Success(fmt.Sprintf("bundle written to %s", *output), map[string]any{
+			"task":   *taskType,
+			"module": *modulePath,
+			"output": *output,
+		})
+	}
+	return nil
 }

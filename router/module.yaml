@@ -103,3 +103,13 @@ agent_hints:
   - Start app-facing route work from reference/standard-service wiring; core.App freezes its owned router during Prepare or first ServeHTTP
   - Keep router focused on matching, params, groups, and metadata; move policy and feature behavior to the owning stable root or x/* family
   - Do not add response helpers, middleware policy, config loading, or service construction here
+
+task_affinity:
+  bugfix_triage: router/
+  symbol_change: router/
+
+landing_zones:
+  route_matching: router.go
+  registration: registration.go
+  params: path.go
+  reverse_routing: router.go

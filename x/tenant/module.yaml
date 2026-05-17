@@ -85,3 +85,19 @@ agent_hints:
   - Prefer subpackage-local middleware and example-backed resolve/transport flows over new tenant bootstrap shapes
   - Do not require core to know tenant internals
   - Reference apps should not depend on this by default
+
+task_affinity:
+  http_endpoint: x/tenant/transport/
+  tenant_policy_change: x/tenant/policy/
+  tenant: x/tenant/
+  bugfix_triage: x/tenant/
+
+landing_zones:
+  handler: transport/
+  policy: policy/
+  quota: quota/
+  session: session/
+  resolve: resolve/
+  rate_limit: ratelimit/
+  store: store/
+  config: config/

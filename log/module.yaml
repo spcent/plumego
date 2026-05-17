@@ -75,3 +75,11 @@ agent_hints:
   - Logging contracts should stay decoupled from feature packages and transport policy
   - Keep CLI bootstrap, default singleton helpers, file rotation, and export backends out of the stable public runtime path
   - Never log secrets, tokens, signatures, or private keys
+
+task_affinity:
+  bugfix_triage: log/
+
+landing_zones:
+  logger_interface: logger.go
+  json_backend: json.go
+  glog_backend: glog.go

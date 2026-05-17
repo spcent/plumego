@@ -106,3 +106,13 @@ agent_hints:
   - Start app-wiring changes from reference/standard-service and only widen core when the kernel truly owns the behavior
   - Prefer explicit constructor and route wiring updates over registries, plugin surfaces, or auto-discovery
   - If the task needs tenant, data, or protocol-specific behavior, route it to the owning x/* family instead of widening core
+
+task_affinity:
+  app_bootstrap: reference/standard-service/
+  bugfix_triage: core/
+
+landing_zones:
+  app_construction: core/app.go
+  lifecycle: core/lifecycle.go
+  route_registration: core/routing.go
+  middleware_attachment: core/middleware.go
