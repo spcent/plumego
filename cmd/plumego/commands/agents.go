@@ -15,19 +15,24 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// AgentsCmd provides agent-oriented subcommands: verify, explain, and bundle.
+// AgentsCmd provides agent-oriented subcommands for the agent workflow.
 type AgentsCmd struct{}
 
-func (c *AgentsCmd) Name() string  { return "agents" }
-func (c *AgentsCmd) Short() string { return "Agent workflow helpers: verify, explain, bundle" }
+func (c *AgentsCmd) Name() string { return "agents" }
+func (c *AgentsCmd) Short() string {
+	return "Agent workflow helpers: verify, explain, bundle, validate-diff, route, list-modules"
+}
 
 func (c *AgentsCmd) Help() CommandHelp {
 	return CommandHelp{
-		Args: "<verify|explain|bundle> [command-flags]",
+		Args: "<verify|explain|bundle|validate-diff|route|list-modules> [command-flags]",
 		Subcommands: []HelpItem{
 			{"verify --changed <module>", "Run validation gates for a changed module"},
 			{"explain --module <module>", "Print module manifest: responsibilities, boundaries, agent hints"},
 			{"bundle --task <type> --module <path>", "Generate a single-file task execution context (YAML)"},
+			{"validate-diff [--base <ref>] [--dry-run]", "Auto-select and run the minimal gate profile for current git diff"},
+			{"route --task <type>", "Routing oracle: start_with docs, avoid paths, and suggested recipe for a task type"},
+			{"list-modules [--layer stable|extension]", "List all known modules with layer, status, risk, and summary"},
 		},
 		Examples: []string{
 			"plumego agents verify --changed log",
@@ -36,13 +41,21 @@ func (c *AgentsCmd) Help() CommandHelp {
 			"plumego agents explain --module x/rest",
 			"plumego agents bundle --task http_endpoint --module x/tenant",
 			"plumego agents bundle --task middleware --module middleware --output .agent-bundle.yaml",
+			"plumego agents validate-diff",
+			"plumego agents validate-diff --base origin/main",
+			"plumego agents validate-diff --dry-run",
+			"plumego agents route --task http_endpoint",
+			"plumego agents route --task add-middleware",
+			"plumego agents route --path middleware/timeout/timeout.go",
+			"plumego agents list-modules",
+			"plumego agents list-modules --layer stable",
 		},
 	}
 }
 
 func (c *AgentsCmd) Run(ctx *Context, args []string) error {
 	if len(args) == 0 {
-		return ctx.Out.Error("agents requires a subcommand: verify, explain, bundle, validate-diff", 1, map[string]any{
+		return ctx.Out.Error("agents requires a subcommand: verify, explain, bundle, validate-diff, route, list-modules", 1, map[string]any{
 			"hint": "run plumego agents --help",
 		})
 	}
@@ -57,6 +70,12 @@ func (c *AgentsCmd) Run(ctx *Context, args []string) error {
 		return runAgentsExplain(ctx, rest)
 	case "bundle":
 		return runAgentsBundle(ctx, rest)
+	case "validate-diff":
+		return runAgentsValidateDiff(ctx, rest)
+	case "route":
+		return runAgentsRoute(ctx, rest)
+	case "list-modules":
+		return runAgentsListModules(ctx, rest)
 	default:
 		return ctx.Out.Error(fmt.Sprintf("unknown agents subcommand: %s", sub), 1, map[string]any{
 			"hint": "run plumego agents --help",
