@@ -1,6 +1,7 @@
 ---
 import MarketingLayout from '../../layouts/MarketingLayout.astro';
 import PageHero from '../../components/marketing/PageHero.astro';
+import JourneyBar from '../../components/marketing/JourneyBar.astro';
 
 interface Framework {
   id: string;
@@ -201,6 +202,12 @@ const matrixRows = [
 
 type FwId = 'gin' | 'echo' | 'fiber' | 'chi' | 'plumego';
 const fwIds: FwId[] = ['gin', 'echo', 'fiber', 'chi', 'plumego'];
+
+const journeySteps = [
+  { label: '为什么选择', href: '/zh/why-plumego' },
+  { label: '示例', href: '/zh/examples' },
+  { label: '状态', href: '/zh/status' },
+];
 ---
 
 <MarketingLayout
@@ -217,10 +224,12 @@ const fwIds: FwId[] = ['gin', 'echo', 'fiber', 'chi', 'plumego'];
     visual="decision"
     links={[
       { label: '为什么选择 Plumego', href: '/zh/why-plumego' },
-      { label: '稳定性', href: '/zh/stability' },
+      { label: '状态', href: '/zh/status' },
       { label: '开始使用', href: '/zh/docs/getting-started' },
     ]}
   />
+
+  <JourneyBar steps={journeySteps} current="/zh/compare" />
 
   <!-- 30 秒快速结论 -->
   <section class="section">

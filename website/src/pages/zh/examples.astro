@@ -10,7 +10,7 @@ const copy = EXAMPLES_COPY.zh;
 const journeySteps = [
   { label: '为什么选择', href: '/zh/why-plumego' },
   { label: '示例', href: '/zh/examples' },
-  { label: '稳定性', href: '/zh/stability' },
+  { label: '状态', href: '/zh/status' },
 ];
 
 const recipeTracks = [
@@ -133,9 +133,9 @@ const readingOrder = [
   {
     label: '04',
     title: '扩展之前先检查模块成熟度',
-    body: '当默认路径已经读清楚，再用发布页判断你关心的表面是否已经成熟到值得采用。',
-    href: '/zh/releases',
-    cta: '查看模块成熟度',
+    body: '当默认路径已经读清楚，在扩大采用范围前，用状态页确认模块成熟度和 v1 就绪情况。',
+    href: '/zh/status',
+    cta: '查看项目状态',
   },
 ] as const;
 ---
@@ -386,10 +386,11 @@ const readingOrder = [
   <section class="section">
     <div class="section__intro">
       <h2>扩展前先确认模块成熟度</h2>
-      <p>理解默认路径之后，用发布页确认你关心的模块是否已经稳定到可以在你的服务中采用。</p>
+      <p>理解默认路径之后，在扩大采用范围前确认你关心的模块是否已经稳定。</p>
     </div>
     <div class="page-links">
-      <a class="text-link" href="/zh/releases">查看模块成熟度 →</a>
+      <a class="text-link" href="/zh/status">项目状态与 v1 清单 →</a>
+      <a class="text-link" href="/zh/stability">详细稳定性分级 →</a>
     </div>
   </section>
 </MarketingLayout>

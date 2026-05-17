@@ -2,7 +2,7 @@
 const { copy } = Astro.props;
 ---
 
-<section class="section contrast-section">
+<section id="contrast" class="section contrast-section">
   <div class="section__intro section__intro--center">
     <h2>{copy.contrastTitle}</h2>
     <p set:html={copy.contrastLead} />

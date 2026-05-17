@@ -11,7 +11,7 @@ const copy = STABILITY_COPY.zh;
 const journeySteps = [
   { label: '为什么选择', href: '/zh/why-plumego' },
   { label: '示例', href: '/zh/examples' },
-  { label: '稳定性', href: '/zh/stability' },
+  { label: '状态', href: '/zh/status' },
 ];
 
 function tierRowClass(status: string): string {
@@ -41,6 +41,7 @@ function badgeClass(status: string): string {
     description={copy.heroBody}
     visual="releases"
     links={[
+      { label: '状态总览', href: '/zh/status' },
       { label: '完整发布矩阵', href: '/zh/releases' },
       { label: '路线图', href: '/zh/roadmap' },
     ]}
