@@ -1,0 +1,421 @@
+---
+import MarketingLayout from '../../layouts/MarketingLayout.astro';
+import PageHero from '../../components/marketing/PageHero.astro';
+import { SITE } from '../../data/site';
+import { MODULE_FACTS } from '../../generated/modules';
+import { ROADMAP_FACTS } from '../../generated/roadmap';
+
+const stableCount = MODULE_FACTS.stableRoots.length;
+const betaCount = MODULE_FACTS.betaExtensionFamilies.length;
+const experimentalCount = MODULE_FACTS.allExtensionPaths.length - betaCount;
+
+const v1Checklist = [
+  { label: '9 个稳定根，含 API 快照', done: true },
+  { label: '4 个 beta 扩展，含晋级证据', done: true },
+  { label: '边界检查在 CI 中机器执行', done: true },
+  { label: 'race-detector 测试套件通过', done: true },
+  { label: '废弃策略已发布', done: true },
+  { label: '文档与 onboarding 同步', done: false },
+];
+---
+
+<MarketingLayout
+  locale="zh"
+  title="项目状态 — Plumego"
+  description="当前版本、模块成熟度、路线图方向与 v1 进度，汇总于一处。"
+  currentPath="/zh/status"
+>
+  <PageHero
+    eyebrow="项目状态"
+    title="今天可以依赖什么。"
+    description="当前版本、模块成熟度分级、活跃路线图方向与 v1 进度——全在这里。"
+    visual="releases"
+    links={[
+      { label: '完整稳定性矩阵', href: '/zh/stability' },
+      { label: '发布矩阵', href: '/zh/releases' },
+      { label: '路线图', href: '/zh/roadmap' },
+    ]}
+  />
+
+  <!-- Quick stat bar -->
+  <section class="section">
+    <div class="stat-hero">
+      <div class="stat-hero__cell">
+        <span class="stat-hero__num">{SITE.currentVersion}</span>
+        <span class="stat-hero__label">当前版本</span>
+      </div>
+      <div class="stat-hero__cell">
+        <span class="stat-hero__num stat-hero__num--accent">{stableCount}</span>
+        <span class="stat-hero__label">稳定根</span>
+      </div>
+      <div class="stat-hero__cell">
+        <span class="stat-hero__num" style="color: #4f46e5">{betaCount}</span>
+        <span class="stat-hero__label">beta 扩展</span>
+      </div>
+      <div class="stat-hero__cell">
+        <span class="stat-hero__num stat-hero__num--warn">{experimentalCount}</span>
+        <span class="stat-hero__label">实验性</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- v1 Progress tracker -->
+  <section class="section section--tinted">
+    <div class="section__intro">
+      <h2>v1 就绪清单。</h2>
+      <p>
+        Plumego 正在慎重地向 v1 推进——清单中的每一项都是打标稳定版本前必须通过的关口。标记为完成的项目已经机器执行或已发布。
+      </p>
+    </div>
+    <div class="v1-checklist">
+      {v1Checklist.map((item) => (
+        <div class={`v1-item ${item.done ? 'v1-item--done' : 'v1-item--pending'}`}>
+          <span class="v1-item__icon" aria-hidden="true">
+            {item.done ? '✓' : '○'}
+          </span>
+          <span class="v1-item__label">{item.label}</span>
+          <span class={`v1-item__badge ${item.done ? 'v1-item__badge--done' : 'v1-item__badge--pending'}`}>
+            {item.done ? '已完成' : '进行中'}
+          </span>
+        </div>
+      ))}
+    </div>
+    <p class="v1-note">
+      完整清单：<a class="text-link" href="https://github.com/spcent/plumego/blob/main/docs/release/PRE_V1_RELEASE_CHECKLIST.md">docs/release/PRE_V1_RELEASE_CHECKLIST.md →</a>
+    </p>
+  </section>
+
+  <!-- Module tier summary -->
+  <section class="section">
+    <div class="section__intro">
+      <h2>模块分级一览。</h2>
+      <p>三个层级，每级都有清晰的采用信号。详细的每模块信息请查看完整稳定性矩阵。</p>
+    </div>
+    <div class="tier-summary-grid">
+      <article class="tier-card tier-card--stable">
+        <p class="tier-card__kicker">stable</p>
+        <h3>稳定根</h3>
+        <p>长期 API 兼容性保证。所有生产服务的推荐基础。</p>
+        <div class="tier-card__chips">
+          {MODULE_FACTS.stableRoots.map((m) => <code>{m}</code>)}
+        </div>
+        <a class="text-link" href="/zh/stability">完整稳定根详情 →</a>
+      </article>
+      <article class="tier-card tier-card--beta">
+        <p class="tier-card__kicker">beta</p>
+        <h3>Beta 扩展</h3>
+        <p>版本引用间 API 冻结。可以采用，升级前查阅发布说明。</p>
+        <div class="tier-card__chips">
+          {MODULE_FACTS.betaExtensionFamilies.map((m) => <code>{m}</code>)}
+        </div>
+        <a class="text-link" href="/zh/stability">Beta 晋级标准 →</a>
+      </article>
+      <article class="tier-card tier-card--experimental">
+        <p class="tier-card__kicker">experimental</p>
+        <h3>实验性扩展</h3>
+        <p>API 未冻结。出于明确理由采用；预期迭代速度快于稳定根。</p>
+        <div class="tier-card__chips">
+          {MODULE_FACTS.allExtensionPaths
+            .filter((m) => !MODULE_FACTS.betaExtensionFamilies.includes(m as any))
+            .map((m) => <code>{m}</code>)}
+        </div>
+        <a class="text-link" href="/zh/releases">完整发布矩阵 →</a>
+      </article>
+    </div>
+  </section>
+
+  <!-- Active roadmap snapshot -->
+  <section class="section section--tinted">
+    <div class="section__intro">
+      <h2>活跃路线图方向。</h2>
+      <p>
+        当前正在推进的内容。路线图不是兼容性承诺——采用决策请以上方的模块分级为准。
+        <a class="text-link" href="/zh/roadmap">完整路线图 →</a>
+      </p>
+    </div>
+    <div class="roadmap-snapshot">
+      {ROADMAP_FACTS.inProgress.length > 0 ? (
+        <div class="roadmap-snapshot__group">
+          <p class="roadmap-snapshot__label">进行中</p>
+          <ul class="roadmap-snapshot__list">
+            {ROADMAP_FACTS.inProgress.map((item) => <li>{item}</li>)}
+          </ul>
+        </div>
+      ) : null}
+      {ROADMAP_FACTS.planned.length > 0 ? (
+        <div class="roadmap-snapshot__group">
+          <p class="roadmap-snapshot__label">计划中</p>
+          <ul class="roadmap-snapshot__list">
+            {ROADMAP_FACTS.planned.map((item) => <li>{item}</li>)}
+          </ul>
+        </div>
+      ) : null}
+    </div>
+  </section>
+
+  <!-- Navigation out -->
+  <section class="section">
+    <div class="section__intro">
+      <h2>深入了解。</h2>
+      <p>以下每个页面都是其领域的权威来源。</p>
+    </div>
+    <div class="status-nav-grid">
+      <a class="status-nav-card" href="/zh/stability">
+        <p class="status-nav-card__kicker">成熟度</p>
+        <h3>稳定性</h3>
+        <p>四级分类表、每模块 API 承诺、beta 晋级标准与发布关口清单。</p>
+      </a>
+      <a class="status-nav-card" href="/zh/releases">
+        <p class="status-nav-card__kicker">发布</p>
+        <h3>发布矩阵</h3>
+        <p>完整支持矩阵、路由器基准测试、升级指南与发布渠道定义。</p>
+      </a>
+      <a class="status-nav-card" href="/zh/roadmap">
+        <p class="status-nav-card__kicker">方向</p>
+        <h3>路线图</h3>
+        <p>基线、进行中、计划中与非目标——从仓库 facts 同步生成。</p>
+      </a>
+    </div>
+  </section>
+</MarketingLayout>
+
+<style>
+  .v1-checklist {
+    max-width: 48rem;
+    margin-inline: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .v1-item {
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+    padding: 0.75rem 1.1rem;
+    border-radius: 0.5rem;
+    border: 1px solid var(--line);
+    background: var(--bg-elevated);
+  }
+
+  .v1-item--done {
+    border-color: color-mix(in srgb, var(--accent) 25%, var(--line));
+  }
+
+  .v1-item__icon {
+    font-size: 0.9rem;
+    width: 1.2rem;
+    text-align: center;
+    flex-shrink: 0;
+  }
+
+  .v1-item--done .v1-item__icon { color: var(--accent); }
+  .v1-item--pending .v1-item__icon { color: var(--fg-soft); }
+
+  .v1-item__label {
+    font-size: 0.88rem;
+    color: var(--fg);
+    flex: 1;
+    line-height: 1.4;
+  }
+
+  .v1-item__badge {
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    padding: 0.15rem 0.5rem;
+    border-radius: 0.25rem;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .v1-item__badge--done {
+    background: color-mix(in srgb, var(--accent) 12%, var(--bg-elevated));
+    border: 1px solid color-mix(in srgb, var(--accent) 25%, var(--line));
+    color: var(--accent-strong);
+  }
+
+  :root[data-theme="dark"] .v1-item__badge--done { color: var(--accent); }
+
+  .v1-item__badge--pending {
+    background: var(--bg-strong);
+    border: 1px solid var(--line);
+    color: var(--fg-soft);
+  }
+
+  .v1-note {
+    max-width: 48rem;
+    margin: 1rem auto 0;
+    font-size: 0.82rem;
+    color: var(--fg-soft);
+    text-align: center;
+  }
+
+  .tier-summary-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1.25rem;
+    max-width: 64rem;
+    margin-inline: auto;
+  }
+
+  @media (min-width: 700px) {
+    .tier-summary-grid { grid-template-columns: repeat(3, 1fr); }
+  }
+
+  .tier-card {
+    background: var(--bg-elevated);
+    border: 1px solid var(--line);
+    border-radius: 0.75rem;
+    padding: 1.4rem 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+  }
+
+  .tier-card--stable { border-top: 3px solid var(--accent); }
+  .tier-card--beta { border-top: 3px solid #4f46e5; }
+  :root[data-theme="dark"] .tier-card--beta { border-top-color: #818cf8; }
+  .tier-card--experimental { border-top: 3px solid #d97706; }
+  :root[data-theme="dark"] .tier-card--experimental { border-top-color: #fbbf24; }
+
+  .tier-card__kicker {
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    margin: 0;
+  }
+
+  .tier-card--stable .tier-card__kicker { color: var(--accent); }
+  .tier-card--beta .tier-card__kicker { color: #4f46e5; }
+  :root[data-theme="dark"] .tier-card--beta .tier-card__kicker { color: #818cf8; }
+  .tier-card--experimental .tier-card__kicker { color: #b45309; }
+  :root[data-theme="dark"] .tier-card--experimental .tier-card__kicker { color: #fbbf24; }
+
+  .tier-card h3 {
+    font-size: 1rem;
+    font-weight: 600;
+    margin: 0;
+    color: var(--fg);
+    letter-spacing: -0.01em;
+  }
+
+  .tier-card p {
+    font-size: 0.84rem;
+    color: var(--fg-soft);
+    margin: 0;
+    line-height: 1.55;
+    flex: 1;
+  }
+
+  .tier-card__chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+  }
+
+  .tier-card__chips code {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    padding: 0.12rem 0.38rem;
+    background: var(--bg-strong);
+    border: 1px solid var(--line);
+    border-radius: 0.22rem;
+    color: var(--fg-soft);
+    white-space: nowrap;
+  }
+
+  .roadmap-snapshot {
+    max-width: 56rem;
+    margin-inline: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+
+  .roadmap-snapshot__group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .roadmap-snapshot__label {
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0;
+  }
+
+  .roadmap-snapshot__list {
+    margin: 0;
+    padding-inline-start: 1.2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+
+  .roadmap-snapshot__list li {
+    font-size: 0.88rem;
+    color: var(--fg-soft);
+    line-height: 1.5;
+  }
+
+  .status-nav-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1.25rem;
+    max-width: 56rem;
+    margin-inline: auto;
+  }
+
+  @media (min-width: 640px) {
+    .status-nav-grid { grid-template-columns: repeat(3, 1fr); }
+  }
+
+  .status-nav-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    background: var(--bg-elevated);
+    border: 1px solid var(--line);
+    border-radius: 0.75rem;
+    padding: 1.4rem 1.5rem;
+    text-decoration: none;
+    color: inherit;
+    transition: border-color 0.18s, box-shadow 0.18s;
+  }
+
+  .status-nav-card:hover {
+    border-color: var(--accent-soft);
+    box-shadow: var(--shadow), 0 0 0 3px var(--accent-soft);
+  }
+
+  .status-nav-card__kicker {
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0;
+  }
+
+  .status-nav-card h3 {
+    font-size: 1rem;
+    font-weight: 600;
+    margin: 0;
+    color: var(--fg);
+    letter-spacing: -0.01em;
+  }
+
+  .status-nav-card p {
+    font-size: 0.84rem;
+    color: var(--fg-soft);
+    margin: 0;
+    line-height: 1.55;
+    flex: 1;
+  }
+</style>

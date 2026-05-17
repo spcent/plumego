@@ -1,0 +1,437 @@
+---
+import MarketingLayout from '../layouts/MarketingLayout.astro';
+import PageHero from '../components/marketing/PageHero.astro';
+import { SITE } from '../data/site';
+import { MODULE_FACTS } from '../generated/modules';
+import { ROADMAP_FACTS } from '../generated/roadmap';
+
+const stableCount = MODULE_FACTS.stableRoots.length;
+const betaCount = MODULE_FACTS.betaExtensionFamilies.length;
+const experimentalCount = MODULE_FACTS.allExtensionPaths.length - betaCount;
+
+const v1Checklist = [
+  { label: '9 stable roots with API snapshots', done: true },
+  { label: '4 beta extensions with promotion evidence', done: true },
+  { label: 'Boundary checks enforced in CI', done: true },
+  { label: 'Race-detector test suite passing', done: true },
+  { label: 'Deprecation policy published', done: true },
+  { label: 'Docs and onboarding sync', done: false },
+];
+---
+
+<MarketingLayout
+  locale="en"
+  title="Project Status — Plumego"
+  description="Current version, module stability tiers, roadmap direction, and v1 progress in one place."
+  currentPath="/status"
+>
+  <PageHero
+    eyebrow="Project Status"
+    title="What you can rely on today."
+    description="Current version, module maturity, active roadmap direction, and v1 progress — all in one place."
+    visual="releases"
+    links={[
+      { label: 'Full stability matrix', href: '/stability' },
+      { label: 'Release matrix', href: '/releases' },
+      { label: 'Roadmap', href: '/roadmap' },
+    ]}
+  />
+
+  <!-- Quick stat bar -->
+  <section class="section">
+    <div class="stat-hero">
+      <div class="stat-hero__cell">
+        <span class="stat-hero__num">{SITE.currentVersion}</span>
+        <span class="stat-hero__label">current version</span>
+      </div>
+      <div class="stat-hero__cell">
+        <span class="stat-hero__num stat-hero__num--accent">{stableCount}</span>
+        <span class="stat-hero__label">stable roots</span>
+      </div>
+      <div class="stat-hero__cell">
+        <span class="stat-hero__num" style="color: #4f46e5">{betaCount}</span>
+        <span class="stat-hero__label">beta extensions</span>
+      </div>
+      <div class="stat-hero__cell">
+        <span class="stat-hero__num stat-hero__num--warn">{experimentalCount}</span>
+        <span class="stat-hero__label">experimental</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- v1 Progress tracker -->
+  <section class="section section--tinted">
+    <div class="section__intro">
+      <h2>v1 readiness checklist.</h2>
+      <p>
+        Plumego is being hardened toward v1 deliberately — each item here represents a gate that must pass
+        before a stable release is tagged. Items marked done are machine-enforced or already published.
+      </p>
+    </div>
+    <div class="v1-checklist">
+      {v1Checklist.map((item) => (
+        <div class={`v1-item ${item.done ? 'v1-item--done' : 'v1-item--pending'}`}>
+          <span class="v1-item__icon" aria-hidden="true">
+            {item.done ? '✓' : '○'}
+          </span>
+          <span class="v1-item__label">{item.label}</span>
+          <span class={`v1-item__badge ${item.done ? 'v1-item__badge--done' : 'v1-item__badge--pending'}`}>
+            {item.done ? 'done' : 'in progress'}
+          </span>
+        </div>
+      ))}
+    </div>
+    <p class="v1-note">
+      Full checklist: <a class="text-link" href="https://github.com/spcent/plumego/blob/main/docs/release/PRE_V1_RELEASE_CHECKLIST.md">docs/release/PRE_V1_RELEASE_CHECKLIST.md →</a>
+    </p>
+  </section>
+
+  <!-- Module tier summary -->
+  <section class="section">
+    <div class="section__intro">
+      <h2>Module tiers at a glance.</h2>
+      <p>Three tiers — each with a clear adoption signal. Read the full stability matrix for per-module detail.</p>
+    </div>
+    <div class="tier-summary-grid">
+      <article class="tier-card tier-card--stable">
+        <p class="tier-card__kicker">stable</p>
+        <h3>Stable roots</h3>
+        <p>Long-term API compatibility promise. The recommended foundation for all production services.</p>
+        <div class="tier-card__chips">
+          {MODULE_FACTS.stableRoots.map((m) => <code>{m}</code>)}
+        </div>
+        <a class="text-link" href="/stability#stable-roots">Full stable-root detail →</a>
+      </article>
+      <article class="tier-card tier-card--beta">
+        <p class="tier-card__kicker">beta</p>
+        <h3>Beta extensions</h3>
+        <p>API frozen between release refs. Safe to adopt; check release notes before upgrading.</p>
+        <div class="tier-card__chips">
+          {MODULE_FACTS.betaExtensionFamilies.map((m) => <code>{m}</code>)}
+        </div>
+        <a class="text-link" href="/stability#beta-extensions">Beta promotion criteria →</a>
+      </article>
+      <article class="tier-card tier-card--experimental">
+        <p class="tier-card__kicker">experimental</p>
+        <h3>Experimental extensions</h3>
+        <p>Not API-frozen. Evaluate for clear reasons; expect faster iteration than stable roots.</p>
+        <div class="tier-card__chips">
+          {MODULE_FACTS.allExtensionPaths
+            .filter((m) => !MODULE_FACTS.betaExtensionFamilies.includes(m as any))
+            .map((m) => <code>{m}</code>)}
+        </div>
+        <a class="text-link" href="/releases">Full release matrix →</a>
+      </article>
+    </div>
+  </section>
+
+  <!-- Active roadmap snapshot -->
+  <section class="section section--tinted">
+    <div class="section__intro">
+      <h2>Active roadmap direction.</h2>
+      <p>
+        What is being worked on now. The roadmap is not a compatibility promise — use module tiers above
+        for adoption decisions. <a class="text-link" href="/roadmap">Full roadmap →</a>
+      </p>
+    </div>
+    <div class="roadmap-snapshot">
+      {ROADMAP_FACTS.inProgress.length > 0 ? (
+        <div class="roadmap-snapshot__group">
+          <p class="roadmap-snapshot__label">in progress</p>
+          <ul class="roadmap-snapshot__list">
+            {ROADMAP_FACTS.inProgress.map((item) => <li>{item}</li>)}
+          </ul>
+        </div>
+      ) : null}
+      {ROADMAP_FACTS.planned.length > 0 ? (
+        <div class="roadmap-snapshot__group">
+          <p class="roadmap-snapshot__label">planned</p>
+          <ul class="roadmap-snapshot__list">
+            {ROADMAP_FACTS.planned.map((item) => <li>{item}</li>)}
+          </ul>
+        </div>
+      ) : null}
+    </div>
+  </section>
+
+  <!-- Navigation out -->
+  <section class="section">
+    <div class="section__intro">
+      <h2>Dig deeper.</h2>
+      <p>Each page below is the authoritative source for its area.</p>
+    </div>
+    <div class="status-nav-grid">
+      <a class="status-nav-card" href="/stability">
+        <p class="status-nav-card__kicker">maturity</p>
+        <h3>Stability</h3>
+        <p>Four-tier table, per-module API promises, beta promotion criteria, and the release gate checklist.</p>
+      </a>
+      <a class="status-nav-card" href="/releases">
+        <p class="status-nav-card__kicker">releases</p>
+        <h3>Release Matrix</h3>
+        <p>Full support matrix, router benchmarks, upgrade guidance, and release channel definitions.</p>
+      </a>
+      <a class="status-nav-card" href="/roadmap">
+        <p class="status-nav-card__kicker">direction</p>
+        <h3>Roadmap</h3>
+        <p>Baseline, in-progress, planned, and non-goals — synchronized from repository facts.</p>
+      </a>
+    </div>
+  </section>
+</MarketingLayout>
+
+<style>
+  .v1-checklist {
+    max-width: 48rem;
+    margin-inline: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .v1-item {
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+    padding: 0.75rem 1.1rem;
+    border-radius: 0.5rem;
+    border: 1px solid var(--line);
+    background: var(--bg-elevated);
+  }
+
+  .v1-item--done {
+    border-color: color-mix(in srgb, var(--accent) 25%, var(--line));
+  }
+
+  .v1-item__icon {
+    font-size: 0.9rem;
+    width: 1.2rem;
+    text-align: center;
+    flex-shrink: 0;
+  }
+
+  .v1-item--done .v1-item__icon {
+    color: var(--accent);
+  }
+
+  .v1-item--pending .v1-item__icon {
+    color: var(--fg-soft);
+  }
+
+  .v1-item__label {
+    font-size: 0.88rem;
+    color: var(--fg);
+    flex: 1;
+    line-height: 1.4;
+  }
+
+  .v1-item--done .v1-item__label {
+    color: var(--fg);
+  }
+
+  .v1-item__badge {
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    padding: 0.15rem 0.5rem;
+    border-radius: 0.25rem;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .v1-item__badge--done {
+    background: color-mix(in srgb, var(--accent) 12%, var(--bg-elevated));
+    border: 1px solid color-mix(in srgb, var(--accent) 25%, var(--line));
+    color: var(--accent-strong);
+  }
+
+  :root[data-theme="dark"] .v1-item__badge--done {
+    color: var(--accent);
+  }
+
+  .v1-item__badge--pending {
+    background: var(--bg-strong);
+    border: 1px solid var(--line);
+    color: var(--fg-soft);
+  }
+
+  .v1-note {
+    max-width: 48rem;
+    margin: 1rem auto 0;
+    font-size: 0.82rem;
+    color: var(--fg-soft);
+    text-align: center;
+  }
+
+  .tier-summary-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1.25rem;
+    max-width: 64rem;
+    margin-inline: auto;
+  }
+
+  @media (min-width: 700px) {
+    .tier-summary-grid {
+      grid-template-columns: repeat(3, 1fr);
+    }
+  }
+
+  .tier-card {
+    background: var(--bg-elevated);
+    border: 1px solid var(--line);
+    border-radius: 0.75rem;
+    padding: 1.4rem 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+  }
+
+  .tier-card--stable { border-top: 3px solid var(--accent); }
+  .tier-card--beta { border-top: 3px solid #4f46e5; }
+  :root[data-theme="dark"] .tier-card--beta { border-top-color: #818cf8; }
+  .tier-card--experimental { border-top: 3px solid #d97706; }
+  :root[data-theme="dark"] .tier-card--experimental { border-top-color: #fbbf24; }
+
+  .tier-card__kicker {
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    margin: 0;
+  }
+
+  .tier-card--stable .tier-card__kicker { color: var(--accent); }
+  .tier-card--beta .tier-card__kicker { color: #4f46e5; }
+  :root[data-theme="dark"] .tier-card--beta .tier-card__kicker { color: #818cf8; }
+  .tier-card--experimental .tier-card__kicker { color: #b45309; }
+  :root[data-theme="dark"] .tier-card--experimental .tier-card__kicker { color: #fbbf24; }
+
+  .tier-card h3 {
+    font-size: 1rem;
+    font-weight: 600;
+    margin: 0;
+    color: var(--fg);
+    letter-spacing: -0.01em;
+  }
+
+  .tier-card p {
+    font-size: 0.84rem;
+    color: var(--fg-soft);
+    margin: 0;
+    line-height: 1.55;
+    flex: 1;
+  }
+
+  .tier-card__chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+  }
+
+  .tier-card__chips code {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    padding: 0.12rem 0.38rem;
+    background: var(--bg-strong);
+    border: 1px solid var(--line);
+    border-radius: 0.22rem;
+    color: var(--fg-soft);
+    white-space: nowrap;
+  }
+
+  .roadmap-snapshot {
+    max-width: 56rem;
+    margin-inline: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+
+  .roadmap-snapshot__group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .roadmap-snapshot__label {
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0;
+  }
+
+  .roadmap-snapshot__list {
+    margin: 0;
+    padding-inline-start: 1.2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+
+  .roadmap-snapshot__list li {
+    font-size: 0.88rem;
+    color: var(--fg-soft);
+    line-height: 1.5;
+  }
+
+  .status-nav-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1.25rem;
+    max-width: 56rem;
+    margin-inline: auto;
+  }
+
+  @media (min-width: 640px) {
+    .status-nav-grid {
+      grid-template-columns: repeat(3, 1fr);
+    }
+  }
+
+  .status-nav-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    background: var(--bg-elevated);
+    border: 1px solid var(--line);
+    border-radius: 0.75rem;
+    padding: 1.4rem 1.5rem;
+    text-decoration: none;
+    color: inherit;
+    transition: border-color 0.18s, box-shadow 0.18s;
+  }
+
+  .status-nav-card:hover {
+    border-color: var(--accent-soft);
+    box-shadow: var(--shadow), 0 0 0 3px var(--accent-soft);
+  }
+
+  .status-nav-card__kicker {
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0;
+  }
+
+  .status-nav-card h3 {
+    font-size: 1rem;
+    font-weight: 600;
+    margin: 0;
+    color: var(--fg);
+    letter-spacing: -0.01em;
+  }
+
+  .status-nav-card p {
+    font-size: 0.84rem;
+    color: var(--fg-soft);
+    margin: 0;
+    line-height: 1.55;
+    flex: 1;
+  }
+</style>

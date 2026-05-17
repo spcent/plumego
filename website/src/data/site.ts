@@ -57,6 +57,7 @@ export const FOOTER_GROUPS: Record<Locale, Array<{ title: string; links: Array<{
     {
       title: 'Status',
       links: [
+        { label: 'Status overview', href: '/status' },
         { label: 'Stability', href: '/stability' },
         { label: 'Roadmap', href: '/roadmap' },
         { label: 'Releases', href: '/releases' },
@@ -88,6 +89,7 @@ export const FOOTER_GROUPS: Record<Locale, Array<{ title: string; links: Array<{
     {
       title: '状态',
       links: [
+        { label: '状态总览', href: '/zh/status' },
         { label: '稳定性', href: '/zh/stability' },
         { label: '路线图', href: '/zh/roadmap' },
         { label: '发布', href: '/zh/releases' },
