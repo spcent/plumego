@@ -71,15 +71,16 @@ candidates:
 
   - module: x/frontend
     owner: frontend
-    current_status: experimental
+    current_status: beta
     evidence_doc: docs/extension-evidence/x-frontend.md
-    release_refs: []
+    release_refs:
+      - 6a99c5e0bc61c12378bcdab5a6a7c4d756b9fa96
+      - v1.1.0
     api_snapshots:
-      - docs/extension-evidence/snapshots/first-batch/x-frontend-head.snapshot
-    blockers:
-      - release_history_missing
-      - api_snapshot_missing
-      - owner_signoff_missing
+      - docs/extension-evidence/snapshots/x-frontend/base.snapshot
+      - docs/extension-evidence/snapshots/x-frontend/head.snapshot
+    owner_signoff: signed
+    blockers: []
 
   - module: x/tenant
     owner: multitenancy

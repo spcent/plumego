@@ -3,7 +3,7 @@
 Milestone: M-010
 Recipe: specs/change-recipes/analysis-only.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/frontend
 Owned Files:
 - `specs/extension-beta-evidence.yaml`
@@ -51,4 +51,8 @@ Done Definition:
 - The evaluation result (promote or block) is not ambiguous.
 
 Outcome:
--
+- Done. `extension-release-evidence` for `./x/frontend` across `v1.0.0` to
+  `v1.1.0` reported API unchanged. Recorded release-backed snapshots, release
+  refs, and `frontend` sign-off; promoted `x/frontend` to beta and synced the
+  evidence, module primer, maturity dashboard, deprecation table, and release
+  artifacts note.

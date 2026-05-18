@@ -66,7 +66,7 @@ status.
 | `x/websocket` | beta evidence complete | none | none |
 | `x/observability` | beta evidence complete | none | none |
 | `x/gateway` | beta evidence complete | none | none |
-| `x/frontend` | evidence doc, current-head snapshot | second-release evidence, release-backed snapshots, owner sign-off | future frontend-owned card |
+| `x/frontend` | beta evidence complete | none | none |
 | `x/tenant` | beta evidence complete | none | none |
 | `x/ai` stable-tier subpackages | beta evidence complete for provider, session, streaming, and tool | none | root `x/ai` remains experimental |
 | `x/data` selected surfaces | beta evidence complete for `x/data/file` and `x/data/idempotency` | none for selected surfaces | root `x/data` remains experimental |

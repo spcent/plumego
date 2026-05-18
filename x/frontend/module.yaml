@@ -1,7 +1,7 @@
 name: x/frontend
 path: x/frontend
 layer: extension
-status: experimental
+status: beta
 owner: frontend
 risk: medium
 summary: Static and embedded frontend serving helpers for explicit mounting.
