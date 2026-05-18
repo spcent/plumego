@@ -48,6 +48,7 @@ canonical_authority:
     - specs/change-recipes/analysis-only.yaml
     - specs/change-recipes/add-http-endpoint.yaml
     - specs/change-recipes/add-middleware.yaml
+    - specs/change-recipes/add-acceptance-tests.yaml
     - specs/change-recipes/fix-bug.yaml
     - specs/change-recipes/http-endpoint-bugfix.yaml
     - specs/change-recipes/new-stable-module.yaml

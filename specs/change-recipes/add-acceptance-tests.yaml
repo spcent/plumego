@@ -1,0 +1,16 @@
+name: add-acceptance-tests
+scope: write pre-failing acceptance test functions that define a task card's done condition
+steps:
+  - Read the task card's Goal and Scope sections to understand the exact behavior being targeted.
+  - Read the owning module manifest (module.yaml) and identify the test_commands for the gate.
+  - Identify the narrowest test file location adjacent to the behavior being tested.
+  - Write one or more focused test functions that assert the target behavior and FAIL in the current codebase.
+  - Name each test function with the TestAcceptance prefix (e.g. TestAcceptanceRateLimitHeaderPresent).
+  - Keep each test function self-contained: no shared state, no global fixtures.
+  - Confirm the tests fail before committing (go test -run TestAcceptance ./<module>/...).
+  - Record the test file path and function names in the task card's Acceptance Tests field.
+  - Do NOT implement the behavior in this step — only write the failing tests.
+stop_conditions:
+  - Do not add acceptance tests for behavior that is already passing; the test must fail first.
+  - Do not write acceptance tests in a separate package from the behavior being tested.
+  - Do not share state between acceptance test functions via package-level variables.

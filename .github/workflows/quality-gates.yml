@@ -49,6 +49,7 @@ jobs:
           go run ./internal/checks/extension-maturity
           go run ./internal/checks/extension-beta-evidence
           go run ./internal/checks/deprecation-inventory -strict
+          go run ./internal/checks/public-entrypoints-sync
 
       - name: Run go vet
         run: go vet ./...

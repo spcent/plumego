@@ -64,6 +64,8 @@ Beta families are tracked in `docs/EXTENSION_MATURITY.md` and
 | `internal/testutil/` | Shared test helpers |
 | `specs/` | Machine-readable authority: routing, taxonomy, dependency rules, quality rules |
 | `specs/change-recipes/` | Reusable prompt recipes for standard task shapes |
+| `specs/stop-condition-handlers.yaml` | Resolution paths for every agent stop condition |
+| `specs/request-flows.yaml` | Machine-readable request flow diagrams (module ownership per step) |
 | `tasks/milestones/` | Milestone specs and execution plans |
 | `tasks/cards/` | Incremental task cards |
 | `docs/` | All control-plane documentation |
@@ -118,6 +120,10 @@ Stop in analysis mode (do not edit) when:
 - task is broad but lacks acceptance criteria or validation commands
 - a spec, module manifest, and local pattern conflict in a behavior-changing way
 
+When a stop condition is hit, read `specs/stop-condition-handlers.yaml` for the
+deterministic resolution path — each condition maps to concrete next steps,
+an escalation action, and unblock criteria.
+
 ---
 
 ## Preflight Checklist
@@ -166,7 +172,12 @@ go run ./internal/checks/dependency-rules
 go run ./internal/checks/agent-workflow
 go run ./internal/checks/module-manifests
 go run ./internal/checks/reference-layout
+go run ./internal/checks/public-entrypoints-sync
 ```
+
+`public-entrypoints-sync` verifies that every entry in each module.yaml
+`public_entrypoints` list exists as an exported Go symbol in that module's
+source. Run it after any symbol rename or removal to prevent stale declarations.
 
 ### Repo-Wide Gates
 
@@ -207,6 +218,10 @@ When executing a milestone:
 
 Scaffold: `make new-milestone`, `make new-plan`, `make new-card`, `make new-verify`.
 Use milestones for multi-step work; use daily implementation prompts for small fixes.
+
+Additional targets:
+- `make run-card C=active/NNNN-slug` — validate card, generate bundle, launch execution
+- `make milestone-status M=active/M-NNN` — display phase checkpoint progress
 
 ---
 

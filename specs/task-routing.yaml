@@ -315,6 +315,16 @@ tasks:
       - security
       - core
 
+  acceptance_test:
+    intent: Write pre-failing acceptance test functions that define a task card's done condition before implementation begins.
+    start_with:
+      - specs/change-recipes/add-acceptance-tests.yaml
+      - tasks/cards/TEMPLATE.md
+      - AGENTS.md
+    avoid:
+      - reference/with-messaging
+      - reference/with-gateway
+
   scaffold:
     start_with:
       - cmd/plumego/commands/new.go
