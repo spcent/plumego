@@ -81,3 +81,14 @@ agent_hints:
   - Keep frontend setup outside core
   - Preserve explicit fallback behavior
   - Prefer transport-only helpers
+
+task_affinity:
+  frontend_asset_serving: x/frontend/
+  bugfix_triage: x/frontend/
+
+landing_zones:
+  mount: mount.go
+  config: config.go
+  response: response.go
+  compression: compression.go
+  paths: paths.go

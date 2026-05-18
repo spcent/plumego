@@ -168,3 +168,13 @@ agent_hints:
   - Use x/websocket for app-facing imports
   - The implementation now lives directly in x/websocket
   - Keep websocket setup out of core
+
+task_affinity:
+  websocket: x/websocket/
+  bugfix_triage: x/websocket/
+
+landing_zones:
+  hub: hub.go
+  server: server.go
+  auth: auth.go
+  security: security.go

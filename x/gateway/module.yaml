@@ -85,3 +85,14 @@ agent_hints:
   - Treat x/gateway as the only app-facing entrypoint for gateway and edge transport work
   - x/gateway/discovery and x/gateway/ipc are subordinate packages; start discovery and IPC work here before opening them directly
   - Route reusable resource-interface work to x/rest rather than mixing it into gateway
+
+task_affinity:
+  gateway_edge_transport: x/gateway/
+  service_discovery: x/gateway/discovery/
+  bugfix_triage: x/gateway/
+
+landing_zones:
+  proxy: proxy.go
+  entrypoint: entrypoints.go
+  discovery: discovery/
+  ipc: ipc/
