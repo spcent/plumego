@@ -63,3 +63,8 @@ agent_hints:
   - Treat x/data/cache as a subordinate of x/data; start distributed cache work in x/data before opening this package directly
   - Prefer store/cache.MemoryCache for in-process caching; open x/data/cache only for distributed or Redis topology
   - For tenant-aware caching use x/tenant/store/cache
+
+landing_zones:
+  distributed: distributed/
+  redis: redis/
+  leaderboard: leaderboard/

@@ -39,11 +39,16 @@ canonical_authority:
   checks:
     - specs/checks.yaml
     - specs/deprecation-inventory.yaml
+  stop_condition_handlers:
+    - specs/stop-condition-handlers.yaml
+  request_flows:
+    - specs/request-flows.yaml
   workflow:
     - specs/change-recipes
     - specs/change-recipes/analysis-only.yaml
     - specs/change-recipes/add-http-endpoint.yaml
     - specs/change-recipes/add-middleware.yaml
+    - specs/change-recipes/add-acceptance-tests.yaml
     - specs/change-recipes/fix-bug.yaml
     - specs/change-recipes/http-endpoint-bugfix.yaml
     - specs/change-recipes/new-stable-module.yaml
@@ -136,6 +141,8 @@ agent_workflow:
     - specs/agent-quality-rules.yaml
     - specs/module-manifest.schema.yaml
     - specs/checks.yaml
+    - specs/stop-condition-handlers.yaml
+    - specs/request-flows.yaml
     - specs/change-recipes
   execution_queue:
     - tasks/cards

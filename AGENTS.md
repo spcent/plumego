@@ -22,7 +22,8 @@ files needed for the task:
 - Machine rules: `specs/repo.yaml`, `specs/task-routing.yaml`,
   `specs/extension-taxonomy.yaml`, `specs/extension-maturity.yaml`,
   `specs/package-hotspots.yaml`, `specs/dependency-rules.yaml`,
-  `specs/checks.yaml`, and `specs/module-manifest.schema.yaml`
+  `specs/checks.yaml`, `specs/module-manifest.schema.yaml`,
+  `specs/stop-condition-handlers.yaml`, and `specs/request-flows.yaml`
 - Local scope: target `<module>/module.yaml`
 - Canonical app wiring: `reference/standard-service`
 
@@ -125,7 +126,10 @@ For normal implementation requests, assume:
 
 Use analysis mode and do not edit when ownership is unclear, the task is broad
 without acceptance criteria, a new dependency is required, or a stable public API
-change was not requested.
+change was not requested. When you hit a stop condition, read
+`specs/stop-condition-handlers.yaml` for the deterministic resolution path —
+each condition maps to concrete next steps, an escalation action, and the
+unblock criteria.
 
 For review requests, do not patch unless explicitly asked. Findings come first,
 ordered by severity, with boundary violations, regressions, hidden coupling, and
@@ -179,6 +183,7 @@ go run ./internal/checks/dependency-rules
 go run ./internal/checks/agent-workflow
 go run ./internal/checks/module-manifests
 go run ./internal/checks/reference-layout
+go run ./internal/checks/public-entrypoints-sync
 ```
 
 Repo-wide gates:

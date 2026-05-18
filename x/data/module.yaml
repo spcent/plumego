@@ -88,3 +88,15 @@ agent_hints:
   - Move sharding and rw orchestration here instead of widening store
   - Keep business repositories and domain-specific dedupe rules in app code, not in x/data
   - x/data/cache is a subordinate package for distributed/Redis cache topology; start cache work here before opening x/data/cache directly
+
+task_affinity:
+  store: x/data/
+  bugfix_triage: x/data/
+
+landing_zones:
+  cache: cache/
+  file: file/
+  kv_engine: kvengine/
+  rw_split: rw/
+  topology: sharding/
+  idempotency: idempotency/

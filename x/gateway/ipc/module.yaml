@@ -44,3 +44,8 @@ agent_hints:
   - Treat x/gateway/ipc as a primitive root, not a user-facing capability entrypoint
   - Treat x/gateway/ipc as a subordinate of x/gateway; start IPC-facing work in x/gateway before opening this package directly
   - Keep IPC internals self-contained with narrow adapters and out of core
+
+landing_zones:
+  server: server.go
+  client: client.go
+  pool: pool.go

@@ -1,0 +1,159 @@
+version: 1
+
+metadata:
+  purpose: >
+    Resolution handlers for agent stop conditions. When an agent hits a stop
+    condition, this file provides the exact next steps, escalation path, and
+    unblock criteria — converting dead-ends into structured flows.
+  read_after:
+    - AGENTS.md
+    - specs/agent-quality-rules.yaml
+    - specs/task-routing.yaml
+
+handlers:
+  unclear_ownership:
+    description: The owning module for a change cannot be determined.
+    resolution:
+      - Read specs/task-routing.yaml: match the task intent to a routing_rule destination.
+      - Read specs/package-hotspots.yaml: check if the package appears as a hotspot with task_families guidance.
+      - If still unclear, read specs/repo.yaml layers section to determine stable vs extension vs tooling.
+      - Document the ambiguity in the task card's Open Questions section.
+    escalation: Create tasks/cards/blocked/<id>-ownership.md with the two candidate modules and why each could own the behavior.
+    unblock_by: human_review
+    docs:
+      - specs/task-routing.yaml
+      - specs/package-hotspots.yaml
+      - specs/repo.yaml
+
+  stable_root_requires_x_import:
+    description: >
+      A task would force a stable root (core, router, contract, middleware,
+      security, store, health, log, metrics) to import an x/* extension package.
+    resolution:
+      - Determine which x/* family owns the capability.
+      - Check if the capability can be expressed as an interface in contract/ instead of a direct import.
+      - If the capability is generic enough, consider whether it belongs in a new stable package (requires RFC).
+      - Prefer option: move the feature to the owning x/* family; pass the behavior into the stable root via constructor injection or interface.
+    escalation: Record in the milestone spec's Open Questions section. Do not widen the stable root.
+    unblock_by: rfc_or_scope_reduction
+    docs:
+      - docs/architecture/core-boundary.md
+      - docs/architecture/extension-boundary.md
+      - specs/dependency-rules.yaml
+    recipe: specs/change-recipes/new-extension-module.yaml
+
+  unapproved_public_api_change:
+    description: The task requires changing a stable public API that was not explicitly requested.
+    resolution:
+      - Verify the API change is truly necessary and not avoidable via additive extension.
+      - If the change is additive (new exported symbol), it may be allowed — confirm with module.yaml stop_conditions.
+      - If the change is breaking (remove or modify existing symbol), split into two tasks: (1) analysis-only review, (2) symbol change with migration.
+      - Record the required API shape in the task card's Open Questions section.
+    escalation: Create tasks/cards/blocked/<id>-api.md describing the change and its callers.
+    unblock_by: explicit_approval_in_task_card
+    docs:
+      - AGENTS.md
+      - specs/change-recipes/symbol-change.yaml
+    recipe: specs/change-recipes/symbol-change.yaml
+
+  unapproved_new_dependency:
+    description: The task requires adding a new external dependency to go.mod.
+    resolution:
+      - Search for a stdlib equivalent first. The main module is stdlib-only by policy.
+      - Check if the dependency already exists in cmd/plumego/go.mod (CLI dependencies are separate).
+      - Check if an existing x/* package already wraps the dependency.
+      - If no stdlib alternative exists, document the dependency, its version, and the justification.
+    escalation: Create tasks/cards/blocked/<id>-dep.md with dependency name, version, alternatives considered, and justification.
+    unblock_by: explicit_approval_in_task_card
+    docs:
+      - AGENTS.md
+      - CLAUDE.md
+
+  broad_task_no_acceptance_criteria:
+    description: The task is broad or vague and lacks concrete acceptance criteria or validation commands.
+    resolution:
+      - Switch to analysis mode; do not edit any files.
+      - Read specs/task-routing.yaml to identify the primary destination layer.
+      - Produce an analysis report identifying: affected modules, required file changes, test scope, and suggested acceptance criteria.
+      - Propose splitting the task into an analysis card and one or more implementation cards.
+    escalation: Write the analysis report to tasks/cards/blocked/<id>-analysis.md and halt.
+    unblock_by: human_review
+    docs:
+      - specs/change-recipes/analysis-only.yaml
+    recipe: specs/change-recipes/analysis-only.yaml
+
+  spec_manifest_pattern_conflict:
+    description: >
+      A spec file (specs/), a module manifest (module.yaml), and local code
+      patterns conflict in a behavior-changing way. The authoritative source
+      is ambiguous.
+    resolution:
+      - Record each conflicting source with the exact conflicting text.
+      - Apply the authority order from AGENTS.md section 1: (1) security/boundary rules, (2) CANONICAL_STYLE_GUIDE.md, (3) machine-readable specs, (4) existing local patterns.
+      - If the conflict is at level (3) vs (4), prefer the spec and flag the local pattern as drift.
+      - If the conflict involves a security or boundary rule, halt and escalate.
+    escalation: Create tasks/cards/blocked/<id>-conflict.md listing each conflicting source and the proposed resolution.
+    unblock_by: human_review
+    docs:
+      - AGENTS.md
+      - docs/CANONICAL_STYLE_GUIDE.md
+      - specs/repo.yaml
+
+  feature_catalog_in_stable_root:
+    description: >
+      The task would add feature-specific behavior, a feature catalog surface,
+      or a capability registration mechanism to a stable root (most commonly core/).
+    resolution:
+      - Identify which x/* family owns the feature domain.
+      - Move the feature to the owning x/* family; wire it via constructor injection in reference apps.
+      - If no x/* family exists yet, follow specs/change-recipes/new-extension-module.yaml.
+      - The stable root should receive at most a thin interface addition to contract/ if truly needed.
+    escalation: Record the proposed x/* target in the task card before implementing.
+    unblock_by: scope_confirmed_in_task_card
+    docs:
+      - docs/architecture/core-boundary.md
+      - docs/architecture/extension-boundary.md
+    recipe: specs/change-recipes/new-extension-module.yaml
+
+  hidden_registration_attempt:
+    description: >
+      The task design relies on init() side-effect registration, package-level
+      mutable registries, context service-locator patterns, or route auto-discovery.
+    resolution:
+      - Refactor to constructor-based dependency injection; pass dependencies explicitly.
+      - Route registration must remain one method + one path + one handler per line in reference apps.
+      - If a registry is truly needed, scope it as a value type passed through constructor, not a global.
+    escalation: None — this is a design violation. Redesign before implementing.
+    unblock_by: design_change
+    docs:
+      - AGENTS.md
+      - docs/CANONICAL_STYLE_GUIDE.md
+
+  auth_policy_in_transport_middleware:
+    description: >
+      The task would add business auth policy, tenant-specific logic, or domain
+      policy branching to transport middleware (middleware/ stable root).
+    resolution:
+      - Transport middleware stays transport-only: logging, tracing, timeout, compression, CORS, request IDs.
+      - Business auth policy belongs in security/ primitives or x/tenant/ policy.
+      - Tenant-specific quota or rate-limit logic belongs in x/tenant/.
+      - Wire auth policy as a separate middleware returned from x/tenant or security, not inside middleware/.
+    escalation: Record the policy behavior in the task card with the proposed owning module.
+    unblock_by: scope_confirmed_in_task_card
+    docs:
+      - middleware/module.yaml
+      - x/tenant/module.yaml
+      - docs/architecture/core-boundary.md
+
+  missing_tests_for_behavior_change:
+    description: A behavior change has no associated tests, or the test scope is insufficient.
+    resolution:
+      - Add unit tests adjacent to the changed file before pushing.
+      - For negative paths (invalid input, boundary conditions, auth failure), tests are mandatory.
+      - For security/ and middleware/ changes, timing-safe and ordering tests are required.
+      - Use internal/testutil/ for shared test helpers; do not duplicate fixtures.
+    escalation: None — tests must accompany behavior changes. Do not push without tests.
+    unblock_by: tests_added
+    docs:
+      - AGENTS.md
+      - specs/agent-quality-rules.yaml

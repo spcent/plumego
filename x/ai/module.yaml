@@ -96,3 +96,14 @@ agent_hints:
   - Prefer explicit handler-level composition
   - Keep provider integrations isolated by subpackage
   - Do not require core to know AI internals; keep generic resilience primitives in x/resilience
+
+task_affinity:
+  bugfix_triage: x/ai/
+
+landing_zones:
+  provider: provider/
+  session: session/
+  streaming: streaming/
+  tool: tool/
+  orchestration: orchestration/
+  resilience: resilience/

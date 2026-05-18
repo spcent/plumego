@@ -71,3 +71,11 @@ agent_hints:
   - Put reusable circuit breaking and rate limiting here instead of in stable security or feature-specific packages
   - Keep feature-specific resilience orchestration in the owning extension package
   - Keep adapters explicit rather than wrapping failures behind hidden middleware magic
+
+task_affinity:
+  resilience: x/resilience/
+  bugfix_triage: x/resilience/
+
+landing_zones:
+  circuit_breaker: circuitbreaker/
+  rate_limit: ratelimit/

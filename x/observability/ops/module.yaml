@@ -49,3 +49,6 @@ agent_hints:
   - Use x/observability/ops for protected admin endpoints only; start broader observability discovery in x/observability
   - Keep ops routing outside core and keep admin surfaces explicitly auth-gated
   - Fail closed on auth errors and do not let x/observability/ops become a competing observability entrypoint
+
+landing_zones:
+  ops: ops.go

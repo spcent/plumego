@@ -29,8 +29,8 @@ non_goals:
 
 public_entrypoints:
   - ResourceSpec
-  - RegisterCollectionRoutes
   - RegisterResourceRoutes
+  - RegisterDBResource
   - pagination
   - query
 
@@ -75,3 +75,12 @@ agent_hints:
   - Use x/rest when standardizing reusable resource APIs and CRUD interface shape
   - Prefer ResourceSpec plus explicit Register*Routes helpers for new reusable resource APIs
   - Do not start application bootstrap, proxy topology, or edge transport work from x/rest; use reference/standard-service and x/gateway instead
+
+task_affinity:
+  resource_api_standardization: x/rest/
+  bugfix_triage: x/rest/
+
+landing_zones:
+  resource_spec: spec.go
+  route_registration: entrypoints.go
+  db_resource: resource_db_routes.go

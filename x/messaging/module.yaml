@@ -90,3 +90,16 @@ agent_hints:
   - Start all new app-facing messaging discovery here before opening sibling x/* packages
   - Keep orchestration inside x/messaging with explicit service wiring and family-level entrypoints
   - Treat x/messaging/mq, x/messaging/pubsub, x/messaging/scheduler, and x/messaging/webhook as subordinate packages under this family, not competing entrypoints
+
+task_affinity:
+  messaging: x/messaging/
+  bugfix_triage: x/messaging/
+
+landing_zones:
+  service: service.go
+  entrypoint: entrypoints.go
+  routes: routes.go
+  queue: mq/
+  pubsub: pubsub/
+  scheduler: scheduler/
+  webhook: webhook/

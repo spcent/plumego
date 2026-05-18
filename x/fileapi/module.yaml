@@ -80,3 +80,11 @@ agent_hints:
   - Wire `Handler.Upload`, `Download`, `GetInfo`, `GetURL`, `Delete`, and `List` explicitly in your application's routes.go
   - Inject tenant middleware before file routes and attach tenant identity with `x/tenant/core.WithTenantID`
   - Use `x/fileapi.WithUserID` when upload handlers need uploader identity in context, and keep backend selection, tenant path policy, and metadata persistence in `x/data/file` or app wiring rather than handlers
+
+task_affinity:
+  file_api: x/fileapi/
+  bugfix_triage: x/fileapi/
+
+landing_zones:
+  handler: handler.go
+  context: context.go

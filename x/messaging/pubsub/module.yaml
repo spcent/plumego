@@ -45,3 +45,8 @@ agent_hints:
   - Treat x/messaging/pubsub as a subordinate primitive package; start new messaging feature discovery in x/messaging
   - Prefer local broker injection and keep pubsub transport-agnostic
   - Do not use x/messaging/pubsub as a competing family entrypoint for new messaging work or move brokers into core
+
+landing_zones:
+  broker: broker.go
+  pubsub: pubsub.go
+  persistence: persistence.go

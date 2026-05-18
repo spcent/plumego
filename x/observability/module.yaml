@@ -75,3 +75,15 @@ agent_hints:
   - Start broader observability adapter and export work here; x/observability/ops and x/observability/devtools are subordinate packages
   - Start transport observability primitives in middleware/requestid, middleware/tracing, middleware/httpmetrics, or middleware/accesslog; keep broader record-buffering and export helpers here
   - Keep adapter-local helpers explicit and do not turn middleware into an observability catalog
+
+task_affinity:
+  observability_admin: x/observability/
+  devtools_local_debug: x/observability/devtools/
+  ops_admin_surface: x/observability/ops/
+  bugfix_triage: x/observability/
+
+landing_zones:
+  adapter: observability.go
+  exporter: exporter.go
+  ops: ops/
+  devtools: devtools/

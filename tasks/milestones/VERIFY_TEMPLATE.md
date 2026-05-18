@@ -19,6 +19,11 @@ Verified Cards:
 - exported symbol changes:
 - residual reference grep:
 
+## Acceptance Test Results
+
+<!-- List each acceptance test defined in task cards and its result.
+     Format: <file>: <TestFunctionName>: PASS / FAIL -->
+
 ## Module Test Summary
 
 - primary module tests:
@@ -30,6 +35,7 @@ Verified Cards:
 - agent-workflow:
 - module-manifests:
 - reference-layout:
+- public-entrypoints-sync:
 
 ## Repo Gate Summary
 
@@ -37,6 +43,15 @@ Verified Cards:
 - `go test -timeout 20s ./...`
 - `go vet ./...`
 - `gofmt -l .`
+
+## Checkpoint Summary
+
+<!-- Read tasks/milestones/M-XXX.checkpoint.json and summarize.
+     Or run: make milestone-status M=active/M-XXX -->
+
+- Phase 1:
+- Phase 2:
+- Phase 3:
 
 ## Open Issues
 

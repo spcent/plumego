@@ -46,3 +46,9 @@ agent_hints:
   - Treat x/messaging/scheduler as a subordinate scheduling primitive; start app-facing messaging feature discovery in x/messaging
   - Open x/messaging/scheduler directly only for narrow cron, delayed job, or retry coordination work
   - Do not use x/messaging/scheduler as a competing family entrypoint for new messaging work or move it into core
+
+landing_zones:
+  scheduler: scheduler.go
+  executor: scheduler_executor.go
+  cron: cron.go
+  api: scheduler_api.go

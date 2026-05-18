@@ -143,6 +143,34 @@ func workflowViolations(repoRoot string) ([]string, error) {
 	}
 	violations = append(violations, httpSurfaceViolations...)
 
+	specViolations, err := requiredControlPlaneSpecViolations(repoRoot)
+	if err != nil {
+		return nil, err
+	}
+	violations = append(violations, specViolations...)
+
+	return violations, nil
+}
+
+// requiredControlPlaneSpecViolations checks that key agent-facing spec files exist.
+// These files form the control-plane contract for agent-driven development; their
+// absence indicates an incomplete or degraded control plane.
+func requiredControlPlaneSpecViolations(repoRoot string) ([]string, error) {
+	required := []string{
+		"specs/stop-condition-handlers.yaml",
+		"specs/request-flows.yaml",
+	}
+	var violations []string
+	for _, relPath := range required {
+		if _, err := os.Stat(filepath.Join(repoRoot, filepath.FromSlash(relPath))); err != nil {
+			if os.IsNotExist(err) {
+				violations = append(violations, relPath+" is required in the agent control plane but does not exist")
+				continue
+			}
+			return nil, err
+		}
+	}
+	sort.Strings(violations)
 	return violations, nil
 }
 
