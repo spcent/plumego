@@ -107,10 +107,10 @@ export const FOOTER_GROUPS: Record<Locale, Array<{ title: string; links: Array<{
 
 export const HOME_COPY = {
   en: {
-    eyebrow: 'stdlib-only · explicit routing · agent-ready · pre-v1',
+    eyebrow: 'stdlib-only · explicit routing · agent-ready · v1.0.0',
     headline: 'Explicit Go HTTP. Built for humans and agents.',
     summary:
-      'Explicit routing that survives code review. Machine-readable specs and per-module manifests give AI coding agents a clear operating model. Zero external dependencies. 9 stable modules, API frozen toward v1.',
+      'Explicit routing that survives code review. Machine-readable specs and per-module manifests give AI coding agents a clear operating model. Zero external dependencies. 9 stable modules with the v1 stable-root compatibility promise.',
     primaryCta: { label: 'Get Started', href: '/docs/getting-started' },
     secondaryCta: { label: 'See the difference', href: '#contrast' },
     scenarioCards: [
@@ -156,13 +156,13 @@ api.Get("/data", tenant.Guard(data.List))
     ],
     stabilityBandTitle: 'Know exactly what you can rely on.',
     stabilityBandItems: [
-      { label: '9 stable modules', detail: 'API frozen, v1-bound', status: 'stable', href: '/stability' },
+      { label: '9 stable modules', detail: 'v1 compatibility promise', status: 'stable', href: '/stability' },
       { label: '4 beta extensions', detail: 'API frozen between refs', status: 'beta', href: '/stability' },
       { label: '16 experimental', detail: 'Evaluate before adopting', status: 'experimental', href: '/stability' },
     ],
-    stabilityBandCta: { label: 'Project status & v1 checklist', href: '/status' },
+    stabilityBandCta: { label: 'Project status & release evidence', href: '/status' },
     moduleTitle: 'Stable modules.',
-    moduleLead: '9 packages with compatibility guarantees toward v1. The recommended starting scope for production evaluation.',
+    moduleLead: '9 packages with the v1 stable-root compatibility promise. The recommended starting scope for production evaluation.',
     moduleBaseImport: 'github.com/spcent/plumego',
     modules: [
       { name: 'core',       description: 'App bootstrap, server lifecycle, and configuration assembly',                        docHref: '/docs/modules/core' },
@@ -224,10 +224,10 @@ api.Get("/data", tenant.Guard(data.List))
     contrastAfterLabel: 'plumego: one file, one contract',
   },
   zh: {
-    eyebrow: 'stdlib only · 显式路由 · agent-ready · pre-v1',
+    eyebrow: 'stdlib only · 显式路由 · agent-ready · v1.0.0',
     headline: '显式 Go HTTP。为人类和 Agent 而生。',
     summary:
-      '在代码评审中清晰可见的显式路由。机器可读的规范与模块清单，让 AI 编程代理精准定位变更边界。零外部依赖。9 个稳定模块，API 向 v1 冻结。',
+      '在代码评审中清晰可见的显式路由。机器可读的规范与模块清单，让 AI 编程代理精准定位变更边界。零外部依赖。9 个稳定模块承载 v1 稳定根兼容性承诺。',
     primaryCta: { label: '开始使用', href: '/zh/docs/getting-started' },
     secondaryCta: { label: '看看有什么不同', href: '#contrast' },
     scenarioCards: [
@@ -273,13 +273,13 @@ api.Get("/data", tenant.Guard(data.List))
     ],
     stabilityBandTitle: '清楚知道哪些可以依赖。',
     stabilityBandItems: [
-      { label: '9 个稳定模块', detail: 'API 冻结，向 v1 推进', status: 'stable', href: '/zh/stability' },
+      { label: '9 个稳定模块', detail: 'v1 兼容性承诺', status: 'stable', href: '/zh/stability' },
       { label: '4 个 beta 扩展', detail: 'ref 间 API 冻结', status: 'beta', href: '/zh/stability' },
       { label: '16 个实验性', detail: '采用前请先评估', status: 'experimental', href: '/zh/stability' },
     ],
-    stabilityBandCta: { label: '项目状态与 v1 清单', href: '/zh/status' },
+    stabilityBandCta: { label: '项目状态与发布证据', href: '/zh/status' },
     moduleTitle: '稳定模块。',
-    moduleLead: '9 个包，具备向 v1 迈进的兼容性保证，是推荐的生产评估起点。',
+    moduleLead: '9 个包承载 v1 稳定根兼容性承诺，是推荐的生产评估起点。',
     moduleBaseImport: 'github.com/spcent/plumego',
     modules: [
       { name: 'core',       description: '应用启动、服务器生命周期与配置组装',                              docHref: '/zh/docs/modules/core' },
@@ -298,7 +298,7 @@ api.Get("/data", tenant.Guard(data.List))
     extensionReleasesHref: '/zh/releases',
     adoptionTitle: '下一步去哪里。',
     adoptionBody:
-      '如果问题是适用性，先看「为什么选择 Plumego」。如果要运行参考服务，先看示例。在扩大采用范围之前，用状态页确认模块成熟度和 v1 进度。',
+      '如果问题是适用性，先看「为什么选择 Plumego」。如果要运行参考服务，先看示例。在扩大采用范围之前，用状态页确认模块成熟度和发布证据。',
     adoptionCards: [
       {
         kicker: 'fit',
@@ -317,7 +317,7 @@ api.Get("/data", tenant.Guard(data.List))
       {
         kicker: 'maturity',
         title: '项目状态',
-        body: '当前版本、模块成熟度分级、v1 就绪清单与活跃路线图——扩大采用范围之前，从这里确认成熟度。',
+        body: '当前版本、模块成熟度分级、发布证据与活跃路线图——扩大采用范围之前，从这里确认成熟度。',
         href: '/zh/status',
         label: '查看项目状态',
       },
@@ -1132,7 +1132,7 @@ export const STABILITY_COPY = {
         status: 'stable',
         label: 'Stable roots',
         badge: 'stable',
-        promise: 'API frozen toward v1. Safe for production.',
+        promise: 'v1 stable-root compatibility promise. Safe for production.',
         adopt: 'Adopt now — these are the recommended starting point for every service.',
         modules: ['core', 'router', 'contract', 'middleware', 'security', 'store', 'health', 'log', 'metrics'],
       },
@@ -1184,7 +1184,7 @@ export const STABILITY_COPY = {
         status: 'stable',
         label: '稳定根',
         badge: '稳定',
-        promise: 'API 向 v1 冻结，可用于生产。',
+        promise: 'v1 稳定根兼容性承诺，可用于生产。',
         adopt: '立即采用——这是所有服务推荐的起点。',
         modules: ['core', 'router', 'contract', 'middleware', 'security', 'store', 'health', 'log', 'metrics'],
       },

@@ -150,7 +150,7 @@ const frameworks: Framework[] = [
     id: 'plumego',
     name: 'Plumego',
     url: 'https://github.com/spcent/plumego',
-    tagline: '显式 HTTP 工具包 — stdlib only，Agent 就绪，pre-v1',
+    tagline: '显式 HTTP 工具包 — stdlib only，Agent 就绪，v1.0.0',
     handlerSig: 'func(w http.ResponseWriter, r *http.Request)',
     stdlibHandler: true,
     zeroDeps: true,
@@ -159,7 +159,7 @@ const frameworks: Framework[] = [
     middlewareStdlib: true,
     agentReady: true,
     stabilityModel: true,
-    stars: 'pre-v1',
+    stars: 'v1.0.0',
     verdict: '适合那些更看重路由 ownership、评审清晰度和共享服务骨架的团队，而不是框架便利性。如果团队在使用 AI 编码工具，这是唯一有机器可读 ownership 信号的选择。',
     whenToChoose: [
       '路由注册、中间件顺序和依赖 wiring 必须在代码评审里清晰可见',
@@ -170,7 +170,7 @@ const frameworks: Framework[] = [
     whenNotToChoose: [
       '希望框架隐藏结构决策——Plumego 刻意保持显式',
       '已有大量 Gin/Echo 代码，迁移成本超过收益',
-      '需要经过验证的 v1+ 版本和长期使用记录',
+      '需要经过多年验证的 v1+ 长期使用记录',
       '服务是小脚本或短生命周期工具，结构开销不划算',
     ],
     migrationCost: 'n/a',
@@ -623,11 +623,11 @@ contract.<span class="hc-fn">WriteError</span>(w, r,
           <svg class="comparison-cell-icon comparison-cell-icon--caution" width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
             <path d="M8 3v6M8 11.5v1" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
           </svg>
-          现在就需要 v1 稳定性
+          现在就需要长期生产记录
         </p>
         <h3>你需要经过验证的 v1+ 版本记录</h3>
         <p>
-          Plumego 仍是 pre-v1。9 个稳定根有兼容性承诺，但项目尚未积累 Gin 或 Echo 那样的长期生产记录。
+          Plumego 已有 v1.0.0 标签，9 个稳定根有兼容性承诺，但项目尚未积累 Gin 或 Echo 那样的长期生产记录。
           如果"5年以上大规模验证"是硬性要求，Gin 或 Echo 在组织层面更安全。
         </p>
       </article>

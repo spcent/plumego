@@ -9,19 +9,19 @@ const stableCount = MODULE_FACTS.stableRoots.length;
 const betaCount = MODULE_FACTS.betaExtensionFamilies.length;
 const experimentalCount = MODULE_FACTS.allExtensionPaths.length - betaCount;
 
-const v1Checklist = [
+const releaseChecklist = [
   { label: '9 stable roots with API snapshots', done: true, subitems: [] },
   { label: '4 beta extensions with promotion evidence', done: true, subitems: [] },
   { label: 'Boundary checks enforced in CI', done: true, subitems: [] },
   { label: 'Race-detector test suite passing', done: true, subitems: [] },
   { label: 'Deprecation policy published', done: true, subitems: [] },
   {
-    label: 'Docs and onboarding sync',
-    done: false,
+    label: 'Post-v1 docs and onboarding sync',
+    done: true,
     subitems: [
       { label: 'Getting-started guide reviewed and accurate', done: true },
       { label: 'All 9 stable-root module primers published', done: true },
-      { label: 'Reference app primer complete and aligned with current code', done: false },
+      { label: 'Reference app primer complete and aligned with current code', done: true },
     ],
   },
 ];
@@ -30,13 +30,13 @@ const v1Checklist = [
 <MarketingLayout
   locale="en"
   title="Project Status — Plumego"
-  description="Current version, module stability tiers, roadmap direction, and v1 progress in one place."
+  description="Current version, module stability tiers, roadmap direction, and release evidence in one place."
   currentPath="/status"
 >
   <PageHero
     eyebrow="Project Status"
     title="What you can rely on today."
-    description="Current version, module maturity, active roadmap direction, and v1 progress — all in one place."
+    description="Current version, module maturity, active roadmap direction, and release evidence — all in one place."
     visual="releases"
     links={[
       { label: 'Full stability matrix', href: '/stability' },
@@ -67,17 +67,17 @@ const v1Checklist = [
     </div>
   </section>
 
-  <!-- v1 Progress tracker -->
+  <!-- Release evidence tracker -->
   <section class="section section--tinted">
     <div class="section__intro">
-      <h2>v1 readiness checklist.</h2>
+      <h2>v1 release evidence.</h2>
       <p>
-        Plumego is being hardened toward v1 deliberately — each item here represents a gate that must pass
-        before a stable release is tagged. Items marked done are machine-enforced or already published.
+        Plumego v1.0.0 is tagged. Each item here records a gate or evidence artifact that supports the
+        current release posture. Items marked done are machine-enforced or already published.
       </p>
     </div>
     <div class="v1-checklist">
-      {v1Checklist.map((item) => (
+      {releaseChecklist.map((item) => (
         <div class={`v1-item-group ${item.done ? 'v1-item-group--done' : 'v1-item-group--pending'}`}>
           <div class={`v1-item ${item.done ? 'v1-item--done' : 'v1-item--pending'}`}>
             <span class="v1-item__icon" aria-hidden="true">
@@ -105,7 +105,7 @@ const v1Checklist = [
       ))}
     </div>
     <p class="v1-note">
-      Full checklist: <a class="text-link" href="https://github.com/spcent/plumego/blob/main/docs/release/PRE_V1_RELEASE_CHECKLIST.md">docs/release/PRE_V1_RELEASE_CHECKLIST.md →</a>
+      Release evidence: <a class="text-link" href="https://github.com/spcent/plumego/blob/main/docs/release/v1.0.0.md">docs/release/v1.0.0.md →</a>
     </p>
   </section>
 

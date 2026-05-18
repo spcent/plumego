@@ -44,10 +44,10 @@ const adoptionGuidance = [
 
 const releaseChannels = [
   {
-    kicker: '稳定根候选',
+    kicker: 'GA 稳定根',
     title: '稳定根',
-    body: '这些是正在向 v1 收紧的兼容性承担表面，也是 Plumego 期望多数服务长期依赖的默认能力。',
-    details: ['公共包表面以长期稳定 API 为目标', '最适合先进入生产评估', '文档与示例都会先围绕这条路径组织'],
+    body: '这些是由 v1 稳定根承诺覆盖的兼容性承担表面，也是 Plumego 期望多数服务长期依赖的默认能力。',
+    details: ['公共包表面承载 v1 稳定根兼容性承诺', '最适合先进入生产评估', '文档与示例都会先围绕这条路径组织'],
   },
   {
     kicker: '受支持参考路径',
@@ -120,10 +120,13 @@ function zhArea(area: string): string {
 
 function zhStatus(status: string): string {
   const labels: Record<string, string> = {
-    'Stable-root candidate': '稳定根候选',
+    'ga': 'GA',
+    'supported reference': '受支持参考路径',
     'Supported reference': '受支持参考路径',
-    'v1 hardening scope': 'v1 收紧范围',
+    'supported tool': '受支持工具',
+    beta: 'Beta',
     Beta: 'Beta',
+    experimental: '实验性',
     Experimental: '实验性',
   };
   return labels[status] ?? status;
@@ -131,8 +134,8 @@ function zhStatus(status: string): string {
 
 function zhPromise(promise: string): string {
   const labels: Record<string, string> = {
-    'Public package surface is intended to remain the long-term stable API after v1 hardening':
-      '公共包表面会在 v1 收紧后承担长期稳定 API 目标',
+    'Public package surface carries the v1 stable-root compatibility promise':
+      '公共包表面承载 v1 稳定根兼容性承诺',
     'Kept aligned with the canonical bootstrap and stable-root usage, but not treated as a reusable extension catalog':
       '与 canonical bootstrap 和稳定根用法保持对齐，但不被当作可复用扩展目录',
     'Supported as a command-line tool, not as a Go import surface; command behavior and generated output must stay aligned with canonical docs':
@@ -290,7 +293,7 @@ function zhPromise(promise: string): string {
     </div>
     <div class="page-grid">
       {releaseChannels.map((item) => (
-        <article class={`page-panel ${item.kicker === '稳定根候选' ? 'page-panel--fit' : item.kicker === '实验性' ? 'page-panel--caution' : item.kicker === 'Beta' ? 'page-panel--info' : ''}`}>
+        <article class={`page-panel ${item.kicker === 'GA 稳定根' ? 'page-panel--fit' : item.kicker === '实验性' ? 'page-panel--caution' : item.kicker === 'Beta' ? 'page-panel--info' : ''}`}>
           <p class="signal-list__kicker">{item.kicker}</p>
           <h2>{item.title}</h2>
           <p>{item.body}</p>

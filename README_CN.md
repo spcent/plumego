@@ -1,7 +1,7 @@
 # Plumego — 仅基于golang标准库的 Web 工具包
 
 [![Go 版本](https://img.shields.io/badge/Go-1.24%2B-00ADD8?style=flat&logo=go)](https://go.dev/)
-[![状态](https://img.shields.io/badge/status-pre--v1-orange)](https://github.com/spcent/plumego/releases)
+[![状态](https://img.shields.io/badge/status-v1.0.0-blue)](https://github.com/spcent/plumego/releases/tag/v1.0.0)
 [![许可证](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 Plumego 是一个小型 Go HTTP 工具包，完全基于标准库实现，同时覆盖路由、中间件、优雅关闭、安全辅助、传输适配器以及可选的 `x/*` 能力包。它设计为嵌入到你自己的 `main` 包中，而不是作为一个独立的框架二进制文件运行。
@@ -78,13 +78,13 @@ Plumego 的采用路径应保持收敛：
 
 ## 当前支持矩阵
 
-该矩阵描述的是当前仓库在正式 v1 tag 之前的状态。不同层级的兼容性承诺并不相同。
+该矩阵描述的是当前仓库在 `v1.0.0` 标签之后的状态。不同层级的兼容性承诺并不相同。
 
 | 范围 | 状态 | 兼容性承诺 | 模块 |
 | --- | --- | --- | --- |
-| 稳定根级库 | 稳定根候选 | 这些公开包预期在 v1 稳定化后构成长期稳定 API 面 | `core`、`router`、`contract`、`middleware`、`security`、`store`、`health`、`log`、`metrics` |
+| 稳定根级库 | `ga` | 这些公开包承载 v1 稳定根兼容性承诺 | `core`、`router`、`contract`、`middleware`、`security`、`store`、`health`、`log`、`metrics` |
 | 规范参考应用 | 支持的参考实现 | 保持与规范启动路径和稳定根级用法一致，但不作为扩展能力目录 | `reference/standard-service` |
-| CLI | v1 稳定化范围 | 作为命令行工具受支持，而不是 Go import 面；命令行为和生成产物必须与规范文档保持一致 | `cmd/plumego` |
+| CLI | 受支持工具 | 作为命令行工具受支持，而不是 Go import 面；命令行为和生成产物必须与规范文档保持一致 | `cmd/plumego` |
 | Beta 扩展族 | `beta` | API 表面在次版本发布引用之间已冻结；通过两个连续打标引用无导出 API 变化并经负责人签字后晋升 | `x/gateway`、`x/observability`、`x/rest`、`x/websocket` |
 | 面向应用的扩展族 | 实验性 | 纳入仓库质量门禁和发布范围，但 API / 配置兼容性尚未冻结 | `x/ai`、`x/data`、`x/fileapi`、`x/frontend`、`x/messaging`、`x/resilience`、`x/tenant` |
 | 从属扩展原语 | 实验性 | 保持维护和测试，但发现入口应先从所属能力族开始，兼容性尚未冻结 | `x/cache`、`x/devtools`、`x/gateway/discovery`、`x/gateway/ipc`、`x/messaging/mq`、`x/messaging/pubsub`、`x/messaging/scheduler`、`x/messaging/webhook`、`x/ops` |

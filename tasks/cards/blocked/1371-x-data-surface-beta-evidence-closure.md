@@ -13,6 +13,7 @@ Depends On: second release refs and owner sign-off
 
 Goal:
 - Complete beta evidence closure for selected `x/data` surfaces.
+- This card is part of the post-v1 maturity roadmap recorded in `tasks/cards/active/1452-post-v1-maturity-roadmap.md`.
 
 Problem:
 The evidence ledger tracks `x/data/file` and `x/data/idempotency` with first

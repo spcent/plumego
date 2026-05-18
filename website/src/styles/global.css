@@ -2951,8 +2951,8 @@ li {
   margin: 0.75rem 0 0;
 }
 
-/* ── Pre-v1 global banner ────────────────────────────────── */
-.pre-v1-banner {
+/* ── Release global banner ───────────────────────────────── */
+.release-banner {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2967,7 +2967,7 @@ li {
   text-align: center;
 }
 
-.pre-v1-banner__version {
+.release-banner__version {
   font-family: var(--font-mono);
   font-size: 0.74rem;
   font-weight: 600;
@@ -2978,15 +2978,15 @@ li {
   white-space: nowrap;
 }
 
-.pre-v1-banner__sep {
+.release-banner__sep {
   color: var(--line);
 }
 
-.pre-v1-banner__text {
+.release-banner__text {
   color: var(--fg-soft);
 }
 
-.pre-v1-banner__link {
+.release-banner__link {
   font-weight: 500;
   color: var(--accent);
   text-decoration: none;
@@ -2994,13 +2994,13 @@ li {
   transition: color 0.15s;
 }
 
-.pre-v1-banner__link:hover {
+.release-banner__link:hover {
   color: var(--accent-strong);
   text-decoration: underline;
 }
 
 @media (max-width: 480px) {
-  .pre-v1-banner__text {
+  .release-banner__text {
     display: none;
   }
 }

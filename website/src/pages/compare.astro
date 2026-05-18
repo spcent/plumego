@@ -152,7 +152,7 @@ const frameworks: Framework[] = [
     id: 'plumego',
     name: 'Plumego',
     url: 'https://github.com/spcent/plumego',
-    tagline: 'Explicit HTTP toolkit — stdlib-only, agent-ready, pre-v1',
+    tagline: 'Explicit HTTP toolkit — stdlib-only, agent-ready, v1.0.0',
     handlerSig: 'func(w http.ResponseWriter, r *http.Request)',
     stdlibHandler: true,
     zeroDeps: true,
@@ -161,7 +161,7 @@ const frameworks: Framework[] = [
     middlewareStdlib: true,
     agentReady: true,
     stabilityModel: true,
-    stars: 'pre-v1',
+    stars: 'v1.0.0',
     verdict: 'For teams where route ownership, review clarity, and a shared service shape matter more than framework convenience. The only choice if your team uses AI coding tools and wants machine-readable ownership signals.',
     whenToChoose: [
       'Route registration, middleware order, and dependency wiring must be visible in code review',
@@ -172,7 +172,7 @@ const frameworks: Framework[] = [
     whenNotToChoose: [
       'You want a framework to hide structure decisions — Plumego keeps them explicit by design',
       'Your team already has a large Gin/Echo codebase and the migration cost outweighs the benefit',
-      'You need a mature v1+ release with a proven long-term track record',
+      'You need a mature v1+ release with a proven multi-year track record',
       'Your service is a small script or short-lived tool where structure overhead isn\'t worth it',
     ],
     migrationCost: 'n/a',
@@ -648,11 +648,11 @@ contract.<span class="hc-fn">WriteError</span>(w, r,
           <svg class="comparison-cell-icon comparison-cell-icon--caution" width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
             <path d="M8 3v6M8 11.5v1" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
           </svg>
-          v1 stability required now
+          long production track record required
         </p>
         <h3>You need a proven v1+ track record</h3>
         <p>
-          Plumego is pre-v1. The 9 stable roots have a compatibility promise, but the project has not
+          Plumego has a v1.0.0 tag and the 9 stable roots have a compatibility promise, but the project has not
           yet accumulated the long-term production track record that Gin or Echo have. If "proven at
           scale for 5+ years" is a hard requirement, Gin or Echo is the safer organizational choice.
         </p>

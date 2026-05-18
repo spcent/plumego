@@ -13,6 +13,7 @@ Depends On: second release ref and owner sign-off
 
 Goal:
 - Complete beta evidence closure for `x/tenant` when real release refs and owner sign-off are available.
+- This card is part of the post-v1 maturity roadmap recorded in `tasks/cards/active/1452-post-v1-maturity-roadmap.md`.
 
 Problem:
 The evidence ledger has an `x/tenant` evidence doc, current-head snapshot, first

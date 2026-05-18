@@ -44,10 +44,10 @@ const adoptionGuidance = [
 
 const releaseChannels = [
   {
-    kicker: 'stable-root candidate',
+    kicker: 'ga stable roots',
     title: 'Stable roots',
-    body: 'These are the compatibility-carrying library surfaces being hardened toward v1. They set the bar for what Plumego expects most services to rely on over time.',
-    details: ['public package surface is intended to become the long-term stable API', 'best first stop for production evaluation', 'documentation and examples assume this path first'],
+    body: 'These are the compatibility-carrying library surfaces covered by the v1 stable-root promise. They set the bar for what Plumego expects most services to rely on over time.',
+    details: ['public package surface carries the v1 stable-root compatibility promise', 'best first stop for production evaluation', 'documentation and examples assume this path first'],
   },
   {
     kicker: 'supported reference',
@@ -186,8 +186,8 @@ function badgeClass(status: string): string {
     </div>
     <div class="stability-spectrum stability-spectrum--four">
       <div class="stability-spectrum__cell stability-spectrum__cell--stable">
-        <p class="signal-list__kicker">Stable-root candidate</p>
-        <p>Hardened toward the long-term v1 API and the first scope to evaluate for production services.</p>
+        <p class="signal-list__kicker">GA stable roots</p>
+        <p>Covered by the long-term v1 stable-root API promise and the first scope to evaluate for production services.</p>
         <ul class="stability-spectrum__items">
           {MODULE_FACTS.stableRoots.map((mod) => (
             <li class="stability-spectrum__item">{mod}</li>

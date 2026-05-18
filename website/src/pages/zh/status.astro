@@ -9,19 +9,19 @@ const stableCount = MODULE_FACTS.stableRoots.length;
 const betaCount = MODULE_FACTS.betaExtensionFamilies.length;
 const experimentalCount = MODULE_FACTS.allExtensionPaths.length - betaCount;
 
-const v1Checklist = [
+const releaseChecklist = [
   { label: '9 个稳定根，含 API 快照', done: true, subitems: [] },
   { label: '4 个 beta 扩展，含晋级证据', done: true, subitems: [] },
   { label: '边界检查在 CI 中机器执行', done: true, subitems: [] },
   { label: 'race-detector 测试套件通过', done: true, subitems: [] },
   { label: '废弃策略已发布', done: true, subitems: [] },
   {
-    label: '文档与 onboarding 同步',
-    done: false,
+    label: 'v1 后文档与 onboarding 同步',
+    done: true,
     subitems: [
       { label: '开始使用指南已审核，内容准确', done: true },
       { label: '全部 9 个稳定根模块手册已发布', done: true },
-      { label: 'Reference app 手册完整并与当前代码对齐', done: false },
+      { label: 'Reference app 手册完整并与当前代码对齐', done: true },
     ],
   },
 ];
@@ -30,13 +30,13 @@ const v1Checklist = [
 <MarketingLayout
   locale="zh"
   title="项目状态 — Plumego"
-  description="当前版本、模块成熟度、路线图方向与 v1 进度，汇总于一处。"
+  description="当前版本、模块成熟度、路线图方向与发布证据，汇总于一处。"
   currentPath="/zh/status"
 >
   <PageHero
     eyebrow="项目状态"
     title="今天可以依赖什么。"
-    description="当前版本、模块成熟度分级、活跃路线图方向与 v1 进度——全在这里。"
+    description="当前版本、模块成熟度分级、活跃路线图方向与发布证据——全在这里。"
     visual="releases"
     links={[
       { label: '完整稳定性矩阵', href: '/zh/stability' },
@@ -67,16 +67,16 @@ const v1Checklist = [
     </div>
   </section>
 
-  <!-- v1 Progress tracker -->
+  <!-- Release evidence tracker -->
   <section class="section section--tinted">
     <div class="section__intro">
-      <h2>v1 就绪清单。</h2>
+      <h2>v1 发布证据。</h2>
       <p>
-        Plumego 正在慎重地向 v1 推进——清单中的每一项都是打标稳定版本前必须通过的关口。标记为完成的项目已经机器执行或已发布。
+        Plumego v1.0.0 已经打标。这里的每一项都记录支撑当前发布姿态的门禁或证据。标记为完成的项目已经机器执行或已发布。
       </p>
     </div>
     <div class="v1-checklist">
-      {v1Checklist.map((item) => (
+      {releaseChecklist.map((item) => (
         <div class={`v1-item-group ${item.done ? 'v1-item-group--done' : 'v1-item-group--pending'}`}>
           <div class={`v1-item ${item.done ? 'v1-item--done' : 'v1-item--pending'}`}>
             <span class="v1-item__icon" aria-hidden="true">
@@ -104,7 +104,7 @@ const v1Checklist = [
       ))}
     </div>
     <p class="v1-note">
-      完整清单：<a class="text-link" href="https://github.com/spcent/plumego/blob/main/docs/release/PRE_V1_RELEASE_CHECKLIST.md">docs/release/PRE_V1_RELEASE_CHECKLIST.md →</a>
+      发布证据：<a class="text-link" href="https://github.com/spcent/plumego/blob/main/docs/release/v1.0.0.md">docs/release/v1.0.0.md →</a>
     </p>
   </section>
 
