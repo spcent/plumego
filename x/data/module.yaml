@@ -18,6 +18,8 @@ entrypoint_reads:
 subordinate_families:
   - package: x/data/cache
     role: distributed cache with consistent hashing, replication, failover, and Redis adapter
+  - package: x/data/pgx
+    role: pgx v5 PostgreSQL adapter for x/data callers
 
 responsibilities:
   - Read-write splitting orchestration

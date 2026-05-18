@@ -184,6 +184,21 @@ modules:
       - reference/**
       - cmd/**
 
+  x/data/pgx:
+    path: x/data/pgx
+    layer: extension
+    allow:
+      - stdlib
+      - store/db
+    deny:
+      - core/**
+      - router/**
+      - middleware/**
+      - security/**
+      - x/tenant/**
+      - reference/**
+      - cmd/**
+
   x/tenant:
     path: x/tenant
     layer: extension

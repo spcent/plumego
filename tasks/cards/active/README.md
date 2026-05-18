@@ -87,7 +87,6 @@ chain in tasks/milestones/ROADMAP.md.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 1550 | P2 | x/data | Create x/data/pgx adapting pgx v5 to store/db interfaces; offline tests |
 | 1551 | P2 | x/data | Create x/data/sqlx adapting sqlx to store/db interfaces; offline tests |
 | 1552 | P2 | x/data | Create x/data/migrate wrapping goose; add plumego migrate up/down/status |
 

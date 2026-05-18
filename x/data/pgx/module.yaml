@@ -1,0 +1,62 @@
+name: x/data/pgx
+path: x/data/pgx
+layer: extension
+status: experimental
+owner: persistence
+risk: medium
+summary: pgx v5 adapter for PostgreSQL access in the x/data family.
+
+parent_family: x/data
+
+entrypoint_reads:
+  - AGENTS.md
+  - docs/CANONICAL_STYLE_GUIDE.md
+  - specs/repo.yaml
+  - specs/task-routing.yaml
+  - specs/dependency-rules.yaml
+  - x/data/module.yaml
+
+responsibilities:
+  - pgx pool construction
+  - pgx query and transaction adapter methods
+  - explicit context propagation to pgx calls
+
+non_goals:
+  - ORM behavior
+  - Query builder ownership
+  - Live database test dependency
+  - Stable store/db interface changes
+
+allowed_imports:
+  - stdlib
+  - store/db
+
+forbidden_imports:
+  - core/**
+  - router/**
+  - middleware/**
+  - security/**
+  - x/tenant/**
+  - reference/**
+  - cmd/**
+
+test_commands:
+  - go test -race -timeout 60s ./...
+  - go test -timeout 20s ./...
+  - go vet ./...
+
+change_risks:
+  - transaction lifecycle regression
+  - context propagation regression
+  - accidental live database test dependency
+
+review_checklist:
+  - Keep pgx isolated to this separately versioned module
+  - Preserve explicit context arguments
+  - Keep tests offline
+  - Do not modify stable store/db interfaces
+
+agent_hints:
+  - Use New for production pgxpool creation
+  - Use NewWithPool when the application already owns the pool lifecycle
+  - Keep PostgreSQL-specific behavior in this module rather than store/db
