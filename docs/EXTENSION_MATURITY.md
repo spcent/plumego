@@ -30,7 +30,9 @@ candidates, it also verifies the evidence link and blocker text against
 beta at d2c25c3–ec70358. All four modules showed no exported API changes across
 both release refs. At v1.1.0, `x/tenant` was promoted to beta, and selected
 surfaces under `x/ai` and `x/data` gained beta evidence without promoting their
-root families. Release-backed API snapshots are recorded in
+root families. The same release promoted `x/frontend` and the app-facing
+`x/messaging` service while leaving subordinate messaging primitives
+experimental. Release-backed API snapshots are recorded in
 `docs/extension-evidence/snapshots/`. Remaining `x/*` modules retain
 `experimental` status until their own release evidence is complete.
 

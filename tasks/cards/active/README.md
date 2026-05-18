@@ -67,7 +67,6 @@ chain in tasks/milestones/ROADMAP.md.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 1515 | P1 | extension evidence | Update docs/EXTENSION_MATURITY.md and DEPRECATION.md for Round 2 |
 
 ### M-012 — Input Validation Bridge (P1, depends on M-008)
 

@@ -3,7 +3,7 @@
 Milestone: M-010
 Recipe: specs/change-recipes/update-docs.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: extension evidence
 Owned Files:
 - `docs/EXTENSION_MATURITY.md`
@@ -44,4 +44,10 @@ Done Definition:
 - `go run ./internal/checks/extension-maturity` exits 0.
 
 Outcome:
--
+- docs/EXTENSION_MATURITY.md now records the M-010 x/frontend and app-facing
+  x/messaging beta results.
+- docs/DEPRECATION.md beta extension table already includes the promoted
+  M-010 entries and remains current.
+- Validation passed with:
+  `go run ./internal/checks/extension-maturity`
+  `go run ./internal/checks/extension-beta-evidence`
