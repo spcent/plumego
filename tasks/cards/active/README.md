@@ -57,7 +57,6 @@ chain in tasks/milestones/ROADMAP.md.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 1510 | P0 | benchmark | Write router benchmark tests (static, single-param, multi-param) vs chi |
 | 1511 | P0 | benchmark | Write middleware chain benchmark tests (1, 3, 5 layers; no-op and JSON) |
 | 1512 | P0 | benchmark | Write benchmark/go.mod, benchmark/README.md, and docs/benchmarks/results-v1.1.0.md |
 

@@ -3,7 +3,7 @@
 Milestone: M-011
 Recipe: specs/change-recipes/add-package.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: benchmark
 Owned Files:
 - `benchmark/router_bench_test.go`
@@ -42,4 +42,8 @@ Done Definition:
 - Plumego and chi variants both appear in the output.
 
 Outcome:
--
+- Done. Added router route-match benchmarks for static, single-param, and
+  multi-param paths with `plumego` and `chi` sub-benchmarks. Also added the
+  minimal separate `benchmark/go.mod` needed for chi to stay out of the main
+  module. Verified with `GOCACHE=/private/tmp/plumego-gocache go test
+  -bench=. -benchmem -count=1 ./...` from `benchmark/`.
