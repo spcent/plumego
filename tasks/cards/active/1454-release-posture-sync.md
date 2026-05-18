@@ -11,7 +11,7 @@ Owned Files:
 - `docs/ROADMAP.md`
 - `docs/release/v1.0.0.md`
 - `website/src/generated`
-Depends On: tasks/cards/active/1453-cli-gate-timeout-stability.md
+Depends On: tasks/cards/done/1453-cli-gate-timeout-stability.md
 
 Goal:
 - Align user-facing release posture with the recorded `v1.0.0` release evidence.
