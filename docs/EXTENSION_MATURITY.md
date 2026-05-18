@@ -24,6 +24,14 @@ state, and coverage state come from `specs/extension-maturity.yaml`. For beta
 candidates, it also verifies the evidence link and blocker text against
 `specs/extension-beta-evidence.yaml`.
 
+## Publishing Extensions
+
+Community-authored extensions use the separate contract in
+[`docs/EXTENSION_AUTHORING.md`](EXTENSION_AUTHORING.md). That guide covers
+`community-extension.yaml`, `plumego add`, explicit constructor ownership, and
+the compatibility checklist for modules published outside this repository. This
+dashboard remains the maturity view for first-party `x/*` families.
+
 ## Release History
 
 `x/rest`, `x/websocket`, `x/gateway`, and `x/observability` were promoted to

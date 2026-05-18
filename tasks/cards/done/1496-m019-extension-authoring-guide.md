@@ -3,7 +3,7 @@
 Milestone: M-019
 Recipe: specs/change-recipes/update-docs.yaml
 Priority: P3
-State: active
+State: done
 Primary Module: docs
 Owned Files:
 - `docs/EXTENSION_AUTHORING.md`
@@ -58,4 +58,12 @@ Done Definition:
 - `gofmt -l .` outputs nothing.
 
 Outcome:
--
+- Added `docs/EXTENSION_AUTHORING.md` covering the community extension
+  overview, schema contract, `x/rpc`-modeled YAML example, compliance
+  checklist, publishing steps, validation commands, and compatibility guidance.
+- Updated `docs/EXTENSION_MATURITY.md` with a publishing extensions pointer and
+  `README.md` with a community extension authoring link.
+- Validated the guide's YAML example with
+  `go run ./internal/checks/community-extension <extracted-example-dir>`.
+- Ran `go run ./internal/checks/module-manifests`, `gofmt -l .`, and
+  `git diff --check`.

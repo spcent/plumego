@@ -107,7 +107,6 @@ chain in tasks/milestones/ROADMAP.md.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 1592 | P3 | docs | Write docs/EXTENSION_AUTHORING.md with x/rpc as worked example |
 
 ## Execution Completeness Checklist
 

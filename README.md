@@ -72,6 +72,11 @@ For current priorities and remaining extension work, see `docs/ROADMAP.md`.
 
 Machine-enforced repo guardrails live under `internal/checks/*` and are enforced directly in CI.
 
+Community-authored extensions should follow
+[`docs/EXTENSION_AUTHORING.md`](./docs/EXTENSION_AUTHORING.md) and be installed
+with `plumego add` only after their `community-extension.yaml` passes the
+schema and compliance checks.
+
 For new application work, use a single canonical path:
 
 - read `reference/standard-service` first for structure and wiring
