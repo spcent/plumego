@@ -1,7 +1,7 @@
 name: x/tenant
 path: x/tenant
 layer: extension
-status: experimental
+status: beta
 owner: multitenancy
 risk: high
 summary: Multi-tenant resolution, policy, quota, rate limit, and tenant-aware adapters.

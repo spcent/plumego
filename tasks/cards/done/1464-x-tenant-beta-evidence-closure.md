@@ -3,7 +3,7 @@
 Milestone: M-003
 Recipe: specs/change-recipes/analysis-only.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: x/tenant
 Owned Files:
 - `specs/extension-beta-evidence.yaml`
@@ -49,4 +49,7 @@ Done Definition:
 - `x/tenant` has two release refs, matching release snapshots, and owner sign-off, or the blocker remains explicit.
 
 Outcome:
--
+- Done. Generated `x/tenant/...` release-backed snapshots across `v1.0.0` to
+  `v1.1.0`; the comparison reported API unchanged. Updated the evidence
+  ledger, recorded `multitenancy` sign-off, cleared blockers, promoted
+  `x/tenant` to `beta`, and synced the module primer and release artifact note.
