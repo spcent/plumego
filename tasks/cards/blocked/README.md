@@ -16,3 +16,4 @@ Rules:
 
 | Card | Priority | Primary module | Blocker |
 |---|---|---|---|
+| [1372](1372-x-discovery-surface-beta-evidence-closure.md) | P1 | x/gateway/discovery | path-migration release evidence and owner sign-off |

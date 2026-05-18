@@ -62,7 +62,6 @@ chain in tasks/milestones/ROADMAP.md.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 1372 | P1 | x/gateway/discovery | Promote x/gateway/discovery core-static to beta |
 | 1371 | P1 | x/data | Promote x/data/file and x/data/idempotency to beta |
 | 1513 | P1 | extension evidence | Update docs/EXTENSION_MATURITY.md and DEPRECATION.md for Round 1 promotions |
 
