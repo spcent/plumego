@@ -614,7 +614,7 @@ const frameworkDecision = [
 
   @media (min-width: 860px) {
     .timeline-grid {
-      grid-template-columns: repeat(3, 1fr);
+      grid-template-columns: repeat(3, minmax(0, 1fr));
     }
   }
 
@@ -626,6 +626,8 @@ const frameworkDecision = [
     display: flex;
     flex-direction: column;
     gap: 0.6rem;
+    min-width: 0;
+    overflow: hidden;
   }
 
   .timeline-card__kicker {

@@ -659,6 +659,8 @@ li {
 }
 
 .page-panel--dense {
+  display: flex;
+  flex-direction: column;
   gap: 0.85rem;
 }
 
@@ -2228,7 +2230,27 @@ li {
 }
 
 .page-panel--caution {
-  border-top: 2px solid rgba(185, 108, 14, 0.60);
+  border-top: 2px solid rgba(217, 119, 6, 0.30);
+}
+
+:root[data-theme="dark"] .page-panel--caution {
+  border-top: 2px solid rgba(251, 191, 36, 0.25);
+}
+
+.page-panel--caution .signal-list__kicker {
+  color: #b45309;
+}
+
+:root[data-theme="dark"] .page-panel--caution .signal-list__kicker {
+  color: #fcd34d;
+}
+
+/* ── Control-grid: last odd item fills row without stretching full width ── */
+@media (min-width: 960px) {
+  .control-grid > *:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+    max-width: calc(50% - 0.5rem);
+  }
 }
 
 /* ── Fit-check board ────────────────────────────────────── */
