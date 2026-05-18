@@ -28,6 +28,8 @@ html {
   background: var(--bg);
   color: var(--fg);
   font-family: var(--font-sans);
+  overflow-x: hidden;
+  overflow-x: clip;
   scroll-behavior: smooth;
 }
 
@@ -46,6 +48,8 @@ html {
 body {
   margin: 0;
   min-height: 100vh;
+  overflow-x: hidden;
+  overflow-x: clip;
   background:
     radial-gradient(circle at top left, var(--body-glow-1), transparent 30%),
     radial-gradient(circle at 85% 20%, var(--body-glow-2), transparent 26%),
@@ -582,8 +586,8 @@ li {
 
 .section--cta {
   max-width: none;
-  width: 100vw;
-  margin-inline: calc(50% - 50vw);
+  width: auto;
+  margin-inline: -1.5rem;
   padding:
     clamp(3.5rem, 5.5vw, 5rem)
     max(1.5rem, calc((100vw - 1180px) / 2 + 1.5rem));
@@ -604,8 +608,8 @@ li {
 
 .section--tinted {
   max-width: none;
-  width: 100vw;
-  margin-inline: calc(50% - 50vw);
+  width: auto;
+  margin-inline: -1.5rem;
   padding-block: clamp(2.5rem, 4vw, 3.5rem);
   padding-inline: max(1.5rem, calc((100vw - 1180px) / 2 + 1.5rem));
   background: var(--bg-strong);
@@ -1002,9 +1006,9 @@ li {
 .hero {
   display: grid;
   position: relative;
-  width: 100vw;
+  width: auto;
   max-width: none;
-  margin-inline: calc(50% - 50vw);
+  margin-inline: -1.5rem;
   padding:
     clamp(4.5rem, 7vw, 6.5rem)
     max(1.5rem, calc((100vw - 1180px) / 2 + 1.5rem));
@@ -2050,8 +2054,8 @@ li {
 /* ── Reading path (canonical steps) ────────────────────── */
 .section--reading-path {
   max-width: none;
-  width: 100vw;
-  margin-inline: calc(50% - 50vw);
+  width: auto;
+  margin-inline: -1.5rem;
   padding:
     clamp(3rem, 5vw, 4.5rem)
     max(1.5rem, calc((100vw - 1180px) / 2 + 1.5rem));
