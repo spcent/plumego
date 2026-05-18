@@ -3,7 +3,7 @@
 Milestone: M-011
 Recipe: specs/change-recipes/add-package.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: benchmark
 Owned Files:
 - `benchmark/chain_bench_test.go`
@@ -42,4 +42,6 @@ Done Definition:
 - Chain depth is visible in benchmark names (1, 3, 5 suffix or sub-benchmark).
 
 Outcome:
--
+- Done. Added middleware chain benchmarks for 1, 3, and 5 layers with no-op
+  and JSON final handlers. Verified from `benchmark/` with
+  `GOCACHE=/private/tmp/plumego-gocache go test -bench=. -benchmem -count=1 ./...`.
