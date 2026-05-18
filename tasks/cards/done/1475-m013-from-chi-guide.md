@@ -3,7 +3,7 @@
 Milestone: M-013
 Recipe: specs/change-recipes/update-docs.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: docs
 Owned Files:
 - `docs/migration/from-chi.md`
@@ -52,4 +52,10 @@ Done Definition:
 - No plumego symbols referenced that do not exist in the current API.
 
 Outcome:
--
+- Added `docs/migration/from-chi.md` with minimal-delta guidance for handlers,
+  middleware, route names, route groups, and request params.
+- Documented that chi-compatible middleware, httptest patterns, and net/http
+  handlers can be kept while app bootstrap and JSON responses move to Plumego
+  conventions.
+- Validation passed with dependency-rules, module-manifests, reference-layout,
+  `gofmt -l .`, and `git diff --check`.
