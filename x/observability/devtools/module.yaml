@@ -50,3 +50,7 @@ agent_hints:
   - Treat x/observability/devtools as a subordinate of x/observability; start debug work in x/observability before opening this package directly
   - Devtools must stay debug-only and must not be mounted in production without an explicit gate
   - Do not move debug routes into core
+
+landing_zones:
+  devtools: devtools.go
+  collector: devcollector.go

@@ -61,3 +61,7 @@ agent_hints:
   - Use this package for durable idempotency storage behind store/idempotency.Store
   - Keep MQ-specific dedupe behavior in x/messaging/mq
   - Do not add HTTP, tenant, or app workflow policy here
+
+landing_zones:
+  kv: kv.go
+  sql: sql.go

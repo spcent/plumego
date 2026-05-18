@@ -63,3 +63,8 @@ agent_hints:
   - Use store/file interfaces as the stable contract and keep HTTP concerns in x/fileapi
   - Keep tenant isolation explicit in path, metadata, and temporary URL generation
   - Use NewDBMetadataManagerE for dynamic database wiring; prefer adding storage backends here instead of widening stable store/file
+
+landing_zones:
+  local: local.go
+  s3: s3.go
+  metadata: metadata.go

@@ -50,3 +50,10 @@ agent_hints:
   - Treat x/messaging/mq as a subordinate queue primitive; start app-facing feature discovery in x/messaging
   - Keep queue adapters local with explicit worker wiring
   - Do not use x/messaging/mq as a competing family entrypoint for new messaging work or move it into core
+
+landing_zones:
+  broker: broker.go
+  queue: queue.go
+  worker: queue_worker.go
+  persistence: persistence.go
+  routes: broker_routes.go

@@ -77,3 +77,8 @@ agent_hints:
   - Use this package when you need WAL, snapshot/replay, serializer selection, compression, or shard/flush tuning
   - Keep stable store/kv focused on the small embedded primitive
   - Do not move transport or tenant policy concerns into this package
+
+landing_zones:
+  kv: kv.go
+  wal: wal.go
+  serializer: serializer.go

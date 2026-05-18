@@ -63,3 +63,9 @@ agent_hints:
   - Start new app-facing messaging feature discovery in x/messaging before opening x/messaging/webhook
   - Open x/messaging/webhook directly only for narrow inbound verification or outbound delivery work
   - Keep webhook transport concerns explicit and local without turning x/messaging/webhook into a family discovery root
+
+landing_zones:
+  inbound: in.go
+  outbound: out.go
+  bridge: bridge.go
+  config: config.go
