@@ -3,7 +3,7 @@
 Milestone: M-015
 Recipe: specs/change-recipes/add-package.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: x/data
 Owned Files:
 - `x/data/sqlx/adapter.go`
@@ -64,4 +64,19 @@ Done Definition:
 - No live database required in CI.
 
 Outcome:
--
+- Added `x/data/sqlx` as a separate Go module with sqlx and go-sqlmock,
+  keeping sqlx out of the main module.
+- Implemented `DB`, `New`, `NewWithDB`, `QueryRow`, `Query`, `Exec`,
+  `BeginTx`, `NamedExec`, `NamedQuery`, `Close`, and transaction wrappers with
+  explicit context propagation.
+- Current `store/db` exposes the stable `DB` database/sql-shaped contract, not
+  the `Querier`, `Transactor`, or `Tx` interfaces named by this card. To avoid
+  a stable-root API change, this adapter exposes context-aware `Querier`,
+  `Transactor`, and `Tx` contracts inside `x/data/sqlx` and uses `store/db`
+  error sentinels for query, transaction, and connection failures.
+- Added go-sqlmock coverage for QueryRow, Query, Exec row count, commit,
+  rollback, and a scan error negative path.
+- Synced `x/data/sqlx/module.yaml`, `x/data/module.yaml`, and dependency rules.
+- Validation passed with `x/data/sqlx` race tests, `x/data/sqlx` vet,
+  dependency-rules, module-manifests, agent-workflow, `gofmt -l .`, and
+  `git diff --check`.

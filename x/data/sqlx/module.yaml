@@ -1,0 +1,62 @@
+name: x/data/sqlx
+path: x/data/sqlx
+layer: extension
+status: experimental
+owner: persistence
+risk: medium
+summary: sqlx adapter for database/sql-backed data access in the x/data family.
+
+parent_family: x/data
+
+entrypoint_reads:
+  - AGENTS.md
+  - docs/CANONICAL_STYLE_GUIDE.md
+  - specs/repo.yaml
+  - specs/task-routing.yaml
+  - specs/dependency-rules.yaml
+  - x/data/module.yaml
+
+responsibilities:
+  - sqlx database construction
+  - sqlx query and transaction adapter methods
+  - named query and named exec helpers
+
+non_goals:
+  - ORM behavior
+  - Query builder ownership
+  - Live database test dependency
+  - Stable store/db interface changes
+
+allowed_imports:
+  - stdlib
+  - store/db
+
+forbidden_imports:
+  - core/**
+  - router/**
+  - middleware/**
+  - security/**
+  - x/tenant/**
+  - reference/**
+  - cmd/**
+
+test_commands:
+  - go test -race -timeout 60s ./...
+  - go test -timeout 20s ./...
+  - go vet ./...
+
+change_risks:
+  - transaction lifecycle regression
+  - named query binding regression
+  - accidental live database test dependency
+
+review_checklist:
+  - Keep sqlx isolated to this separately versioned module
+  - Preserve explicit context arguments
+  - Keep tests offline with go-sqlmock
+  - Do not modify stable store/db interfaces
+
+agent_hints:
+  - Use New for production sqlx.Open construction
+  - Use NewWithDB when the application already owns the sqlx.DB lifecycle
+  - Keep SQL helper behavior in this module rather than store/db

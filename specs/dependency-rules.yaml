@@ -199,6 +199,21 @@ modules:
       - reference/**
       - cmd/**
 
+  x/data/sqlx:
+    path: x/data/sqlx
+    layer: extension
+    allow:
+      - stdlib
+      - store/db
+    deny:
+      - core/**
+      - router/**
+      - middleware/**
+      - security/**
+      - x/tenant/**
+      - reference/**
+      - cmd/**
+
   x/tenant:
     path: x/tenant
     layer: extension
