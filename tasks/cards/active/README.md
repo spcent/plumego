@@ -62,7 +62,6 @@ chain in tasks/milestones/ROADMAP.md.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 1370 | P1 | x/ai | Promote x/ai stable-tier subpackages (provider, session, tool, streaming) to beta |
 | 1367 | P1 | x/tenant | Promote x/tenant to beta |
 | 1372 | P1 | x/gateway/discovery | Promote x/gateway/discovery core-static to beta |
 | 1371 | P1 | x/data | Promote x/data/file and x/data/idempotency to beta |

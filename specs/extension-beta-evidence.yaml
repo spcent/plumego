@@ -132,10 +132,10 @@ subpackage_candidates:
       - 6a99c5e0bc61c12378bcdab5a6a7c4d756b9fa96
       - v1.1.0
     api_snapshots:
-      - docs/extension-evidence/snapshots/ai-stable-tier/x-ai-provider-head.snapshot
-    blockers:
-      - api_snapshot_missing
-      - owner_signoff_missing
+      - docs/extension-evidence/snapshots/x-ai-provider/base.snapshot
+      - docs/extension-evidence/snapshots/x-ai-provider/head.snapshot
+    owner_signoff: signed
+    blockers: []
 
   - module: x/ai
     subpackage: session
@@ -146,10 +146,10 @@ subpackage_candidates:
       - 6a99c5e0bc61c12378bcdab5a6a7c4d756b9fa96
       - v1.1.0
     api_snapshots:
-      - docs/extension-evidence/snapshots/ai-stable-tier/x-ai-session-head.snapshot
-    blockers:
-      - api_snapshot_missing
-      - owner_signoff_missing
+      - docs/extension-evidence/snapshots/x-ai-session/base.snapshot
+      - docs/extension-evidence/snapshots/x-ai-session/head.snapshot
+    owner_signoff: signed
+    blockers: []
 
   - module: x/ai
     subpackage: streaming
@@ -160,10 +160,10 @@ subpackage_candidates:
       - 6a99c5e0bc61c12378bcdab5a6a7c4d756b9fa96
       - v1.1.0
     api_snapshots:
-      - docs/extension-evidence/snapshots/ai-stable-tier/x-ai-streaming-head.snapshot
-    blockers:
-      - api_snapshot_missing
-      - owner_signoff_missing
+      - docs/extension-evidence/snapshots/x-ai-streaming/base.snapshot
+      - docs/extension-evidence/snapshots/x-ai-streaming/head.snapshot
+    owner_signoff: signed
+    blockers: []
 
   - module: x/ai
     subpackage: tool
@@ -174,10 +174,10 @@ subpackage_candidates:
       - 6a99c5e0bc61c12378bcdab5a6a7c4d756b9fa96
       - v1.1.0
     api_snapshots:
-      - docs/extension-evidence/snapshots/ai-stable-tier/x-ai-tool-head.snapshot
-    blockers:
-      - api_snapshot_missing
-      - owner_signoff_missing
+      - docs/extension-evidence/snapshots/x-ai-tool/base.snapshot
+      - docs/extension-evidence/snapshots/x-ai-tool/head.snapshot
+    owner_signoff: signed
+    blockers: []
 
 surface_candidates:
   - module: x/data

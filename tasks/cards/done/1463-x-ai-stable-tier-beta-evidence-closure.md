@@ -3,7 +3,7 @@
 Milestone: M-003
 Recipe: specs/change-recipes/analysis-only.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: x/ai
 Owned Files:
 - `specs/extension-beta-evidence.yaml`
@@ -54,4 +54,8 @@ Done Definition:
 - All tracked `x/ai` stable-tier subpackages have two release refs, matching release snapshots, and owner sign-off, or blockers remain explicit.
 
 Outcome:
--
+- Done. Generated release-backed snapshots for `x/ai/provider`,
+  `x/ai/session`, `x/ai/streaming`, and `x/ai/tool` across `v1.0.0` to
+  `v1.1.0`; each comparison reported API unchanged. Updated the evidence
+  ledger, recorded `ai-gateway` sign-off, and cleared blockers for the four
+  stable-tier subpackages without promoting the root `x/ai` family.
