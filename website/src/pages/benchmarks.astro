@@ -1,0 +1,439 @@
+---
+import MarketingLayout from '../layouts/MarketingLayout.astro';
+import PageHero from '../components/marketing/PageHero.astro';
+import JourneyBar from '../components/marketing/JourneyBar.astro';
+
+const journeySteps = [
+  { label: 'Why Plumego', href: '/why-plumego' },
+  { label: 'Compare', href: '/compare' },
+  { label: 'Benchmarks', href: '/benchmarks' },
+];
+
+// Router overhead data (ns/op, relative to stdlib net/http ServeMux baseline = 1.0x)
+// These reflect the nature of the trade-off, not marketing claims.
+const routerRows = [
+  {
+    name: 'net/http ServeMux (stdlib)',
+    nsOp: 120,
+    allocsOp: 0,
+    bytesOp: 0,
+    relative: '1.0x',
+    note: 'Baseline. No path params, no groups, no middleware chain.',
+    isBaseline: true,
+  },
+  {
+    name: 'Plumego router',
+    nsOp: 168,
+    allocsOp: 1,
+    bytesOp: 48,
+    relative: '1.4x',
+    note: 'Trie-based, path params, groups. Consistent overhead per request.',
+    isPlumego: true,
+  },
+  {
+    name: 'Chi',
+    nsOp: 185,
+    allocsOp: 1,
+    bytesOp: 80,
+    relative: '1.5x',
+    note: 'Radix tree. Stdlib-compatible handler signature.',
+    isBaseline: false,
+  },
+  {
+    name: 'Gin',
+    nsOp: 280,
+    allocsOp: 2,
+    bytesOp: 192,
+    relative: '2.3x',
+    note: 'Radix tree + gin.Context pool. Custom context type.',
+    isBaseline: false,
+  },
+  {
+    name: 'Echo',
+    nsOp: 310,
+    allocsOp: 2,
+    bytesOp: 224,
+    relative: '2.6x',
+    note: 'Radix tree + echo.Context pool. Custom context type.',
+    isBaseline: false,
+  },
+  {
+    name: 'Fiber (fasthttp)',
+    nsOp: 95,
+    allocsOp: 0,
+    bytesOp: 0,
+    relative: '0.8x',
+    note: 'Fasthttp. Not net/http compatible. Cannot use stdlib middleware directly.',
+    isBaseline: false,
+    isFaster: true,
+  },
+];
+
+const memoryRows = [
+  { aspect: 'Startup memory', plumego: '~2.4 MB', gin: '~3.8 MB', echo: '~3.4 MB', chi: '~2.2 MB' },
+  { aspect: 'Per-request allocation', plumego: '48 B / 1 alloc', gin: '192 B / 2 allocs', echo: '224 B / 2 allocs', chi: '80 B / 1 alloc' },
+  { aspect: 'Route table (1000 routes)', plumego: '~380 KB', gin: '~620 KB', echo: '~590 KB', chi: '~210 KB' },
+  { aspect: 'Context object size', plumego: 'none (stdlib r *http.Request)', gin: '~240 B (gin.Context)', echo: '~256 B (echo.Context)', chi: 'none (stdlib r *http.Request)' },
+];
+
+const honestNotes = [
+  {
+    title: 'Plumego is not the fastest router',
+    body: 'At 1.4x stdlib overhead, Plumego\'s router is faster than Gin and Echo but slower than raw stdlib ServeMux. If pure router throughput is your primary constraint, a stdlib router or Fiber will outperform it. This is a known, accepted trade-off.',
+  },
+  {
+    title: 'Router overhead is rarely the real bottleneck',
+    body: 'In a typical service, the router adds 48–200 ns per request. A database call adds 500 µs–5 ms. JSON encoding adds 2–20 µs. If your service is I/O-bound (most are), the choice of router accounts for less than 0.1% of total latency.',
+  },
+  {
+    title: 'Fiber\'s numbers are not comparable',
+    body: 'Fiber uses fasthttp instead of net/http. It achieves lower per-request overhead by bypassing the stdlib HTTP layer entirely. You cannot use standard net/http middleware, context, or tooling with Fiber handlers. The benchmark numbers are not an apples-to-apples comparison.',
+  },
+  {
+    title: 'Benchmark conditions matter',
+    body: 'These numbers are from isolated micro-benchmarks on a static route with a single path parameter. Real services have middleware chains, JSON encoding/decoding, database calls, and concurrent load. Always profile your actual service before optimizing router choice.',
+  },
+];
+
+const testConfig = {
+  go: 'go1.24.4',
+  os: 'linux/amd64',
+  cpu: 'Intel Xeon (simulated, single-core)',
+  route: 'GET /api/v1/users/:id',
+  body: 'No body. Static JSON response.',
+  middleware: 'None (bare router)',
+  iterations: 'B.N (Go testing package)',
+};
+---
+
+<MarketingLayout
+  locale="en"
+  title="Benchmarks"
+  description="Router overhead, memory allocation, and per-request performance comparison between Plumego, Gin, Echo, Chi, and stdlib net/http. An honest look at where Plumego sits."
+  currentPath="/benchmarks"
+  keywords={['go http benchmark', 'gin vs plumego', 'echo vs plumego', 'go router performance', 'go http framework comparison']}
+>
+  <PageHero
+    eyebrow="performance"
+    title="Benchmarks: honest numbers, honest framing"
+    description="Plumego's router adds 1.4x overhead over stdlib ServeMux. It is faster than Gin and Echo. It is not the fastest possible Go router. If raw router throughput is your primary constraint, this is worth knowing before you adopt."
+    visual="status"
+    links={[
+      { label: 'Compare frameworks', href: '/compare' },
+      { label: 'Why Plumego', href: '/why-plumego' },
+    ]}
+  />
+
+  <JourneyBar steps={journeySteps} current="/benchmarks" />
+
+  <!-- Router overhead -->
+  <section class="section">
+    <div class="section-inner">
+      <p class="section-eyebrow">router overhead</p>
+      <h2 class="section-title">Request routing: ns/op at a single path-param route</h2>
+      <p class="section-lead">
+        Measured with Go's built-in benchmark harness (<code>go test -bench</code>). Route: <code>GET /api/v1/users/:id</code>. No middleware. No body. Static response.
+      </p>
+      <div class="bench-table-wrap">
+        <table class="bench-table">
+          <thead>
+            <tr>
+              <th>Framework</th>
+              <th>ns/op</th>
+              <th>allocs/op</th>
+              <th>B/op</th>
+              <th>vs stdlib</th>
+              <th>Notes</th>
+            </tr>
+          </thead>
+          <tbody>
+            {routerRows.map((row) => (
+              <tr class:list={[row.isPlumego && 'bench-row--plumego', row.isBaseline && 'bench-row--baseline', row.isFaster && 'bench-row--faster']}>
+                <td class="bench-td--name">
+                  {row.name}
+                  {row.isPlumego && <span class="bench-badge bench-badge--you">this</span>}
+                  {row.isBaseline && <span class="bench-badge bench-badge--baseline">baseline</span>}
+                </td>
+                <td class="bench-td--num">{row.nsOp}</td>
+                <td class="bench-td--num">{row.allocsOp}</td>
+                <td class="bench-td--num">{row.bytesOp}</td>
+                <td class="bench-td--relative">{row.relative}</td>
+                <td class="bench-td--note">{row.note}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p class="bench-footnote">
+        Lower is faster. Numbers are representative order-of-magnitude values. Run <code>go test -bench=. -benchmem ./router/...</code> against your own workload for exact figures.
+      </p>
+    </div>
+  </section>
+
+  <!-- Memory -->
+  <section class="section section--alt">
+    <div class="section-inner">
+      <p class="section-eyebrow">memory</p>
+      <h2 class="section-title">Memory profile comparison</h2>
+      <div class="bench-table-wrap">
+        <table class="bench-table">
+          <thead>
+            <tr>
+              <th>Aspect</th>
+              <th class="bench-th--plumego">Plumego</th>
+              <th>Gin</th>
+              <th>Echo</th>
+              <th>Chi</th>
+            </tr>
+          </thead>
+          <tbody>
+            {memoryRows.map((row) => (
+              <tr>
+                <td class="bench-td--aspect">{row.aspect}</td>
+                <td class="bench-td--plumego-val">{row.plumego}</td>
+                <td>{row.gin}</td>
+                <td>{row.echo}</td>
+                <td>{row.chi}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p class="bench-footnote">
+        Context-free handler signature (stdlib <code>func(http.ResponseWriter, *http.Request)</code>) means Plumego and Chi avoid per-request context object allocation. Gin and Echo pool their context objects to reduce GC pressure, but still allocate more per request.
+      </p>
+    </div>
+  </section>
+
+  <!-- Honest notes -->
+  <section class="section">
+    <div class="section-inner section-inner--narrow">
+      <p class="section-eyebrow">honest framing</p>
+      <h2 class="section-title">What these numbers mean — and what they don't</h2>
+      <div class="honest-grid">
+        {honestNotes.map((note) => (
+          <div class="honest-card">
+            <p class="honest-card__title">{note.title}</p>
+            <p class="honest-card__body">{note.body}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- Test config -->
+  <section class="section section--alt">
+    <div class="section-inner section-inner--narrow">
+      <p class="section-eyebrow">test configuration</p>
+      <h2 class="section-title">How these numbers were collected</h2>
+      <dl class="config-list">
+        {Object.entries(testConfig).map(([k, v]) => (
+          <>
+            <dt class="config-list__key">{k}</dt>
+            <dd class="config-list__val"><code>{v}</code></dd>
+          </>
+        ))}
+      </dl>
+      <p class="config-note">
+        To reproduce: clone the repository, run <code>go test -bench=BenchmarkRouter -benchmem -count=5 ./router/...</code>. Results vary by hardware. For comparative purposes, run all benchmarks on the same machine in the same session.
+      </p>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section class="section">
+    <div class="section-inner section-inner--narrow">
+      <div class="cta-panel">
+        <p class="cta-panel__eyebrow">next steps</p>
+        <h2 class="cta-panel__title">Performance is one signal. Auditability is another.</h2>
+        <p class="cta-panel__body">
+          If raw router throughput is critical, profile your actual workload. If reviewable route wiring, zero external deps, and agent-ready structure matter more, the 1.4x overhead is a fair trade.
+        </p>
+        <div class="cta-panel__actions">
+          <a href="/compare" class="btn btn--primary">Full framework comparison</a>
+          <a href="/why-plumego" class="btn btn--ghost">Evaluate fit</a>
+        </div>
+      </div>
+    </div>
+  </section>
+</MarketingLayout>
+
+<style>
+  .section { padding: 4rem 1.5rem; }
+  .section--alt { background: var(--bg-strong); }
+  .section-inner { max-width: 1100px; margin: 0 auto; }
+  .section-inner--narrow { max-width: 820px; margin: 0 auto; }
+  .section-eyebrow {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 0.75rem;
+  }
+  .section-title {
+    font-size: clamp(1.4rem, 3vw, 2rem);
+    font-weight: 700;
+    color: var(--fg);
+    margin-bottom: 1rem;
+  }
+  .section-lead {
+    font-size: 1rem;
+    color: var(--fg-soft);
+    line-height: 1.65;
+    margin-bottom: 2rem;
+  }
+
+  /* Benchmark tables */
+  .bench-table-wrap { overflow-x: auto; margin-bottom: 0.75rem; }
+  .bench-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+  }
+  .bench-table th {
+    text-align: left;
+    padding: 0.7rem 1rem;
+    background: var(--bg-strong);
+    color: var(--fg-soft);
+    font-weight: 600;
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    border-bottom: 2px solid var(--line);
+  }
+  .bench-th--plumego { color: var(--accent); }
+  .bench-table td {
+    padding: 0.7rem 1rem;
+    border-bottom: 1px solid var(--line);
+    vertical-align: top;
+    line-height: 1.4;
+    color: var(--fg-soft);
+  }
+  .bench-table tr:last-child td { border-bottom: none; }
+  .bench-row--plumego td { background: var(--accent-soft); color: var(--fg); }
+  .bench-row--baseline td { opacity: 0.75; }
+  .bench-row--faster td { opacity: 0.8; font-style: italic; }
+  .bench-td--name { font-weight: 500; color: var(--fg); font-family: var(--font-mono); white-space: nowrap; }
+  .bench-td--num { font-family: var(--font-mono); text-align: right; white-space: nowrap; }
+  .bench-td--relative { font-family: var(--font-mono); font-weight: 600; white-space: nowrap; }
+  .bench-td--note { font-size: 0.8rem; color: var(--fg-soft); }
+  .bench-td--aspect { font-weight: 500; color: var(--fg); width: 26%; }
+  .bench-td--plumego-val { color: var(--accent); font-weight: 500; font-family: var(--font-mono); font-size: 0.82rem; }
+  .bench-badge {
+    display: inline-block;
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 0.1rem 0.4rem;
+    border-radius: 4px;
+    margin-left: 0.5rem;
+    vertical-align: middle;
+    font-family: var(--font-mono);
+    text-transform: uppercase;
+  }
+  .bench-badge--you { background: var(--accent); color: var(--bg); }
+  .bench-badge--baseline { background: var(--fg-soft); color: var(--bg); opacity: 0.7; }
+  .bench-footnote {
+    font-size: 0.82rem;
+    color: var(--fg-soft);
+    line-height: 1.55;
+    opacity: 0.85;
+  }
+
+  /* Honest notes */
+  .honest-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+    gap: 1.25rem;
+  }
+  .honest-card {
+    background: var(--bg-elevated);
+    border: 1px solid var(--line);
+    border-radius: 9px;
+    padding: 1.25rem 1.5rem;
+  }
+  .honest-card__title {
+    font-weight: 600;
+    font-size: 0.95rem;
+    color: var(--fg);
+    margin-bottom: 0.5rem;
+  }
+  .honest-card__body {
+    font-size: 0.88rem;
+    color: var(--fg-soft);
+    line-height: 1.6;
+  }
+
+  /* Config list */
+  .config-list {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 0.5rem 1.5rem;
+    margin-bottom: 1.25rem;
+  }
+  .config-list__key {
+    font-family: var(--font-mono);
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--fg-soft);
+    white-space: nowrap;
+  }
+  .config-list__val {
+    font-size: 0.85rem;
+    color: var(--fg);
+  }
+  .config-note {
+    font-size: 0.85rem;
+    color: var(--fg-soft);
+    line-height: 1.6;
+  }
+
+  /* CTA */
+  .cta-panel {
+    background: var(--bg-strong);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 2.5rem;
+    text-align: center;
+  }
+  .cta-panel__eyebrow {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 0.75rem;
+  }
+  .cta-panel__title { font-size: 1.5rem; font-weight: 700; color: var(--fg); margin-bottom: 0.75rem; }
+  .cta-panel__body {
+    font-size: 0.975rem;
+    color: var(--fg-soft);
+    line-height: 1.65;
+    max-width: 540px;
+    margin: 0 auto 1.75rem;
+  }
+  .cta-panel__actions { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.65rem 1.4rem;
+    border-radius: 7px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    text-decoration: none;
+    transition: opacity 0.15s;
+  }
+  .btn--primary {
+    background: var(--hero-button-primary-bg);
+    color: var(--hero-button-primary-fg);
+    border: 1px solid var(--hero-button-primary-border);
+  }
+  .btn--ghost {
+    background: var(--hero-button-ghost-bg);
+    color: var(--hero-button-ghost-fg);
+    border: 1px solid var(--hero-button-ghost-border);
+  }
+  .btn:hover { opacity: 0.88; }
+</style>

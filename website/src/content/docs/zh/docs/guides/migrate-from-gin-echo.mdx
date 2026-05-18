@@ -1,0 +1,355 @@
+---
+title: 从 Gin 或 Echo 迁移
+description: 代码并排对比，以及将 Gin 或 Echo 服务迁移到 Plumego 的分步路径。
+translationKey: guides-migrate-from-gin-echo
+sidebar:
+  order: 18
+---
+
+# 从 Gin 或 Echo 迁移
+
+本指南面向正在运行 Gin 或 Echo 服务、希望迁移到 Plumego 的团队。内容涵盖常见的修改面——handler 签名、路由、中间件、请求解析、响应写入——并附有并排对比，让你可以逐步推进迁移。
+
+预估工时：**每个服务 1–3 天**，具体取决于 handler 数量和中间件复杂度。
+
+## 开始之前
+
+先读 [为什么选择 Plumego](/zh/why-plumego) 并查看[框架对比表](/zh/compare)。当可读性路由注册、agent-ready 结构或零外部依赖内核比你正在离开的框架的便利性更重要时，迁移才值得做。
+
+如果 Gin 或 Echo 已经很适合你的团队，这次迁移不是正确的投入。
+
+## 什么会变，什么不变
+
+| 修改面 | Gin | Echo | Plumego |
+| --- | --- | --- | --- |
+| Handler 签名 | `func(*gin.Context)` | `func(echo.Context) error` | `func(http.ResponseWriter, *http.Request)` |
+| 路由注册 | `r.GET(path, h)` | `e.GET(path, h)` | `r.Get(path, h)` |
+| 路径参数 | `c.Param("id")` | `c.Param("id")` | `r.PathValue("id")` |
+| 查询参数 | `c.Query("k")` | `c.QueryParam("k")` | `r.URL.Query().Get("k")` |
+| JSON body | `c.ShouldBindJSON(&v)` | `c.Bind(&v)` | `json.NewDecoder(r.Body).Decode(&v)` |
+| JSON 响应 | `c.JSON(200, v)` | `c.JSON(200, v)` | `contract.WriteResponse(w, r, 200, v, nil)` |
+| 错误响应 | `c.JSON(400, gin.H{"error":…})` | `return echo.ErrBadRequest` | `contract.WriteError(w, r, err)` |
+| 中间件 | `func(*gin.Context)` | `func(echo.HandlerFunc) echo.HandlerFunc` | `func(http.Handler) http.Handler` |
+| 路由分组 | `r.Group("/v1")` | `e.Group("/v1")` | `r.Group("/v1")` |
+| 应用初始化 | `gin.New()` / `r.Run(addr)` | `echo.New()` / `e.Start(addr)` | `core.New(cfg, deps)` / `app.Run()` |
+
+---
+
+## 第一步 — 替换 handler 签名
+
+这是修改面最大的变化。Gin 和 Echo 的每个 handler 都使用框架特定的 context 类型。Plumego 使用标准库签名。
+
+**Gin 之前：**
+
+```go
+func GetUser(c *gin.Context) {
+    id := c.Param("id")
+    user, err := store.Get(id)
+    if err != nil {
+        c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
+        return
+    }
+    c.JSON(http.StatusOK, user)
+}
+```
+
+**Echo 之前：**
+
+```go
+func GetUser(c echo.Context) error {
+    id := c.Param("id")
+    user, err := store.Get(id)
+    if err != nil {
+        return echo.ErrNotFound
+    }
+    return c.JSON(http.StatusOK, user)
+}
+```
+
+**Plumego 之后（两种迁移路径相同）：**
+
+```go
+func GetUser(w http.ResponseWriter, r *http.Request) {
+    id := r.PathValue("id")
+    user, err := store.Get(id)
+    if err != nil {
+        contract.WriteError(w, r, contract.ErrNotFound)
+        return
+    }
+    contract.WriteResponse(w, r, http.StatusOK, user, nil)
+}
+```
+
+Plumego handler 是标准的 `func(http.ResponseWriter, *http.Request)`。所有现有的 `net/http` 中间件无需适配器即可工作。
+
+## 第二步 — 更新路由注册
+
+路由语法几乎 1:1 对应，只有方法名大小写变化（`GET` → `Get`）。
+
+**Gin 之前：**
+
+```go
+engine := gin.New()
+engine.Use(gin.Recovery())
+
+v1 := engine.Group("/api/v1")
+v1.Use(authMiddleware)
+v1.GET("/users/:id", GetUser)
+v1.POST("/users", CreateUser)
+v1.DELETE("/users/:id", DeleteUser)
+```
+
+**Echo 之前：**
+
+```go
+e := echo.New()
+e.Use(middleware.Recover())
+
+v1 := e.Group("/api/v1")
+v1.Use(authMiddleware)
+v1.GET("/users/:id", GetUser)
+v1.POST("/users", CreateUser)
+v1.DELETE("/users/:id", DeleteUser)
+```
+
+**Plumego 之后：**
+
+```go
+app := core.New(core.DefaultConfig(), core.AppDependencies{
+    Logger: plog.NewLogger(),
+})
+
+app.Use(middleware.Recovery())
+
+v1 := app.Group("/api/v1", authMiddleware)
+v1.Get("/users/:id",    http.HandlerFunc(GetUser))
+v1.Post("/users",       http.HandlerFunc(CreateUser))
+v1.Delete("/users/:id", http.HandlerFunc(DeleteUser))
+
+app.Run()
+```
+
+把所有路由注册移到 `internal/app/routes.go`，这是规范布局。完整结构见[参考应用](/zh/docs/reference-app)。
+
+## 第三步 — 重写中间件
+
+Gin 和 Echo 中间件使用框架特定签名。Plumego 使用标准 `func(http.Handler) http.Handler` 形态。
+
+**Gin 之前：**
+
+```go
+func AuthMiddleware(secret string) gin.HandlerFunc {
+    return func(c *gin.Context) {
+        token := c.GetHeader("Authorization")
+        claims, err := jwt.Validate(token, secret)
+        if err != nil {
+            c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+            return
+        }
+        c.Set("claims", claims)
+        c.Next()
+    }
+}
+```
+
+**Echo 之前：**
+
+```go
+func AuthMiddleware(secret string) echo.MiddlewareFunc {
+    return func(next echo.HandlerFunc) echo.HandlerFunc {
+        return func(c echo.Context) error {
+            token := c.Request().Header.Get("Authorization")
+            claims, err := jwt.Validate(token, secret)
+            if err != nil {
+                return echo.ErrUnauthorized
+            }
+            c.Set("claims", claims)
+            return next(c)
+        }
+    }
+}
+```
+
+**Plumego 之后（两种迁移路径相同）：**
+
+```go
+func AuthMiddleware(secret string) func(http.Handler) http.Handler {
+    return func(next http.Handler) http.Handler {
+        return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+            token := r.Header.Get("Authorization")
+            claims, err := jwt.Validate(token, secret)
+            if err != nil {
+                contract.WriteError(w, r, contract.ErrUnauthorized)
+                return
+            }
+            r = r.WithContext(context.WithValue(r.Context(), claimsKey{}, claims))
+            next.ServeHTTP(w, r)
+        })
+    }
+}
+```
+
+context 值通过 `r.WithContext` 传递，而不是 `c.Set`。这是 stdlib 模式。使用类型化的未导出 key 结构体（`claimsKey{}`）来避免冲突。
+
+## 第四步 — 更新请求解析
+
+**路径参数** — Gin 和 Echo 都使用 `c.Param("id")`。Plumego 使用 `r.PathValue("id")`（Go 1.22 起的 stdlib）或 `contract.PathParam(r, "id")`。
+
+```go
+// Gin / Echo：
+id := c.Param("id")
+
+// Plumego：
+id := r.PathValue("id")
+```
+
+**查询参数** — 用 `r.URL.Query().Get` 替换 `c.Query` / `c.QueryParam`。
+
+```go
+// Gin / Echo：
+page := c.Query("page")
+
+// Plumego：
+page := r.URL.Query().Get("page")
+```
+
+**JSON body** — 用 `json.NewDecoder` 替换 `c.ShouldBindJSON` / `c.Bind`。
+
+```go
+// Gin / Echo：
+var input CreateUserInput
+if err := c.ShouldBindJSON(&input); err != nil {
+    c.JSON(400, gin.H{"error": err.Error()})
+    return
+}
+
+// Plumego：
+var input CreateUserInput
+if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+    contract.WriteError(w, r, contract.ErrBadRequest.WithDetail(err.Error()))
+    return
+}
+```
+
+**请求头** — 用 `r.Header.Get` 替换 `c.GetHeader`。
+
+```go
+// Gin / Echo：
+token := c.GetHeader("Authorization")
+
+// Plumego：
+token := r.Header.Get("Authorization")
+```
+
+## 第五步 — 更新响应写入
+
+用 `contract.WriteResponse` 和 `contract.WriteError` 替换所有响应辅助函数。
+
+**成功响应：**
+
+```go
+// Gin：  c.JSON(http.StatusOK, data)
+// Echo： return c.JSON(http.StatusOK, data)
+
+// Plumego：
+contract.WriteResponse(w, r, http.StatusOK, data, nil)
+```
+
+**错误响应：**
+
+```go
+// Gin：  c.JSON(400, gin.H{"error": "bad input"})
+// Echo： return echo.NewHTTPError(400, "bad input")
+
+// Plumego：
+contract.WriteError(w, r, contract.ErrBadRequest)
+// 带详情：
+contract.WriteError(w, r, contract.ErrBadRequest.WithDetail("字段 X 是必填项"))
+```
+
+内置错误码完整列表见[错误模型](/zh/docs/concepts/error-model)。
+
+## 第六步 — 替换应用初始化
+
+用 `core.New` 替换 Gin/Echo 的引擎初始化。
+
+**Gin 之前：**
+
+```go
+func main() {
+    engine := gin.New()
+    engine.Use(gin.Recovery(), gin.Logger())
+    registerRoutes(engine)
+    engine.Run(":8080")
+}
+```
+
+**Echo 之前：**
+
+```go
+func main() {
+    e := echo.New()
+    e.Use(middleware.Recover(), middleware.Logger())
+    registerRoutes(e)
+    e.Start(":8080")
+}
+```
+
+**Plumego 之后：**
+
+```go
+func main() {
+    cfg := core.DefaultConfig()
+    deps := core.AppDependencies{
+        Logger: plog.NewLogger(),
+    }
+    app := core.New(cfg, deps)
+    app.Use(
+        middleware.RequestID(),
+        middleware.Logger(deps.Logger),
+        middleware.Recovery(deps.Logger),
+    )
+    registerRoutes(app)
+    app.Run()
+}
+```
+
+所有路由与中间件注册集中在 `internal/app/routes.go`，constructor-based 依赖注入放在 `internal/app/app.go`。规范布局见[参考应用](/zh/docs/reference-app)。
+
+## 增量迁移路径
+
+不需要一次性迁移所有内容。Plumego handler 是标准 `http.Handler` 值，因此可以用反向代理包裹 Gin 或 Echo，同时运行两个服务器，逐步转移路由：
+
+1. 从一个服务开始
+2. 替换应用初始化和核心中间件
+3. 逐文件迁移 handler，从最简单的开始
+4. 将路由注册移到 `internal/app/routes.go`
+5. 每批次推送前运行 `make gates`
+
+## 需要注意的地方
+
+**context 值传播** — Gin 使用 `c.Set` / `c.Get`；Echo 也使用 `c.Set` / `c.Get`。Plumego 使用 `r.WithContext` 和类型化 context key。审查每一处从框架 context 读取值的代码，改写为 `r.Context().Value(key)`。
+
+**中间件顺序** — 显式的中间件顺序现在在 `routes.go` 中可见。将顺序与你的 Gin/Echo 设置对比，确保语义一致。
+
+**错误处理** — Gin 和 Echo 允许 handler 函数通过状态码短路。在 Plumego 中，每个 handler 必须自己用 `contract.WriteError` 写入响应然后 return。检查每条错误路径。
+
+**参数校验** — Gin 的 `ShouldBind` 和 Echo 的 `Bind` 包含结构体 tag 校验。Plumego 的 `json.NewDecoder` 只负责解码。解码后需要自行添加校验步骤，或使用挂载到你的服务（而不是框架）的独立校验库。
+
+## 运行 gates
+
+迁移完一个服务后，确认边界合规性：
+
+```bash
+go run ./internal/checks/dependency-rules
+make gates
+```
+
+`make gates` 运行 `gofmt`、`go vet`、测试和边界检查——与 CI 使用的套件相同。
+
+## 继续阅读
+
+- [参考应用](/zh/docs/reference-app) — 每个迁移后的服务都应该达到的规范布局
+- [框架横向对比](/zh/compare) — Gin、Echo、Chi 和 Plumego 的详细功能矩阵
+- [错误模型](/zh/docs/concepts/error-model) — 结构化错误码与响应信封
+- [中间件模型](/zh/docs/concepts/middleware-model) — 纯传输层中间件合约

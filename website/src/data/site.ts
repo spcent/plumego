@@ -44,9 +44,11 @@ export const FOOTER_GROUPS: Record<Locale, Array<{ title: string; links: Array<{
       links: [
         { label: 'Docs', href: '/docs' },
         { label: 'Why Plumego', href: '/why-plumego' },
+        { label: 'Agent Workflow', href: '/agent-workflow' },
         { label: 'Use Cases', href: '/use-cases' },
         { label: 'Architecture', href: '/architecture' },
         { label: 'Compare Frameworks', href: '/compare' },
+        { label: 'Benchmarks', href: '/benchmarks' },
         { label: 'Examples', href: '/examples' },
       ],
     },
@@ -55,6 +57,7 @@ export const FOOTER_GROUPS: Record<Locale, Array<{ title: string; links: Array<{
       links: [
         { label: 'Getting Started', href: '/docs/getting-started' },
         { label: 'Reference App', href: '/docs/reference-app' },
+        { label: 'Migrate from Gin/Echo', href: '/docs/guides/migrate-from-gin-echo' },
         { label: 'FAQ', href: '/docs/faq' },
       ],
     },
@@ -77,9 +80,11 @@ export const FOOTER_GROUPS: Record<Locale, Array<{ title: string; links: Array<{
       links: [
         { label: '文档', href: '/zh/docs' },
         { label: '为什么选择 Plumego', href: '/zh/why-plumego' },
+        { label: 'Agent 工作流', href: '/zh/agent-workflow' },
         { label: '使用场景', href: '/zh/use-cases' },
         { label: '架构', href: '/zh/architecture' },
         { label: '框架横向对比', href: '/zh/compare' },
+        { label: '性能测试', href: '/zh/benchmarks' },
         { label: '示例', href: '/zh/examples' },
       ],
     },
@@ -88,6 +93,7 @@ export const FOOTER_GROUPS: Record<Locale, Array<{ title: string; links: Array<{
       links: [
         { label: '开始使用', href: '/zh/docs/getting-started' },
         { label: '参考应用', href: '/zh/docs/reference-app' },
+        { label: '从 Gin/Echo 迁移', href: '/zh/docs/guides/migrate-from-gin-echo' },
         { label: '常见问题', href: '/zh/docs/faq' },
       ],
     },

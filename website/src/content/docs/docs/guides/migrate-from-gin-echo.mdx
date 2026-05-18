@@ -1,0 +1,355 @@
+---
+title: Migrate from Gin or Echo
+description: Side-by-side code comparison and a step-by-step path for moving a Gin or Echo service to Plumego.
+translationKey: guides-migrate-from-gin-echo
+sidebar:
+  order: 18
+---
+
+# Migrate from Gin or Echo
+
+This guide is for teams running a Gin or Echo service who want to move to Plumego. It covers the common surface areas — handler signatures, routing, middleware, request parsing, and response writing — with side-by-side comparisons so you can migrate incrementally.
+
+Estimated effort: **1–3 days per service**, depending on handler count and middleware complexity.
+
+## Before you start
+
+Read [Why Plumego](/why-plumego) and check the [comparison table](/compare) first. Migration is worth doing when reviewable wiring, agent-ready structure, or a zero-external-dep kernel matter more than the convenience of the framework you are leaving.
+
+If Gin or Echo already fits your team well, this migration is not the right investment.
+
+## What changes and what stays the same
+
+| Surface | Gin | Echo | Plumego |
+| --- | --- | --- | --- |
+| Handler signature | `func(*gin.Context)` | `func(echo.Context) error` | `func(http.ResponseWriter, *http.Request)` |
+| Route registration | `r.GET(path, h)` | `e.GET(path, h)` | `r.Get(path, h)` |
+| Path parameters | `c.Param("id")` | `c.Param("id")` | `r.PathValue("id")` |
+| Query parameters | `c.Query("k")` | `c.QueryParam("k")` | `r.URL.Query().Get("k")` |
+| JSON body | `c.ShouldBindJSON(&v)` | `c.Bind(&v)` | `json.NewDecoder(r.Body).Decode(&v)` |
+| JSON response | `c.JSON(200, v)` | `c.JSON(200, v)` | `contract.WriteResponse(w, r, 200, v, nil)` |
+| Error response | `c.JSON(400, gin.H{"error":…})` | `return echo.ErrBadRequest` | `contract.WriteError(w, r, err)` |
+| Middleware | `func(*gin.Context)` | `func(echo.HandlerFunc) echo.HandlerFunc` | `func(http.Handler) http.Handler` |
+| Groups | `r.Group("/v1")` | `e.Group("/v1")` | `r.Group("/v1")` |
+| App setup | `gin.New()` / `r.Run(addr)` | `echo.New()` / `e.Start(addr)` | `core.New(cfg, deps)` / `app.Run()` |
+
+---
+
+## Step 1 — Replace the handler signature
+
+This is the largest surface change. Every handler in Gin and Echo uses a framework-specific context type. Plumego uses the standard library signature.
+
+**Gin before:**
+
+```go
+func GetUser(c *gin.Context) {
+    id := c.Param("id")
+    user, err := store.Get(id)
+    if err != nil {
+        c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
+        return
+    }
+    c.JSON(http.StatusOK, user)
+}
+```
+
+**Echo before:**
+
+```go
+func GetUser(c echo.Context) error {
+    id := c.Param("id")
+    user, err := store.Get(id)
+    if err != nil {
+        return echo.ErrNotFound
+    }
+    return c.JSON(http.StatusOK, user)
+}
+```
+
+**Plumego after (identical for both migrations):**
+
+```go
+func GetUser(w http.ResponseWriter, r *http.Request) {
+    id := r.PathValue("id")
+    user, err := store.Get(id)
+    if err != nil {
+        contract.WriteError(w, r, contract.ErrNotFound)
+        return
+    }
+    contract.WriteResponse(w, r, http.StatusOK, user, nil)
+}
+```
+
+The Plumego handler is a plain `func(http.ResponseWriter, *http.Request)`. Every existing `net/http` middleware works without adapters.
+
+## Step 2 — Update route registration
+
+Route syntax maps almost 1:1. Only the method casing changes (`GET` → `Get`).
+
+**Gin before:**
+
+```go
+engine := gin.New()
+engine.Use(gin.Recovery())
+
+v1 := engine.Group("/api/v1")
+v1.Use(authMiddleware)
+v1.GET("/users/:id", GetUser)
+v1.POST("/users", CreateUser)
+v1.DELETE("/users/:id", DeleteUser)
+```
+
+**Echo before:**
+
+```go
+e := echo.New()
+e.Use(middleware.Recover())
+
+v1 := e.Group("/api/v1")
+v1.Use(authMiddleware)
+v1.GET("/users/:id", GetUser)
+v1.POST("/users", CreateUser)
+v1.DELETE("/users/:id", DeleteUser)
+```
+
+**Plumego after:**
+
+```go
+app := core.New(core.DefaultConfig(), core.AppDependencies{
+    Logger: plog.NewLogger(),
+})
+
+app.Use(middleware.Recovery())
+
+v1 := app.Group("/api/v1", authMiddleware)
+v1.Get("/users/:id",  http.HandlerFunc(GetUser))
+v1.Post("/users",     http.HandlerFunc(CreateUser))
+v1.Delete("/users/:id", http.HandlerFunc(DeleteUser))
+
+app.Run()
+```
+
+Move all route registration into `internal/app/routes.go` for the canonical layout. See [Reference App](/docs/reference-app) for the full structure.
+
+## Step 3 — Rewrite middleware
+
+Gin and Echo middleware uses framework-specific signatures. Plumego uses the standard `func(http.Handler) http.Handler` shape.
+
+**Gin before:**
+
+```go
+func AuthMiddleware(secret string) gin.HandlerFunc {
+    return func(c *gin.Context) {
+        token := c.GetHeader("Authorization")
+        claims, err := jwt.Validate(token, secret)
+        if err != nil {
+            c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+            return
+        }
+        c.Set("claims", claims)
+        c.Next()
+    }
+}
+```
+
+**Echo before:**
+
+```go
+func AuthMiddleware(secret string) echo.MiddlewareFunc {
+    return func(next echo.HandlerFunc) echo.HandlerFunc {
+        return func(c echo.Context) error {
+            token := c.Request().Header.Get("Authorization")
+            claims, err := jwt.Validate(token, secret)
+            if err != nil {
+                return echo.ErrUnauthorized
+            }
+            c.Set("claims", claims)
+            return next(c)
+        }
+    }
+}
+```
+
+**Plumego after (identical for both migrations):**
+
+```go
+func AuthMiddleware(secret string) func(http.Handler) http.Handler {
+    return func(next http.Handler) http.Handler {
+        return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+            token := r.Header.Get("Authorization")
+            claims, err := jwt.Validate(token, secret)
+            if err != nil {
+                contract.WriteError(w, r, contract.ErrUnauthorized)
+                return
+            }
+            r = r.WithContext(context.WithValue(r.Context(), claimsKey{}, claims))
+            next.ServeHTTP(w, r)
+        })
+    }
+}
+```
+
+Note that context values use `r.WithContext` instead of `c.Set`. This is the stdlib pattern. Use typed unexported key structs (`claimsKey{}`) to avoid collisions.
+
+## Step 4 — Update request parsing
+
+**Path parameters** — Gin and Echo both use `c.Param("id")`. Plumego uses `r.PathValue("id")` (stdlib since Go 1.22) or `contract.PathParam(r, "id")`.
+
+```go
+// Gin / Echo:
+id := c.Param("id")
+
+// Plumego:
+id := r.PathValue("id")
+```
+
+**Query parameters** — Replace `c.Query` / `c.QueryParam` with `r.URL.Query().Get`.
+
+```go
+// Gin / Echo:
+page := c.Query("page")
+
+// Plumego:
+page := r.URL.Query().Get("page")
+```
+
+**JSON body** — Replace `c.ShouldBindJSON` / `c.Bind` with `json.NewDecoder`.
+
+```go
+// Gin / Echo:
+var input CreateUserInput
+if err := c.ShouldBindJSON(&input); err != nil {  // Gin
+    c.JSON(400, gin.H{"error": err.Error()})
+    return
+}
+
+// Plumego:
+var input CreateUserInput
+if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+    contract.WriteError(w, r, contract.ErrBadRequest.WithDetail(err.Error()))
+    return
+}
+```
+
+**Headers** — Replace `c.GetHeader` with `r.Header.Get`.
+
+```go
+// Gin / Echo:
+token := c.GetHeader("Authorization")
+
+// Plumego:
+token := r.Header.Get("Authorization")
+```
+
+## Step 5 — Update response writing
+
+Replace all response helpers with `contract.WriteResponse` and `contract.WriteError`.
+
+**Success response:**
+
+```go
+// Gin:   c.JSON(http.StatusOK, data)
+// Echo:  return c.JSON(http.StatusOK, data)
+
+// Plumego:
+contract.WriteResponse(w, r, http.StatusOK, data, nil)
+```
+
+**Error response:**
+
+```go
+// Gin:   c.JSON(400, gin.H{"error": "bad input"})
+// Echo:  return echo.NewHTTPError(400, "bad input")
+
+// Plumego:
+contract.WriteError(w, r, contract.ErrBadRequest)
+// or with detail:
+contract.WriteError(w, r, contract.ErrBadRequest.WithDetail("field X is required"))
+```
+
+See [Error Model](/docs/concepts/error-model) for the full list of built-in error codes.
+
+## Step 6 — Replace app setup
+
+Replace the Gin/Echo engine initialisation with `core.New`.
+
+**Gin before:**
+
+```go
+func main() {
+    engine := gin.New()
+    engine.Use(gin.Recovery(), gin.Logger())
+    registerRoutes(engine)
+    engine.Run(":8080")
+}
+```
+
+**Echo before:**
+
+```go
+func main() {
+    e := echo.New()
+    e.Use(middleware.Recover(), middleware.Logger())
+    registerRoutes(e)
+    e.Start(":8080")
+}
+```
+
+**Plumego after:**
+
+```go
+func main() {
+    cfg := core.DefaultConfig()
+    deps := core.AppDependencies{
+        Logger: plog.NewLogger(),
+    }
+    app := core.New(cfg, deps)
+    app.Use(
+        middleware.RequestID(),
+        middleware.Logger(deps.Logger),
+        middleware.Recovery(deps.Logger),
+    )
+    registerRoutes(app)
+    app.Run()
+}
+```
+
+Keep all route and middleware wiring in one place (`internal/app/routes.go`). Constructor-based dependency injection stays in `internal/app/app.go`. See [Reference App](/docs/reference-app) for the canonical layout.
+
+## Incremental migration path
+
+You do not need to migrate everything at once. Plumego handlers are plain `http.Handler` values, so you can wrap Gin or Echo in a reverse proxy, run both servers, and shift routes gradually:
+
+1. Start with one service
+2. Replace the app setup and core middleware
+3. Migrate handlers file by file, starting with the simplest ones
+4. Move route registration into `internal/app/routes.go`
+5. Run `make gates` before pushing each batch
+
+## What to watch for
+
+**Context value propagation** — Gin uses `c.Set` / `c.Get`; Echo uses `c.Set` / `c.Get`. Plumego uses `r.WithContext` and typed context keys. Audit every place your code reads context values from the framework context and convert to `r.Context().Value(key)`.
+
+**Middleware order** — Explicit middleware ordering is now visible in `routes.go`. Review the order against your Gin/Echo setup to ensure the same semantics.
+
+**Error handling** — Gin and Echo allow handler functions to short-circuit with a status code. In Plumego, every handler must write the response itself using `contract.WriteError` and then return. Check every error path.
+
+**Validation** — Gin's `ShouldBind` and Echo's `Bind` include struct tag validation. Plumego's `json.NewDecoder` decodes only. Add your own validation step after decoding, or use a standalone validation library attached to your service — not to the framework.
+
+## Run the gates
+
+After migrating a service, confirm boundary compliance:
+
+```bash
+go run ./internal/checks/dependency-rules
+make gates
+```
+
+`make gates` runs `gofmt`, `go vet`, tests, and boundary checks — the same suite CI uses.
+
+## Read next
+
+- [Reference App](/docs/reference-app) — canonical layout every migrated service should target
+- [Compare Frameworks](/compare) — detailed feature matrix for Gin, Echo, Chi, and Plumego
+- [Error Model](/docs/concepts/error-model) — structured error codes and response envelope
+- [Middleware Model](/docs/concepts/middleware-model) — transport-only middleware contracts
