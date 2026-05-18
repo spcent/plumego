@@ -46,7 +46,14 @@ The active queue is an execution surface, not an archive.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| _None_ | - | - | No executable cards are queued right now. Blocked evidence cards live in `tasks/cards/blocked/`. |
+| 1500 | P0 | release | Run full gate suite and record output in docs/release/v1.1.0.md |
+| 1501 | P0 | release | Write complete release notes in docs/release/v1.1.0.md |
+| 1502 | P0 | release | Compare stable-root API snapshots v1.0.0 → HEAD; confirm zero symbol changes |
+| 1503 | P0 | release | Create annotated git tag v1.1.0 |
+| 1504 | P0 | extension evidence | Update beta evidence ledger with second_release_ref v1.1.0; move blocked cards 1367, 1370, 1371, 1372, 1373 to active |
+| 1510 | P1 | benchmark | Write router benchmark tests (static, single-param, multi-param) vs chi |
+| 1511 | P1 | benchmark | Write middleware chain benchmark tests (1, 3, 5 layers; no-op and JSON) |
+| 1512 | P1 | benchmark | Write benchmark/go.mod, benchmark/README.md, and docs/benchmarks/results-v1.1.0.md |
 
 ## Execution Completeness Checklist
 
