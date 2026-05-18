@@ -3,7 +3,7 @@
 Milestone: M-014
 Recipe: specs/change-recipes/add-package.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/openapi
 Owned Files:
 - `x/openapi/openapi.go`
@@ -66,4 +66,12 @@ Done Definition:
 - `go run ./internal/checks/dependency-rules` exits 0.
 
 Outcome:
--
+- Created the experimental `x/openapi` module with OpenAPI 3.1 document
+  structs, `Op` hints, parameter/schema helpers, and `Generator.Generate`.
+- Added route-to-path-template conversion, hint lookup by route name or
+  `METHOD path`, and default 200 responses for routes without hints.
+- Synced the new extension root into repo/taxonomy/dependency/maturity control
+  plane.
+- Validation passed with `x/openapi` race tests, `x/openapi` vet,
+  dependency-rules, module-manifests, agent-workflow, extension-maturity,
+  reference-layout, `gofmt -l .`, and `git diff --check`.

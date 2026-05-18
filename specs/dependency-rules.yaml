@@ -237,6 +237,22 @@ modules:
       - reference/**
       - cmd/**
 
+  x/openapi:
+    path: x/openapi
+    layer: extension
+    allow:
+      - stdlib
+      - router
+      - contract
+    deny:
+      - core/**
+      - middleware/**
+      - security/**
+      - store/**
+      - x/**
+      - reference/**
+      - cmd/**
+
   x/messaging/webhook:
     path: x/messaging/webhook
     layer: extension

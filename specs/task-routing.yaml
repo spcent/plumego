@@ -32,6 +32,7 @@ routing_rules:
       - x/websocket
       - x/frontend
       - x/observability
+      - x/openapi
       - x/resilience
       - x/data
       - x/ai

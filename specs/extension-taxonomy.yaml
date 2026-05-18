@@ -39,6 +39,11 @@ families:
       - x/observability/ops
       - x/observability/devtools
 
+  openapi:
+    canonical_root: x/openapi
+    roots:
+      - x/openapi
+
   resilience:
     canonical_root: x/resilience
     roots:

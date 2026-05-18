@@ -1,0 +1,70 @@
+name: x/openapi
+path: x/openapi
+layer: extension
+status: experimental
+owner: api
+risk: medium
+summary: Route-driven OpenAPI 3.1 document generation for explicit Plumego routes.
+
+entrypoint_reads:
+  - AGENTS.md
+  - docs/CANONICAL_STYLE_GUIDE.md
+  - specs/repo.yaml
+  - specs/task-routing.yaml
+  - specs/dependency-rules.yaml
+  - router/module.yaml
+
+responsibilities:
+  - OpenAPI document model
+  - RouteInfo to OpenAPI path conversion
+  - Optional operation hint merging
+  - Parameter and schema helper constructors
+
+non_goals:
+  - OpenAPI 2.0 generation
+  - Handler reflection
+  - Stable root route annotation ownership
+  - External OpenAPI library dependency
+
+allowed_imports:
+  - stdlib
+  - router
+  - contract
+
+forbidden_imports:
+  - core/**
+  - middleware/**
+  - security/**
+  - store/**
+  - x/**
+  - reference/**
+  - cmd/**
+
+test_commands:
+  - go test -race -timeout 60s ./...
+  - go test -timeout 20s ./...
+  - go vet ./...
+
+doc_paths:
+  - docs/modules/x-openapi/README.md
+
+change_risks:
+  - route path template regression
+  - operation hint merge regression
+  - serialization drift in downstream cards
+
+stop_conditions:
+  - The change introduces reflection over handlers or stable-root annotations.
+  - The change requires an external OpenAPI dependency.
+  - The change moves OpenAPI generation into router, core, or contract.
+
+review_checklist:
+  - Keep route generation driven by router.RouteInfo
+  - Keep hints optional
+  - Preserve dependency-free OpenAPI document structs
+  - Avoid stable root changes
+
+agent_hints:
+  - Use route names or method/path keys for hints
+  - Keep serialization separate from document generation
+  - Keep CLI wiring in cmd/plumego

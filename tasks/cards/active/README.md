@@ -82,7 +82,6 @@ chain in tasks/milestones/ROADMAP.md.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 1540 | P1 | x/openapi | Create x/openapi Generator with Op hint type and Document struct |
 | 1541 | P1 | x/openapi | Add JSON and YAML serialisation to x/openapi (no external YAML library) |
 | 1542 | P1 | cmd/plumego | Add `plumego generate spec` subcommand wiring x/openapi.Generator |
 

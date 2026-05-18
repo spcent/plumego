@@ -86,6 +86,7 @@ layers:
       - x/gateway
       - x/messaging
       - x/observability
+      - x/openapi
       - x/resilience
       - x/rest
       - x/validate
