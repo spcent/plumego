@@ -82,7 +82,6 @@ chain in tasks/milestones/ROADMAP.md.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 1541 | P1 | x/openapi | Add JSON and YAML serialisation to x/openapi (no external YAML library) |
 | 1542 | P1 | cmd/plumego | Add `plumego generate spec` subcommand wiring x/openapi.Generator |
 
 ### M-015 — Database Adapters (P2, depends on M-009)

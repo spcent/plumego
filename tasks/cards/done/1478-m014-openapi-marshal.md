@@ -3,7 +3,7 @@
 Milestone: M-014
 Recipe: specs/change-recipes/add-package.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/openapi
 Owned Files:
 - `x/openapi/marshal.go`
@@ -50,4 +50,12 @@ Done Definition:
 - No external dependencies added to x/openapi/go.mod beyond those in card 1540.
 
 Outcome:
--
+- Added `MarshalJSON`, `MarshalYAML`, `WriteJSON`, and `WriteYAML` to
+  `x/openapi` without adding an external YAML dependency.
+- Implemented deterministic minimal YAML rendering by converting through JSON
+  values and sorting map keys.
+- Added tests for valid JSON, YAML shape, JSON round-trip, empty documents, and
+  writer helpers.
+- Validation passed with `x/openapi` race tests, `x/openapi` vet,
+  dependency-rules, module-manifests, agent-workflow, `gofmt -l .`, and
+  `git diff --check`.
