@@ -3,7 +3,7 @@
 Milestone: M-019
 Recipe: specs/change-recipes/update-docs.yaml
 Priority: P3
-State: active
+State: done
 Primary Module: specs
 Owned Files:
 - `specs/community-extension.schema.yaml`
@@ -62,4 +62,15 @@ Done Definition:
 - `go run ./internal/checks/module-manifests` exits 0.
 
 Outcome:
--
+- Added `specs/community-extension.schema.yaml` with required fields, status
+  enum, handler-shape constant, required true booleans, list minimums, and
+  stable-root forbidden import requirements.
+- Added `internal/checks/community-extension`, a stdlib-only check tool that
+  validates a target directory's `community-extension.yaml` against the schema.
+- Added tests for valid manifests, missing `name`, invalid `status`, missing
+  `test_commands`, and `no_init_side_effects: false`.
+- Validated with `go test -timeout 20s ./internal/checks/community-extension/...`,
+  `go vet ./internal/checks/community-extension/...`,
+  `go run ./internal/checks/community-extension <valid-temp-dir>`,
+  `go run ./internal/checks/module-manifests`, touched-file `gofmt -l`, and
+  `git diff --check`.

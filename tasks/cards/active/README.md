@@ -107,7 +107,6 @@ chain in tasks/milestones/ROADMAP.md.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 1590 | P3 | specs | Create specs/community-extension.schema.yaml and validation check tool |
 | 1591 | P3 | cmd/plumego | Implement `plumego add` command with schema validation before go get |
 | 1592 | P3 | docs | Write docs/EXTENSION_AUTHORING.md with x/rpc as worked example |
 
