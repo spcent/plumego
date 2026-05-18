@@ -3,7 +3,7 @@
 Milestone: M-013
 Recipe: specs/change-recipes/update-docs.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: docs
 Owned Files:
 - `docs/migration/from-echo.md`
@@ -49,4 +49,10 @@ Done Definition:
 - All code snippets reference only currently exported plumego symbols.
 
 Outcome:
--
+- Added `docs/migration/from-echo.md` with Echo-to-Plumego concept mappings,
+  handler/JSON response, middleware, and error handling conversion snippets.
+- Covered the Echo `Context` difference, the lack of `c.Next()`, and
+  incompatibilities for template rendering, binder registry, validator hooks,
+  and `SkipperMiddleware`.
+- Validation passed with dependency-rules, module-manifests, reference-layout,
+  `gofmt -l .`, and `git diff --check`.
