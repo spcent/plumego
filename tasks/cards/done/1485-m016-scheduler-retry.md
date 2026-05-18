@@ -3,7 +3,7 @@
 Milestone: M-016
 Recipe: specs/change-recipes/add-package.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: reference/with-events
 Owned Files:
 - `reference/with-events/internal/scheduler/retry_job.go`
@@ -53,4 +53,10 @@ Done Definition:
 - `go build ./reference/with-events/...` exits 0.
 
 Outcome:
--
+- Added `internal/scheduler.RetryJob` with registration, delayed scheduling,
+  serialized event payload closure, republish handling, retry backoff, and
+  MaxRetries enforcement.
+- Added tests for delayed scheduling, first-attempt republish, stopping after
+  MaxRetries, and idempotency-store hit behavior.
+- Validation passed with scheduler package tests, `reference/with-events` build,
+  `reference/with-events` vet, agent-workflow, and `git diff --check`.

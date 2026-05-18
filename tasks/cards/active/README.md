@@ -92,7 +92,6 @@ chain in tasks/milestones/ROADMAP.md.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 1562 | P2 | reference/with-events | Implement delayed retry job using x/messaging/scheduler |
 | 1563 | P2 | reference/with-events | Implement webhook sender with backoff retry; write README.md |
 
 ### M-017 — gRPC Support (P3, depends on M-014)
