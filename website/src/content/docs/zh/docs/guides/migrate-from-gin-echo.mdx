@@ -73,7 +73,7 @@ func GetUser(w http.ResponseWriter, r *http.Request) {
     id := r.PathValue("id")
     user, err := store.Get(id)
     if err != nil {
-        contract.WriteError(w, r, contract.ErrNotFound)
+        contract.WriteError(w, r, contract.NewErrorBuilder().Type(contract.TypeNotFound).Build())
         return
     }
     contract.WriteResponse(w, r, http.StatusOK, user, nil)
@@ -179,7 +179,7 @@ func AuthMiddleware(secret string) func(http.Handler) http.Handler {
             token := r.Header.Get("Authorization")
             claims, err := jwt.Validate(token, secret)
             if err != nil {
-                contract.WriteError(w, r, contract.ErrUnauthorized)
+                contract.WriteError(w, r, contract.NewErrorBuilder().Type(contract.TypeUnauthorized).Build())
                 return
             }
             r = r.WithContext(context.WithValue(r.Context(), claimsKey{}, claims))
@@ -193,7 +193,7 @@ context 值通过 `r.WithContext` 传递，而不是 `c.Set`。这是 stdlib 模
 
 ## 第四步 — 更新请求解析
 
-**路径参数** — Gin 和 Echo 都使用 `c.Param("id")`。Plumego 使用 `r.PathValue("id")`（Go 1.22 起的 stdlib）或 `contract.PathParam(r, "id")`。
+**路径参数** — Gin 和 Echo 都使用 `c.Param("id")`。Plumego 使用 `r.PathValue("id")`（Go 1.22 起的 stdlib）。
 
 ```go
 // Gin / Echo：
@@ -226,7 +226,7 @@ if err := c.ShouldBindJSON(&input); err != nil {
 // Plumego：
 var input CreateUserInput
 if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-    contract.WriteError(w, r, contract.ErrBadRequest.WithDetail(err.Error()))
+    contract.WriteError(w, r, contract.NewErrorBuilder().Type(contract.TypeBadRequest).Message(err.Error()).Build())
     return
 }
 ```
@@ -262,9 +262,9 @@ contract.WriteResponse(w, r, http.StatusOK, data, nil)
 // Echo： return echo.NewHTTPError(400, "bad input")
 
 // Plumego：
-contract.WriteError(w, r, contract.ErrBadRequest)
+contract.WriteError(w, r, contract.NewErrorBuilder().Type(contract.TypeBadRequest).Build())
 // 带详情：
-contract.WriteError(w, r, contract.ErrBadRequest.WithDetail("字段 X 是必填项"))
+contract.WriteError(w, r, contract.NewErrorBuilder().Type(contract.TypeBadRequest).Message("字段 X 是必填项").Build())
 ```
 
 内置错误码完整列表见[错误模型](/zh/docs/concepts/error-model)。
