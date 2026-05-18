@@ -105,6 +105,21 @@ const fitProfiles = [
 
 const cautionProfiles = [
   {
+    kicker: 'not a fit',
+    title: '团队深度依赖 Gin 或 Echo 的插件生态',
+    body: 'Gin 和 Echo 有大量围绕其自定义 context 类型（gin.Context / echo.Context）构建的中间件目录、认证插件和社区工具。如果团队依赖这套生态，切换 handler 签名的迁移代价是真实存在的，且收益不明显。',
+  },
+  {
+    kicker: 'not a fit',
+    title: '你需要框架内置 ORM、依赖注入容器或自动注册机制',
+    body: 'Plumego 不携带数据库访问、依赖注入或自动注册逻辑。如果团队期待框架提供或装配这些关注点，显式 DI 模式会像不必要的负担。请选择一个完整的应用框架。',
+  },
+  {
+    kicker: 'not a fit',
+    title: 'x/* 家族的 pre-v1 API 风险是你组织的硬性阻断',
+    body: '9 个稳定根对 v1 有兼容性承诺。x/* 扩展家族属于 experimental 或 beta——其 API 在稳定标签发布前仍可能变化。如果组织政策要求全面稳定的 v1 API，请等待 v1 里程碑，或仅采用稳定根。',
+  },
+  {
     kicker: 'slow down',
     title: '你希望框架约定自动处理服务结构',
     body: '如果团队主要想把路由和依赖配置交给框架隐式处理，Plumego 可能会显得比预期更刻意。',
@@ -113,11 +128,6 @@ const cautionProfiles = [
     kicker: 'slow down',
     title: '每个服务都刻意采用独立的自定义结构',
     body: '每个服务需要自己定义启动流程、路由逻辑和依赖模式的比例越高，共用参考基线能提供的价值就越少。',
-  },
-  {
-    kicker: 'slow down',
-    title: '你希望直接使用包而不遵循结构化的采用模型',
-    body: 'Plumego 更适合那些愿意区分稳定、受支持与实验模块的团队；如果这种区分对你的团队不重要，围绕它建立的纪律就会显得多余。',
   },
 ] as const;
 
@@ -199,7 +209,10 @@ const frameworkRows = [
       </div>
       <h2 class="agent-first-callout__title">专为使用 AI 编码工具的团队设计。</h2>
       <p class="agent-first-callout__body">
-        Plumego 是第一个让 AI 编码助手（Claude、Copilot、Cursor）在动手写代码之前就能精确定位变更归属的 Go HTTP 工具包。
+        <em>这里讨论的是 AI 编码助手（Claude、Copilot、Cursor）——帮助写代码或评审代码的工具。这不是关于构建 AI agent 服务的内容；那是 <code>x/ai</code> 模块的范围。</em>
+      </p>
+      <p class="agent-first-callout__body">
+        Plumego 是第一个让这些编码助手在动手写代码之前就能精确定位变更归属的 Go HTTP 工具包。
         机器可读规范、每模块 manifest 和显式边界规则，让 Agent 拥有和资深 reviewer 相同的任务路由信号。
       </p>
       <div class="agent-first-callout__points">
@@ -454,6 +467,58 @@ const frameworkRows = [
     </div>
   </section>
 
+  <section class="section section--tinted">
+    <div class="section__intro reveal">
+      <h2>采用随时间的样貌。</h2>
+      <p>
+        Plumego 在入口处刻意保持窄口，扩展路径明确。以下是三个典型采用阶段的实际情况。
+      </p>
+    </div>
+    <div class="timeline-grid reveal-stagger">
+      <article class="timeline-card">
+        <p class="timeline-card__kicker">第 1 天</p>
+        <h3>5 分钟内运行 canonical 参考服务</h3>
+        <div class="code-block" style="margin: 0.75rem 0;">
+          <div class="code-block__bar">
+            <div class="code-block__dots"><span></span><span></span><span></span></div>
+            <span class="code-block__filename">terminal</span>
+          </div>
+          <pre class="code-block__pre"><code>go run ./reference/standard-service
+# → server started at :8080
+# → GET /ping → &#123;"data":&#123;"message":"pong"&#125;&#125;</code></pre>
+        </div>
+        <p>
+          克隆仓库，运行参考服务，阅读 <code>internal/app/routes.go</code>。整条请求链路无需打开任何框架源码即可看清楚。
+          在深入评估之前，先从这里开始。
+        </p>
+      </article>
+      <article class="timeline-card">
+        <p class="timeline-card__kicker">第 30 天</p>
+        <h3>从 x/* 添加能力而不触碰稳定根</h3>
+        <p>
+          稳定根基线在服务中运行稳定之后，下一个决策点是：你是否需要 x/* 层的某项能力——WebSocket、多租户、AI 流式传输、边缘代理。
+          每个 x/* 家族都在传输层挂载，不修改稳定根。你用 <code>go run ./internal/checks/dependency-rules</code> 验证边界是否保持。
+        </p>
+        <p>
+          <code>specs/task-routing.yaml</code> 在你开始前就告诉你哪个 x/* 家族拥有新能力的归属。
+          扩展层按自己的节奏演进，稳定根保持不变。
+        </p>
+      </article>
+      <article class="timeline-card">
+        <p class="timeline-card__kicker">第 90 天（及 v1）</p>
+        <h3>v1 打标签时，升级路径是确定性的</h3>
+        <p>
+          9 个稳定根对 v1 有兼容性承诺。v1 标签落地时，<code>core</code>、<code>router</code>、<code>contract</code>
+          等稳定根的升级路径是机械性的——无 handler 签名变更，无 response envelope 破坏性改动。
+        </p>
+        <p>
+          v1 时仍处于 experimental 的 x/* 家族将单独打标签，成熟度等级在发布矩阵中明确标注。
+          你只采用已达到 beta 或 stable 的能力，不需要接受整个扩展目录的风险。
+        </p>
+      </article>
+    </div>
+  </section>
+
   <section class="section">
     <div class="section__intro">
       <h2>下一步。</h2>
@@ -470,6 +535,67 @@ const frameworkRows = [
 </MarketingLayout>
 
 <style>
+  /* ── Timeline grid (第 1/30/90 天) ────────────────────── */
+  .timeline-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1.25rem;
+    max-width: 64rem;
+    margin-inline: auto;
+  }
+
+  @media (min-width: 860px) {
+    .timeline-grid {
+      grid-template-columns: repeat(3, 1fr);
+    }
+  }
+
+  .timeline-card {
+    background: var(--bg-elevated);
+    border: 1px solid var(--line);
+    border-radius: 0.75rem;
+    padding: 1.4rem 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+  }
+
+  .timeline-card__kicker {
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0;
+  }
+
+  .timeline-card h3 {
+    font-size: 0.97rem;
+    font-weight: 600;
+    margin: 0;
+    color: var(--fg);
+    line-height: 1.35;
+    letter-spacing: -0.01em;
+  }
+
+  .timeline-card p {
+    font-size: 0.84rem;
+    color: var(--fg-soft);
+    line-height: 1.6;
+    margin: 0;
+  }
+
+  .timeline-card code {
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    color: var(--accent);
+    background: var(--accent-soft);
+    padding: 0.08rem 0.35rem;
+    border-radius: 0.22rem;
+    white-space: nowrap;
+  }
+
+  /* ── Agent-first callout ─────────────────────────────── */
   .agent-first-callout {
     padding-block: 2rem;
   }
