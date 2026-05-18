@@ -77,7 +77,6 @@ chain in tasks/milestones/ROADMAP.md.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 1533 | P2 | docs | Write docs/migration/middleware-compat.md and update docs/ADOPTION_PATH.md |
 
 ### M-014 — OpenAPI 3.1 Generation (P1, depends on M-009)
 

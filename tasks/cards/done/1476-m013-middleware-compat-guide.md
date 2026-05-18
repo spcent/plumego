@@ -3,7 +3,7 @@
 Milestone: M-013
 Recipe: specs/change-recipes/update-docs.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: docs
 Owned Files:
 - `docs/migration/middleware-compat.md`
@@ -55,4 +55,12 @@ Done Definition:
 - `gofmt -l .` outputs nothing.
 
 Outcome:
--
+- Added `docs/migration/middleware-compat.md` with net/http, gorilla-style,
+  negroni-style, and alice-style middleware wrapping patterns.
+- Documented the single-next-call middleware contract and how to identify
+  incompatible retry/fan-out middleware.
+- Updated `docs/ADOPTION_PATH.md` to point to Gin, Echo, Chi, and middleware
+  migration guides.
+- Confirmed all four migration guides exist.
+- Validation passed with dependency-rules, module-manifests, reference-layout,
+  `gofmt -l .`, and `git diff --check`.

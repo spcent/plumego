@@ -14,6 +14,9 @@ standard service path:
 | Current stack | First read |
 | --- | --- |
 | Gin | `docs/migration/from-gin.md` |
+| Echo | `docs/migration/from-echo.md` |
+| Chi | `docs/migration/from-chi.md` |
+| Existing middleware stack | `docs/migration/middleware-compat.md` |
 
 ## 5 Minutes: Run One Standard Service
 
