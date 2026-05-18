@@ -3,7 +3,7 @@
 Milestone: M-009
 Recipe: specs/change-recipes/update-docs.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: extension evidence
 Owned Files:
 - `docs/EXTENSION_MATURITY.md`
@@ -46,4 +46,9 @@ Done Definition:
 - `go run ./internal/checks/extension-maturity` exits 0.
 
 Outcome:
--
+- Done with one explicit exception: 1372 remained blocked because
+  `x/gateway/discovery` did not exist at `v1.0.0`, so no beta promotion was
+  recorded for that surface. Updated docs/EXTENSION_MATURITY.md and
+  docs/DEPRECATION.md for the completed Round 1 promotions: `x/tenant`, the
+  four `x/ai` stable-tier surfaces, and `x/data/file` plus
+  `x/data/idempotency`.

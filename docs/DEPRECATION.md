@@ -41,8 +41,8 @@ below.
 
 | Tier | Modules | Compatibility rule |
 | --- | --- | --- |
-| `beta` | `x/gateway`, `x/observability`, `x/rest`, `x/websocket` | Exported API frozen between minor release refs. Breaking changes require a new tagged ref and a snapshot comparison showing the diff. No silent breakage. |
-| `experimental` | all other `x/*` | No compatibility freeze. API and config may change between any commits. Adopt for clear reasons, not by default. |
+| `beta` | `x/gateway`, `x/observability`, `x/rest`, `x/tenant`, `x/websocket`, `x/ai/provider`, `x/ai/session`, `x/ai/streaming`, `x/ai/tool`, `x/data/file`, `x/data/idempotency` | Exported API frozen between minor release refs for the listed module or selected surface. Breaking changes require a new tagged ref and a snapshot comparison showing the diff. No silent breakage. |
+| `experimental` | unlisted `x/*` modules and surfaces | No compatibility freeze. API and config may change between any commits. Adopt for clear reasons, not by default. |
 | `ga` | none yet | Full stable-root-equivalent compatibility promise. |
 
 Promotion from `experimental` to `beta` requires evidence recorded in

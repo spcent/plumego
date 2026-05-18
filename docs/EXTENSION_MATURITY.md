@@ -28,18 +28,31 @@ candidates, it also verifies the evidence link and blocker text against
 
 `x/rest`, `x/websocket`, `x/gateway`, and `x/observability` were promoted to
 beta at d2c25c3–ec70358. All four modules showed no exported API changes across
-both release refs. Release-backed API snapshots are recorded in
+both release refs. At v1.1.0, `x/tenant` was promoted to beta, and selected
+surfaces under `x/ai` and `x/data` gained beta evidence without promoting their
+root families. Release-backed API snapshots are recorded in
 `docs/extension-evidence/snapshots/`. Remaining `x/*` modules retain
 `experimental` status until their own release evidence is complete.
+
+## Selected Beta Surfaces
+
+| Surface | Parent | Status | Owner | Release refs | Evidence |
+| --- | --- | --- | --- | --- | --- |
+| `x/ai/provider` | x/ai | beta surface | ai-gateway | `v1.0.0`, `v1.1.0` | [beta evidence](extension-evidence/x-ai-provider.md): API unchanged; owner sign-off recorded |
+| `x/ai/session` | x/ai | beta surface | ai-gateway | `v1.0.0`, `v1.1.0` | [beta evidence](extension-evidence/x-ai-session.md): API unchanged; owner sign-off recorded |
+| `x/ai/streaming` | x/ai | beta surface | ai-gateway | `v1.0.0`, `v1.1.0` | [beta evidence](extension-evidence/x-ai-streaming.md): API unchanged; owner sign-off recorded |
+| `x/ai/tool` | x/ai | beta surface | ai-gateway | `v1.0.0`, `v1.1.0` | [beta evidence](extension-evidence/x-ai-tool.md): API unchanged; owner sign-off recorded |
+| `x/data/file` | x/data | beta surface | persistence | `v1.0.0`, `v1.1.0` | [beta evidence](extension-evidence/x-data.md): API unchanged; owner sign-off recorded |
+| `x/data/idempotency` | x/data | beta surface | persistence | `v1.0.0`, `v1.1.0` | [beta evidence](extension-evidence/x-data.md): API unchanged; owner sign-off recorded |
 
 ## App-Facing Families
 
 | Family | Status | Risk | Owner | Recommended entrypoint | Signals | Validation | Evidence / blocker |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `x/ai` | experimental | high | ai-gateway | `x/ai/provider`, `x/ai/session`, `x/ai/streaming`, `x/ai/tool` for stable-tier adoption | docs:primer; coverage:stable-tier | `go test -timeout 20s ./x/ai/...` | Root family is not beta-ready; evaluate stable-tier subpackages separately |
-| `x/data` | experimental | medium | persistence | `docs/modules/x-data/README.md` before subordinate data packages | docs:primer; coverage:sub-surface-inventory | `go test -timeout 20s ./x/data/...` | [maturity note](extension-evidence/x-data.md): sub-surface inventory selects `x/data/file` and `x/data/idempotency` as possible future beta targets; topology surfaces remain experimental |
+| `x/ai` | experimental | high | ai-gateway | `x/ai/provider`, `x/ai/session`, `x/ai/streaming`, `x/ai/tool` for beta-surface adoption | docs:primer; coverage:stable-tier | `go test -timeout 20s ./x/ai/...` | Root family is not beta-ready; stable-tier subpackages have beta evidence at v1.1.0 |
+| `x/data` | experimental | medium | persistence | `docs/modules/x-data/README.md` before subordinate data packages | docs:primer; coverage:sub-surface-inventory | `go test -timeout 20s ./x/data/...` | [maturity note](extension-evidence/x-data.md): `x/data/file` and `x/data/idempotency` are beta surfaces at v1.1.0; topology surfaces remain experimental |
 | `x/observability/devtools` | experimental | medium | observability | Explicit local/protected debug mounting only | docs:primer; coverage:debug-surface | `go test -timeout 20s ./x/observability/devtools/...` | Debug tooling; not a production admin surface |
-| `x/gateway/discovery` | experimental | medium | edge | Caller-selected discovery backend | docs:primer; coverage:backend-tests | `go test -timeout 20s ./x/gateway/discovery/...` | [maturity note](extension-evidence/x-discovery.md): core contract and static backend are possible future beta targets; Consul/Kubernetes/etcd need backend release observation |
+| `x/gateway/discovery` | experimental | medium | edge | Caller-selected discovery backend | docs:primer; coverage:backend-tests | `go test -timeout 20s ./x/gateway/discovery/...` | [maturity note](extension-evidence/x-discovery.md): core/static surface blocked because `x/gateway/discovery` did not exist at `v1.0.0`; path-migration evidence is required |
 | `x/fileapi` | experimental | medium | persistence | HTTP file transport over `x/data/file` and stable `store/file` contracts | docs:primer; coverage:transport-tests | `go test -timeout 20s ./x/fileapi/...` | Needs persistence and transport scenario evidence as behavior expands |
 | `x/frontend` | experimental | medium | frontend | Explicit static or embedded asset serving | docs:primer; coverage:asset-serving; hardening:directory-safety/precompressed/negotiation | `go test -timeout 20s ./x/frontend/...` | [beta evidence](extension-evidence/x-frontend.md): current-head snapshot is development-only; release history, release-backed API snapshots, owner sign-off, and candidate release gate evidence remain missing |
 | `x/gateway` | beta | medium | edge | `x/gateway` for proxy, rewrite, balancing, and edge transport | docs:primer; coverage:edge-tests | `go test -timeout 20s ./x/gateway/...` | [beta evidence](extension-evidence/x-gateway.md): promoted at d2c25c3–ec70358; API unchanged across both refs |
