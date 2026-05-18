@@ -23,8 +23,8 @@ interface Props {
 const { locale, title, description, currentPath, imagePath, noindex, type, keywords, includeAlternates } = Astro.props;
 const releasesHref = locale === 'zh' ? '/zh/releases' : '/releases';
 const preBadgeLabel = locale === 'zh'
-  ? `pre-v1 · 稳定根可评估 · 扩展模块按成熟度标注`
-  : `pre-v1 · stable roots ready to evaluate · x/* families carry explicit maturity labels`;
+  ? `v1.0.0 · 稳定根 GA · 扩展模块按成熟度标注`
+  : `v1.0.0 · stable roots GA · x/* families carry explicit maturity labels`;
 const preBadgeCta = locale === 'zh' ? '查看发布策略 →' : 'View release posture →';
 const pageTitle = `${title} · ${SITE.name}`;
 const footerGroups = FOOTER_GROUPS[locale];
@@ -95,11 +95,11 @@ const footerTagline = SITE_COPY[locale].footerTagline;
     </script>
   </head>
   <body class="marketing-shell">
-    <div class="pre-v1-banner" role="note">
-      <span class="pre-v1-banner__version">{RELEASE_FACTS.currentVersion}</span>
-      <span class="pre-v1-banner__sep" aria-hidden="true">·</span>
-      <span class="pre-v1-banner__text">{preBadgeLabel}</span>
-      <a class="pre-v1-banner__link" href={releasesHref}>{preBadgeCta}</a>
+    <div class="release-banner" role="note">
+      <span class="release-banner__version">{RELEASE_FACTS.currentVersion}</span>
+      <span class="release-banner__sep" aria-hidden="true">·</span>
+      <span class="release-banner__text">{preBadgeLabel}</span>
+      <a class="release-banner__link" href={releasesHref}>{preBadgeCta}</a>
     </div>
     <SiteHeader locale={locale} currentPath={currentPath} />
     <main>

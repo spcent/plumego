@@ -116,8 +116,8 @@ const cautionProfiles = [
   },
   {
     kicker: 'not a fit',
-    title: 'x/* 家族的 pre-v1 API 风险是你组织的硬性阻断',
-    body: '9 个稳定根对 v1 有兼容性承诺。x/* 扩展家族属于 experimental 或 beta——其 API 在稳定标签发布前仍可能变化。如果组织政策要求全面稳定的 v1 API，请等待 v1 里程碑，或仅采用稳定根。',
+    title: 'x/* 家族的成熟度风险是你组织的硬性阻断',
+    body: '9 个稳定根承载 v1 兼容性承诺。x/* 扩展家族属于 experimental 或 beta——在各自证据闭环前 API 仍可能变化。如果组织政策要求所有能力都具备稳定版本化 API，请只采用稳定根和已晋级 beta 的表面。',
   },
   {
     kicker: 'slow down',
@@ -246,7 +246,7 @@ const frameworkRows = [
       </div>
       <div class="comparison-table__row" role="row">
         <strong role="cell">stable root（稳定根）</strong>
-        <span role="cell">具有长期 API 兼容承诺的模块，属于 v1 hardening 范围：<code>core</code>、<code>router</code>、<code>contract</code>、<code>middleware</code>、<code>security</code>、<code>store</code>、<code>health</code>、<code>log</code>、<code>metrics</code>。</span>
+        <span role="cell">具有长期 API 兼容承诺的模块，属于 v1 稳定根表面：<code>core</code>、<code>router</code>、<code>contract</code>、<code>middleware</code>、<code>security</code>、<code>store</code>、<code>health</code>、<code>log</code>、<code>metrics</code>。</span>
       </div>
       <div class="comparison-table__row" role="row">
         <strong role="cell">x/* family（x/* 家族）</strong>
@@ -505,14 +505,14 @@ const frameworkRows = [
         </p>
       </article>
       <article class="timeline-card">
-        <p class="timeline-card__kicker">第 90 天（及 v1）</p>
-        <h3>v1 打标签时，升级路径是确定性的</h3>
+        <p class="timeline-card__kicker">第 90 天与发布证据</p>
+        <h3>v1 打标签后，升级路径是确定性的</h3>
         <p>
-          9 个稳定根对 v1 有兼容性承诺。v1 标签落地时，<code>core</code>、<code>router</code>、<code>contract</code>
+          9 个稳定根承载 v1 兼容性承诺。v1 标签落地后，<code>core</code>、<code>router</code>、<code>contract</code>
           等稳定根的升级路径是机械性的——无 handler 签名变更，无 response envelope 破坏性改动。
         </p>
         <p>
-          v1 时仍处于 experimental 的 x/* 家族将单独打标签，成熟度等级在发布矩阵中明确标注。
+          v1 后仍处于 experimental 的 x/* 家族将继续单独追踪，成熟度等级在发布矩阵中明确标注。
           你只采用已达到 beta 或 stable 的能力，不需要接受整个扩展目录的风险。
         </p>
       </article>

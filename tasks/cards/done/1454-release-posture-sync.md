@@ -3,7 +3,7 @@
 Milestone: M-003
 Recipe: specs/change-recipes/analysis-only.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: docs
 Owned Files:
 - `README.md`
@@ -45,4 +45,8 @@ Done Definition:
 - Repository entrypoints no longer claim `pre-v1` while release docs and tags claim `v1.0.0`.
 
 Outcome:
--
+- Updated README and README_CN to report `v1.0.0` and `ga` stable roots.
+- Synced generated website release facts to `v1.0.0`.
+- Updated website release/status/compare/home copy so user-facing entrypoints no
+  longer describe Plumego as pre-v1 while preserving beta and experimental
+  extension maturity warnings.

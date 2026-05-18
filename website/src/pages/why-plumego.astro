@@ -125,8 +125,8 @@ const cautionProfiles = [
   },
   {
     kicker: 'not a fit',
-    title: 'The x/* families\' pre-v1 API risk is a blocker for your organization',
-    body: 'The 9 stable roots have a compatibility promise toward v1. The x/* extension families are experimental or beta — their APIs may still change before a stable tag. If your organization requires a fully stable, versioned v1 API across every capability you use, wait for the v1 milestone or restrict adoption to the stable roots only.',
+    title: 'The x/* families\' maturity risk is a blocker for your organization',
+    body: 'The 9 stable roots carry the v1 compatibility promise. The x/* extension families are experimental or beta — their APIs may still change until their own evidence is complete. If your organization requires a fully stable, versioned API across every capability you use, restrict adoption to stable roots and promoted beta surfaces only.',
   },
   {
     kicker: 'slow down',
@@ -255,7 +255,7 @@ const frameworkDecision = [
       </div>
       <div class="comparison-table__row" role="row">
         <strong role="cell">stable root</strong>
-        <span role="cell">A module with a long-term API compatibility promise, part of the v1 hardening scope: <code>core</code>, <code>router</code>, <code>contract</code>, <code>middleware</code>, <code>security</code>, <code>store</code>, <code>health</code>, <code>log</code>, <code>metrics</code>.</span>
+        <span role="cell">A module with a long-term API compatibility promise, part of the v1 stable-root surface: <code>core</code>, <code>router</code>, <code>contract</code>, <code>middleware</code>, <code>security</code>, <code>store</code>, <code>health</code>, <code>log</code>, <code>metrics</code>.</span>
       </div>
       <div class="comparison-table__row" role="row">
         <strong role="cell">x/* family</strong>
@@ -571,15 +571,15 @@ const frameworkDecision = [
         </p>
       </article>
       <article class="timeline-card">
-        <p class="timeline-card__kicker">Day 90 (and v1)</p>
-        <h3>When v1 is tagged, the upgrade path is deterministic</h3>
+        <p class="timeline-card__kicker">Day 90 and release evidence</p>
+        <h3>After v1 is tagged, the upgrade path is deterministic</h3>
         <p>
-          The 9 stable roots have a compatibility promise toward v1. When the v1 tag lands, the upgrade path for
+          The 9 stable roots carry the v1 compatibility promise. After the v1 tag, the upgrade path for
           <code>core</code>, <code>router</code>, <code>contract</code>, and the other stable roots is mechanical —
           no handler signature changes, no breaking response envelope changes.
         </p>
         <p>
-          x/* families that are still experimental at v1 will be tagged separately. Their maturity tier will be
+          x/* families that remain experimental after v1 are tracked separately. Their maturity tier is
           explicit in the release matrix. You adopt only the capabilities that have reached beta or stable — not the whole
           extension catalog.
         </p>
