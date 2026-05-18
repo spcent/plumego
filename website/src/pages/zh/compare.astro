@@ -6,6 +6,7 @@ import JourneyBar from '../../components/marketing/JourneyBar.astro';
 interface Framework {
   id: string;
   name: string;
+  url: string;
   tagline: string;
   handlerSig: string;
   stdlibHandler: boolean;
@@ -30,6 +31,7 @@ const frameworks: Framework[] = [
   {
     id: 'gin',
     name: 'Gin',
+    url: 'https://github.com/gin-gonic/gin',
     tagline: 'Martini 风格路由器，基数树路由',
     handlerSig: 'func(c *gin.Context)',
     stdlibHandler: false,
@@ -59,6 +61,7 @@ const frameworks: Framework[] = [
   {
     id: 'echo',
     name: 'Echo',
+    url: 'https://github.com/labstack/echo',
     tagline: '高性能极简 Web 框架',
     handlerSig: 'func(c echo.Context) error',
     stdlibHandler: false,
@@ -87,6 +90,7 @@ const frameworks: Framework[] = [
   {
     id: 'fiber',
     name: 'Fiber',
+    url: 'https://github.com/gofiber/fiber',
     tagline: 'Express 风格，基于 Fasthttp',
     handlerSig: 'func(c *fiber.Ctx) error',
     stdlibHandler: false,
@@ -108,12 +112,15 @@ const frameworks: Framework[] = [
       '使用基于 net/http 的可观测性、链路追踪或认证库',
       '团队以 Go 标准库为中心，期望标准库兼容性',
     ],
+    migrationCost: 'high',
+    migrationNote: '需要完全重写。Fasthttp 与 net/http 从根本上不兼容——handler 无法复用、中间件无法复用、测试基础设施无法复用。可观测性、认证和链路追踪库全部需要替换。预计以周计，而非天。',
     color: '#00d4aa',
     warning: 'Fiber 使用 Fasthttp，不是 net/http。与 Go 标准库 HTTP 生态完全不兼容。',
   },
   {
     id: 'chi',
     name: 'Chi',
+    url: 'https://github.com/go-chi/chi',
     tagline: '轻量惯用的 Go HTTP 服务路由器',
     handlerSig: 'func(w http.ResponseWriter, r *http.Request)',
     stdlibHandler: true,
@@ -142,6 +149,7 @@ const frameworks: Framework[] = [
   {
     id: 'plumego',
     name: 'Plumego',
+    url: 'https://github.com/spcent/plumego',
     tagline: '显式 HTTP 工具包 — stdlib only，Agent 就绪，pre-v1',
     handlerSig: 'func(w http.ResponseWriter, r *http.Request)',
     stdlibHandler: true,
