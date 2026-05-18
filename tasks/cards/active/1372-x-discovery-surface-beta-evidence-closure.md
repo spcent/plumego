@@ -3,13 +3,13 @@
 Milestone: M-003
 Recipe: specs/change-recipes/analysis-only.yaml
 Priority: P2
-State: blocked
+State: active
 Primary Module: x/gateway/discovery
 Owned Files:
 - `specs/extension-beta-evidence.yaml`
 - `docs/extension-evidence/x-discovery.md`
 - `docs/extension-evidence/release-artifacts.md`
-Depends On: second release ref and owner sign-off
+Depends On: release-backed snapshots and owner sign-off
 
 Goal:
 - Complete beta evidence closure for the `x/gateway/discovery` core/static surface.

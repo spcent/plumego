@@ -3,7 +3,7 @@
 Milestone: M-003
 Recipe: specs/change-recipes/analysis-only.yaml
 Priority: P2
-State: blocked
+State: active
 Primary Module: x/ai
 Owned Files:
 - `specs/extension-beta-evidence.yaml`
@@ -11,7 +11,7 @@ Owned Files:
 - `docs/extension-evidence/x-ai-session.md`
 - `docs/extension-evidence/x-ai-streaming.md`
 - `docs/extension-evidence/x-ai-tool.md`
-Depends On: second release refs and owner sign-off
+Depends On: release-backed snapshots and owner sign-off
 
 Goal:
 - Complete beta evidence closure for `x/ai` stable-tier subpackages.

@@ -3,7 +3,7 @@
 Milestone: M-008
 Recipe: specs/change-recipes/analysis-only.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: release
 Owned Files:
 - `docs/stable-api/snapshots/`

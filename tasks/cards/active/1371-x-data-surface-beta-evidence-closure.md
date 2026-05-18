@@ -3,13 +3,13 @@
 Milestone: M-003
 Recipe: specs/change-recipes/analysis-only.yaml
 Priority: P2
-State: blocked
+State: active
 Primary Module: x/data
 Owned Files:
 - `specs/extension-beta-evidence.yaml`
 - `docs/extension-evidence/x-data.md`
 - `docs/extension-evidence/release-artifacts.md`
-Depends On: second release refs and owner sign-off
+Depends On: release-backed snapshots and owner sign-off
 
 Goal:
 - Complete beta evidence closure for selected `x/data` surfaces.

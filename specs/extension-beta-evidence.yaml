@@ -87,10 +87,10 @@ candidates:
     evidence_doc: docs/extension-evidence/x-tenant.md
     release_refs:
       - 6a99c5e0bc61c12378bcdab5a6a7c4d756b9fa96
+      - v1.1.0
     api_snapshots:
       - docs/extension-evidence/snapshots/first-batch/x-tenant-head.snapshot
     blockers:
-      - release_history_missing
       - api_snapshot_missing
       - owner_signoff_missing
 
@@ -130,10 +130,10 @@ subpackage_candidates:
     evidence_doc: docs/extension-evidence/x-ai-provider.md
     release_refs:
       - 6a99c5e0bc61c12378bcdab5a6a7c4d756b9fa96
+      - v1.1.0
     api_snapshots:
       - docs/extension-evidence/snapshots/ai-stable-tier/x-ai-provider-head.snapshot
     blockers:
-      - release_history_missing
       - api_snapshot_missing
       - owner_signoff_missing
 
@@ -144,10 +144,10 @@ subpackage_candidates:
     evidence_doc: docs/extension-evidence/x-ai-session.md
     release_refs:
       - 6a99c5e0bc61c12378bcdab5a6a7c4d756b9fa96
+      - v1.1.0
     api_snapshots:
       - docs/extension-evidence/snapshots/ai-stable-tier/x-ai-session-head.snapshot
     blockers:
-      - release_history_missing
       - api_snapshot_missing
       - owner_signoff_missing
 
@@ -158,10 +158,10 @@ subpackage_candidates:
     evidence_doc: docs/extension-evidence/x-ai-streaming.md
     release_refs:
       - 6a99c5e0bc61c12378bcdab5a6a7c4d756b9fa96
+      - v1.1.0
     api_snapshots:
       - docs/extension-evidence/snapshots/ai-stable-tier/x-ai-streaming-head.snapshot
     blockers:
-      - release_history_missing
       - api_snapshot_missing
       - owner_signoff_missing
 
@@ -172,10 +172,10 @@ subpackage_candidates:
     evidence_doc: docs/extension-evidence/x-ai-tool.md
     release_refs:
       - 6a99c5e0bc61c12378bcdab5a6a7c4d756b9fa96
+      - v1.1.0
     api_snapshots:
       - docs/extension-evidence/snapshots/ai-stable-tier/x-ai-tool-head.snapshot
     blockers:
-      - release_history_missing
       - api_snapshot_missing
       - owner_signoff_missing
 
@@ -188,10 +188,10 @@ surface_candidates:
     evidence_doc: docs/extension-evidence/x-data.md
     release_refs:
       - 6a99c5e0bc61c12378bcdab5a6a7c4d756b9fa96
+      - v1.1.0
     api_snapshots:
       - docs/extension-evidence/snapshots/v1-baseline/x-data-file/base.snapshot
     blockers:
-      - release_history_missing
       - api_snapshot_missing
       - owner_signoff_missing
 
@@ -203,10 +203,10 @@ surface_candidates:
     evidence_doc: docs/extension-evidence/x-data.md
     release_refs:
       - 6a99c5e0bc61c12378bcdab5a6a7c4d756b9fa96
+      - v1.1.0
     api_snapshots:
       - docs/extension-evidence/snapshots/v1-baseline/x-data-idempotency/base.snapshot
     blockers:
-      - release_history_missing
       - api_snapshot_missing
       - owner_signoff_missing
 
@@ -218,10 +218,10 @@ surface_candidates:
     evidence_doc: docs/extension-evidence/x-discovery.md
     release_refs:
       - 6a99c5e0bc61c12378bcdab5a6a7c4d756b9fa96
+      - v1.1.0
     api_snapshots:
       - docs/extension-evidence/snapshots/v1-baseline/x-discovery/base.snapshot
     blockers:
-      - release_history_missing
       - api_snapshot_missing
       - owner_signoff_missing
 
@@ -233,9 +233,9 @@ surface_candidates:
     evidence_doc: docs/extension-evidence/x-messaging.md
     release_refs:
       - 6a99c5e0bc61c12378bcdab5a6a7c4d756b9fa96
+      - v1.1.0
     api_snapshots:
       - docs/extension-evidence/snapshots/v1-baseline/x-messaging/base.snapshot
     blockers:
-      - release_history_missing
       - api_snapshot_missing
       - owner_signoff_missing

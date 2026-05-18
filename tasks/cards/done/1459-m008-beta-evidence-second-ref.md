@@ -3,7 +3,7 @@
 Milestone: M-008
 Recipe: specs/change-recipes/update-docs.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: extension evidence
 Owned Files:
 - `specs/extension-beta-evidence.yaml`
@@ -59,4 +59,8 @@ Done Definition:
 - tasks/cards/blocked/ no longer contains the five moved cards.
 
 Outcome:
--
+- Done. Confirmed `v1.1.0` exists, added it as the second release ref for
+  `x/tenant`, the four `x/ai` stable-tier subpackages, `x/data/file`,
+  `x/data/idempotency`, `x/gateway/discovery:core-static`, and
+  `x/messaging:app-facing-service`; moved cards 1367, 1370, 1371, 1372, and
+  1373 back to active.

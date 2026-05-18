@@ -3,13 +3,13 @@
 Milestone: M-003
 Recipe: specs/change-recipes/analysis-only.yaml
 Priority: P2
-State: blocked
+State: active
 Primary Module: x/tenant
 Owned Files:
 - `specs/extension-beta-evidence.yaml`
 - `docs/extension-evidence/x-tenant.md`
 - `docs/extension-evidence/release-artifacts.md`
-Depends On: second release ref and owner sign-off
+Depends On: release-backed snapshots and owner sign-off
 
 Goal:
 - Complete beta evidence closure for `x/tenant` when real release refs and owner sign-off are available.

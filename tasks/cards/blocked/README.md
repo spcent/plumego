@@ -16,8 +16,3 @@ Rules:
 
 | Card | Priority | Primary module | Blocker |
 |---|---|---|---|
-| [1367](1367-x-tenant-beta-evidence-closure.md) | P2 | x/tenant | second release ref and owner sign-off |
-| [1370](1370-x-ai-stable-tier-beta-evidence-closure.md) | P2 | x/ai | second release refs and owner sign-off |
-| [1371](1371-x-data-surface-beta-evidence-closure.md) | P2 | x/data | second release refs and owner sign-off |
-| [1372](1372-x-discovery-surface-beta-evidence-closure.md) | P2 | x/gateway/discovery | second release ref and owner sign-off |
-| [1373](1373-x-messaging-service-beta-evidence-closure.md) | P2 | x/messaging | second release ref and owner sign-off |

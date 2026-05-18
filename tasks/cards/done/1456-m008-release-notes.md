@@ -3,7 +3,7 @@
 Milestone: M-008
 Recipe: specs/change-recipes/update-docs.yaml
 Priority: P0
-State: active
+State: done
 Primary Module: release
 Owned Files:
 - `docs/release/v1.1.0.md`
