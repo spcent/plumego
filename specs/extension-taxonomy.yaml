@@ -48,6 +48,8 @@ families:
     canonical_root: x/rpc
     roots:
       - x/rpc
+      - x/rpc/client
+      - x/rpc/gateway
       - x/rpc/server
 
   resilience:

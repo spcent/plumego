@@ -86,6 +86,22 @@ packages:
       - reference/standard-service
     summary: Optional RPC transport adapters and lifecycle helpers; keep gRPC dependencies out of stable roots and the main module.
 
+  x/rpc/client:
+    module: x/rpc
+    layer: extension
+    role: primitive
+    task_families:
+      - rpc_transport
+    start_with:
+      - x/rpc/module.yaml
+      - x/rpc/client/module.yaml
+      - x/rpc/client/pool.go
+    avoid:
+      - core
+      - middleware
+      - x/gateway
+    summary: gRPC client connection pool and unary interceptors with caller-selected retry policy.
+
   x/rpc/server:
     module: x/rpc
     layer: extension
@@ -101,6 +117,22 @@ packages:
       - middleware
       - x/gateway
     summary: gRPC server lifecycle primitive with explicit service registration and context-aware shutdown.
+
+  x/rpc/gateway:
+    module: x/rpc
+    layer: extension
+    role: adapter
+    task_families:
+      - rpc_transport
+    start_with:
+      - x/rpc/module.yaml
+      - x/rpc/gateway/module.yaml
+      - x/rpc/gateway/transcoder.go
+    avoid:
+      - core
+      - router
+      - x/gateway
+    summary: HTTP-to-gRPC transcoding adapter over grpc-gateway runtime; not the edge gateway family.
 
   x/gateway:
     module: x/gateway

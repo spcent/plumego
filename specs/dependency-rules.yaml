@@ -355,6 +355,32 @@ modules:
       - reference/**
       - cmd/**
 
+  x/rpc/gateway:
+    path: x/rpc/gateway
+    layer: extension
+    allow:
+      - stdlib
+    deny:
+      - core/**
+      - router/**
+      - contract/**
+      - middleware/**
+      - security/**
+      - store/**
+      - x/tenant/**
+      - x/ai/**
+      - x/data/**
+      - x/fileapi/**
+      - x/frontend/**
+      - x/gateway/**
+      - x/messaging/**
+      - x/openapi/**
+      - x/resilience/**
+      - x/rest/**
+      - x/websocket/**
+      - reference/**
+      - cmd/**
+
   x/rpc/server:
     path: x/rpc/server
     layer: extension

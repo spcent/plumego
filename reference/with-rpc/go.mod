@@ -1,4 +1,4 @@
-module github.com/spcent/plumego/x/rpc
+module github.com/spcent/plumego/reference/with-rpc
 
 go 1.24.0
 
@@ -7,6 +7,7 @@ toolchain go1.24.4
 require (
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.28.0
 	github.com/spcent/plumego v0.0.0
+	github.com/spcent/plumego/x/rpc v0.0.0
 	google.golang.org/grpc v1.80.0
 	google.golang.org/protobuf v1.36.11
 )
@@ -20,3 +21,5 @@ require (
 )
 
 replace github.com/spcent/plumego => ../..
+
+replace github.com/spcent/plumego/x/rpc => ../../x/rpc

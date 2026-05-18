@@ -18,6 +18,8 @@ subordinate_families:
     role: gRPC server lifecycle wrapper aligned with context cancellation
   - package: x/rpc/client
     role: gRPC client connection pool and unary interceptors
+  - package: x/rpc/gateway
+    role: HTTP transcoder over grpc-gateway runtime ServeMux
 
 responsibilities:
   - gRPC server lifecycle wrappers
@@ -36,6 +38,7 @@ public_entrypoints:
 
 doc_paths:
   - docs/modules/x-rpc/README.md
+  - reference/with-rpc
 
 allowed_imports:
   - stdlib
