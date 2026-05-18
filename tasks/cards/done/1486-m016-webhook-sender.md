@@ -3,7 +3,7 @@
 Milestone: M-016
 Recipe: specs/change-recipes/add-http-endpoint.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: reference/with-events
 Owned Files:
 - `reference/with-events/internal/webhook/sender.go`
@@ -63,4 +63,26 @@ Done Definition:
 - `go build ./reference/with-events/...` exits 0.
 
 Outcome:
--
+- Implemented reference/with-events webhook delivery with JSON POST, empty-target
+  no-op behavior, and retryable HTTP/network failure handling using
+  x/messaging/webhook retry rules.
+- Wired the order consumer to an optional webhook sender from
+  WEBHOOK_TARGET_URL so the reference flow includes consumer -> webhook target
+  delivery.
+- Added httptest coverage for first-attempt success, two failures then success,
+  exhausted 500 retries, and empty target no-op.
+- Wrote reference/with-events/README.md with ASCII architecture diagram, run
+  instructions, and notes for outbox, at-least-once consumer, delayed retry,
+  webhook delivery, and replacing in-process pubsub.
+- Validation:
+  `GOTOOLCHAIN=go1.24.4 GOCACHE=/private/tmp/plumego-gocache go test -timeout 30s ./internal/webhook/...`
+  from reference/with-events; `GOTOOLCHAIN=go1.24.4
+  GOCACHE=/private/tmp/plumego-gocache go test -timeout 30s ./...` from
+  reference/with-events; `GOTOOLCHAIN=go1.24.4
+  GOCACHE=/private/tmp/plumego-gocache go vet ./...` from
+  reference/with-events; `GOTOOLCHAIN=go1.24.4
+  GOCACHE=/private/tmp/plumego-gocache go build ./...` from
+  reference/with-events; `GOTOOLCHAIN=go1.24.4
+  GOCACHE=/private/tmp/plumego-gocache go run ./internal/checks/reference-layout`;
+  `GOTOOLCHAIN=go1.24.4 GOCACHE=/private/tmp/plumego-gocache go run
+  ./internal/checks/agent-workflow`; `gofmt -l .`; `git diff --check`.

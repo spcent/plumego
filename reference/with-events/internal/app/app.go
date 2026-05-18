@@ -11,6 +11,7 @@ import (
 	"github.com/spcent/plumego/middleware/requestid"
 	"github.com/spcent/plumego/reference/with-events/internal/config"
 	"github.com/spcent/plumego/reference/with-events/internal/order"
+	orderwebhook "github.com/spcent/plumego/reference/with-events/internal/webhook"
 	"github.com/spcent/plumego/x/messaging"
 )
 
@@ -29,6 +30,7 @@ type App struct {
 	Messaging *messaging.Service
 	Orders    *order.Handler
 	Consumer  *order.OrderConsumer
+	Webhooks  *orderwebhook.Sender
 }
 
 // New constructs the App with an in-process messaging service.
@@ -59,7 +61,8 @@ func New(cfg config.Config, deps Deps) (*App, error) {
 		ConsumerID: "with-events",
 	})
 	publisher := order.NewPublisher(bus, order.NewMemoryIdempotencyStore())
-	consumer := order.NewConsumer(bus, order.NewMemoryIdempotencyStore())
+	webhooks := orderwebhook.NewSender(cfg.WebhookTargetURL)
+	consumer := order.NewConsumer(bus, order.NewMemoryIdempotencyStore(), webhooks)
 
 	return &App{
 		Core:      a,
@@ -69,6 +72,7 @@ func New(cfg config.Config, deps Deps) (*App, error) {
 		Messaging: svc,
 		Orders:    order.NewHandler(publisher),
 		Consumer:  consumer,
+		Webhooks:  webhooks,
 	}, nil
 }
 
