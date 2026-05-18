@@ -71,4 +71,4 @@ status.
 | `x/ai` stable-tier subpackages | beta evidence complete for provider, session, streaming, and tool | none | root `x/ai` remains experimental |
 | `x/data` selected surfaces | beta evidence complete for `x/data/file` and `x/data/idempotency` | none for selected surfaces | root `x/data` remains experimental |
 | `x/gateway/discovery` core/static surface | evidence doc, first `v1.0.0` release ref, v1 baseline intake snapshot | second release ref, complete release-backed snapshots, owner sign-off | `tasks/cards/blocked/1372-x-discovery-surface-beta-evidence-closure.md` |
-| `x/messaging` app-facing service | evidence doc, first `v1.0.0` release ref, v1 baseline intake snapshot | second release ref, complete release-backed snapshots, owner sign-off | `tasks/cards/blocked/1373-x-messaging-service-beta-evidence-closure.md` |
+| `x/messaging` app-facing service | beta evidence complete | none for app-facing service | subordinate primitives remain experimental |

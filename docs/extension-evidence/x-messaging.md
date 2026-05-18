@@ -4,11 +4,11 @@ Module: `x/messaging`
 
 Owner: `messaging`
 
-Current status: `experimental`
+Current status: `beta`
 
-Candidate status: `not selected`
+Candidate status: `beta`
 
-Evidence state: surface inventory
+Evidence state: complete
 
 ## Current Coverage
 
@@ -37,7 +37,7 @@ broad.
 
 | Surface | Package | Current decision | Why | Next blocker |
 | --- | --- | --- | --- | --- |
-| App-facing messaging service | `x/messaging` | Likely beta candidate after inventory | Canonical user entrypoint for send, receipt, monitoring, failover, and route wiring | Freeze service, provider, receipt, route, and response shapes separately from primitives |
+| App-facing messaging service | `x/messaging` | Beta at v1.1.0 | Canonical user entrypoint for send, receipt, monitoring, failover, and route wiring | Subordinate primitives remain experimental |
 | Queue primitive | `x/messaging/mq` | Experimental | Durable queue and worker coordination are subordinate but broad | Inventory task lifecycle, store contracts, DLQ replay, leases, and SQL/memory stores |
 | Pub/sub primitive | `x/messaging/pubsub` | Experimental | Broker, pattern matching, backpressure, replay, hooks, and TTL behavior need separate evidence | Select a small broker API subset before any beta snapshot |
 | Scheduler primitive | `x/messaging/scheduler` | Experimental | Job lifecycle, store, backpressure, worker, clock, and retry behavior remain broad | Freeze the constructor/options/store interfaces across release refs |
@@ -49,59 +49,60 @@ primitive promotion work must not turn `x/messaging/mq`, `x/messaging/pubsub`, `
 
 ## Required Release Evidence
 
-Partially recorded. The `x/messaging:app-facing-service` surface has `v1.0.0`
-as its first post-v1 release-ref intake point. It still needs a second release
-ref with unchanged exported API.
+Recorded. The `x/messaging:app-facing-service` surface has two consecutive
+minor release refs with unchanged exported API.
 
 Release refs:
 
 - `6a99c5e0bc61c12378bcdab5a6a7c4d756b9fa96` (`v1.0.0` tag target)
+- `v1.1.0`
 
 ## API Snapshot Evidence
 
-Partially recorded. The v1 baseline intake artifacts below are checked in. They
-are first-release baselines only and do not clear `api_snapshot_missing` until
-a second release-backed comparison is recorded.
+Release-backed API snapshots are recorded for the selected app-facing service
+surface. The v1 baseline intake artifacts remain useful history, but the
+v1.0.0 to v1.1.0 snapshots are the promotion evidence.
 
 Snapshot refs:
 
 - `docs/extension-evidence/snapshots/v1-baseline/x-messaging/base.snapshot`
 - `docs/extension-evidence/snapshots/v1-baseline/x-messaging/head.snapshot`
+- `docs/extension-evidence/snapshots/x-messaging/base.snapshot`
+- `docs/extension-evidence/snapshots/x-messaging/head.snapshot`
 
 ## Release Evidence
 
 `specs/extension-beta-evidence.yaml` tracks
 `x/messaging:app-facing-service` as a `surface_candidate` covering the
-app-facing service package. It remains blocked on release history, complete API
-snapshot evidence, and owner sign-off. Queue, pub/sub, scheduler, and webhook
-primitives are intentionally excluded from that surface.
+app-facing service package. Queue, pub/sub, scheduler, and webhook primitives
+are intentionally excluded from that surface.
 
 Current state:
 
 - Selected release candidate: `x/messaging:app-facing-service`
-- API snapshot comparison: `v1.0.0` to `v1.0.0`, unchanged
-- Release-history comparison: first ref only
+- API snapshot comparison: `v1.0.0` to `v1.1.0`, unchanged
+- Release-history comparison: two release refs recorded
 
 ## Owner Sign-Off
 
-Missing. No selected `x/messaging` surface has owner sign-off recorded.
+Signed off by `messaging` for v1.1.0:
+
+> I confirm that the `x/messaging` app-facing service surface meets the beta
+> criteria in docs/EXTENSION_STABILITY_POLICY.md and accept the beta
+> compatibility obligations for the documented public surface.
 
 ## Next Evidence Needed
 
-- Explicit contract inventory for app-facing `x/messaging` entrypoints.
 - Subordinate primitive inventories for queue, pub/sub, scheduler, and webhook
   behavior before selecting any primitive beta target.
-- Second release-backed exported API snapshot after the selected surface
-  inventory is complete.
-- Release-history evidence for the selected API surface.
 
 ## Blockers
 
-- The app-facing service surface is not release-frozen yet.
-- `release_history_missing`
-- `api_snapshot_missing`
-- `owner_signoff_missing`
+None for the app-facing `x/messaging` service surface. Subordinate primitives
+remain experimental.
 
 ## Promotion Posture
 
-Keep `x/messaging` experimental.
+Promoted app-facing `x/messaging` service surface to `beta` at v1.1.0. Keep
+`x/messaging/mq`, `x/messaging/pubsub`, `x/messaging/scheduler`, and
+`x/messaging/webhook` experimental.

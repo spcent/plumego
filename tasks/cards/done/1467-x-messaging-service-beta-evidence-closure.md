@@ -3,7 +3,7 @@
 Milestone: M-003
 Recipe: specs/change-recipes/analysis-only.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: x/messaging
 Owned Files:
 - `specs/extension-beta-evidence.yaml`
@@ -47,4 +47,8 @@ Done Definition:
 - `x/messaging:app-facing-service` has checked-in snapshots, two release refs, release snapshots, and owner sign-off, or blockers remain explicit.
 
 Outcome:
--
+- Done. Generated app-facing `x/messaging` release-backed snapshots across
+  `v1.0.0` to `v1.1.0`; the comparison reported API unchanged. Updated the
+  evidence ledger, recorded `messaging` sign-off, cleared blockers, promoted
+  `x/messaging` to `beta` for the app-facing service surface, and kept
+  subordinate primitives experimental.

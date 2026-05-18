@@ -67,7 +67,6 @@ chain in tasks/milestones/ROADMAP.md.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 1373 | P1 | x/messaging | Promote x/messaging app-facing service to beta |
 | 1514 | P1 | x/frontend | Evaluate x/frontend for beta; record promotion or explicit blocker |
 | 1515 | P1 | extension evidence | Update docs/EXTENSION_MATURITY.md and DEPRECATION.md for Round 2 |
 

@@ -6,8 +6,11 @@
 
 ## v1 Status
 
-- `experimental` in the Plumego v1 support matrix
-- Included in repository release scope, but compatibility is not frozen
+- `beta` in the Plumego v1.1 support matrix for the app-facing service surface
+- Included in repository release scope with beta compatibility obligations for
+  the documented app-facing `x/messaging` public surface
+- Subordinate primitives (`mq`, `pubsub`, `scheduler`, `webhook`) remain
+  experimental until their own evidence is recorded.
 
 ## Use this module when
 
