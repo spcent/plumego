@@ -3,7 +3,7 @@
 Milestone: M-013
 Recipe: specs/change-recipes/update-docs.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: docs
 Owned Files:
 - `docs/migration/from-gin.md`
@@ -51,4 +51,10 @@ Done Definition:
 - `gofmt -l .` outputs nothing.
 
 Outcome:
--
+- Added `docs/migration/from-gin.md` with Gin-to-Plumego concept mappings,
+  handler, route group, JSON response, and middleware conversion snippets.
+- Added explicit Gin incompatibilities and next-read links to the canonical
+  style guide and standard-service reference.
+- Added the first migration guide entry to `docs/ADOPTION_PATH.md`.
+- Validation passed with dependency-rules, module-manifests, reference-layout,
+  `gofmt -l .`, and `git diff --check`.

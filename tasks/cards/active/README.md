@@ -77,7 +77,6 @@ chain in tasks/milestones/ROADMAP.md.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 1530 | P2 | docs | Write docs/migration/from-gin.md with concept mapping table and code snippets |
 | 1531 | P2 | docs | Write docs/migration/from-echo.md with Context abstraction translation |
 | 1532 | P2 | docs | Write docs/migration/from-chi.md focused on minimal-delta conventions |
 | 1533 | P2 | docs | Write docs/migration/middleware-compat.md and update docs/ADOPTION_PATH.md |

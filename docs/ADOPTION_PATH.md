@@ -6,6 +6,15 @@ The first impression should be simple: standard-library HTTP compatibility,
 small stable kernel, explicit wiring, and machine-checkable agent workflow.
 Optional `x/*` packages are capability additions, not alternate bootstraps.
 
+## Migrating From Another Framework
+
+Read the focused migration guide for your current stack, then return to the
+standard service path:
+
+| Current stack | First read |
+| --- | --- |
+| Gin | `docs/migration/from-gin.md` |
+
 ## 5 Minutes: Run One Standard Service
 
 Read:
