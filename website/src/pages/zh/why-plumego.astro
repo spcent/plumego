@@ -11,24 +11,6 @@ const journeySteps = [
   { label: '状态', href: '/zh/status' },
 ];
 
-const guideCards = [
-  {
-    kicker: 'explicit wiring',
-    title: 'Plumego 适合那些希望服务结构在代码库增长后依然可读的团队',
-    body: '真正的价值在团队变大之后才会显现：路由注册、中间件顺序与依赖注入都写在代码里——评审一次改动就是阅读代码本身，而不是追踪框架约定。',
-  },
-  {
-    kicker: 'shared baseline',
-    title: '当多个服务需要共用一套默认结构时，它会更有价值',
-    body: '如果新服务应该从同一份可读的参考结构起步，而不是让每个团队各写一套启动逻辑，Plumego 提供的基线就能方便地交接和扩展，而不会逐渐偏离成各自的模式。',
-  },
-  {
-    kicker: '清晰的成熟度信号',
-    title: '当你需要在采用前区分稳定与实验时，它最有说服力',
-    body: '稳定模块与实验性能力被刻意分开，采用决策可以基于今天真正生产就绪的内容——而不仅仅是某个包已经存在于仓库。',
-  },
-] as const;
-
 const fitChecks = [
   {
     label: '01',

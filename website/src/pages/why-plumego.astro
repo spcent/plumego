@@ -20,24 +20,6 @@ const wiringCopy = {
   contrastAfterLabel: 'plumego: visible in routes.go',
 };
 
-const guideCards = [
-  {
-    kicker: 'explicit wiring',
-    title: 'Plumego is for teams where service structure should stay readable as the codebase grows',
-    body: 'The value shows up when the team stops being small: route registration, middleware order, and dependency wiring are visible in code — so reviewing a change means reading the code, not tracing framework conventions.',
-  },
-  {
-    kicker: 'shared baseline',
-    title: 'It gets stronger when multiple services should start from one default shape',
-    body: 'If new services should begin from one readable reference rather than each team writing its own setup, Plumego gives you a baseline that is easy to hand off and extend without diverging into service-specific patterns.',
-  },
-  {
-    kicker: 'clear maturity signals',
-    title: 'It is most useful when you need to separate stable from experimental before adopting',
-    body: 'Stable modules and experimental capabilities are kept separate on purpose, so adoption decisions can be based on release posture instead of assuming every package has the same maturity.',
-  },
-] as const;
-
 const fitChecks = [
   {
     label: '01',
