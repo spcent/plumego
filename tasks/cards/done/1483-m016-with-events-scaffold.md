@@ -3,7 +3,7 @@
 Milestone: M-016
 Recipe: specs/change-recipes/add-package.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: reference/with-events
 Owned Files:
 - `reference/with-events/main.go`
@@ -60,4 +60,11 @@ Done Definition:
 - `go run ./internal/checks/reference-layout` exits 0.
 
 Outcome:
--
+- Added `reference/with-events` as a separate scenario module with local
+  replace wiring to the Plumego checkout.
+- Implemented config loading, main bootstrap, `App` construction with
+  `core.App`, logger, in-process messaging broker, and `messaging.Service`.
+- Added placeholder `/orders`, `/scheduler`, and `/webhook` route groups for
+  later M-016 cards.
+- Validation passed with `reference/with-events` build, `reference/with-events`
+  vet, reference-layout, agent-workflow, and `git diff --check`.
