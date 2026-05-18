@@ -3,7 +3,7 @@
 Milestone: M-018
 Recipe: specs/change-recipes/add-package.yaml
 Priority: P3
-State: active
+State: done
 Primary Module: reference/with-tenant-admin
 Owned Files:
 - `reference/with-tenant-admin/main.go`
@@ -64,4 +64,23 @@ Done Definition:
 - `go run ./internal/checks/reference-layout` exits 0.
 
 Outcome:
--
+- Added the `reference/with-tenant-admin` nested module with standard
+  main/config/app/routes layout and explicit `core.App` wiring.
+- Added app-local config for `Addr`, `AdminToken`, and `LogLevel`, with env and
+  flag overrides plus validation.
+- Added static admin-token middleware using `X-Admin-Token`, fail-closed 401
+  responses through `contract.WriteError`, and SHA-256 plus `hmac.Equal` for
+  fixed-length timing-safe comparison.
+- Added x/tenant in-memory config and quota manager instances to the app
+  constructor for later tenant/quota/usage cards.
+- Registered protected placeholder route groups at `/admin/tenants`,
+  `/admin/quota`, and `/admin/usage`.
+- Validation:
+  `GOTOOLCHAIN=go1.24.4 GOCACHE=/private/tmp/plumego-gocache go test -timeout
+  20s ./...` from reference/with-tenant-admin; `GOTOOLCHAIN=go1.24.4
+  GOCACHE=/private/tmp/plumego-gocache go build ./...` from
+  reference/with-tenant-admin; `GOTOOLCHAIN=go1.24.4
+  GOCACHE=/private/tmp/plumego-gocache go vet ./...` from
+  reference/with-tenant-admin; `GOTOOLCHAIN=go1.24.4
+  GOCACHE=/private/tmp/plumego-gocache go run ./internal/checks/reference-layout`;
+  `gofmt -l .`; `git diff --check`.
