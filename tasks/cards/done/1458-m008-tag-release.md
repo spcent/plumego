@@ -39,4 +39,6 @@ Done Definition:
 - Tag message references docs/release/v1.1.0.md by path.
 
 Outcome:
--
+- Done. Created annotated tag `v1.1.0` on HEAD `58aad7ee`; `git show
+  v1.1.0` shows the tag message `v1.1.0 release - gate output in
+  docs/release/v1.1.0.md`.

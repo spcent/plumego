@@ -52,7 +52,6 @@ chain in tasks/milestones/ROADMAP.md.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 1503 | P0 | release | Create annotated git tag v1.1.0 |
 | 1504 | P0 | extension evidence | Update beta evidence ledger with second_release_ref v1.1.0; move blocked cards 1367, 1370, 1371, 1372, 1373 to active |
 
 ### M-011 — Benchmark Suite (P0, parallel with M-008)
