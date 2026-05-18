@@ -1,5 +1,5 @@
-import type { Locale } from '../data/site';
 import { toLocalePath } from './i18n';
+import { LOCALES, LOCALE_CODES, type Locale } from './locales';
 
 const SITE_ORIGIN = 'https://plumego.birdor.com';
 
@@ -21,25 +21,31 @@ export function buildMarketingSeo(input: MarketingSeoInput) {
     description,
     currentPath,
     locale,
-    imagePath = locale === 'zh' ? '/brand/og-zh.svg' : '/brand/og-default.svg',
+    imagePath = LOCALES[locale].defaultOgImage,
     noindex = false,
     type = 'website',
     keywords = [],
     includeAlternates = true,
   } = input;
 
-  const canonicalPath = toLocalePath(currentPath, 'en');
-  const zhPath = toLocalePath(currentPath, 'zh');
-  const canonicalUrl = `${SITE_ORIGIN}${locale === 'zh' ? zhPath : canonicalPath}`;
+  const canonicalPath = toLocalePath(currentPath, locale);
+  const alternates = LOCALE_CODES.map((code) => ({
+    locale: code,
+    path: toLocalePath(currentPath, code),
+    hreflang: LOCALES[code].hreflang,
+    ogLocale: LOCALES[code].ogLocale,
+  }));
 
   return {
     siteOrigin: SITE_ORIGIN,
     canonicalPath,
-    zhPath,
-    canonicalUrl,
+    canonicalUrl: `${SITE_ORIGIN}${canonicalPath}`,
+    alternates,
     imageUrl: `${SITE_ORIGIN}${imagePath}`,
-    ogLocale: locale === 'zh' ? 'zh_CN' : 'en_US',
-    alternateLocale: locale === 'zh' ? 'en_US' : 'zh_CN',
+    ogLocale: LOCALES[locale].ogLocale,
+    alternateLocales: alternates
+      .filter((alternate) => alternate.locale !== locale)
+      .map((alternate) => alternate.ogLocale),
     robots: noindex ? 'noindex,follow' : 'index,follow',
     type,
     keywords: keywords.join(', '),

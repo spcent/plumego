@@ -1,20 +1,56 @@
-import type { Locale } from '../data/site';
+import { DEFAULT_LOCALE, LOCALES, LOCALE_CODES, PREFIXED_LOCALES, type Locale } from './locales';
 
 export function localeFromPath(pathname: string): Locale {
-  return pathname === '/zh' || pathname.startsWith('/zh/') ? 'zh' : 'en';
+  const clean = normalizePath(pathname);
+
+  for (const locale of PREFIXED_LOCALES) {
+    const prefix = LOCALES[locale].pathPrefix;
+    if (clean === prefix || clean.startsWith(`${prefix}/`)) {
+      return locale;
+    }
+  }
+
+  return DEFAULT_LOCALE;
 }
 
 export function toLocalePath(pathname: string, locale: Locale): string {
-  const clean = pathname.length > 1 && pathname.endsWith('/') ? pathname.slice(0, -1) : pathname;
-  const base = clean === '/zh' ? '/' : clean.startsWith('/zh/') ? clean.slice(3) : clean;
+  const base = basePath(pathname);
+  const prefix = LOCALES[locale].pathPrefix;
 
-  if (locale === 'zh') {
-    return base === '/' ? '/zh' : `/zh${base}`;
+  if (!prefix) {
+    return base;
   }
 
-  return base || '/';
+  return base === '/' ? prefix : `${prefix}${base}`;
 }
 
 export function switchLocalePath(pathname: string): string {
-  return localeFromPath(pathname) === 'zh' ? toLocalePath(pathname, 'en') : toLocalePath(pathname, 'zh');
+  const current = localeFromPath(pathname);
+  const next = LOCALE_CODES.find((locale) => locale !== current) ?? DEFAULT_LOCALE;
+  return toLocalePath(pathname, next);
+}
+
+function basePath(pathname: string): string {
+  const clean = normalizePath(pathname);
+
+  for (const locale of PREFIXED_LOCALES) {
+    const prefix = LOCALES[locale].pathPrefix;
+    if (clean === prefix) {
+      return '/';
+    }
+    if (clean.startsWith(`${prefix}/`)) {
+      return clean.slice(prefix.length) || '/';
+    }
+  }
+
+  return clean;
+}
+
+function normalizePath(pathname: string): string {
+  if (!pathname || pathname === '/') {
+    return '/';
+  }
+
+  const clean = pathname.endsWith('/') ? pathname.slice(0, -1) : pathname;
+  return clean.startsWith('/') ? clean : `/${clean}`;
 }

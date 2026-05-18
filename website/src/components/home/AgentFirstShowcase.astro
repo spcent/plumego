@@ -1,5 +1,7 @@
 ---
-const { locale = 'en' } = Astro.props as { locale?: 'en' | 'zh' };
+import type { Locale } from '../../lib/locales';
+
+const { locale = 'en' } = Astro.props as { locale?: Locale };
 
 const copy = {
   en: {

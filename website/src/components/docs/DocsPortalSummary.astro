@@ -2,63 +2,66 @@
 import { MODULE_FACTS } from '../../generated/modules';
 import { RELEASE_FACTS } from '../../generated/releases';
 import { ROADMAP_FACTS } from '../../generated/roadmap';
+import type { Locale } from '../../lib/locales';
 
 interface Props {
-  locale?: 'en' | 'zh';
+  locale?: Locale;
 }
 
 const { locale = 'en' } = Astro.props as Props;
 
-const copy =
-  locale === 'zh'
-    ? {
-        moduleEyebrow: '模块事实',
-        moduleTitle: '模块与边界',
-        moduleBody: '默认学习路径从稳定根开始，能力工作从主扩展家族开始。',
-        modulePrimary: '稳定根',
-        moduleSecondary: '主扩展家族',
-        moduleLink: '/zh/docs/modules/overview',
-        moduleLinkLabel: '查看模块总览',
-        releaseEyebrow: '发布事实',
-        releaseTitle: '发布姿态',
-        releaseBody: '在假设长期兼容性之前，先看 README 同步过来的支持矩阵。',
-        releasePrimary: '当前版本',
-        releaseSecondary: '支持分组',
-        releaseLink: '/zh/docs/release-posture',
-        releaseLinkLabel: '查看发布姿态',
-        roadmapEyebrow: '路线图事实',
-        roadmapTitle: '当前方向',
-        roadmapBody: '路线图摘要会在构建前从 docs/ROADMAP.md 自动同步。',
-        roadmapPrimary: '进行中',
-        roadmapSecondary: '计划中',
-        roadmapLink: '/zh/roadmap',
-        roadmapLinkLabel: '查看路线图',
-        source: '这些摘要全部来自构建前同步的仓库事实，而不是站点专属副本。',
-      }
-    : {
-        moduleEyebrow: 'module facts',
-        moduleTitle: 'Modules and boundaries',
-        moduleBody: 'The default learning path starts with stable roots. Capability work starts from the primary extension families.',
-        modulePrimary: 'Stable roots',
-        moduleSecondary: 'Primary extension families',
-        moduleLink: '/docs/modules/overview',
-        moduleLinkLabel: 'Open modules overview',
-        releaseEyebrow: 'release facts',
-        releaseTitle: 'Release posture',
-        releaseBody: 'Read the support matrix synced from README before assuming long-term compatibility.',
-        releasePrimary: 'Current version',
-        releaseSecondary: 'Support groups',
-        releaseLink: '/docs/release-posture',
-        releaseLinkLabel: 'Open release posture',
-        roadmapEyebrow: 'roadmap facts',
-        roadmapTitle: 'Current direction',
-        roadmapBody: 'The roadmap summary is synced from docs/ROADMAP.md before each build.',
-        roadmapPrimary: 'In progress',
-        roadmapSecondary: 'Planned',
-        roadmapLink: '/roadmap',
-        roadmapLinkLabel: 'Open roadmap',
-        source: 'These summaries all come from prebuild-synced repository facts instead of a website-only copy.',
-      };
+const copyByLocale = {
+  en: {
+    moduleEyebrow: 'module facts',
+    moduleTitle: 'Modules and boundaries',
+    moduleBody: 'The default learning path starts with stable roots. Capability work starts from the primary extension families.',
+    modulePrimary: 'Stable roots',
+    moduleSecondary: 'Primary extension families',
+    moduleLink: '/docs/modules/overview',
+    moduleLinkLabel: 'Open modules overview',
+    releaseEyebrow: 'release facts',
+    releaseTitle: 'Release posture',
+    releaseBody: 'Read the support matrix synced from README before assuming long-term compatibility.',
+    releasePrimary: 'Current version',
+    releaseSecondary: 'Support groups',
+    releaseLink: '/docs/release-posture',
+    releaseLinkLabel: 'Open release posture',
+    roadmapEyebrow: 'roadmap facts',
+    roadmapTitle: 'Current direction',
+    roadmapBody: 'The roadmap summary is synced from docs/ROADMAP.md before each build.',
+    roadmapPrimary: 'In progress',
+    roadmapSecondary: 'Planned',
+    roadmapLink: '/roadmap',
+    roadmapLinkLabel: 'Open roadmap',
+    source: 'These summaries all come from prebuild-synced repository facts instead of a website-only copy.',
+  },
+  zh: {
+    moduleEyebrow: '模块事实',
+    moduleTitle: '模块与边界',
+    moduleBody: '默认学习路径从稳定根开始，能力工作从主扩展家族开始。',
+    modulePrimary: '稳定根',
+    moduleSecondary: '主扩展家族',
+    moduleLink: '/zh/docs/modules/overview',
+    moduleLinkLabel: '查看模块总览',
+    releaseEyebrow: '发布事实',
+    releaseTitle: '发布姿态',
+    releaseBody: '在假设长期兼容性之前，先看 README 同步过来的支持矩阵。',
+    releasePrimary: '当前版本',
+    releaseSecondary: '支持分组',
+    releaseLink: '/zh/docs/release-posture',
+    releaseLinkLabel: '查看发布姿态',
+    roadmapEyebrow: '路线图事实',
+    roadmapTitle: '当前方向',
+    roadmapBody: '路线图摘要会在构建前从 docs/ROADMAP.md 自动同步。',
+    roadmapPrimary: '进行中',
+    roadmapSecondary: '计划中',
+    roadmapLink: '/zh/roadmap',
+    roadmapLinkLabel: '查看路线图',
+    source: '这些摘要全部来自构建前同步的仓库事实，而不是站点专属副本。',
+  },
+} satisfies Record<Locale, Record<string, string>>;
+
+const copy = copyByLocale[locale];
 ---
 
 <div class="portal-grid">

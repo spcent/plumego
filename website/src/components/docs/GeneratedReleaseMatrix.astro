@@ -1,24 +1,27 @@
 ---
 import { RELEASE_FACTS } from '../../generated/releases';
+import type { Locale } from '../../lib/locales';
 
 interface Props {
-  locale?: 'en' | 'zh';
+  locale?: Locale;
 }
 
 const { locale = 'en' } = Astro.props as Props;
 
-const copy =
-  locale === 'zh'
-    ? {
-        source: '从 `README.md` 的 v1 支持矩阵同步',
-        modules: '模块',
-        countLabel: '同步条目',
-      }
-    : {
-        source: 'Synced from the v1 support matrix in `README.md`',
-        modules: 'Modules',
-        countLabel: 'Synced entries',
-      };
+const copyByLocale = {
+  en: {
+    source: 'Synced from the v1 support matrix in `README.md`',
+    modules: 'Modules',
+    countLabel: 'Synced entries',
+  },
+  zh: {
+    source: '从 `README.md` 的 v1 支持矩阵同步',
+    modules: '模块',
+    countLabel: '同步条目',
+  },
+} satisfies Record<Locale, { source: string; modules: string; countLabel: string }>;
+
+const copy = copyByLocale[locale];
 ---
 
 <p class="fact-footnote">{copy.source}</p>

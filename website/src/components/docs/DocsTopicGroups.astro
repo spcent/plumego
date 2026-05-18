@@ -1,13 +1,43 @@
 ---
+import type { Locale } from '../../lib/locales';
+
 interface Props {
-  locale?: 'en' | 'zh';
+  locale?: Locale;
 }
 
 const { locale = 'en' } = Astro.props as Props;
 
-const groups =
-  locale === 'zh'
-    ? [
+const groupsByLocale = {
+  en: [
+    {
+      title: 'Evaluate, then implement',
+      body: 'If fit is still unclear, go back to Why Plumego. If the decision is already made, continue from docs home into the implementation path.',
+      links: [
+        { label: 'Why Plumego', href: '/why-plumego' },
+        { label: 'Getting Started', href: '/docs/getting-started' },
+      ],
+    },
+    {
+      title: 'Concepts',
+      body: 'Build the request-flow and repository-boundary model before you open packages at random.',
+      links: [
+        { label: 'Request Flow', href: '/docs/concepts/request-flow' },
+        { label: 'Repository Boundaries', href: '/docs/concepts/repo-control-plane' },
+        { label: 'FAQ', href: '/docs/faq' },
+      ],
+    },
+    {
+      title: 'Boundaries',
+      body: 'Move into modules and release posture when you need to decide where work belongs.',
+      links: [
+        { label: 'Modules Overview', href: '/docs/modules/overview' },
+        { label: 'Stable Roots', href: '/docs/stable-roots' },
+        { label: 'x/* Family', href: '/docs/x-family' },
+        { label: 'Release Posture', href: '/docs/release-posture' },
+      ],
+    },
+  ],
+  zh: [
         {
           title: '先判断，再进入实现',
           body: '如果你还没有完全确认适配度，就先回到“为什么选择 Plumego”；如果判断已经清楚，就从文档首页继续实现路径。',
@@ -35,36 +65,10 @@ const groups =
             { label: '发布姿态', href: '/zh/docs/release-posture' },
           ],
         },
-      ]
-    : [
-        {
-          title: 'Evaluate, then implement',
-          body: 'If fit is still unclear, go back to Why Plumego. If the decision is already made, continue from docs home into the implementation path.',
-          links: [
-            { label: 'Why Plumego', href: '/why-plumego' },
-            { label: 'Getting Started', href: '/docs/getting-started' },
-          ],
-        },
-        {
-          title: 'Concepts',
-          body: 'Build the request-flow and repository-boundary model before you open packages at random.',
-          links: [
-            { label: 'Request Flow', href: '/docs/concepts/request-flow' },
-            { label: 'Repository Boundaries', href: '/docs/concepts/repo-control-plane' },
-            { label: 'FAQ', href: '/docs/faq' },
-          ],
-        },
-        {
-          title: 'Boundaries',
-          body: 'Move into modules and release posture when you need to decide where work belongs.',
-          links: [
-            { label: 'Modules Overview', href: '/docs/modules/overview' },
-            { label: 'Stable Roots', href: '/docs/stable-roots' },
-            { label: 'x/* Family', href: '/docs/x-family' },
-            { label: 'Release Posture', href: '/docs/release-posture' },
-          ],
-        },
-      ];
+      ],
+} satisfies Record<Locale, Array<{ title: string; body: string; links: Array<{ label: string; href: string }> }>>;
+
+const groups = groupsByLocale[locale];
 ---
 
 <div class="docs-topic-groups">

@@ -1,6 +1,7 @@
 ---
 import { SITE } from '../../data/site';
 import { localeFromPath } from '../../lib/i18n';
+import { LOCALES } from '../../lib/locales';
 import { buildMarketingSeo } from '../../lib/seo';
 
 const { starlightRoute } = Astro.locals;
@@ -69,8 +70,9 @@ const filteredHead = starlightRoute.head.filter((entry) => {
 <link rel="shortcut icon" href="/favicon.svg" type="image/svg+xml" />
 <link rel="canonical" href={seo.canonicalUrl} />
 <link rel="alternate" href="https://plumego.birdor.com/" hreflang="x-default" />
-<link rel="alternate" href={`${seo.siteOrigin}${seo.canonicalPath}`} hreflang="en" />
-<link rel="alternate" href={`${seo.siteOrigin}${seo.zhPath}`} hreflang="zh" />
+{seo.alternates.map((alternate) => (
+  <link rel="alternate" href={`${seo.siteOrigin}${alternate.path}`} hreflang={alternate.hreflang} />
+))}
 <link rel="sitemap" href="/sitemap-index.xml" />
 <meta property="og:site_name" content={SITE.name} />
 <meta property="og:type" content={seo.type} />
@@ -80,7 +82,9 @@ const filteredHead = starlightRoute.head.filter((entry) => {
 <meta property="og:image" content={seo.imageUrl} />
 <meta property="og:image:alt" content={description} />
 <meta property="og:locale" content={seo.ogLocale} />
-<meta property="og:locale:alternate" content={seo.alternateLocale} />
+{seo.alternateLocales.map((alternateLocale) => (
+  <meta property="og:locale:alternate" content={alternateLocale} />
+))}
 <meta name="twitter:card" content="summary_large_image" />
 <meta name="twitter:title" content={pageTitle} />
 <meta name="twitter:description" content={description} />
@@ -92,7 +96,7 @@ const filteredHead = starlightRoute.head.filter((entry) => {
   "headline": pageTitle,
   "description": description,
   "url": seo.canonicalUrl,
-  "inLanguage": locale === 'zh' ? 'zh-CN' : 'en',
+  "inLanguage": LOCALES[locale].htmlLang,
   "publisher": {
     "@type": "Organization",
     "name": "Plumego",

@@ -1,6 +1,8 @@
 ---
+import type { Locale } from '../../lib/locales';
+
 interface Props {
-  locale?: 'en' | 'zh';
+  locale?: Locale;
 }
 
 const { locale = 'en' } = Astro.props as Props;

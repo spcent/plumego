@@ -1,13 +1,14 @@
 ---
+import type { Locale } from '../../lib/locales';
+
 interface Props {
-  locale?: 'en' | 'zh';
+  locale?: Locale;
 }
 
 const { locale = 'en' } = Astro.props as Props;
 
-const cards =
-  locale === 'zh'
-    ? [
+const cardsByLocale = {
+  zh: [
         {
           eyebrow: '推荐路径',
           title: '开始使用',
@@ -85,8 +86,8 @@ const cards =
           href: '/zh/docs/faq',
           label: '查看 FAQ',
         },
-      ]
-    : [
+  ],
+  en: [
         {
           eyebrow: 'canonical path',
           title: 'Getting Started',
@@ -164,7 +165,16 @@ const cards =
           href: '/docs/faq',
           label: 'Open FAQ',
         },
-      ];
+  ],
+} satisfies Record<Locale, Array<{
+  eyebrow: string;
+  title: string;
+  body: string;
+  href: string;
+  label: string;
+}>>;
+
+const cards = cardsByLocale[locale];
 ---
 
 <div class="portal-grid portal-grid--dense">

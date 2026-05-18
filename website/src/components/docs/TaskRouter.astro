@@ -1,8 +1,9 @@
 ---
 import { ROUTING_SCENARIOS } from '../../generated/routing';
+import type { Locale } from '../../lib/locales';
 
 interface Props {
-  locale?: 'en' | 'zh';
+  locale?: Locale;
 }
 
 const { locale = 'en' } = Astro.props as Props;
@@ -12,31 +13,33 @@ const scenarios = ROUTING_SCENARIOS[locale];
 const GITHUB_ROUTING_URL =
   'https://github.com/spcent/plumego/blob/main/specs/task-routing.yaml';
 
-const copy =
-  locale === 'zh'
-    ? {
-        heading: '给定一个任务，路由表会把它分配到哪个模块？',
-        subheading: '选一个场景，看路由决策过程：',
-        destination: '目标模块',
-        startWith: '从这里开始',
-        avoid: '避开',
-        why: '分类依据',
-        primerCta: '打开模块 primer',
-        yamlCta: '查看 task-routing.yaml',
-        footer: '路由表不取代阅读代码——它缩小在打开任何 Go 文件之前的搜索空间。',
-      }
-    : {
-        heading: 'Given a task, which module does the routing table assign?',
-        subheading: 'Select a scenario to see the classification:',
-        destination: 'Destination',
-        startWith: 'Start with',
-        avoid: 'Avoid',
-        why: 'Why this routing',
-        primerCta: 'Open module primer',
-        yamlCta: 'View task-routing.yaml',
-        footer:
-          'The routing table does not replace reading code — it narrows the search space before you open any Go file.',
-      };
+const copyByLocale = {
+  en: {
+    heading: 'Given a task, which module does the routing table assign?',
+    subheading: 'Select a scenario to see the classification:',
+    destination: 'Destination',
+    startWith: 'Start with',
+    avoid: 'Avoid',
+    why: 'Why this routing',
+    primerCta: 'Open module primer',
+    yamlCta: 'View task-routing.yaml',
+    footer:
+      'The routing table does not replace reading code — it narrows the search space before you open any Go file.',
+  },
+  zh: {
+    heading: '给定一个任务，路由表会把它分配到哪个模块？',
+    subheading: '选一个场景，看路由决策过程：',
+    destination: '目标模块',
+    startWith: '从这里开始',
+    avoid: '避开',
+    why: '分类依据',
+    primerCta: '打开模块 primer',
+    yamlCta: '查看 task-routing.yaml',
+    footer: '路由表不取代阅读代码——它缩小在打开任何 Go 文件之前的搜索空间。',
+  },
+} satisfies Record<Locale, Record<string, string>>;
+
+const copy = copyByLocale[locale];
 ---
 
 <div class="task-router" data-locale={locale}>

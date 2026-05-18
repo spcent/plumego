@@ -1,10 +1,11 @@
 ---
+import type { Locale } from '../../lib/locales';
+
 interface LinkItem {
   label: string;
   href: string;
 }
 
-type Locale = 'en' | 'zh';
 type HeroVisual = 'decision' | 'architecture' | 'examples' | 'releases' | 'roadmap' | 'fit';
 
 interface Props {

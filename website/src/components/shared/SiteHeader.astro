@@ -1,6 +1,7 @@
 ---
 import { NAV_LINKS, type Locale } from '../../data/site';
-import { localeFromPath } from '../../lib/i18n';
+import { localeFromPath, toLocalePath } from '../../lib/i18n';
+import { LOCALES } from '../../lib/locales';
 import LanguageSelect from './LanguageSelect.astro';
 import SiteBrand from './SiteBrand.astro';
 import ThemeSelect from './ThemeSelect.astro';
@@ -15,20 +16,21 @@ const currentPath = Astro.props.currentPath ?? Astro.url.pathname;
 const locale = Astro.props.locale ?? localeFromPath(currentPath);
 const variant = Astro.props.variant ?? 'marketing';
 const nav = NAV_LINKS[locale];
+const localeLabels = LOCALES[locale].labels;
 const scrollMode = variant === 'docs' ? 'static' : 'sticky';
 
 const isCurrent = (href: string) => {
   if (href.startsWith('http')) return false;
-  if (href === '/' || href === '/zh') return currentPath === href;
+  if (href === '/' || href === toLocalePath('/', locale)) return currentPath === href;
   return currentPath === href || currentPath.startsWith(`${href}/`);
 };
 ---
 
 <header class:list={['site-header', variant === 'docs' && 'site-header--docs']} data-site-header={scrollMode} data-scroll-state="visible">
   <div class="site-header__leading">
-    <SiteBrand href={locale === 'zh' ? '/zh' : '/'} locale={locale} />
+    <SiteBrand href={toLocalePath('/', locale)} locale={locale} />
   </div>
-  <nav class="site-header__nav" aria-label={locale === 'zh' ? '主导航' : 'Primary'}>
+  <nav class="site-header__nav" aria-label={localeLabels.primaryNav}>
     {nav.map((link) => {
       const active = isCurrent(link.href);
 
@@ -61,7 +63,7 @@ const isCurrent = (href: string) => {
     <LanguageSelect />
     <button
       class="site-header__menu-btn"
-      aria-label={locale === 'zh' ? '打开菜单' : 'Open menu'}
+      aria-label={localeLabels.openMenu}
       aria-expanded="false"
       aria-controls="site-mobile-nav"
     >
@@ -78,7 +80,7 @@ const isCurrent = (href: string) => {
 <nav
   id="site-mobile-nav"
   class="site-mobile-nav"
-  aria-label={locale === 'zh' ? '移动端导航' : 'Mobile navigation'}
+  aria-label={localeLabels.mobileNav}
   data-state="closed"
 >
   {nav.map((link) => {

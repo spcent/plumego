@@ -12,17 +12,18 @@
  * <TranslationNotice> imports to every zh MDX page individually.
  */
 import { TRANSLATION_LAG } from '../../generated/translation-lag';
+import { localeFromPath } from '../../lib/i18n';
+import { TRANSLATION_LAG_LOCALE } from '../../lib/locales';
 
 const { entry } = Astro.locals.starlightRoute;
 
-// Detect zh pages by the docs collection id prefix
-const isZh = entry.id.startsWith('zh/');
+const locale = localeFromPath(Astro.url.pathname);
 const translationKey: string | undefined = (entry.data as Record<string, unknown>).translationKey as string | undefined;
 const lagDays: number | undefined = translationKey
   ? (TRANSLATION_LAG as Record<string, number>)[translationKey]
   : undefined;
 
-const showLagNotice = isZh && lagDays !== undefined;
+const showLagNotice = locale === TRANSLATION_LAG_LOCALE && lagDays !== undefined;
 ---
 
 {showLagNotice && (

@@ -1,16 +1,20 @@
 ---
 import { localeFromPath, toLocalePath } from '../../lib/i18n';
+import { LOCALES, LOCALE_CODES } from '../../lib/locales';
 
 const currentPath = Astro.url.pathname;
 const currentLocale = localeFromPath(currentPath);
 
-const locales = [
-  { code: 'en', label: 'English', shortLabel: 'EN', href: toLocalePath(currentPath, 'en') },
-  { code: 'zh', label: '简体中文', shortLabel: '中文', href: toLocalePath(currentPath, 'zh') },
-] as const;
+const locales = LOCALE_CODES.map((code) => ({
+  code,
+  label: LOCALES[code].label,
+  shortLabel: LOCALES[code].shortLabel,
+  href: toLocalePath(currentPath, code),
+  htmlLang: LOCALES[code].htmlLang,
+}));
 
 const current = locales.find((item) => item.code === currentLocale) ?? locales[0];
-const accessibleLabel = currentLocale === 'zh' ? '选择语言' : 'Select language';
+const accessibleLabel = LOCALES[currentLocale].labels.selectLanguage;
 ---
 
 <details class="language-menu" data-language-menu>
@@ -31,7 +35,7 @@ const accessibleLabel = currentLocale === 'zh' ? '选择语言' : 'Select langua
         href={item.href}
         class:list={['language-menu__item', item.code === currentLocale && 'is-active']}
         aria-current={item.code === currentLocale ? 'true' : undefined}
-        lang={item.code === 'zh' ? 'zh-CN' : 'en'}
+        lang={item.htmlLang}
         role="menuitem"
       >
         <span>{item.label}</span>

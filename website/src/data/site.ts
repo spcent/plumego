@@ -1,7 +1,8 @@
 import { MODULE_FACTS } from '../generated/modules';
 import { RELEASE_FACTS } from '../generated/releases';
+import type { Locale } from '../lib/locales';
 
-export type Locale = 'en' | 'zh';
+export type { Locale };
 
 export const SITE = {
   name: 'Plumego',
