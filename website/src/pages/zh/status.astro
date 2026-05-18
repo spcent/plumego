@@ -10,12 +10,20 @@ const betaCount = MODULE_FACTS.betaExtensionFamilies.length;
 const experimentalCount = MODULE_FACTS.allExtensionPaths.length - betaCount;
 
 const v1Checklist = [
-  { label: '9 个稳定根，含 API 快照', done: true },
-  { label: '4 个 beta 扩展，含晋级证据', done: true },
-  { label: '边界检查在 CI 中机器执行', done: true },
-  { label: 'race-detector 测试套件通过', done: true },
-  { label: '废弃策略已发布', done: true },
-  { label: '文档与 onboarding 同步', done: false },
+  { label: '9 个稳定根，含 API 快照', done: true, subitems: [] },
+  { label: '4 个 beta 扩展，含晋级证据', done: true, subitems: [] },
+  { label: '边界检查在 CI 中机器执行', done: true, subitems: [] },
+  { label: 'race-detector 测试套件通过', done: true, subitems: [] },
+  { label: '废弃策略已发布', done: true, subitems: [] },
+  {
+    label: '文档与 onboarding 同步',
+    done: false,
+    subitems: [
+      { label: '开始使用指南已审核，内容准确', done: true },
+      { label: '全部 9 个稳定根模块手册已发布', done: true },
+      { label: 'Reference app 手册完整并与当前代码对齐', done: false },
+    ],
+  },
 ];
 ---
 
@@ -69,14 +77,29 @@ const v1Checklist = [
     </div>
     <div class="v1-checklist">
       {v1Checklist.map((item) => (
-        <div class={`v1-item ${item.done ? 'v1-item--done' : 'v1-item--pending'}`}>
-          <span class="v1-item__icon" aria-hidden="true">
-            {item.done ? '✓' : '○'}
-          </span>
-          <span class="v1-item__label">{item.label}</span>
-          <span class={`v1-item__badge ${item.done ? 'v1-item__badge--done' : 'v1-item__badge--pending'}`}>
-            {item.done ? '已完成' : '进行中'}
-          </span>
+        <div class={`v1-item-group ${item.done ? 'v1-item-group--done' : 'v1-item-group--pending'}`}>
+          <div class={`v1-item ${item.done ? 'v1-item--done' : 'v1-item--pending'}`}>
+            <span class="v1-item__icon" aria-hidden="true">
+              {item.done ? '✓' : '○'}
+            </span>
+            <span class="v1-item__label">{item.label}</span>
+            <span class={`v1-item__badge ${item.done ? 'v1-item__badge--done' : 'v1-item__badge--pending'}`}>
+              {item.done ? '已完成' : '进行中'}
+            </span>
+          </div>
+          {item.subitems && item.subitems.length > 0 && (
+            <div class="v1-subitems">
+              {item.subitems.map((sub) => (
+                <div class={`v1-subitem ${sub.done ? 'v1-subitem--done' : 'v1-subitem--pending'}`}>
+                  <span class="v1-subitem__icon" aria-hidden="true">{sub.done ? '✓' : '○'}</span>
+                  <span class="v1-subitem__label">{sub.label}</span>
+                  <span class={`v1-item__badge v1-item__badge--sm ${sub.done ? 'v1-item__badge--done' : 'v1-item__badge--pending'}`}>
+                    {sub.done ? '已完成' : '待完成'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       ))}
     </div>
@@ -187,6 +210,43 @@ const v1Checklist = [
     flex-direction: column;
     gap: 0.5rem;
   }
+
+  .v1-item-group { display: flex; flex-direction: column; }
+
+  .v1-item-group--pending > .v1-item {
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+    border-bottom: none;
+  }
+
+  .v1-subitems {
+    border: 1px solid var(--line);
+    border-top: none;
+    border-bottom-left-radius: 0.5rem;
+    border-bottom-right-radius: 0.5rem;
+    background: var(--bg);
+    overflow: hidden;
+  }
+
+  .v1-subitem {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.5rem 1.1rem 0.5rem 2.5rem;
+    border-bottom: 1px solid var(--line);
+    font-size: 0.83rem;
+  }
+
+  .v1-subitem:last-child { border-bottom: none; }
+
+  .v1-subitem__icon { font-size: 0.78rem; width: 1rem; text-align: center; flex-shrink: 0; }
+  .v1-subitem--done .v1-subitem__icon { color: var(--accent); }
+  .v1-subitem--pending .v1-subitem__icon { color: var(--fg-soft); }
+
+  .v1-subitem__label { flex: 1; color: var(--fg-soft); line-height: 1.4; }
+  .v1-subitem--done .v1-subitem__label { color: var(--fg); }
+
+  .v1-item__badge--sm { font-size: 0.62rem; padding: 0.1rem 0.38rem; }
 
   .v1-item {
     display: flex;
