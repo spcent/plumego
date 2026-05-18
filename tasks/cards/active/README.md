@@ -72,7 +72,6 @@ chain in tasks/milestones/ROADMAP.md.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 1521 | P1 | x/validate | Create x/validate/playground adapter wrapping go-playground/validator v10 |
 | 1522 | P1 | reference/with-rest | Add x/validate usage example to with-rest create-item handler |
 
 ### M-013 — Migration Guides (P2, depends on M-008)

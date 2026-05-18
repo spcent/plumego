@@ -216,6 +216,13 @@ func walkGoImports(repoRoot, dir string, includeTests bool, visit func(relPath, 
 			return err
 		}
 		if d.IsDir() {
+			if path != dir {
+				if _, err := os.Stat(filepath.Join(path, "go.mod")); err == nil {
+					return filepath.SkipDir
+				} else if !os.IsNotExist(err) {
+					return err
+				}
+			}
 			return nil
 		}
 		if !strings.HasSuffix(path, ".go") || (!includeTests && strings.HasSuffix(path, "_test.go")) {

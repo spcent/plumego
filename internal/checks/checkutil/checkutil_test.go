@@ -44,6 +44,36 @@ import "github.com/spcent/plumego/x/tenant/resolve"
 	}
 }
 
+func TestFindDisallowedImportsSkipsNestedModules(t *testing.T) {
+	repo := t.TempDir()
+	writeRepoSpec(t, repo)
+	writeDependencyRulesSpec(t, repo)
+	writeFile(t, filepath.Join(repo, "core", "core.go"), `package core
+
+import "net/http"
+
+func Use(_ http.ResponseWriter) {}
+`)
+	writeFile(t, filepath.Join(repo, "core", "adapter", "go.mod"), `module github.com/spcent/plumego/core/adapter
+`)
+	writeFile(t, filepath.Join(repo, "core", "adapter", "adapter.go"), `package adapter
+
+import "github.com/spcent/plumego/x/tenant/resolve"
+
+func Use() {
+	_ = resolve.Options{}
+}
+`)
+
+	violations, err := FindDisallowedImports(repo, nil)
+	if err != nil {
+		t.Fatalf("FindDisallowedImports: %v", err)
+	}
+	if len(violations) != 0 {
+		t.Fatalf("expected nested module imports to be skipped, got %v", violations)
+	}
+}
+
 func TestValidateManifestDependencyRuleConsistencyReportsContradictions(t *testing.T) {
 	repo := t.TempDir()
 	writeRepoSpec(t, repo)

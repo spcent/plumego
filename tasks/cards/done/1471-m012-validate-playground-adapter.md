@@ -3,7 +3,7 @@
 Milestone: M-012
 Recipe: specs/change-recipes/add-package.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/validate
 Owned Files:
 - `x/validate/playground/adapter.go`
@@ -57,4 +57,15 @@ Done Definition:
 - x/validate/go.mod does NOT contain go-playground/validator.
 
 Outcome:
--
+- Created `x/validate/playground` as a separate Go module wrapping
+  `github.com/go-playground/validator/v10` v10.27.0.
+- Added `NewValidator`, functional options, structured field errors, and
+  adapter tests for valid input, required fields, email, min/max, and custom
+  validation functions.
+- Kept `go-playground/validator` out of `x/validate/go.mod` and the main
+  module.
+- Updated dependency import scanning to stop at nested `go.mod` boundaries so
+  separately versioned submodules are not misclassified as their parent module.
+- Validation passed with playground `go test -race`, playground `go vet`,
+  checkutil tests, dependency-rules, module-manifests, agent-workflow, and
+  `git diff --check`.
