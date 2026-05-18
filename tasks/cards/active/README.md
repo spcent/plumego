@@ -92,7 +92,6 @@ chain in tasks/milestones/ROADMAP.md.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 1561 | P2 | reference/with-events | Implement order publisher (outbox) and idempotent consumer |
 | 1562 | P2 | reference/with-events | Implement delayed retry job using x/messaging/scheduler |
 | 1563 | P2 | reference/with-events | Implement webhook sender with backoff retry; write README.md |
 

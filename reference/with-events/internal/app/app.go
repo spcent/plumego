@@ -10,6 +10,7 @@ import (
 	"github.com/spcent/plumego/middleware/recovery"
 	"github.com/spcent/plumego/middleware/requestid"
 	"github.com/spcent/plumego/reference/with-events/internal/config"
+	"github.com/spcent/plumego/reference/with-events/internal/order"
 	"github.com/spcent/plumego/x/messaging"
 )
 
@@ -26,6 +27,8 @@ type App struct {
 	Logger    plumelog.StructuredLogger
 	Bus       *messaging.Broker
 	Messaging *messaging.Service
+	Orders    *order.Handler
+	Consumer  *order.OrderConsumer
 }
 
 // New constructs the App with an in-process messaging service.
@@ -55,6 +58,8 @@ func New(cfg config.Config, deps Deps) (*App, error) {
 		Logger:     logger,
 		ConsumerID: "with-events",
 	})
+	publisher := order.NewPublisher(bus, order.NewMemoryIdempotencyStore())
+	consumer := order.NewConsumer(bus, order.NewMemoryIdempotencyStore())
 
 	return &App{
 		Core:      a,
@@ -62,6 +67,8 @@ func New(cfg config.Config, deps Deps) (*App, error) {
 		Logger:    logger,
 		Bus:       bus,
 		Messaging: svc,
+		Orders:    order.NewHandler(publisher),
+		Consumer:  consumer,
 	}, nil
 }
 
@@ -74,6 +81,11 @@ func (a *App) Start(ctx context.Context) error {
 		defer func() {
 			_ = a.Messaging.Stop(ctx)
 		}()
+	}
+	if a.Consumer != nil {
+		if err := a.Consumer.Start(ctx); err != nil {
+			return fmt.Errorf("start order consumer: %w", err)
+		}
 	}
 	if err := a.Core.Prepare(); err != nil {
 		return fmt.Errorf("prepare server: %w", err)

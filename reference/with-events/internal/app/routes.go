@@ -13,10 +13,10 @@ type placeholderResponse struct {
 
 // RegisterRoutes wires placeholder route groups for later event-flow cards.
 func (a *App) RegisterRoutes() error {
-	if err := a.Core.Post("/orders", placeholder("orders")); err != nil {
+	if err := a.Core.Post("/orders", http.HandlerFunc(a.Orders.Create)); err != nil {
 		return err
 	}
-	if err := a.Core.Get("/orders/:id", placeholder("orders")); err != nil {
+	if err := a.Core.Get("/orders/:id", http.HandlerFunc(a.Orders.Get)); err != nil {
 		return err
 	}
 	if err := a.Core.Post("/scheduler/retry", placeholder("scheduler")); err != nil {

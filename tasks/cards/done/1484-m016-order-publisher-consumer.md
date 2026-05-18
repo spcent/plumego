@@ -3,7 +3,7 @@
 Milestone: M-016
 Recipe: specs/change-recipes/add-http-endpoint.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: reference/with-events
 Owned Files:
 - `reference/with-events/internal/order/publisher.go`
@@ -62,4 +62,12 @@ Done Definition:
 - `go build ./reference/with-events/...` exits 0.
 
 Outcome:
--
+- Added the `internal/order` package with `OrderPublisher`,
+  `OrderConsumer`, in-memory idempotency store, HTTP handler, and tests.
+- Wired `POST /orders` and `GET /orders/:id` into the with-events app,
+  replacing the scaffold placeholders for the order route group.
+- The publisher records event IDs before publishing to `orders.created`; the
+  consumer skips duplicate message IDs and marks new messages as processed.
+- Validation passed with order package tests, `reference/with-events` build,
+  `reference/with-events` vet, reference-layout, agent-workflow, and
+  `git diff --check`.
