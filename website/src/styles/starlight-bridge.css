@@ -80,7 +80,7 @@
     right: 0;
     height: auto;
     z-index: 60;
-    padding: 0.78rem max(1.5rem, calc((100vw - 1180px) / 2 + 1.5rem));
+    padding: 0.72rem clamp(1rem, 2vw, 1.5rem);
     border-bottom: 1px solid var(--line);
     background: var(--header-bg);
     backdrop-filter: blur(14px) saturate(130%);
@@ -396,8 +396,22 @@
   transform: none;
   opacity: 1;
   pointer-events: auto;
-  grid-template-columns: minmax(0, max-content) minmax(0, 1fr) auto;
+  grid-template-columns: minmax(15rem, max-content) minmax(18rem, 1fr) minmax(0, max-content);
   align-items: center;
+  gap: clamp(1rem, 2vw, 1.8rem);
+}
+
+:where([data-has-sidebar]) .header > .site-header--docs .site-header__leading {
+  justify-self: start;
+}
+
+:where([data-has-sidebar]) .header > .site-header--docs .site-header__nav {
+  justify-self: center;
+  width: min(100%, 45rem);
+}
+
+:where([data-has-sidebar]) .header > .site-header--docs .site-header__tools {
+  justify-self: end;
 }
 
 [data-has-sidebar][data-has-toc] .main-pane {
@@ -411,5 +425,47 @@
 @media (max-width: 72rem) {
   :root {
     --sl-content-pad-x: 1rem;
+  }
+}
+
+@media (max-width: 960px) {
+  :where([data-has-sidebar]) .header > .site-header--docs {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+}
+
+@media (max-width: 640px) {
+  :where([data-has-sidebar]) .header {
+    padding-inline: 0.8rem;
+  }
+
+  :where([data-has-sidebar]) .header > .site-header--docs {
+    gap: 0.5rem;
+  }
+
+  :where([data-has-sidebar]) .header > .site-header--docs .site-brand {
+    max-width: 2.5rem;
+  }
+
+  :where([data-has-sidebar]) .header > .site-header--docs .site-brand__copy {
+    display: none;
+  }
+
+  :where([data-has-sidebar]) .header > .site-header--docs .site-brand__mark,
+  :where([data-has-sidebar]) .header > .site-header--docs .site-header__icon-link,
+  :where([data-has-sidebar]) .header > .site-header--docs .site-header__menu-btn {
+    width: 2.5rem;
+    height: 2.5rem;
+    min-height: 2.5rem;
+    border-radius: 0.8rem;
+  }
+
+  :where([data-has-sidebar]) .header > .site-header--docs .site-brand__mark img {
+    width: 1.5rem;
+    height: 1.5rem;
+  }
+
+  :where([data-has-sidebar]) .header > .site-header--docs .site-header__tools {
+    gap: 0.38rem;
   }
 }

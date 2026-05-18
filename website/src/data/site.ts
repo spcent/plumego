@@ -26,14 +26,12 @@ export const NAV_LINKS: Record<Locale, Array<{ label: string; href: string }>> =
     { label: 'Why', href: '/why-plumego' },
     { label: 'Examples', href: '/examples' },
     { label: 'Status', href: '/status' },
-    { label: 'GitHub', href: 'https://github.com/spcent/plumego' },
   ],
   zh: [
     { label: '文档', href: '/zh/docs' },
     { label: '为什么选择', href: '/zh/why-plumego' },
     { label: '示例', href: '/zh/examples' },
     { label: '状态', href: '/zh/status' },
-    { label: 'GitHub', href: 'https://github.com/spcent/plumego' },
   ],
 };
 
