@@ -3,7 +3,7 @@
 Milestone: M-019
 Recipe: specs/change-recipes/add-package.yaml
 Priority: P3
-State: active
+State: done
 Primary Module: cmd/plumego
 Owned Files:
 - `cmd/plumego/commands/add.go`
@@ -56,4 +56,13 @@ Done Definition:
 - cmd/plumego/README.md documents the add command.
 
 Outcome:
--
+- Implemented `plumego add <module-path> [--version latest]` with `go list`,
+  `go mod download`, `community-extension.yaml` schema validation, `go vet`,
+  forbidden import scanning, deferred `go get`, and a compliance report.
+- Added tests covering valid add, missing schema, missing name, forbidden
+  import, and `go list` network failure with retry guidance.
+- Registered the command in root/help surfaces and documented it in
+  `cmd/plumego/README.md`.
+- Validated from `cmd/plumego` with `go test -race -timeout 60s ./...` and
+  `go vet ./...`; also ran touched-file `gofmt -l` and `git diff --check`
+  from the repository root.

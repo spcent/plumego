@@ -191,22 +191,39 @@ best fit for local projects rather than very large repository trees.
 example `--auth "Bearer <token>"`. Inspect response bodies are capped at 10 MiB;
 larger responses fail with a structured error instead of being truncated.
 
+### Add Community Extensions
+
+```bash
+plumego add github.com/acme/plumego-cache --version v0.1.0
+```
+
+`plumego add <module-path>` resolves the requested module with `go list`,
+downloads it with `go mod download`, reads `community-extension.yaml`, validates
+the schema contract, runs `go vet ./...`, scans for imports declared in
+`forbidden_imports`, and only then runs `go get <module-path>@<version>`.
+
+On success, the command prints a compliance report with `module_path`,
+`version`, `manifest_path`, `fields_validated`, `checks_passed`, and
+`module_added`. On schema, vet, forbidden-import, or network failure, it exits
+with code 1 before modifying `go.mod`.
+
 ## Commands
 
-The v1 CLI surface currently targets these 12 commands:
+The v1 CLI surface currently targets these 13 commands:
 
 1. **new** - Create projects from templates
 2. **generate** - Generate middleware, handlers, models
-3. **dev** - Development server with hot reload
-4. **check** - Health and security validation
-5. **config** - Configuration management
-6. **routes** - Route analysis and inspection
-7. **migrate** - Offline migration file creation plus runtime migration commands for custom driver builds
-8. **test** - Enhanced test runner
-9. **build** - Build with optimizations
-10. **inspect** - Runtime inspection
-11. **serve** - Local static file preview server
-12. **version** - Build and version metadata
+3. **add** - Validate and add community extension modules
+4. **dev** - Development server with hot reload
+5. **check** - Health and security validation
+6. **config** - Configuration management
+7. **routes** - Route analysis and inspection
+8. **migrate** - Offline migration file creation plus runtime migration commands for custom driver builds
+9. **test** - Enhanced test runner
+10. **build** - Build with optimizations
+11. **inspect** - Runtime inspection
+12. **serve** - Local static file preview server
+13. **version** - Build and version metadata
 
 See module notes: [MODULE.md](./MODULE.md)
 

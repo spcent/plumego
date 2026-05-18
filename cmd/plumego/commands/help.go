@@ -8,6 +8,7 @@ import (
 var stableCommandOrder = []string{
 	"new",
 	"generate",
+	"add",
 	"dev",
 	"routes",
 	"check",
@@ -127,6 +128,19 @@ func (c *GenerateCmd) Help() CommandHelp {
 			"plumego generate handler User --methods GET,POST,PUT,DELETE --with-tests",
 			"plumego generate model Invoice --with-validation",
 			"plumego generate spec --dir reference/with-rest --format yaml --output openapi.yaml",
+		},
+	}
+}
+
+func (c *AddCmd) Help() CommandHelp {
+	return CommandHelp{
+		Args: "<module-path> [command-flags]",
+		Flags: []HelpItem{
+			{"--version <version>", "Module version to add (default: latest)"},
+		},
+		Examples: []string{
+			"plumego add github.com/acme/plumego-cache --version v0.1.0",
+			"plumego add github.com/acme/plumego-cache",
 		},
 	}
 }

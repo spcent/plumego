@@ -62,6 +62,7 @@ func TestCommandHelpListsDeclaredFlags(t *testing.T) {
 	}{
 		{name: "new", cmd: &NewCmd{}, sourceFile: "new.go"},
 		{name: "generate", cmd: &GenerateCmd{}, sourceFile: "generate.go"},
+		{name: "add", cmd: &AddCmd{}, sourceFile: "add.go"},
 		{name: "dev", cmd: NewDevCmd(), sourceFile: "dev.go"},
 		{name: "routes", cmd: &RoutesCmd{}, sourceFile: "routes.go"},
 		{name: "check", cmd: &CheckCmd{}, sourceFile: "check.go"},
@@ -153,7 +154,7 @@ func TestCLI_HelpListsStableCommandSurface(t *testing.T) {
 	}
 
 	for _, command := range []string{
-		"new", "generate", "dev", "routes", "check", "config",
+		"new", "generate", "add", "dev", "routes", "check", "config",
 		"migrate", "test", "build", "inspect", "serve", "version",
 	} {
 		if !strings.Contains(stdout, command) {

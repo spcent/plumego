@@ -42,6 +42,7 @@ func runCLI(t *testing.T, args []string, cwd string) (string, string, error) {
 
 	root.Register(&NewCmd{})
 	root.Register(&GenerateCmd{})
+	root.Register(&AddCmd{})
 	root.Register(&DevCmd{})
 	root.Register(&RoutesCmd{})
 	root.Register(&CheckCmd{})
