@@ -3,7 +3,7 @@
 Milestone: M-018
 Recipe: specs/change-recipes/add-http-endpoint.yaml
 Priority: P3
-State: active
+State: done
 Primary Module: reference/with-tenant-admin
 Owned Files:
 - `reference/with-tenant-admin/internal/usage/handler.go`
@@ -67,4 +67,13 @@ Done Definition:
 - `go run ./internal/checks/reference-layout` exits 0.
 
 Outcome:
--
+- Implemented in-memory usage recording and report handlers, wired
+  `/admin/usage/:tenantID` POST/GET behind the admin token middleware, and
+  added focused handler tests.
+- Wrote `reference/with-tenant-admin/README.md` with run instructions, curl
+  examples, adapter replacement guidance, and the fail-closed auth pattern.
+- Validated with `go test -timeout 30s ./internal/usage/...`,
+  `go test -timeout 30s ./...`, `go vet ./...`, and `go build ./...` from
+  `reference/with-tenant-admin`.
+- Ran `go run ./internal/checks/reference-layout`, touched-file `gofmt -l`,
+  and `git diff --check` from the repository root.

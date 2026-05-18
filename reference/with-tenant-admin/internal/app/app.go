@@ -13,6 +13,7 @@ import (
 	"github.com/spcent/plumego/reference/with-tenant-admin/internal/config"
 	quotaadmin "github.com/spcent/plumego/reference/with-tenant-admin/internal/quota/admin"
 	tenantadmin "github.com/spcent/plumego/reference/with-tenant-admin/internal/tenant/admin"
+	"github.com/spcent/plumego/reference/with-tenant-admin/internal/usage"
 	tenantcore "github.com/spcent/plumego/x/tenant/core"
 )
 
@@ -22,6 +23,7 @@ type Deps struct {
 	QuotaManager tenantcore.QuotaManager
 	QuotaStore   *tenantcore.InMemoryQuotaStore
 	TenantStore  *tenantadmin.InMemoryStore
+	UsageStore   *usage.InMemoryUsageStore
 }
 
 type App struct {
@@ -33,6 +35,7 @@ type App struct {
 	QuotaStore   *tenantcore.InMemoryQuotaStore
 	Tenants      *tenantadmin.Handler
 	Quotas       *quotaadmin.Handler
+	Usage        *usage.Handler
 }
 
 func New(cfg config.Config, deps Deps) (*App, error) {
@@ -68,6 +71,10 @@ func New(cfg config.Config, deps Deps) (*App, error) {
 	if tenantStore == nil {
 		tenantStore = tenantadmin.NewInMemoryStore()
 	}
+	usageStore := deps.UsageStore
+	if usageStore == nil {
+		usageStore = usage.NewInMemoryUsageStore()
+	}
 
 	return &App{
 		Core:         app,
@@ -78,6 +85,7 @@ func New(cfg config.Config, deps Deps) (*App, error) {
 		QuotaStore:   quotaStore,
 		Tenants:      tenantadmin.NewHandler(tenantStore),
 		Quotas:       quotaadmin.NewHandler(tenantStore, tenantConfig, quotaStore),
+		Usage:        usage.NewHandler(tenantStore, usageStore),
 	}, nil
 }
 

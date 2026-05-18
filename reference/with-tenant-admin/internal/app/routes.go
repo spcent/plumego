@@ -3,7 +3,6 @@ package app
 import (
 	"net/http"
 
-	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/reference/with-tenant-admin/internal/auth"
 )
 
@@ -42,14 +41,8 @@ func (a *App) registerQuotaAdminRoutes(admin func(http.Handler) http.Handler) er
 }
 
 func (a *App) registerUsageAdminRoutes(admin func(http.Handler) http.Handler) error {
-	return a.Core.Post("/admin/usage", admin(http.HandlerFunc(notImplemented("usage recording handlers are added in card 1583"))))
-}
-
-func notImplemented(message string) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-			Type(contract.TypeNotImplemented).
-			Message(message).
-			Build())
+	if err := a.Core.Post("/admin/usage/:tenantID", admin(http.HandlerFunc(a.Usage.RecordUsage))); err != nil {
+		return err
 	}
+	return a.Core.Get("/admin/usage/:tenantID", admin(http.HandlerFunc(a.Usage.GetUsageReport)))
 }
