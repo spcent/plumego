@@ -40,4 +40,6 @@ Done Definition:
 - No placeholder text remains in the document.
 
 Outcome:
--
+- Done. docs/release/v1.1.0.md now contains the required release-note
+  sections, references the card 1500 gate output, lists the M-007 first
+  release-ref evidence surfaces, and records `Decision: GO`.
