@@ -19,7 +19,16 @@ func (a *App) RegisterRoutes() error {
 }
 
 func (a *App) registerTenantAdminRoutes(admin func(http.Handler) http.Handler) error {
-	return a.Core.Get("/admin/tenants", admin(http.HandlerFunc(notImplemented("tenant admin handlers are added in card 1581"))))
+	if err := a.Core.Post("/admin/tenants", admin(http.HandlerFunc(a.Tenants.CreateTenant))); err != nil {
+		return err
+	}
+	if err := a.Core.Get("/admin/tenants/:id", admin(http.HandlerFunc(a.Tenants.GetTenant))); err != nil {
+		return err
+	}
+	if err := a.Core.Post("/admin/tenants/:id/suspend", admin(http.HandlerFunc(a.Tenants.SuspendTenant))); err != nil {
+		return err
+	}
+	return a.Core.Delete("/admin/tenants/:id", admin(http.HandlerFunc(a.Tenants.DeleteTenant)))
 }
 
 func (a *App) registerQuotaAdminRoutes(admin func(http.Handler) http.Handler) error {

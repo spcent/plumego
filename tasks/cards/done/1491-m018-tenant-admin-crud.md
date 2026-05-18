@@ -3,7 +3,7 @@
 Milestone: M-018
 Recipe: specs/change-recipes/add-http-endpoint.yaml
 Priority: P3
-State: active
+State: done
 Primary Module: reference/with-tenant-admin
 Owned Files:
 - `reference/with-tenant-admin/internal/tenant/admin/store.go`
@@ -59,4 +59,9 @@ Done Definition:
 - `go build ./reference/with-tenant-admin/...` exits 0.
 
 Outcome:
--
+- Implemented the tenant admin in-memory store, lifecycle handlers, admin-token
+  protected routes, and CRUD handler tests.
+- Validated with `go test -timeout 30s ./internal/tenant/...`,
+  `go vet ./...`, and `go build ./...` from `reference/with-tenant-admin`.
+- Ran `go run ./internal/checks/reference-layout`, `gofmt -l` for touched
+  files, and `git diff --check` from the repository root.
