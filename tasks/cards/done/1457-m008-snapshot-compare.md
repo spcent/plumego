@@ -42,4 +42,7 @@ Done Definition:
 - Card does not proceed if unexpected changes are found; a blocker is recorded instead.
 
 Outcome:
--
+- Done. Compared all nine stable roots from `v1.0.0` to `HEAD` with
+  `go run ./internal/checks/extension-release-evidence`; every root reported
+  `api unchanged` and `snapshots match`. Recorded the result in
+  docs/release/v1.1.0.md and ran dependency-rules plus module-manifests.
