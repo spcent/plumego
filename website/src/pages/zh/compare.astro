@@ -2,6 +2,8 @@
 import MarketingLayout from '../../layouts/MarketingLayout.astro';
 import PageHero from '../../components/marketing/PageHero.astro';
 import JourneyBar from '../../components/marketing/JourneyBar.astro';
+import CheckIcon from '../../components/shared/CheckIcon.astro';
+import CautionIcon from '../../components/shared/CautionIcon.astro';
 
 interface Framework {
   id: string;
@@ -526,15 +528,11 @@ contract.<span class="hc-fn">WriteError</span>(w, r,
       <div class="comparison-table__head" role="row">
         <span role="columnheader">框架</span>
         <span role="columnheader">
-          <svg class="comparison-cell-icon comparison-cell-icon--fit" width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-            <path d="M3 8l3.5 3.5L13 4" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
+          <CheckIcon size={12} class="comparison-cell-icon comparison-cell-icon--fit" />
           选择场景
         </span>
         <span role="columnheader">
-          <svg class="comparison-cell-icon comparison-cell-icon--caution" width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-            <path d="M8 3v6M8 11.5v1" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
-          </svg>
+          <CautionIcon size={12} class="comparison-cell-icon comparison-cell-icon--caution" />
           暂停场景
         </span>
       </div>
@@ -548,9 +546,7 @@ contract.<span class="hc-fn">WriteError</span>(w, r,
           <ul class="fw-points" role="cell">
             {fw.whenToChoose.map((point) => (
               <li>
-                <svg class="comparison-cell-icon comparison-cell-icon--fit" width="11" height="11" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                  <path d="M3 8l3.5 3.5L13 4" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-                </svg>
+                <CheckIcon size={11} class="comparison-cell-icon comparison-cell-icon--fit" />
                 {point}
               </li>
             ))}
@@ -558,9 +554,7 @@ contract.<span class="hc-fn">WriteError</span>(w, r,
           <ul class="fw-points" role="cell">
             {fw.whenNotToChoose.map((point) => (
               <li>
-                <svg class="comparison-cell-icon comparison-cell-icon--caution" width="11" height="11" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                  <path d="M8 3v6M8 11.5v1" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
-                </svg>
+                <CautionIcon size={11} class="comparison-cell-icon comparison-cell-icon--caution" />
                 {point}
               </li>
             ))}
@@ -581,9 +575,7 @@ contract.<span class="hc-fn">WriteError</span>(w, r,
     <div class="control-grid">
       <article class="control-grid__item">
         <p class="signal-list__kicker">
-          <svg class="comparison-cell-icon comparison-cell-icon--caution" width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-            <path d="M8 3v6M8 11.5v1" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
-          </svg>
+          <CautionIcon size={13} class="comparison-cell-icon comparison-cell-icon--caution" />
           约定优先的团队
         </p>
         <h3>你希望框架替你管理结构</h3>
@@ -594,9 +586,7 @@ contract.<span class="hc-fn">WriteError</span>(w, r,
       </article>
       <article class="control-grid__item">
         <p class="signal-list__kicker">
-          <svg class="comparison-cell-icon comparison-cell-icon--caution" width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-            <path d="M8 3v6M8 11.5v1" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
-          </svg>
+          <CautionIcon size={13} class="comparison-cell-icon comparison-cell-icon--caution" />
           已有大型代码库
         </p>
         <h3>团队已经有大量 Gin/Echo 服务</h3>
@@ -607,9 +597,7 @@ contract.<span class="hc-fn">WriteError</span>(w, r,
       </article>
       <article class="control-grid__item">
         <p class="signal-list__kicker">
-          <svg class="comparison-cell-icon comparison-cell-icon--caution" width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-            <path d="M8 3v6M8 11.5v1" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
-          </svg>
+          <CautionIcon size={13} class="comparison-cell-icon comparison-cell-icon--caution" />
           最大吞吐量
         </p>
         <h3>原始 HTTP 吞吐量是你的主要瓶颈</h3>
@@ -620,9 +608,7 @@ contract.<span class="hc-fn">WriteError</span>(w, r,
       </article>
       <article class="control-grid__item">
         <p class="signal-list__kicker">
-          <svg class="comparison-cell-icon comparison-cell-icon--caution" width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-            <path d="M8 3v6M8 11.5v1" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
-          </svg>
+          <CautionIcon size={13} class="comparison-cell-icon comparison-cell-icon--caution" />
           现在就需要长期生产记录
         </p>
         <h3>你需要经过验证的 v1+ 版本记录</h3>
