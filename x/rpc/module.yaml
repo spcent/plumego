@@ -16,6 +16,8 @@ entrypoint_reads:
 subordinate_families:
   - package: x/rpc/server
     role: gRPC server lifecycle wrapper aligned with context cancellation
+  - package: x/rpc/client
+    role: gRPC client connection pool and unary interceptors
 
 responsibilities:
   - gRPC server lifecycle wrappers
@@ -37,6 +39,9 @@ doc_paths:
 
 allowed_imports:
   - stdlib
+  - contract
+  - log
+  - x/observability
 
 forbidden_imports:
   - core/**

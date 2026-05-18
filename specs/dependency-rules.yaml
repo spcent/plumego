@@ -302,17 +302,45 @@ modules:
     layer: extension
     allow:
       - stdlib
+      - contract
+      - log
       - x/observability
     deny:
       - core/**
       - router/**
-      - contract/**
       - middleware/**
       - security/**
       - store/**
       - health/**
-      - log/**
       - metrics/**
+      - x/tenant/**
+      - x/ai/**
+      - x/data/**
+      - x/fileapi/**
+      - x/frontend/**
+      - x/gateway/**
+      - x/messaging/**
+      - x/openapi/**
+      - x/resilience/**
+      - x/rest/**
+      - x/websocket/**
+      - reference/**
+      - cmd/**
+
+  x/rpc/client:
+    path: x/rpc/client
+    layer: extension
+    allow:
+      - stdlib
+      - contract
+      - log
+      - x/observability
+    deny:
+      - core/**
+      - router/**
+      - middleware/**
+      - security/**
+      - store/**
       - x/tenant/**
       - x/ai/**
       - x/data/**

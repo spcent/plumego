@@ -3,7 +3,7 @@
 Milestone: M-017
 Recipe: specs/change-recipes/add-package.yaml
 Priority: P3
-State: active
+State: done
 Primary Module: x/rpc
 Owned Files:
 - `x/rpc/client/pool.go`
@@ -58,4 +58,24 @@ Done Definition:
 - All four pool_test.go cases pass with `go test -race`.
 
 Outcome:
--
+- Added `x/rpc/client.Pool` with target-keyed `grpc.ClientConn` caching,
+  closed-pool protection, aggregate close errors, and a keepalive dial option
+  helper.
+- Added unary client interceptors for structured logging, caller-selected retry
+  on gRPC status codes, and trace context propagation through outgoing metadata.
+- Added a `x/rpc/client` module manifest and updated `x/rpc`/dependency
+  control-plane metadata for the new client subpackage.
+- Added bufconn tests covering cached dials, dial-after-close errors, logging
+  method fields, and retrying `codes.Unavailable` until success.
+- Validation:
+  `GOTOOLCHAIN=go1.24.4 GOCACHE=/private/tmp/plumego-gocache go test -race
+  -timeout 60s ./client/...` from x/rpc; `GOTOOLCHAIN=go1.24.4
+  GOCACHE=/private/tmp/plumego-gocache go vet ./client/...` from x/rpc;
+  `GOTOOLCHAIN=go1.24.4 GOCACHE=/private/tmp/plumego-gocache go test -timeout
+  20s ./...` from x/rpc; `GOTOOLCHAIN=go1.24.4
+  GOCACHE=/private/tmp/plumego-gocache go build ./...` from x/rpc;
+  `GOTOOLCHAIN=go1.24.4 GOCACHE=/private/tmp/plumego-gocache go run
+  ./internal/checks/dependency-rules`; `GOTOOLCHAIN=go1.24.4
+  GOCACHE=/private/tmp/plumego-gocache go run ./internal/checks/module-manifests`;
+  `GOTOOLCHAIN=go1.24.4 GOCACHE=/private/tmp/plumego-gocache go run
+  ./internal/checks/agent-workflow`; `gofmt -l .`; `git diff --check`.
