@@ -3,7 +3,7 @@
 Milestone: M-003
 Recipe: specs/change-recipes/analysis-only.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: control-plane
 Owned Files:
 - `tasks/cards/active/1452-post-v1-maturity-roadmap.md`
@@ -44,4 +44,6 @@ Done Definition:
 - The roadmap exists in `tasks/cards/` with unblocked work in `active/` and evidence-gated promotion work explicitly blocked.
 
 Outcome:
--
+- Added the post-v1 maturity roadmap to task cards, with unblocked work in
+  `tasks/cards/active/` and release-evidence-dependent beta closure work
+  remaining in `tasks/cards/blocked/`.
