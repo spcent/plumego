@@ -5,7 +5,8 @@ const copy = {
   en: {
     kicker: 'Agent-ready',
     title: 'Built for the way modern teams work.',
-    lead: 'As AI coding assistants take on more of the execution, the question shifts: does your repository give them a clear operating model — or do they guess? Plumego\'s control plane gives agents the same routing signals a senior reviewer uses.',
+    disclaimer: 'This section is about AI coding assistants — Copilot, Claude, Cursor — tools that write or review code. It is not about building AI agent services; for that, see x/ai.',
+    lead: 'As AI coding assistants take on more execution work, the question shifts: does your repository give them a clear operating model — or do they guess? Plumego\'s control plane gives agents the same routing signals a senior reviewer uses.',
     files: [
       {
         path: 'specs/task-routing.yaml',
@@ -23,15 +24,39 @@ const copy = {
         desc: 'Each module declares its own checks. Agents run only what is relevant.',
       },
     ],
-    tableCaption: 'How task routing works in practice',
-    tableHead: ['Task description', 'Routing rule', 'Owner'],
-    tableRows: [
-      ['Add rate limiting to HTTP endpoint', 'middleware', 'middleware/'],
-      ['Add per-tenant JWT validation', 'tenant_policy_change', 'x/tenant/'],
-      ['Build AI streaming SSE endpoint', 'extension_work → x/ai', 'x/ai/'],
-      ['Update import boundary rules', 'repo_rules', 'specs/'],
+    tableCaption: 'Try a scenario — see where it routes',
+    scenarios: [
+      {
+        chip: 'Rate limiting',
+        task: 'Add rate limiting to an HTTP endpoint',
+        rule: 'middleware',
+        owner: 'middleware/',
+        reason: 'Transport-only cross-cutting concern — no x/* import needed. Stable roots handle this entirely.',
+      },
+      {
+        chip: 'Per-tenant JWT',
+        task: 'Add per-tenant JWT validation and quota enforcement',
+        rule: 'tenant_policy_change',
+        owner: 'x/tenant/',
+        reason: 'Tenant identity and policy always route to x/tenant. Stable roots never see tenant logic.',
+      },
+      {
+        chip: 'AI streaming SSE',
+        task: 'Build an AI streaming SSE endpoint with tool routing',
+        rule: 'extension_work → x/ai',
+        owner: 'x/ai/',
+        reason: 'AI capability work stays in the extension layer. The stable HTTP kernel is not modified.',
+      },
+      {
+        chip: 'Boundary rules',
+        task: 'Update allowed import directions in specs',
+        rule: 'repo_rules',
+        owner: 'specs/',
+        reason: 'Import policy and dependency rules live in the control plane — not in any Go package.',
+      },
     ],
-    cta: 'How agents use the control plane →',
+    resultLabels: { rule: 'routing rule', owner: 'owner', reason: 'why' },
+    cta: 'Full interactive routing demo →',
     ctaHref: '/docs/concepts/agent-first-workflow',
     whyHref: '/why-plumego',
     whyLabel: 'Adoption fit check',
@@ -57,15 +82,40 @@ const copy = {
         desc: '每个模块自声明检查命令。Agent 只运行相关的验证。',
       },
     ],
-    tableCaption: '任务路由实际运作方式',
-    tableHead: ['任务描述', '路由规则', '归属模块'],
-    tableRows: [
-      ['为 HTTP 端点添加限流', 'middleware', 'middleware/'],
-      ['添加每租户 JWT 验证', 'tenant_policy_change', 'x/tenant/'],
-      ['构建 AI 流式 SSE 端点', 'extension_work → x/ai', 'x/ai/'],
-      ['更新 import 边界规则', 'repo_rules', 'specs/'],
+    disclaimer: '本节讨论的是 AI 编码助手——Copilot、Claude、Cursor——帮助写代码或评审代码的工具。这不是关于构建 AI agent 服务的内容；那是 x/ai 模块的范围。',
+    tableCaption: '选择一个场景，看看它会路由到哪里',
+    scenarios: [
+      {
+        chip: '限流中间件',
+        task: '为 HTTP 端点添加限流',
+        rule: 'middleware',
+        owner: 'middleware/',
+        reason: '传输层横切关注点，不需要引入 x/* 模块。稳定根完全可以处理。',
+      },
+      {
+        chip: '每租户 JWT',
+        task: '添加每租户 JWT 验证和配额执行',
+        rule: 'tenant_policy_change',
+        owner: 'x/tenant/',
+        reason: '租户身份和策略始终路由到 x/tenant。稳定根从不接触租户逻辑。',
+      },
+      {
+        chip: 'AI 流式 SSE',
+        task: '构建带工具路由的 AI 流式 SSE 端点',
+        rule: 'extension_work → x/ai',
+        owner: 'x/ai/',
+        reason: 'AI 能力工作留在扩展层。稳定的 HTTP 内核不会被修改。',
+      },
+      {
+        chip: '边界规则',
+        task: '更新 specs 中允许的 import 方向',
+        rule: 'repo_rules',
+        owner: 'specs/',
+        reason: 'import 策略和依赖规则存储在控制平面，不在任何 Go 包里。',
+      },
     ],
-    cta: '了解 Agent 如何使用控制平面 →',
+    resultLabels: { rule: '路由规则', owner: '归属模块', reason: '原因' },
+    cta: '查看完整交互式路由 demo →',
     ctaHref: '/zh/docs/concepts/agent-first-workflow',
     whyHref: '/zh/why-plumego',
     whyLabel: '查看完整适用性评估',
@@ -80,6 +130,7 @@ const t = copy[locale];
     <div class="agent-showcase-header__left">
       <p class="agent-showcase-kicker">{t.kicker}</p>
       <h2>{t.title}</h2>
+      <p class="agent-showcase-disclaimer">{t.disclaimer}</p>
       <p class="agent-showcase-lead">{t.lead}</p>
     </div>
     <div class="agent-showcase-files">
@@ -97,24 +148,73 @@ const t = copy[locale];
 
   <div class="agent-routing-block">
     <p class="agent-routing-caption">{t.tableCaption}</p>
-    <div class="agent-routing-table" role="table" aria-label={t.tableCaption}>
-      <div class="agent-routing-table__head" role="row">
-        {t.tableHead.map((h) => <span role="columnheader">{h}</span>)}
+
+    <div class="agent-scenario-picker" data-scenarios={JSON.stringify(t.scenarios)} data-labels={JSON.stringify(t.resultLabels)}>
+      <div class="agent-scenario-chips" role="tablist" aria-label={t.tableCaption}>
+        {t.scenarios.map((s, i) => (
+          <button
+            class={`agent-chip${i === 0 ? ' agent-chip--active' : ''}`}
+            role="tab"
+            aria-selected={i === 0 ? 'true' : 'false'}
+            data-idx={i}
+          >{s.chip}</button>
+        ))}
       </div>
-      {t.tableRows.map(([task, rule, owner]) => (
-        <div class="agent-routing-table__row" role="row">
-          <span role="cell">{task}</span>
-          <span role="cell"><code>{rule}</code></span>
-          <span role="cell"><code>{owner}</code></span>
+      <div class="agent-scenario-result" role="tabpanel">
+        <div class="agent-scenario-result__task" id="agentResultTask">{t.scenarios[0].task}</div>
+        <div class="agent-scenario-result__row">
+          <span class="agent-scenario-result__label">{t.resultLabels.rule}</span>
+          <code class="agent-scenario-result__val" id="agentResultRule">{t.scenarios[0].rule}</code>
         </div>
-      ))}
+        <div class="agent-scenario-result__row">
+          <span class="agent-scenario-result__label">{t.resultLabels.owner}</span>
+          <code class="agent-scenario-result__val" id="agentResultOwner">{t.scenarios[0].owner}</code>
+        </div>
+        <div class="agent-scenario-result__row agent-scenario-result__row--reason">
+          <span class="agent-scenario-result__label">{t.resultLabels.reason}</span>
+          <span class="agent-scenario-result__reason" id="agentResultReason">{t.scenarios[0].reason}</span>
+        </div>
+      </div>
     </div>
+
     <div class="agent-showcase-links">
       <a class="text-link" href={t.ctaHref}>{t.cta}</a>
       <a class="text-link" href={t.whyHref}>{t.whyLabel} →</a>
     </div>
   </div>
 </section>
+
+<script>
+  document.querySelectorAll<HTMLElement>('.agent-scenario-picker').forEach((picker) => {
+    const scenarios: Array<{ chip: string; task: string; rule: string; owner: string; reason: string }> =
+      JSON.parse(picker.dataset.scenarios || '[]');
+
+    const taskEl = picker.querySelector<HTMLElement>('#agentResultTask');
+    const ruleEl = picker.querySelector<HTMLElement>('#agentResultRule');
+    const ownerEl = picker.querySelector<HTMLElement>('#agentResultOwner');
+    const reasonEl = picker.querySelector<HTMLElement>('#agentResultReason');
+
+    picker.querySelectorAll<HTMLButtonElement>('.agent-chip').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const idx = parseInt(btn.dataset.idx || '0', 10);
+        const s = scenarios[idx];
+        if (!s || !taskEl || !ruleEl || !ownerEl || !reasonEl) return;
+
+        picker.querySelectorAll('.agent-chip').forEach((b) => {
+          b.classList.remove('agent-chip--active');
+          b.setAttribute('aria-selected', 'false');
+        });
+        btn.classList.add('agent-chip--active');
+        btn.setAttribute('aria-selected', 'true');
+
+        taskEl.textContent = s.task;
+        ruleEl.textContent = s.rule;
+        ownerEl.textContent = s.owner;
+        reasonEl.textContent = s.reason;
+      });
+    });
+  });
+</script>
 
 <style>
   .agent-showcase-section {
@@ -153,6 +253,17 @@ const t = copy[locale];
     letter-spacing: -0.025em;
     line-height: 1.25;
     color: var(--fg);
+  }
+
+  .agent-showcase-disclaimer {
+    font-size: 0.78rem;
+    color: var(--fg-soft);
+    font-style: italic;
+    line-height: 1.55;
+    margin: 0 0 0.5rem;
+    max-width: 36rem;
+    border-left: 2px solid var(--line);
+    padding-left: 0.75rem;
   }
 
   .agent-showcase-lead {
@@ -222,69 +333,119 @@ const t = copy[locale];
     letter-spacing: 0.05em;
     text-transform: uppercase;
     color: var(--fg-soft);
-    margin: 0 0 0.6rem;
+    margin: 0 0 0.75rem;
   }
 
-  .agent-routing-table {
+  /* ── Interactive scenario picker ──────────────────────── */
+  .agent-scenario-picker {
     border: 1px solid var(--line);
-    border-radius: 0.625rem;
+    border-radius: 0.75rem;
     overflow: hidden;
     background: var(--bg-elevated);
     margin-bottom: 1.25rem;
   }
 
-  .agent-routing-table__head {
-    display: grid;
-    grid-template-columns: 2fr 1.2fr 1fr;
-    padding: 0.5rem 1.1rem;
+  .agent-scenario-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    padding: 0.6rem 0.8rem;
     background: var(--bg-strong);
     border-bottom: 1px solid var(--line);
-    font-size: 0.7rem;
+  }
+
+  .agent-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 0.28rem 0.75rem;
+    border-radius: 1rem;
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--fg-soft);
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+    font-family: inherit;
+    letter-spacing: 0.01em;
+  }
+
+  .agent-chip:hover {
+    background: var(--bg-elevated);
+    color: var(--fg);
+    border-color: var(--line);
+  }
+
+  .agent-chip--active {
+    background: var(--accent-soft);
+    color: var(--accent-strong);
+    border-color: color-mix(in srgb, var(--accent) 30%, transparent);
+  }
+
+  :root[data-theme="dark"] .agent-chip--active {
+    color: var(--accent);
+  }
+
+  .agent-scenario-result {
+    padding: 1rem 1.2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    min-height: 7rem;
+  }
+
+  .agent-scenario-result__task {
+    font-size: 0.84rem;
+    color: var(--fg);
+    font-weight: 500;
+    line-height: 1.4;
+    margin-bottom: 0.1rem;
+  }
+
+  .agent-scenario-result__row {
+    display: flex;
+    align-items: baseline;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+  }
+
+  .agent-scenario-result__row--reason {
+    align-items: flex-start;
+  }
+
+  .agent-scenario-result__label {
+    font-size: 0.66rem;
     font-weight: 700;
-    letter-spacing: 0.07em;
+    letter-spacing: 0.08em;
     text-transform: uppercase;
     color: var(--fg-soft);
-    gap: 0.5rem;
+    width: 4.5rem;
+    flex-shrink: 0;
+    padding-top: 0.05rem;
   }
 
-  .agent-routing-table__row {
-    display: grid;
-    grid-template-columns: 2fr 1.2fr 1fr;
-    padding: 0.65rem 1.1rem;
-    border-bottom: 1px solid var(--line);
-    font-size: 0.84rem;
-    gap: 0.5rem;
-    align-items: center;
-    color: var(--fg-soft);
-  }
-
-  .agent-routing-table__row:last-child {
-    border-bottom: none;
-  }
-
-  .agent-routing-table__row code {
+  .agent-scenario-result__val {
     font-family: var(--font-mono);
-    font-size: 0.76rem;
+    font-size: 0.8rem;
     color: var(--accent);
     background: var(--accent-soft);
-    padding: 0.1rem 0.35rem;
-    border-radius: 0.22rem;
+    padding: 0.1rem 0.4rem;
+    border-radius: 0.25rem;
     white-space: nowrap;
   }
+
+  .agent-scenario-result__reason {
+    font-size: 0.83rem;
+    color: var(--fg-soft);
+    line-height: 1.5;
+  }
+
+  /* ─────────────────────────────────────────────────────── */
 
   .agent-showcase-links {
     display: flex;
     gap: 1.5rem;
     flex-wrap: wrap;
-  }
-
-  @media (max-width: 640px) {
-    .agent-routing-table__head,
-    .agent-routing-table__row {
-      grid-template-columns: 1fr;
-    }
-    .agent-routing-table__head span:not(:first-child) {
-      display: none;
-    }
   }
 </style>

@@ -22,6 +22,8 @@ interface Framework {
   verdict: string;
   whenToChoose: string[];
   whenNotToChoose: string[];
+  migrationCost: 'low' | 'medium' | 'high' | 'n/a';
+  migrationNote: string;
   color: string;
   isPlumego?: boolean;
   warning?: string;
@@ -54,6 +56,8 @@ const frameworks: Framework[] = [
       'You want route ownership and middleware order visible in code review without reading framework internals',
       'You want a structured, consistent error and response envelope across all handlers',
     ],
+    migrationCost: 'medium',
+    migrationNote: 'All handlers must be rewritten from gin.Context to func(w, r). Middleware must be adapted or replaced. Route syntax maps cleanly (/foo/:id stays the same). Expect 1–3 days per service depending on handler count.',
     color: '#00b4d8',
   },
   {
@@ -81,6 +85,8 @@ const frameworks: Framework[] = [
       'You need a consistent JSON envelope; Echo leaves response formatting to you',
       'You want one canonical service shape across multiple teams',
     ],
+    migrationCost: 'medium',
+    migrationNote: 'Handler rewrite from echo.Context + error return to func(w, r). Grouped routing concepts map cleanly. Middleware adapters needed. Expect similar effort to Gin migration — roughly 1–3 days per service.',
     color: '#6c63ff',
   },
   {
@@ -108,6 +114,8 @@ const frameworks: Framework[] = [
       'You use net/http-based observability, tracing, or auth libraries',
       'Your team is Go-stdlib-first and expects standard library compatibility',
     ],
+    migrationCost: 'high',
+    migrationNote: 'Full rewrite required. Fasthttp and net/http are fundamentally incompatible — no handler reuse, no middleware reuse, no testing infrastructure reuse. Observability, auth, and tracing libraries all need replacing. Expect weeks, not days.',
     color: '#00d4aa',
     warning: 'Fiber uses Fasthttp, not net/http. It is incompatible with the Go standard library HTTP ecosystem.',
   },
@@ -136,6 +144,8 @@ const frameworks: Framework[] = [
       'You need a canonical service shape to onboard new team members quickly',
       'You want explicit maturity signals per module rather than all-or-nothing routing',
     ],
+    migrationCost: 'low',
+    migrationNote: 'Handler signature is identical (stdlib func(w, r)). Route syntax differs slightly: Chi uses /foo/{id} while Plumego uses /foo/:id. Middleware is fully compatible. Most services migrate in hours, not days.',
     color: '#f59e0b',
   },
   {
@@ -165,6 +175,8 @@ const frameworks: Framework[] = [
       'You need a mature v1+ release with a proven long-term track record',
       'Your service is a small script or short-lived tool where structure overhead isn\'t worth it',
     ],
+    migrationCost: 'n/a',
+    migrationNote: 'This is the destination, not the source.',
     isPlumego: true,
     color: 'var(--accent)',
   },
@@ -689,6 +701,38 @@ contract.<span class="hc-fn">WriteError</span>(w, r,
     </div>
   </section>
 
+  <!-- Migration cost section -->
+  <section class="section">
+    <div class="section__intro">
+      <h2>Migration cost to Plumego.</h2>
+      <p>
+        The decision to switch frameworks is rarely just about API ergonomics — it also involves handler
+        rewrites, middleware replacements, and testing infrastructure. This table gives an honest estimate
+        of the effort involved when migrating an existing service to Plumego.
+      </p>
+    </div>
+    <div class="comparison-table" role="table" aria-label="Migration cost to Plumego from each framework">
+      <div class="comparison-table__head" role="row">
+        <span role="columnheader">From</span>
+        <span role="columnheader">Cost</span>
+        <span role="columnheader">What changes</span>
+      </div>
+      {frameworks.filter((fw) => !fw.isPlumego).map((fw) => (
+        <div class="comparison-table__row" role="row">
+          <strong role="cell">{fw.name}</strong>
+          <span role="cell">
+            <span class={`migration-badge migration-badge--${fw.migrationCost}`}>{fw.migrationCost}</span>
+          </span>
+          <span role="cell" class="migration-note">{fw.migrationNote}</span>
+        </div>
+      ))}
+    </div>
+    <p class="matrix-note">
+      Migration cost assumes a working service with existing handlers and middleware.
+      A greenfield service starting from <code>reference/standard-service</code> has no migration cost.
+    </p>
+  </section>
+
   <!-- CTA -->
   <section class="section section--cta">
     <div class="section__intro section__intro--cta">
@@ -706,6 +750,45 @@ contract.<span class="hc-fn">WriteError</span>(w, r,
 </MarketingLayout>
 
 <style>
+  /* ── Migration cost badges ─────────────────────────────────────────────── */
+  .migration-badge {
+    display: inline-block;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    padding: 0.18rem 0.55rem;
+    border-radius: 0.28rem;
+    white-space: nowrap;
+  }
+
+  .migration-badge--low {
+    background: color-mix(in srgb, #22c55e 12%, var(--bg-elevated));
+    border: 1px solid color-mix(in srgb, #22c55e 30%, transparent);
+    color: #15803d;
+  }
+  :root[data-theme="dark"] .migration-badge--low { color: #4ade80; }
+
+  .migration-badge--medium {
+    background: color-mix(in srgb, #f59e0b 12%, var(--bg-elevated));
+    border: 1px solid color-mix(in srgb, #f59e0b 30%, transparent);
+    color: #b45309;
+  }
+  :root[data-theme="dark"] .migration-badge--medium { color: #fbbf24; }
+
+  .migration-badge--high {
+    background: color-mix(in srgb, #ef4444 12%, var(--bg-elevated));
+    border: 1px solid color-mix(in srgb, #ef4444 30%, transparent);
+    color: #b91c1c;
+  }
+  :root[data-theme="dark"] .migration-badge--high { color: #f87171; }
+
+  .migration-note {
+    font-size: 0.83rem;
+    color: var(--fg-soft);
+    line-height: 1.55;
+  }
+
   /* ── Verdict cards ─────────────────────────────────────────────────────── */
   .verdict-grid {
     display: grid;

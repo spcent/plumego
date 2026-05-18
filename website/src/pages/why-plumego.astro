@@ -114,6 +114,21 @@ const fitProfiles = [
 
 const cautionProfiles = [
   {
+    kicker: 'not a fit',
+    title: 'Your team is invested in the Gin or Echo plugin ecosystem',
+    body: 'Gin and Echo have large middleware catalogs, authentication plugins, and community tooling built around their custom context types. If your team depends on gin.Context or echo.Context — and the ecosystem around it — switching handler signatures imposes real migration cost with no clear upside.',
+  },
+  {
+    kicker: 'not a fit',
+    title: 'You need framework-level ORM, DI container, or auto-wiring',
+    body: 'Plumego does not carry database access, dependency injection, or auto-registration. If your team expects the framework to provide or wire these concerns, the explicit DI pattern will feel like unnecessary overhead. Reach for a full application framework instead.',
+  },
+  {
+    kicker: 'not a fit',
+    title: 'The x/* families\' pre-v1 API risk is a blocker for your organization',
+    body: 'The 9 stable roots have a compatibility promise toward v1. The x/* extension families are experimental or beta — their APIs may still change before a stable tag. If your organization requires a fully stable, versioned v1 API across every capability you use, wait for the v1 milestone or restrict adoption to the stable roots only.',
+  },
+  {
     kicker: 'slow down',
     title: 'You want framework conventions to handle structure automatically',
     body: 'If the team mainly wants routing and dependency setup handled invisibly by the framework, Plumego may feel more deliberate than productive.',
@@ -122,11 +137,6 @@ const cautionProfiles = [
     kicker: 'slow down',
     title: 'Every service is intentionally built with its own custom structure',
     body: 'The more each service must define its own startup, routing, and dependency patterns, the less a shared reference baseline can offer.',
-  },
-  {
-    kicker: 'slow down',
-    title: 'You want to use packages without following a structured adoption model',
-    body: 'Plumego rewards teams that distinguish between stable, supported, and experimental modules. If that separation is not important to your team, the discipline around it will feel unnecessary.',
   },
 ] as const;
 
@@ -206,9 +216,13 @@ const frameworkDecision = [
       </div>
       <h2 class="agent-first-callout__title">Built for teams using AI coding tools.</h2>
       <p class="agent-first-callout__body">
-        Plumego is the first Go HTTP toolkit designed so AI coding assistants (Claude, Copilot, Cursor)
-        know exactly where a change belongs — before writing any code. Machine-readable specs, per-module
-        manifests, and explicit boundary rules give agents the same routing signals a senior reviewer uses.
+        <em>This is about AI coding assistants (Claude, Copilot, Cursor) — tools that write or review code.
+        It is not about building AI agent services; for that, see <code>x/ai</code>.</em>
+      </p>
+      <p class="agent-first-callout__body">
+        Plumego is the first Go HTTP toolkit designed so those coding assistants know exactly where a change
+        belongs — before writing any code. Machine-readable specs, per-module manifests, and explicit
+        boundary rules give agents the same routing signals a senior reviewer uses.
       </p>
       <div class="agent-first-callout__points">
         <div class="agent-first-callout__point">
@@ -518,6 +532,61 @@ const frameworkDecision = [
     </div>
   </section>
 
+  <section class="section section--tinted">
+    <div class="section__intro reveal">
+      <h2>What adoption looks like over time.</h2>
+      <p>
+        Plumego is intentionally narrow at entry and explicit about where it expands. Here is what the first three stages of adoption typically involve.
+      </p>
+    </div>
+    <div class="timeline-grid reveal-stagger">
+      <article class="timeline-card">
+        <p class="timeline-card__kicker">Day 1</p>
+        <h3>Run the canonical reference service in under 5 minutes</h3>
+        <div class="code-block" style="margin: 0.75rem 0;">
+          <div class="code-block__bar">
+            <div class="code-block__dots"><span></span><span></span><span></span></div>
+            <span class="code-block__filename">terminal</span>
+          </div>
+          <pre class="code-block__pre"><code>go run ./reference/standard-service
+# → server started at :8080
+# → GET /ping → &#123;"data":&#123;"message":"pong"&#125;&#125;</code></pre>
+        </div>
+        <p>
+          Clone the repo, run the reference service, read <code>internal/app/routes.go</code>. The full request path is visible
+          without reading any framework source. Start here before evaluating further.
+        </p>
+      </article>
+      <article class="timeline-card">
+        <p class="timeline-card__kicker">Day 30</p>
+        <h3>Add a capability from x/* without touching stable roots</h3>
+        <p>
+          Once the stable-root baseline is working in your service, the next inflection point is whether you need a capability from
+          the x/* layer — WebSocket, multi-tenancy, AI streaming, or edge proxying. Each x/* family attaches at the transport layer
+          without modifying stable roots. You verify the boundary holds with <code>go run ./internal/checks/dependency-rules</code>.
+        </p>
+        <p>
+          The <code>specs/task-routing.yaml</code> table tells you which x/* family owns any new capability before you start.
+          The extension layer evolves at its own pace — stable roots stay unchanged.
+        </p>
+      </article>
+      <article class="timeline-card">
+        <p class="timeline-card__kicker">Day 90 (and v1)</p>
+        <h3>When v1 is tagged, the upgrade path is deterministic</h3>
+        <p>
+          The 9 stable roots have a compatibility promise toward v1. When the v1 tag lands, the upgrade path for
+          <code>core</code>, <code>router</code>, <code>contract</code>, and the other stable roots is mechanical —
+          no handler signature changes, no breaking response envelope changes.
+        </p>
+        <p>
+          x/* families that are still experimental at v1 will be tagged separately. Their maturity tier will be
+          explicit in the release matrix. You adopt only the capabilities that have reached beta or stable — not the whole
+          extension catalog.
+        </p>
+      </article>
+    </div>
+  </section>
+
   <section class="section">
     <div class="section__intro reveal">
       <h2>Continue from here.</h2>
@@ -534,6 +603,67 @@ const frameworkDecision = [
 </MarketingLayout>
 
 <style>
+  /* ── Timeline grid (Day 1/30/90) ──────────────────────── */
+  .timeline-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1.25rem;
+    max-width: 64rem;
+    margin-inline: auto;
+  }
+
+  @media (min-width: 860px) {
+    .timeline-grid {
+      grid-template-columns: repeat(3, 1fr);
+    }
+  }
+
+  .timeline-card {
+    background: var(--bg-elevated);
+    border: 1px solid var(--line);
+    border-radius: 0.75rem;
+    padding: 1.4rem 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+  }
+
+  .timeline-card__kicker {
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0;
+  }
+
+  .timeline-card h3 {
+    font-size: 0.97rem;
+    font-weight: 600;
+    margin: 0;
+    color: var(--fg);
+    line-height: 1.35;
+    letter-spacing: -0.01em;
+  }
+
+  .timeline-card p {
+    font-size: 0.84rem;
+    color: var(--fg-soft);
+    line-height: 1.6;
+    margin: 0;
+  }
+
+  .timeline-card code {
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    color: var(--accent);
+    background: var(--accent-soft);
+    padding: 0.08rem 0.35rem;
+    border-radius: 0.22rem;
+    white-space: nowrap;
+  }
+
+  /* ── Agent-first callout ─────────────────────────────── */
   .agent-first-callout {
     padding-block: 2rem;
   }

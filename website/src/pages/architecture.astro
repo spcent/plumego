@@ -223,6 +223,63 @@ const repositorySignals = [
     <LayerDiagram />
   </section>
 
+  <!-- Control plane / module layer dual-track diagram -->
+  <section class="section">
+    <div class="section__intro">
+      <h2>Two parallel tracks — module code and control plane.</h2>
+      <p>
+        The module hierarchy is only one track. The control plane (<code>specs/</code>, <code>docs/</code>, <code>tasks/</code>)
+        runs in parallel and holds the machine-readable rules that govern how the module code may be changed.
+        Both tracks are first-class — neither is subordinate to the other.
+      </p>
+    </div>
+    <div class="dual-track-diagram" aria-label="Two parallel tracks: module code and control plane">
+      <div class="dual-track-diagram__col">
+        <p class="dual-track-diagram__header">Module code track</p>
+        <div class="dual-track-diagram__zone dual-track-diagram__zone--ext">
+          <span class="dual-track-diagram__zone-label">x/* extension families</span>
+          <span class="dual-track-diagram__zone-note">experimental · beta</span>
+        </div>
+        <div class="dual-track-diagram__arrow" aria-hidden="true">↑ builds on</div>
+        <div class="dual-track-diagram__zone dual-track-diagram__zone--ref">
+          <span class="dual-track-diagram__zone-label">canonical path</span>
+          <span class="dual-track-diagram__zone-note">reference/standard-service</span>
+        </div>
+        <div class="dual-track-diagram__arrow" aria-hidden="true">↑ builds on</div>
+        <div class="dual-track-diagram__zone dual-track-diagram__zone--stable">
+          <span class="dual-track-diagram__zone-label">stable roots</span>
+          <span class="dual-track-diagram__zone-note">core · router · contract · middleware · …</span>
+        </div>
+      </div>
+      <div class="dual-track-diagram__divider" aria-hidden="true">
+        <span class="dual-track-diagram__divider-label">governed by</span>
+        <svg width="20" height="60" viewBox="0 0 20 60" fill="none" aria-hidden="true">
+          <path d="M10 0 L10 60" stroke="currentColor" stroke-width="1.5" stroke-dasharray="4 3"/>
+          <path d="M2 30 L10 40 L18 30" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <div class="dual-track-diagram__col">
+        <p class="dual-track-diagram__header">Control plane track</p>
+        <div class="dual-track-diagram__zone dual-track-diagram__zone--tasks">
+          <span class="dual-track-diagram__zone-label">tasks/</span>
+          <span class="dual-track-diagram__zone-note">executable work cards for agents and humans</span>
+        </div>
+        <div class="dual-track-diagram__zone dual-track-diagram__zone--specs">
+          <span class="dual-track-diagram__zone-label">specs/</span>
+          <span class="dual-track-diagram__zone-note">task-routing · dependency-rules · change-recipes</span>
+        </div>
+        <div class="dual-track-diagram__zone dual-track-diagram__zone--docs">
+          <span class="dual-track-diagram__zone-label">docs/</span>
+          <span class="dual-track-diagram__zone-note">human-readable architecture · primers · roadmap</span>
+        </div>
+      </div>
+    </div>
+    <p class="dual-track-diagram__caption">
+      <code>internal/checks/</code> enforces the rules in <code>specs/</code> against the module code at CI time.
+      Neither humans nor AI coding agents bypass this gate.
+    </p>
+  </section>
+
   <!-- Layers explanation (from copy) -->
   <section class="section">
     <div class="section__intro">
@@ -443,3 +500,124 @@ const repositorySignals = [
     </div>
   </section>
 </MarketingLayout>
+
+<style>
+  /* ── Dual-track control plane diagram ─────────────────── */
+  .dual-track-diagram {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    gap: 0;
+    max-width: 56rem;
+    margin-inline: auto;
+    align-items: center;
+  }
+
+  @media (max-width: 700px) {
+    .dual-track-diagram {
+      grid-template-columns: 1fr;
+    }
+    .dual-track-diagram__divider {
+      display: none;
+    }
+  }
+
+  .dual-track-diagram__col {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 1rem;
+  }
+
+  .dual-track-diagram__header {
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--fg-soft);
+    margin: 0 0 0.25rem;
+  }
+
+  .dual-track-diagram__zone {
+    border: 1px solid var(--line);
+    border-radius: 0.5rem;
+    padding: 0.7rem 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    background: var(--bg-elevated);
+  }
+
+  .dual-track-diagram__zone--stable { border-left: 3px solid var(--accent); }
+  .dual-track-diagram__zone--ref    { border-left: 3px solid #4f46e5; }
+  .dual-track-diagram__zone--ext    { border-left: 3px solid #d97706; }
+
+  :root[data-theme="dark"] .dual-track-diagram__zone--ref { border-left-color: #818cf8; }
+  :root[data-theme="dark"] .dual-track-diagram__zone--ext { border-left-color: #fbbf24; }
+
+  .dual-track-diagram__zone--specs  { border-left: 3px solid #7c3aed; }
+  .dual-track-diagram__zone--docs   { border-left: 3px solid #0ea5e9; }
+  .dual-track-diagram__zone--tasks  { border-left: 3px solid #10b981; }
+
+  :root[data-theme="dark"] .dual-track-diagram__zone--specs { border-left-color: #a78bfa; }
+  :root[data-theme="dark"] .dual-track-diagram__zone--docs  { border-left-color: #38bdf8; }
+  :root[data-theme="dark"] .dual-track-diagram__zone--tasks { border-left-color: #34d399; }
+
+  .dual-track-diagram__zone-label {
+    font-family: var(--font-mono);
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--fg);
+  }
+
+  .dual-track-diagram__zone-note {
+    font-size: 0.72rem;
+    color: var(--fg-soft);
+    line-height: 1.4;
+  }
+
+  .dual-track-diagram__arrow {
+    font-size: 0.7rem;
+    color: var(--fg-soft);
+    text-align: center;
+    padding: 0.15rem 0;
+    letter-spacing: 0.03em;
+  }
+
+  .dual-track-diagram__divider {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0 1rem;
+    color: var(--fg-soft);
+  }
+
+  .dual-track-diagram__divider-label {
+    font-size: 0.65rem;
+    font-weight: 600;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--fg-soft);
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
+    transform: rotate(180deg);
+  }
+
+  .dual-track-diagram__caption {
+    max-width: 56rem;
+    margin: 1rem auto 0;
+    font-size: 0.82rem;
+    color: var(--fg-soft);
+    text-align: center;
+    line-height: 1.55;
+  }
+
+  .dual-track-diagram__caption code {
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    color: var(--accent);
+    background: var(--accent-soft);
+    padding: 0.08rem 0.35rem;
+    border-radius: 0.22rem;
+  }
+</style>

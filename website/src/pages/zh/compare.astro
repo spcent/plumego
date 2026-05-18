@@ -6,6 +6,7 @@ import JourneyBar from '../../components/marketing/JourneyBar.astro';
 interface Framework {
   id: string;
   name: string;
+  url: string;
   tagline: string;
   handlerSig: string;
   stdlibHandler: boolean;
@@ -19,6 +20,8 @@ interface Framework {
   verdict: string;
   whenToChoose: string[];
   whenNotToChoose: string[];
+  migrationCost: 'low' | 'medium' | 'high' | 'n/a';
+  migrationNote: string;
   color: string;
   isPlumego?: boolean;
   warning?: string;
@@ -28,6 +31,7 @@ const frameworks: Framework[] = [
   {
     id: 'gin',
     name: 'Gin',
+    url: 'https://github.com/gin-gonic/gin',
     tagline: 'Martini 风格路由器，基数树路由',
     handlerSig: 'func(c *gin.Context)',
     stdlibHandler: false,
@@ -50,11 +54,14 @@ const frameworks: Framework[] = [
       '希望在代码评审里直接看到路由归属和中间件顺序，而不需要翻框架源码',
       '需要跨所有 handler 一致的结构化错误与响应封装',
     ],
+    migrationCost: 'medium',
+    migrationNote: '所有 handler 需要从 gin.Context 改写为 func(w, r)，中间件需要适配或替换。路由语法基本一致（/foo/:id 不变）。视 handler 数量，每个服务预计需要 1–3 天。',
     color: '#00b4d8',
   },
   {
     id: 'echo',
     name: 'Echo',
+    url: 'https://github.com/labstack/echo',
     tagline: '高性能极简 Web 框架',
     handlerSig: 'func(c echo.Context) error',
     stdlibHandler: false,
@@ -76,11 +83,14 @@ const frameworks: Framework[] = [
       '需要统一的 JSON 响应封装——Echo 把响应格式留给你自己决定',
       '需要跨多个团队共用一套规范服务骨架',
     ],
+    migrationCost: 'medium',
+    migrationNote: '需要把 handler 从 echo.Context + error return 改写为 func(w, r)。路由分组概念映射较直接。中间件需适配器。与 Gin 迁移工作量相当，约 1–3 天每个服务。',
     color: '#6c63ff',
   },
   {
     id: 'fiber',
     name: 'Fiber',
+    url: 'https://github.com/gofiber/fiber',
     tagline: 'Express 风格，基于 Fasthttp',
     handlerSig: 'func(c *fiber.Ctx) error',
     stdlibHandler: false,
@@ -102,12 +112,15 @@ const frameworks: Framework[] = [
       '使用基于 net/http 的可观测性、链路追踪或认证库',
       '团队以 Go 标准库为中心，期望标准库兼容性',
     ],
+    migrationCost: 'high',
+    migrationNote: '需要完全重写。Fasthttp 与 net/http 从根本上不兼容——handler 无法复用、中间件无法复用、测试基础设施无法复用。可观测性、认证和链路追踪库全部需要替换。预计以周计，而非天。',
     color: '#00d4aa',
     warning: 'Fiber 使用 Fasthttp，不是 net/http。与 Go 标准库 HTTP 生态完全不兼容。',
   },
   {
     id: 'chi',
     name: 'Chi',
+    url: 'https://github.com/go-chi/chi',
     tagline: '轻量惯用的 Go HTTP 服务路由器',
     handlerSig: 'func(w http.ResponseWriter, r *http.Request)',
     stdlibHandler: true,
@@ -129,11 +142,14 @@ const frameworks: Framework[] = [
       '需要快速上手的规范服务结构',
       '需要每个模块单独的成熟度信号',
     ],
+    migrationCost: 'low',
+    migrationNote: 'Handler 签名完全相同（stdlib func(w, r)）。路由语法略有差异：Chi 用 /foo/{id}，Plumego 用 /foo/:id。中间件完全兼容。大多数服务的迁移以小时计，而非天。',
     color: '#f59e0b',
   },
   {
     id: 'plumego',
     name: 'Plumego',
+    url: 'https://github.com/spcent/plumego',
     tagline: '显式 HTTP 工具包 — stdlib only，Agent 就绪，pre-v1',
     handlerSig: 'func(w http.ResponseWriter, r *http.Request)',
     stdlibHandler: true,
@@ -157,6 +173,8 @@ const frameworks: Framework[] = [
       '需要经过验证的 v1+ 版本和长期使用记录',
       '服务是小脚本或短生命周期工具，结构开销不划算',
     ],
+    migrationCost: 'n/a',
+    migrationNote: '这是目标框架，不是迁移来源。',
     isPlumego: true,
     color: 'var(--accent)',
   },
@@ -650,6 +668,37 @@ contract.<span class="hc-fn">WriteError</span>(w, r,
     </div>
   </section>
 
+  <!-- 迁移成本 -->
+  <section class="section">
+    <div class="section__intro">
+      <h2>迁移到 Plumego 的成本。</h2>
+      <p>
+        切换框架的决策不只是 API 人机工程学问题——还涉及 handler 改写、中间件替换和测试基础设施的调整。
+        下表对从各框架迁移到 Plumego 所需工作量给出诚实估算。
+      </p>
+    </div>
+    <div class="comparison-table" role="table" aria-label="从各框架迁移到 Plumego 的成本">
+      <div class="comparison-table__head" role="row">
+        <span role="columnheader">来源框架</span>
+        <span role="columnheader">成本</span>
+        <span role="columnheader">变化内容</span>
+      </div>
+      {frameworks.filter((fw) => !fw.isPlumego).map((fw) => (
+        <div class="comparison-table__row" role="row">
+          <strong role="cell">{fw.name}</strong>
+          <span role="cell">
+            <span class={`migration-badge migration-badge--${fw.migrationCost}`}>{fw.migrationCost}</span>
+          </span>
+          <span role="cell" class="migration-note">{fw.migrationNote}</span>
+        </div>
+      ))}
+    </div>
+    <p class="matrix-note">
+      迁移成本以现有 handler 和中间件的服务为基准。
+      从 <code>reference/standard-service</code> 全新搭建的服务没有迁移成本。
+    </p>
+  </section>
+
   <!-- CTA -->
   <section class="section section--cta">
     <div class="section__intro section__intro--cta">
@@ -666,6 +715,38 @@ contract.<span class="hc-fn">WriteError</span>(w, r,
 </MarketingLayout>
 
 <style>
+  /* ── 迁移成本徽章 ──────────────────────────────────────── */
+  .migration-badge {
+    display: inline-block;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    padding: 0.18rem 0.55rem;
+    border-radius: 0.28rem;
+    white-space: nowrap;
+  }
+  .migration-badge--low {
+    background: color-mix(in srgb, #22c55e 12%, var(--bg-elevated));
+    border: 1px solid color-mix(in srgb, #22c55e 30%, transparent);
+    color: #15803d;
+  }
+  :root[data-theme="dark"] .migration-badge--low { color: #4ade80; }
+  .migration-badge--medium {
+    background: color-mix(in srgb, #f59e0b 12%, var(--bg-elevated));
+    border: 1px solid color-mix(in srgb, #f59e0b 30%, transparent);
+    color: #b45309;
+  }
+  :root[data-theme="dark"] .migration-badge--medium { color: #fbbf24; }
+  .migration-badge--high {
+    background: color-mix(in srgb, #ef4444 12%, var(--bg-elevated));
+    border: 1px solid color-mix(in srgb, #ef4444 30%, transparent);
+    color: #b91c1c;
+  }
+  :root[data-theme="dark"] .migration-badge--high { color: #f87171; }
+  .migration-note { font-size: 0.83rem; color: var(--fg-soft); line-height: 1.55; }
+
+  /* ── Verdict cards ──────────────────────────────────────── */
   .verdict-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
