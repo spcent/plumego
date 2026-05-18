@@ -22,6 +22,9 @@ func (a *App) RegisterRoutes() error {
 	if err := a.Core.Post("/api/users", http.HandlerFunc(a.Users.Create)); err != nil {
 		return err
 	}
+	if err := a.Core.Post("/api/items", a.Items); err != nil {
+		return err
+	}
 	if err := a.Core.Put("/api/users/:id", http.HandlerFunc(a.Users.Update)); err != nil {
 		return err
 	}

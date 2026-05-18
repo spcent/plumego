@@ -94,6 +94,7 @@ layers:
   tooling:
     description: Developer tools, checks, and CLI.
     paths:
+      - benchmark
       - cmd
       - internal/checks
       - internal/testutil

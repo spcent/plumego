@@ -12,6 +12,7 @@ this scenario reference as wiring guidance, not as a compatibility claim.
 
 - normal explicit handlers and `x/rest` resource controllers in the same app
 - in-memory repository implementation with no external database
+- explicit `x/validate.Bind[T]` request validation with the playground adapter
 - visible route registration through `core.App`
 - standard `contract.WriteResponse` for app-local handlers
 
@@ -21,9 +22,11 @@ this scenario reference as wiring guidance, not as a compatibility claim.
 - `GET /api/users`
 - `GET /api/users/:id`
 - `POST /api/users`
+- `POST /api/items`
 
 ## Run
 
 ```bash
-go run ./reference/with-rest
+cd reference/with-rest
+go run .
 ```

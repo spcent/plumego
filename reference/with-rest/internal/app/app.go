@@ -12,7 +12,9 @@ import (
 	"github.com/spcent/plumego/middleware/requestid"
 	"github.com/spcent/plumego/reference/with-rest/internal/config"
 	"github.com/spcent/plumego/reference/with-rest/internal/domain/user"
+	"github.com/spcent/plumego/reference/with-rest/internal/handler"
 	"github.com/spcent/plumego/x/rest"
+	"github.com/spcent/plumego/x/validate/playground"
 )
 
 // App holds application-wide dependencies.
@@ -20,6 +22,7 @@ type App struct {
 	Core  *core.App
 	Cfg   config.Config
 	Users *rest.DBResourceController[user.User]
+	Items *handler.CreateItem
 }
 
 // New constructs the App with all dependencies wired explicitly.
@@ -40,6 +43,7 @@ func New(cfg config.Config) (*App, error) {
 		Core:  app,
 		Cfg:   cfg,
 		Users: users,
+		Items: handler.NewCreateItem(playground.NewValidator()),
 	}, nil
 }
 

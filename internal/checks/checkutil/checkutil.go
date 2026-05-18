@@ -39,6 +39,7 @@ var StableRoots = []string{
 }
 
 var allowedTopLevelDirs = []string{
+	"benchmark",
 	"cmd",
 	"contract",
 	"core",

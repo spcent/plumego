@@ -3,7 +3,7 @@
 Milestone: M-012
 Recipe: specs/change-recipes/update-docs.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: reference/with-rest
 Owned Files:
 - `reference/with-rest/internal/handler/create_item.go`
@@ -49,4 +49,16 @@ Done Definition:
 - reference/with-rest builds without errors.
 
 Outcome:
--
+- Added a validated `POST /api/items` reference handler using
+  `x/validate.Bind[CreateItemRequest]` and an injected
+  `playground.NewValidator()`.
+- Created `reference/with-rest/go.mod` so the reference app can depend on the
+  separately versioned `x/validate/playground` module without touching the main
+  module.
+- Added handler tests for valid create requests, missing required field
+  structured errors, and malformed JSON.
+- Updated the with-rest README feature list, route list, and run command for
+  the nested module layout.
+- Validation passed with reference `go build`, reference `go test`, reference
+  `go vet`, checkutil tests, dependency-rules, module-manifests,
+  agent-workflow, reference-layout, and `git diff --check`.
