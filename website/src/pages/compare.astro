@@ -2,6 +2,8 @@
 import MarketingLayout from '../layouts/MarketingLayout.astro';
 import PageHero from '../components/marketing/PageHero.astro';
 import JourneyBar from '../components/marketing/JourneyBar.astro';
+import CheckIcon from '../components/shared/CheckIcon.astro';
+import CautionIcon from '../components/shared/CautionIcon.astro';
 
 // ── Framework data ──────────────────────────────────────────────────────────
 
@@ -543,15 +545,11 @@ contract.<span class="hc-fn">WriteError</span>(w, r,
       <div class="comparison-table__head" role="row">
         <span role="columnheader">Framework</span>
         <span role="columnheader">
-          <svg class="comparison-cell-icon comparison-cell-icon--fit" width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-            <path d="M3 8l3.5 3.5L13 4" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
+          <CheckIcon size={12} class="comparison-cell-icon comparison-cell-icon--fit" />
           Choose when
         </span>
         <span role="columnheader">
-          <svg class="comparison-cell-icon comparison-cell-icon--caution" width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-            <path d="M8 3v6M8 11.5v1" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
-          </svg>
+          <CautionIcon size={12} class="comparison-cell-icon comparison-cell-icon--caution" />
           Pause when
         </span>
       </div>
@@ -569,9 +567,7 @@ contract.<span class="hc-fn">WriteError</span>(w, r,
           <ul class="fw-points" role="cell">
             {fw.whenToChoose.map((point) => (
               <li>
-                <svg class="comparison-cell-icon comparison-cell-icon--fit" width="11" height="11" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                  <path d="M3 8l3.5 3.5L13 4" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-                </svg>
+                <CheckIcon size={11} class="comparison-cell-icon comparison-cell-icon--fit" />
                 {point}
               </li>
             ))}
@@ -579,9 +575,7 @@ contract.<span class="hc-fn">WriteError</span>(w, r,
           <ul class="fw-points" role="cell">
             {fw.whenNotToChoose.map((point) => (
               <li>
-                <svg class="comparison-cell-icon comparison-cell-icon--caution" width="11" height="11" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                  <path d="M8 3v6M8 11.5v1" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
-                </svg>
+                <CautionIcon size={11} class="comparison-cell-icon comparison-cell-icon--caution" />
                 {point}
               </li>
             ))}
@@ -603,9 +597,7 @@ contract.<span class="hc-fn">WriteError</span>(w, r,
     <div class="control-grid">
       <article class="control-grid__item">
         <p class="signal-list__kicker">
-          <svg class="comparison-cell-icon comparison-cell-icon--caution" width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-            <path d="M8 3v6M8 11.5v1" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
-          </svg>
+          <CautionIcon size={13} class="comparison-cell-icon comparison-cell-icon--caution" />
           convention-first teams
         </p>
         <h3>You want the framework to manage structure for you</h3>
@@ -617,9 +609,7 @@ contract.<span class="hc-fn">WriteError</span>(w, r,
       </article>
       <article class="control-grid__item">
         <p class="signal-list__kicker">
-          <svg class="comparison-cell-icon comparison-cell-icon--caution" width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-            <path d="M8 3v6M8 11.5v1" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
-          </svg>
+          <CautionIcon size={13} class="comparison-cell-icon comparison-cell-icon--caution" />
           existing large codebase
         </p>
         <h3>Your team already has a large Gin/Echo service</h3>
@@ -631,9 +621,7 @@ contract.<span class="hc-fn">WriteError</span>(w, r,
       </article>
       <article class="control-grid__item">
         <p class="signal-list__kicker">
-          <svg class="comparison-cell-icon comparison-cell-icon--caution" width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-            <path d="M8 3v6M8 11.5v1" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
-          </svg>
+          <CautionIcon size={13} class="comparison-cell-icon comparison-cell-icon--caution" />
           maximum throughput
         </p>
         <h3>Raw HTTP throughput is your primary bottleneck</h3>
@@ -645,9 +633,7 @@ contract.<span class="hc-fn">WriteError</span>(w, r,
       </article>
       <article class="control-grid__item">
         <p class="signal-list__kicker">
-          <svg class="comparison-cell-icon comparison-cell-icon--caution" width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-            <path d="M8 3v6M8 11.5v1" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
-          </svg>
+          <CautionIcon size={13} class="comparison-cell-icon comparison-cell-icon--caution" />
           long production track record required
         </p>
         <h3>You need a proven v1+ track record</h3>

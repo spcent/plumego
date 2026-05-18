@@ -3,6 +3,7 @@ import MarketingLayout from '../layouts/MarketingLayout.astro';
 import PageHero from '../components/marketing/PageHero.astro';
 import JourneyBar from '../components/marketing/JourneyBar.astro';
 import LayerDiagram from '../components/marketing/LayerDiagram.astro';
+import ArchitectureDiagram from '../components/marketing/ArchitectureDiagram.astro';
 import RequestFlowViz from '../components/marketing/RequestFlowViz.astro';
 import { ARCHITECTURE_COPY } from '../data/site';
 import { MODULE_FACTS } from '../generated/modules';
@@ -210,6 +211,17 @@ const repositorySignals = [
         </article>
       ))}
     </div>
+  </section>
+
+  <!-- Architecture SVG diagram (comprehensive) -->
+  <section class="section">
+    <div class="section__intro">
+      <h2>Three layers + control plane — the complete picture.</h2>
+      <p>
+        Every Plumego service sits at the intersection of three module layers and a machine-readable control plane. The diagram below shows the full structure, import direction, and how <code>specs/</code> governs what changes are allowed.
+      </p>
+    </div>
+    <ArchitectureDiagram locale="en" />
   </section>
 
   <!-- Three-zone architecture diagram -->

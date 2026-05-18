@@ -3,6 +3,7 @@ import MarketingLayout from '../../layouts/MarketingLayout.astro';
 import PageHero from '../../components/marketing/PageHero.astro';
 import JourneyBar from '../../components/marketing/JourneyBar.astro';
 import LayerDiagram from '../../components/marketing/LayerDiagram.astro';
+import ArchitectureDiagram from '../../components/marketing/ArchitectureDiagram.astro';
 import RequestFlowViz from '../../components/marketing/RequestFlowViz.astro';
 import { ARCHITECTURE_COPY } from '../../data/site';
 import { MODULE_FACTS } from '../../generated/modules';
@@ -209,6 +210,17 @@ const repositorySignals = [
         </article>
       ))}
     </div>
+  </section>
+
+  <!-- 架构 SVG 完整图 -->
+  <section class="section">
+    <div class="section__intro">
+      <h2>三层 + 控制面——完整架构全貌。</h2>
+      <p>
+        每个 Plumego 服务处于三个模块层与机器可读控制面的交叉点。下图展示了完整结构、导入方向，以及 <code>specs/</code> 如何规范允许哪些变更。
+      </p>
+    </div>
+    <ArchitectureDiagram locale="zh" />
   </section>
 
   <section class="section section--tinted">

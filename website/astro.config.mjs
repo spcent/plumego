@@ -162,6 +162,7 @@ export default defineConfig({
                 { label: 'Integrate AI', slug: 'docs/guides/integrate-ai', translations: { 'zh-CN': '集成 AI' } },
                 { label: 'Multi-tenancy', slug: 'docs/guides/multi-tenancy', translations: { 'zh-CN': '多租户' } },
                 { label: 'Migration & Upgrades', slug: 'docs/guides/migration-and-upgrades', translations: { 'zh-CN': '迁移与升级' } },
+                { label: 'Migrate from Gin/Echo', slug: 'docs/guides/migrate-from-gin-echo', translations: { 'zh-CN': '从 Gin/Echo 迁移' } },
               ],
             },
             {

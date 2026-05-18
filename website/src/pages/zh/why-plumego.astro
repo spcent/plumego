@@ -2,30 +2,14 @@
 import PageHero from '../../components/marketing/PageHero.astro';
 import JourneyBar from '../../components/marketing/JourneyBar.astro';
 import MarketingLayout from '../../layouts/MarketingLayout.astro';
+import CheckIcon from '../../components/shared/CheckIcon.astro';
+import CautionIcon from '../../components/shared/CautionIcon.astro';
 
 const journeySteps = [
   { label: '为什么选择', href: '/zh/why-plumego' },
   { label: '示例', href: '/zh/examples' },
   { label: '状态', href: '/zh/status' },
 ];
-
-const guideCards = [
-  {
-    kicker: 'explicit wiring',
-    title: 'Plumego 适合那些希望服务结构在代码库增长后依然可读的团队',
-    body: '真正的价值在团队变大之后才会显现：路由注册、中间件顺序与依赖注入都写在代码里——评审一次改动就是阅读代码本身，而不是追踪框架约定。',
-  },
-  {
-    kicker: 'shared baseline',
-    title: '当多个服务需要共用一套默认结构时，它会更有价值',
-    body: '如果新服务应该从同一份可读的参考结构起步，而不是让每个团队各写一套启动逻辑，Plumego 提供的基线就能方便地交接和扩展，而不会逐渐偏离成各自的模式。',
-  },
-  {
-    kicker: '清晰的成熟度信号',
-    title: '当你需要在采用前区分稳定与实验时，它最有说服力',
-    body: '稳定模块与实验性能力被刻意分开，采用决策可以基于今天真正生产就绪的内容——而不仅仅是某个包已经存在于仓库。',
-  },
-] as const;
 
 const fitChecks = [
   {
@@ -305,7 +289,10 @@ const frameworkRows = [
     <div class="page-grid">
       {fitProfiles.map((item) => (
         <article class="page-panel page-panel--fit">
-          <p class="signal-list__kicker">{item.kicker}</p>
+          <p class="signal-list__kicker">
+            <CheckIcon class="comparison-cell-icon comparison-cell-icon--fit" size={13} />
+            {item.kicker}
+          </p>
           <h2>{item.title}</h2>
           <p>{item.body}</p>
           <ul>
@@ -399,14 +386,26 @@ const frameworkRows = [
     <div class="comparison-table" role="table" aria-label="Plumego 采用判断的适配信号与谨慎信号对照">
       <div class="comparison-table__head" role="row">
         <span role="columnheader">信号</span>
-        <span role="columnheader">适合</span>
-        <span role="columnheader">先放慢</span>
+        <span role="columnheader">
+          <CheckIcon class="comparison-cell-icon comparison-cell-icon--fit" size={13} />
+          适合
+        </span>
+        <span role="columnheader">
+          <CautionIcon class="comparison-cell-icon comparison-cell-icon--caution" size={13} />
+          先放慢
+        </span>
       </div>
       {teamRows.map((row) => (
         <div class="comparison-table__row" role="row">
           <strong role="cell">{row.signal}</strong>
-          <span role="cell">{row.fit}</span>
-          <span role="cell">{row.caution}</span>
+          <span role="cell">
+            <CheckIcon class="comparison-cell-icon comparison-cell-icon--fit" size={12} />
+            {row.fit}
+          </span>
+          <span role="cell">
+            <CautionIcon class="comparison-cell-icon comparison-cell-icon--caution" size={12} />
+            {row.caution}
+          </span>
         </div>
       ))}
     </div>
@@ -459,7 +458,10 @@ const frameworkRows = [
     <div class="control-grid">
       {cautionProfiles.map((item) => (
         <article class="page-panel page-panel--dense page-panel--caution">
-          <p class="signal-list__kicker">{item.kicker}</p>
+          <p class="signal-list__kicker">
+            <CautionIcon class="comparison-cell-icon comparison-cell-icon--caution" size={13} />
+            {item.kicker}
+          </p>
           <h3>{item.title}</h3>
           <p>{item.body}</p>
         </article>

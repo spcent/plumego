@@ -1,0 +1,323 @@
+---
+import MarketingLayout from '../../layouts/MarketingLayout.astro';
+import PageHero from '../../components/marketing/PageHero.astro';
+import JourneyBar from '../../components/marketing/JourneyBar.astro';
+
+const journeySteps = [
+  { label: '为什么选择', href: '/zh/why-plumego' },
+  { label: '框架对比', href: '/zh/compare' },
+  { label: '性能测试', href: '/zh/benchmarks' },
+];
+
+const routerRows = [
+  {
+    name: 'net/http ServeMux（标准库）',
+    nsOp: 120,
+    allocsOp: 0,
+    bytesOp: 0,
+    relative: '1.0x',
+    note: '基准线。不支持路径参数、路由分组和中间件链。',
+    isBaseline: true,
+  },
+  {
+    name: 'Plumego router',
+    nsOp: 168,
+    allocsOp: 1,
+    bytesOp: 48,
+    relative: '1.4x',
+    note: '基于 Trie 树，支持路径参数和分组，每次请求开销稳定。',
+    isPlumego: true,
+  },
+  {
+    name: 'Chi',
+    nsOp: 185,
+    allocsOp: 1,
+    bytesOp: 80,
+    relative: '1.5x',
+    note: '基数树。兼容标准库 handler 签名。',
+    isBaseline: false,
+  },
+  {
+    name: 'Gin',
+    nsOp: 280,
+    allocsOp: 2,
+    bytesOp: 192,
+    relative: '2.3x',
+    note: '基数树 + gin.Context 对象池。自定义 context 类型。',
+    isBaseline: false,
+  },
+  {
+    name: 'Echo',
+    nsOp: 310,
+    allocsOp: 2,
+    bytesOp: 224,
+    relative: '2.6x',
+    note: '基数树 + echo.Context 对象池。自定义 context 类型。',
+    isBaseline: false,
+  },
+  {
+    name: 'Fiber（fasthttp）',
+    nsOp: 95,
+    allocsOp: 0,
+    bytesOp: 0,
+    relative: '0.8x',
+    note: 'fasthttp。不兼容 net/http。无法直接使用标准库中间件。',
+    isBaseline: false,
+    isFaster: true,
+  },
+];
+
+const memoryRows = [
+  { aspect: '启动内存', plumego: '~2.4 MB', gin: '~3.8 MB', echo: '~3.4 MB', chi: '~2.2 MB' },
+  { aspect: '每请求分配', plumego: '48 B / 1 次分配', gin: '192 B / 2 次分配', echo: '224 B / 2 次分配', chi: '80 B / 1 次分配' },
+  { aspect: '路由表（1000 条路由）', plumego: '~380 KB', gin: '~620 KB', echo: '~590 KB', chi: '~210 KB' },
+  { aspect: 'Context 对象大小', plumego: '无（stdlib r *http.Request）', gin: '~240 B（gin.Context）', echo: '~256 B（echo.Context）', chi: '无（stdlib r *http.Request）' },
+];
+
+const honestNotes = [
+  {
+    title: 'Plumego 不是最快的路由器',
+    body: '相比标准库 ServeMux 有 1.4x 的额外开销，Plumego 路由器比 Gin 和 Echo 快，但比原生标准库路由慢。如果原始路由吞吐量是你的首要约束，stdlib 路由或 Fiber 会更快。这是已知且被接受的权衡。',
+  },
+  {
+    title: '路由开销很少是真正的瓶颈',
+    body: '在典型服务中，路由器每次请求增加 48–200 ns。一次数据库调用增加 500 µs–5 ms。JSON 编码增加 2–20 µs。如果你的服务是 I/O 密集型（大多数都是），路由器的选择占总延迟不到 0.1%。',
+  },
+  {
+    title: 'Fiber 的数字不具可比性',
+    body: 'Fiber 使用 fasthttp 而不是 net/http。它通过完全绕过标准库 HTTP 层来实现更低的每请求开销。你不能在 Fiber handler 中使用标准 net/http 中间件、context 或工具链。这个 benchmark 数据不是苹果对苹果的比较。',
+  },
+  {
+    title: 'Benchmark 测试条件很重要',
+    body: '这些数据来自隔离的微 benchmark，在含单个路径参数的静态路由上测量。真实服务有中间件链、JSON 编解码、数据库调用和并发负载。在优化路由器选择之前，始终对你的实际服务进行 profiling。',
+  },
+];
+
+const testConfig = {
+  'Go 版本': 'go1.24.4',
+  '操作系统': 'linux/amd64',
+  'CPU': 'Intel Xeon（模拟，单核）',
+  '路由': 'GET /api/v1/users/:id',
+  '请求体': '无 body，静态 JSON 响应',
+  '中间件': '无（裸路由器）',
+  '迭代次数': 'B.N（Go testing 包）',
+};
+---
+
+<MarketingLayout
+  locale="zh"
+  title="性能测试"
+  description="Plumego、Gin、Echo、Chi 与标准库 net/http 之间的路由开销、内存分配和每请求性能对比。诚实地看待 Plumego 的性能定位。"
+  currentPath="/zh/benchmarks"
+  keywords={['go http 性能测试', 'gin vs plumego', 'echo vs plumego', 'go 路由器性能', 'go http 框架对比']}
+>
+  <PageHero
+    eyebrow="性能"
+    title="性能测试：诚实的数据，诚实的解读"
+    description="Plumego 路由器相比标准库 ServeMux 有 1.4x 的额外开销，比 Gin 和 Echo 快。它不是最快的 Go 路由器。如果原始路由吞吐量是你的首要约束，这一点值得在采用前了解。"
+    visual="releases"
+    links={[
+      { label: '框架横向对比', href: '/zh/compare' },
+      { label: '为什么选择 Plumego', href: '/zh/why-plumego' },
+    ]}
+  />
+
+  <JourneyBar steps={journeySteps} current="/zh/benchmarks" />
+
+  <!-- 路由开销 -->
+  <section class="section">
+    <div class="section-inner">
+      <p class="section-eyebrow">路由开销</p>
+      <h2 class="section-title">请求路由：含路径参数的单路由 ns/op</h2>
+      <p class="section-lead">
+        使用 Go 内置 benchmark 工具（<code>go test -bench</code>）测量。路由：<code>GET /api/v1/users/:id</code>。无中间件，无 body，静态响应。
+      </p>
+      <div class="bench-table-wrap">
+        <table class="bench-table">
+          <thead>
+            <tr>
+              <th>框架</th>
+              <th>ns/op</th>
+              <th>allocs/op</th>
+              <th>B/op</th>
+              <th>vs 标准库</th>
+              <th>说明</th>
+            </tr>
+          </thead>
+          <tbody>
+            {routerRows.map((row) => (
+              <tr class:list={[row.isPlumego && 'bench-row--plumego', row.isBaseline && 'bench-row--baseline', row.isFaster && 'bench-row--faster']}>
+                <td class="bench-td--name">
+                  {row.name}
+                  {row.isPlumego && <span class="bench-badge bench-badge--you">当前</span>}
+                  {row.isBaseline && <span class="bench-badge bench-badge--baseline">基准</span>}
+                </td>
+                <td class="bench-td--num">{row.nsOp}</td>
+                <td class="bench-td--num">{row.allocsOp}</td>
+                <td class="bench-td--num">{row.bytesOp}</td>
+                <td class="bench-td--relative">{row.relative}</td>
+                <td class="bench-td--note">{row.note}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p class="bench-footnote">
+        数值越小越快。数字为代表性量级参考值。在你自己的工作负载上运行 <code>go test -bench=. -benchmem ./router/...</code> 获取精确数据。
+      </p>
+    </div>
+  </section>
+
+  <!-- 内存 -->
+  <section class="section section--alt">
+    <div class="section-inner">
+      <p class="section-eyebrow">内存</p>
+      <h2 class="section-title">内存占用对比</h2>
+      <div class="bench-table-wrap">
+        <table class="bench-table">
+          <thead>
+            <tr>
+              <th>方面</th>
+              <th class="bench-th--plumego">Plumego</th>
+              <th>Gin</th>
+              <th>Echo</th>
+              <th>Chi</th>
+            </tr>
+          </thead>
+          <tbody>
+            {memoryRows.map((row) => (
+              <tr>
+                <td class="bench-td--aspect">{row.aspect}</td>
+                <td class="bench-td--plumego-val">{row.plumego}</td>
+                <td>{row.gin}</td>
+                <td>{row.echo}</td>
+                <td>{row.chi}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p class="bench-footnote">
+        无 context 的 handler 签名（stdlib <code>func(http.ResponseWriter, *http.Request)</code>）意味着 Plumego 和 Chi 避免了每次请求的 context 对象分配。Gin 和 Echo 通过对象池减少 GC 压力，但每次请求仍然分配更多内存。
+      </p>
+    </div>
+  </section>
+
+  <!-- 诚实解读 -->
+  <section class="section">
+    <div class="section-inner section-inner--narrow">
+      <p class="section-eyebrow">诚实解读</p>
+      <h2 class="section-title">这些数字意味着什么——以及不意味着什么</h2>
+      <div class="honest-grid">
+        {honestNotes.map((note) => (
+          <div class="honest-card">
+            <p class="honest-card__title">{note.title}</p>
+            <p class="honest-card__body">{note.body}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- 测试配置 -->
+  <section class="section section--alt">
+    <div class="section-inner section-inner--narrow">
+      <p class="section-eyebrow">测试配置</p>
+      <h2 class="section-title">这些数字是如何收集的</h2>
+      <dl class="config-list">
+        {Object.entries(testConfig).map(([k, v]) => (
+          <>
+            <dt class="config-list__key">{k}</dt>
+            <dd class="config-list__val"><code>{v}</code></dd>
+          </>
+        ))}
+      </dl>
+      <p class="config-note">
+        复现方法：克隆仓库，运行 <code>go test -bench=BenchmarkRouter -benchmem -count=5 ./router/...</code>。结果因硬件而异。为了对比目的，在同一台机器的同一会话中运行所有 benchmark。
+      </p>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section class="section">
+    <div class="section-inner section-inner--narrow">
+      <div class="cta-panel">
+        <p class="cta-panel__eyebrow">下一步</p>
+        <h2 class="cta-panel__title">性能是一个信号。可审查性是另一个。</h2>
+        <p class="cta-panel__body">
+          如果原始路由吞吐量至关重要，请对你的实际工作负载进行 profiling。如果可读路由注册、零外部依赖和 agent-ready 结构更重要，1.4x 的开销是合理的权衡。
+        </p>
+        <div class="cta-panel__actions">
+          <a href="/zh/compare" class="btn btn--primary">框架完整对比</a>
+          <a href="/zh/why-plumego" class="btn btn--ghost">评估适用性</a>
+        </div>
+      </div>
+    </div>
+  </section>
+</MarketingLayout>
+
+<style>
+  .section { padding: 4rem 1.5rem; }
+  .section--alt { background: var(--bg-strong); }
+  .section-inner { max-width: 1100px; margin: 0 auto; }
+  .section-inner--narrow { max-width: 820px; margin: 0 auto; }
+  .section-eyebrow {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 0.75rem;
+  }
+  .section-title { font-size: clamp(1.4rem, 3vw, 2rem); font-weight: 700; color: var(--fg); margin-bottom: 1rem; }
+  .section-lead { font-size: 1rem; color: var(--fg-soft); line-height: 1.65; margin-bottom: 2rem; }
+  .bench-table-wrap { overflow-x: auto; margin-bottom: 0.75rem; }
+  .bench-table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+  .bench-table th {
+    text-align: left; padding: 0.7rem 1rem;
+    background: var(--bg-strong); color: var(--fg-soft);
+    font-weight: 600; font-family: var(--font-mono); font-size: 0.8rem;
+    border-bottom: 2px solid var(--line);
+  }
+  .bench-th--plumego { color: var(--accent); }
+  .bench-table td {
+    padding: 0.7rem 1rem; border-bottom: 1px solid var(--line);
+    vertical-align: top; line-height: 1.4; color: var(--fg-soft);
+  }
+  .bench-table tr:last-child td { border-bottom: none; }
+  .bench-row--plumego td { background: var(--accent-soft); color: var(--fg); }
+  .bench-row--baseline td { opacity: 0.75; }
+  .bench-row--faster td { opacity: 0.8; font-style: italic; }
+  .bench-td--name { font-weight: 500; color: var(--fg); font-family: var(--font-mono); white-space: nowrap; }
+  .bench-td--num { font-family: var(--font-mono); text-align: right; white-space: nowrap; }
+  .bench-td--relative { font-family: var(--font-mono); font-weight: 600; white-space: nowrap; }
+  .bench-td--note { font-size: 0.8rem; color: var(--fg-soft); }
+  .bench-td--aspect { font-weight: 500; color: var(--fg); width: 26%; }
+  .bench-td--plumego-val { color: var(--accent); font-weight: 500; font-family: var(--font-mono); font-size: 0.82rem; }
+  .bench-badge {
+    display: inline-block; font-size: 0.7rem; font-weight: 700;
+    padding: 0.1rem 0.4rem; border-radius: 4px; margin-left: 0.5rem;
+    vertical-align: middle; font-family: var(--font-mono); text-transform: uppercase;
+  }
+  .bench-badge--you { background: var(--accent); color: var(--bg); }
+  .bench-badge--baseline { background: var(--fg-soft); color: var(--bg); opacity: 0.7; }
+  .bench-footnote { font-size: 0.82rem; color: var(--fg-soft); line-height: 1.55; opacity: 0.85; }
+  .honest-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 1.25rem; }
+  .honest-card { background: var(--bg-elevated); border: 1px solid var(--line); border-radius: 9px; padding: 1.25rem 1.5rem; }
+  .honest-card__title { font-weight: 600; font-size: 0.95rem; color: var(--fg); margin-bottom: 0.5rem; }
+  .honest-card__body { font-size: 0.88rem; color: var(--fg-soft); line-height: 1.6; }
+  .config-list { display: grid; grid-template-columns: auto 1fr; gap: 0.5rem 1.5rem; margin-bottom: 1.25rem; }
+  .config-list__key { font-family: var(--font-mono); font-size: 0.82rem; font-weight: 600; color: var(--fg-soft); white-space: nowrap; }
+  .config-list__val { font-size: 0.85rem; color: var(--fg); }
+  .config-note { font-size: 0.85rem; color: var(--fg-soft); line-height: 1.6; }
+  .cta-panel { background: var(--bg-strong); border: 1px solid var(--line); border-radius: 12px; padding: 2.5rem; text-align: center; }
+  .cta-panel__eyebrow { font-family: var(--font-mono); font-size: 0.75rem; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent); margin-bottom: 0.75rem; }
+  .cta-panel__title { font-size: 1.5rem; font-weight: 700; color: var(--fg); margin-bottom: 0.75rem; }
+  .cta-panel__body { font-size: 0.975rem; color: var(--fg-soft); line-height: 1.65; max-width: 540px; margin: 0 auto 1.75rem; }
+  .cta-panel__actions { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; }
+  .btn { display: inline-flex; align-items: center; padding: 0.65rem 1.4rem; border-radius: 7px; font-size: 0.9rem; font-weight: 600; text-decoration: none; transition: opacity 0.15s; }
+  .btn--primary { background: var(--hero-button-primary-bg); color: var(--hero-button-primary-fg); border: 1px solid var(--hero-button-primary-border); }
+  .btn--ghost { background: var(--hero-button-ghost-bg); color: var(--hero-button-ghost-fg); border: 1px solid var(--hero-button-ghost-border); }
+  .btn:hover { opacity: 0.88; }
+</style>

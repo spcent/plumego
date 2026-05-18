@@ -1,0 +1,356 @@
+---
+import type { Locale } from '../../lib/locales';
+
+interface Props {
+  locale?: Locale;
+}
+
+const { locale = 'en' } = Astro.props;
+
+const copy: Record<Locale, {
+  aria: string; appTitle: string; appSub: string; appHint: string;
+  extTitle: string; betaLabel: string; expLabel: string; expMore: string;
+  expBadgeW: number; expBadgeCx: number;
+  stableTitle: string; stableSub: string; cpTitle: string;
+  cpItems: { label: string; desc: string }[];
+  arrow1: string; arrow2: string; blocked: string;
+}> = {
+  en: {
+    aria: 'Plumego three-layer architecture: app layer, extension families, stable roots, and control plane',
+    appTitle: 'YOUR APPLICATION',
+    appSub: 'reference/standard-service  ·  internal/app/  ·  cmd/myservice',
+    appHint: 'explicit wiring in internal/app/routes.go',
+    extTitle: 'EXTENSION FAMILIES (x/*)',
+    betaLabel: 'BETA',
+    expLabel: 'EXPERIMENTAL',
+    expBadgeW: 106,
+    expBadgeCx: 83,
+    expMore: '+ 10 more families',
+    stableTitle: 'STABLE ROOTS',
+    stableSub: '9 modules · v1 GA · zero external deps · stdlib-only kernel',
+    cpTitle: 'CONTROL PLANE',
+    cpItems: [
+      { label: 'specs/', desc: 'dependency rules · task routing · change recipes' },
+      { label: 'docs/', desc: 'module primers · concept guides' },
+      { label: 'tasks/', desc: 'milestones · task cards' },
+      { label: 'module.yaml', desc: 'local scope · allowed imports · validation' },
+    ],
+    arrow1: 'app imports from extensions and stable roots',
+    arrow2: 'x/* imports stable roots (not vice versa)',
+    blocked: 'stable → x/* blocked',
+  },
+  zh: {
+    aria: 'Plumego 三层架构图：应用层、扩展家族、稳定根与控制面',
+    appTitle: '你的应用',
+    appSub: 'reference/standard-service  ·  internal/app/  ·  cmd/myservice',
+    appHint: '显式路由注册在 internal/app/routes.go',
+    extTitle: '扩展家族 (x/*)',
+    betaLabel: 'BETA',
+    expLabel: '实验性',
+    expBadgeW: 70,
+    expBadgeCx: 65,
+    expMore: '+ 10 个更多',
+    stableTitle: '稳定根',
+    stableSub: '9 个模块 · v1 GA · 零外部依赖 · stdlib-only 内核',
+    cpTitle: '控制面',
+    cpItems: [
+      { label: 'specs/', desc: '依赖规则 · 任务路由 · 变更配方' },
+      { label: 'docs/', desc: '模块手册 · 概念指南' },
+      { label: 'tasks/', desc: '里程碑 · 任务卡片' },
+      { label: 'module.yaml', desc: '本地作用域 · 允许导入 · 验证规则' },
+    ],
+    arrow1: '应用层可导入扩展与稳定根',
+    arrow2: 'x/* 可导入稳定根',
+    blocked: '稳定根 → x/* 禁止',
+  },
+};
+
+const labels = copy[locale];
+
+const betaModules = ['x/rest', 'x/gateway', 'x/websocket', 'x/observability'];
+const expModules = ['x/ai', 'x/tenant', 'x/data', 'x/resilience', 'x/messaging', 'x/frontend'];
+const stableRow1 = ['core', 'router', 'contract', 'middleware', 'security'];
+const stableRow2 = ['store', 'health', 'log', 'metrics'];
+
+// Chip layout helpers
+const CHIP_H = 24;
+const CHIP_R = 5;
+const CHIP_GAP = 8;
+const CHIP_PX = 12; // horizontal padding per side
+
+function chipWidth(text: string): number {
+  // approximate: ~7.2px per char at 11px mono + 2*CHIP_PX
+  return Math.max(52, Math.round(text.length * 7.2) + CHIP_PX * 2);
+}
+
+interface Chip { x: number; w: number; label: string }
+function chipRow(modules: string[], startX: number): Chip[] {
+  const chips: Chip[] = [];
+  let x = startX;
+  for (const m of modules) {
+    const w = chipWidth(m);
+    chips.push({ x, w, label: m });
+    x += w + CHIP_GAP;
+  }
+  return chips;
+}
+
+const betaChips = chipRow(betaModules, 92);
+const expChips  = chipRow(expModules,  30);
+const stableChips1 = chipRow(stableRow1, 30);
+const stableChips2 = chipRow(stableRow2, 30);
+
+// Zone Y coordinates
+const APP_Y     = 15;
+const APP_H     = 86;
+const ARROW1_Y  = APP_Y + APP_H;       // 101
+const EXT_Y     = ARROW1_Y + 42;       // 143
+const EXT_H     = 168;
+const ARROW2_Y  = EXT_Y + EXT_H;       // 311
+const STABLE_Y  = ARROW2_Y + 42;       // 353
+const STABLE_H  = 138;
+const DIAGRAM_W = 724;
+const CP_X      = DIAGRAM_W + 31;      // 755
+const CP_W      = 194;
+const CP_H      = STABLE_Y + STABLE_H - APP_Y; // total height match
+const SVG_H     = STABLE_Y + STABLE_H + 15;    // 506
+---
+
+<div class="arch-diag" role="img" aria-label={labels.aria}>
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox={`0 0 960 ${SVG_H}`}
+    class="arch-diag__svg"
+    aria-hidden="true"
+  >
+    <defs>
+      <!-- Arrow marker (pointing down) -->
+      <marker id="adArrow" markerWidth="8" markerHeight="8" refX="4" refY="7" orient="auto">
+        <path d="M1,1 L4,7 L7,1" fill="none" stroke="var(--fg-soft)" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+      </marker>
+      <!-- Blocked marker (X) -->
+      <marker id="adBlock" markerWidth="10" markerHeight="10" refX="5" refY="5" orient="auto">
+        <line x1="2" y1="2" x2="8" y2="8" stroke="var(--fg-soft)" stroke-width="1.4" opacity="0.45"/>
+        <line x1="8" y1="2" x2="2" y2="8" stroke="var(--fg-soft)" stroke-width="1.4" opacity="0.45"/>
+      </marker>
+    </defs>
+
+    <!-- ── APP ZONE ──────────────────────────────────────────────────── -->
+    <rect
+      x="15" y={APP_Y} width={DIAGRAM_W} height={APP_H} rx="9"
+      fill="var(--bg-strong)" stroke="var(--line)" stroke-width="1"
+    />
+    <!-- dashed overlay to signal "your code" -->
+    <rect
+      x="15" y={APP_Y} width={DIAGRAM_W} height={APP_H} rx="9"
+      fill="none" stroke="var(--fg-soft)" stroke-width="1"
+      stroke-dasharray="5 4" opacity="0.22"
+    />
+    <text x="32" y={APP_Y + 26} font-family="var(--font-mono)" font-size="10" font-weight="600"
+      letter-spacing="0.10em" fill="var(--fg)" opacity="0.7">{labels.appTitle}</text>
+    <text x="32" y={APP_Y + 46} font-family="var(--font-mono)" font-size="10.5" fill="var(--fg-soft)">{labels.appSub}</text>
+    <!-- hint badge on right -->
+    <rect x={DIAGRAM_W - 226} y={APP_Y + 58} width="218" height="20" rx="4"
+      fill="var(--accent-soft)" />
+    <text x={DIAGRAM_W - 218} y={APP_Y + 72} font-family="var(--font-mono)" font-size="10"
+      fill="var(--accent)" font-weight="500">{labels.appHint}</text>
+
+    <!-- ── ARROW 1: App → Extensions ────────────────────────────────── -->
+    <line
+      x1="375" y1={ARROW1_Y + 6}
+      x2="375" y2={EXT_Y - 7}
+      stroke="var(--fg-soft)" stroke-width="1.4"
+      marker-end="url(#adArrow)"
+    />
+    <text x="387" y={ARROW1_Y + 24}
+      font-family="var(--font-sans)" font-size="10" fill="var(--fg-soft)">{labels.arrow1}</text>
+
+    <!-- ── EXTENSION ZONE ─────────────────────────────────────────────── -->
+    <rect
+      x="15" y={EXT_Y} width={DIAGRAM_W} height={EXT_H} rx="9"
+      fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1" opacity="0.95"
+    />
+    <text x="32" y={EXT_Y + 24} font-family="var(--font-mono)" font-size="10" font-weight="600"
+      letter-spacing="0.10em" fill="var(--accent)">{labels.extTitle}</text>
+
+    <!-- Beta row -->
+    <!-- BETA badge -->
+    <rect x="30" y={EXT_Y + 34} width="54" height={CHIP_H} rx={CHIP_R}
+      fill="var(--accent)" />
+    <text x="57" y={EXT_Y + 34 + 15} font-family="var(--font-mono)" font-size="9.5" font-weight="700"
+      fill="var(--bg)" text-anchor="middle" dominant-baseline="middle">{labels.betaLabel}</text>
+    <!-- Beta chips -->
+    {betaChips.map((c) => (
+      <>
+        <rect x={c.x} y={EXT_Y + 34} width={c.w} height={CHIP_H} rx={CHIP_R}
+          fill="var(--bg-elevated)" stroke="var(--accent)" stroke-width="1" stroke-opacity="0.5"/>
+        <text x={c.x + c.w / 2} y={EXT_Y + 34 + 12}
+          font-family="var(--font-mono)" font-size="10.5" fill="var(--fg)"
+          text-anchor="middle" dominant-baseline="middle">{c.label}</text>
+      </>
+    ))}
+
+    <!-- Experimental row -->
+    <!-- EXP badge -->
+    <rect x="30" y={EXT_Y + 70} width={labels.expBadgeW} height={CHIP_H} rx={CHIP_R}
+      fill="var(--fg-soft)" opacity="0.55"/>
+    <text x={labels.expBadgeCx} y={EXT_Y + 70 + 12}
+      font-family="var(--font-mono)" font-size="9" font-weight="600"
+      fill="var(--bg)" text-anchor="middle" dominant-baseline="middle">{labels.expLabel}</text>
+    <!-- Exp chips -->
+    {expChips.map((c) => (
+      <>
+        <rect x={c.x} y={EXT_Y + 70} width={c.w} height={CHIP_H} rx={CHIP_R}
+          fill="var(--bg-elevated)" stroke="var(--fg-soft)" stroke-width="1" stroke-opacity="0.3" opacity="0.85"/>
+        <text x={c.x + c.w / 2} y={EXT_Y + 70 + 12}
+          font-family="var(--font-mono)" font-size="10.5" fill="var(--fg)" opacity="0.8"
+          text-anchor="middle" dominant-baseline="middle">{c.label}</text>
+      </>
+    ))}
+    <!-- "+ more" label -->
+    {(() => {
+      const last = expChips[expChips.length - 1];
+      const moreX = last ? last.x + last.w + CHIP_GAP : 30;
+      return (
+        <text x={moreX} y={EXT_Y + 70 + 13} font-family="var(--font-mono)" font-size="10"
+          fill="var(--fg-soft)" dominant-baseline="middle">{labels.expMore}</text>
+      );
+    })()}
+
+    <!-- ext description -->
+    <text x="32" y={EXT_Y + EXT_H - 16} font-family="var(--font-sans)" font-size="10.5"
+      fill="var(--fg-soft)" opacity="0.85">
+      optional protocol &amp; product capability — evolves faster, never absorbed into the kernel
+    </text>
+
+    <!-- ── ARROW 2: Extensions → Stable (with blocked reverse) ───────── -->
+    <!-- Forward arrow (x/* can import stable) -->
+    <line
+      x1="340" y1={ARROW2_Y + 6}
+      x2="340" y2={STABLE_Y - 7}
+      stroke="var(--fg-soft)" stroke-width="1.4"
+      marker-end="url(#adArrow)"
+    />
+    <text x="352" y={ARROW2_Y + 24}
+      font-family="var(--font-sans)" font-size="10" fill="var(--fg-soft)">{labels.arrow2}</text>
+
+    <!-- Blocked reverse (stable cannot import x/*) -->
+    <line
+      x1="292" y1={STABLE_Y - 8}
+      x2="292" y2={ARROW2_Y + 10}
+      stroke="var(--fg-soft)" stroke-width="1.2"
+      stroke-dasharray="3 3" opacity="0.35"
+    />
+    <!-- X mark (blocked) -->
+    <line x1="285" y1={ARROW2_Y + 18} x2="299" y2={ARROW2_Y + 30}
+      stroke="var(--fg-soft)" stroke-width="1.5" opacity="0.4"/>
+    <line x1="299" y1={ARROW2_Y + 18} x2="285" y2={ARROW2_Y + 30}
+      stroke="var(--fg-soft)" stroke-width="1.5" opacity="0.4"/>
+    <text x="306" y={ARROW2_Y + 28}
+      font-family="var(--font-sans)" font-size="9.5" fill="var(--fg-soft)" opacity="0.55">{labels.blocked}</text>
+
+    <!-- ── STABLE ROOTS ZONE ──────────────────────────────────────────── -->
+    <rect
+      x="15" y={STABLE_Y} width={DIAGRAM_W} height={STABLE_H} rx="9"
+      fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1.5"
+    />
+    <!-- Stronger accent fill for stable -->
+    <rect
+      x="15" y={STABLE_Y} width={DIAGRAM_W} height={STABLE_H} rx="9"
+      fill="var(--accent)" opacity="0.07"
+    />
+    <text x="32" y={STABLE_Y + 26} font-family="var(--font-mono)" font-size="10" font-weight="700"
+      letter-spacing="0.12em" fill="var(--accent)">{labels.stableTitle}</text>
+    <!-- GA badge -->
+    <rect x={DIAGRAM_W - 72} y={STABLE_Y + 12} width="58" height="20" rx="4"
+      fill="var(--accent)" opacity="0.9"/>
+    <text x={DIAGRAM_W - 43} y={STABLE_Y + 25} font-family="var(--font-mono)" font-size="9.5" font-weight="700"
+      fill="var(--bg)" text-anchor="middle">v1 GA</text>
+
+    <!-- Stable chips row 1 -->
+    {stableChips1.map((c) => (
+      <>
+        <rect x={c.x} y={STABLE_Y + 38} width={c.w} height={CHIP_H} rx={CHIP_R}
+          fill="var(--bg-elevated)" stroke="var(--accent)" stroke-width="1"/>
+        <text x={c.x + c.w / 2} y={STABLE_Y + 38 + 12}
+          font-family="var(--font-mono)" font-size="10.5" fill="var(--fg)"
+          text-anchor="middle" dominant-baseline="middle" font-weight="500">{c.label}</text>
+      </>
+    ))}
+
+    <!-- Stable chips row 2 -->
+    {stableChips2.map((c) => (
+      <>
+        <rect x={c.x} y={STABLE_Y + 38 + CHIP_H + CHIP_GAP} width={c.w} height={CHIP_H} rx={CHIP_R}
+          fill="var(--bg-elevated)" stroke="var(--accent)" stroke-width="1"/>
+        <text x={c.x + c.w / 2} y={STABLE_Y + 38 + CHIP_H + CHIP_GAP + 12}
+          font-family="var(--font-mono)" font-size="10.5" fill="var(--fg)"
+          text-anchor="middle" dominant-baseline="middle" font-weight="500">{c.label}</text>
+      </>
+    ))}
+
+    <!-- Stable sub-description -->
+    <text x="32" y={STABLE_Y + STABLE_H - 16}
+      font-family="var(--font-sans)" font-size="10.5" fill="var(--fg-soft)">{labels.stableSub}</text>
+
+    <!-- ── CONTROL PLANE SIDEBAR ────────────────────────────────────── -->
+    <rect
+      x={CP_X} y={APP_Y} width={CP_W} height={CP_H} rx="9"
+      fill="var(--bg-elevated)" stroke="var(--line)" stroke-width="1"
+    />
+    <text x={CP_X + 16} y={APP_Y + 26}
+      font-family="var(--font-mono)" font-size="10" font-weight="700"
+      letter-spacing="0.12em" fill="var(--fg)" opacity="0.75">{labels.cpTitle}</text>
+    <!-- divider -->
+    <line x1={CP_X + 12} y1={APP_Y + 36} x2={CP_X + CP_W - 12} y2={APP_Y + 36}
+      stroke="var(--line)" stroke-width="1"/>
+
+    <!-- CP items -->
+    {labels.cpItems.map((item, i) => {
+      const iy = APP_Y + 52 + i * 104;
+      return (
+        <>
+          <!-- icon dot -->
+          <circle cx={CP_X + 22} cy={iy + 8} r="4"
+            fill="var(--accent)" opacity="0.7"/>
+          <text x={CP_X + 34} y={iy + 12}
+            font-family="var(--font-mono)" font-size="11" font-weight="600"
+            fill="var(--fg)">{item.label}</text>
+          <text x={CP_X + 16} y={iy + 30}
+            font-family="var(--font-sans)" font-size="10" fill="var(--fg-soft)"
+            style={`word-spacing: 0.02em`}>{item.desc}</text>
+          {i < labels.cpItems.length - 1 && (
+            <line
+              x1={CP_X + 12} y1={iy + 80}
+              x2={CP_X + CP_W - 12} y2={iy + 80}
+              stroke="var(--line)" stroke-width="1" opacity="0.6"
+            />
+          )}
+        </>
+      );
+    })}
+
+    <!-- Connector: dashed line from stable zone to CP -->
+    <line
+      x1={DIAGRAM_W + 15} y1={STABLE_Y + STABLE_H / 2}
+      x2={CP_X} y2={STABLE_Y + STABLE_H / 2}
+      stroke="var(--line)" stroke-width="1" stroke-dasharray="4 3"
+    />
+  </svg>
+</div>
+
+<style>
+  .arch-diag {
+    width: 100%;
+    margin: 2rem 0;
+    container-type: inline-size;
+  }
+  .arch-diag__svg {
+    width: 100%;
+    height: auto;
+    display: block;
+    border-radius: 10px;
+    border: 1px solid var(--line);
+    background: var(--bg);
+  }
+</style>
