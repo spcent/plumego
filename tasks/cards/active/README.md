@@ -52,7 +52,6 @@ chain in tasks/milestones/ROADMAP.md.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 1500 | P0 | release | Run full gate suite and record output in docs/release/v1.1.0.md |
 | 1501 | P0 | release | Write complete release notes in docs/release/v1.1.0.md |
 | 1502 | P0 | release | Compare stable-root API snapshots v1.0.0 → HEAD; confirm zero symbol changes |
 | 1503 | P0 | release | Create annotated git tag v1.1.0 |

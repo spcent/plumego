@@ -39,4 +39,6 @@ Done Definition:
 - Go toolchain version and date are recorded in the file header.
 
 Outcome:
--
+- Done. `make gates` exited 0 with `GOCACHE=/private/tmp/plumego-gocache`;
+  docs/release/v1.1.0.md records the timestamp, Go toolchain, command, and
+  verbatim gate output.
