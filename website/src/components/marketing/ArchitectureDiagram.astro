@@ -1,55 +1,71 @@
 ---
+import type { Locale } from '../../lib/locales';
+
 interface Props {
-  locale?: 'en' | 'zh';
+  locale?: Locale;
 }
 
 const { locale = 'en' } = Astro.props;
 
-const labels = locale === 'zh'
-  ? {
-      aria: 'Plumego 三层架构图：应用层、扩展家族、稳定根与控制面',
-      appTitle: '你的应用',
-      appSub: 'reference/standard-service  ·  internal/app/  ·  cmd/myservice',
-      appHint: '显式路由注册在 internal/app/routes.go',
-      extTitle: '扩展家族 (x/*)',
-      betaLabel: 'BETA',
-      expLabel: '实验性',
-      expMore: '+ 10 个更多',
-      stableTitle: '稳定根',
-      stableSub: '9 个模块 · v1 GA · 零外部依赖 · stdlib-only 内核',
-      cpTitle: '控制面',
-      cpItems: [
-        { label: 'specs/', desc: '依赖规则 · 任务路由 · 变更配方' },
-        { label: 'docs/', desc: '模块手册 · 概念指南' },
-        { label: 'tasks/', desc: '里程碑 · 任务卡片' },
-        { label: 'module.yaml', desc: '本地作用域 · 允许导入 · 验证规则' },
-      ],
-      arrow1: '应用层可导入扩展与稳定根',
-      arrow2: 'x/* 可导入稳定根',
-      blocked: '稳定根 → x/* 禁止',
-    }
-  : {
-      aria: 'Plumego three-layer architecture: app layer, extension families, stable roots, and control plane',
-      appTitle: 'YOUR APPLICATION',
-      appSub: 'reference/standard-service  ·  internal/app/  ·  cmd/myservice',
-      appHint: 'explicit wiring in internal/app/routes.go',
-      extTitle: 'EXTENSION FAMILIES (x/*)',
-      betaLabel: 'BETA',
-      expLabel: 'EXPERIMENTAL',
-      expMore: '+ 10 more families',
-      stableTitle: 'STABLE ROOTS',
-      stableSub: '9 modules · v1 GA · zero external deps · stdlib-only kernel',
-      cpTitle: 'CONTROL PLANE',
-      cpItems: [
-        { label: 'specs/', desc: 'dependency rules · task routing · change recipes' },
-        { label: 'docs/', desc: 'module primers · concept guides' },
-        { label: 'tasks/', desc: 'milestones · task cards' },
-        { label: 'module.yaml', desc: 'local scope · allowed imports · validation' },
-      ],
-      arrow1: 'app imports from extensions and stable roots',
-      arrow2: 'x/* imports stable roots (not vice versa)',
-      blocked: 'stable → x/* blocked',
-    };
+const copy: Record<Locale, {
+  aria: string; appTitle: string; appSub: string; appHint: string;
+  extTitle: string; betaLabel: string; expLabel: string; expMore: string;
+  expBadgeW: number; expBadgeCx: number;
+  stableTitle: string; stableSub: string; cpTitle: string;
+  cpItems: { label: string; desc: string }[];
+  arrow1: string; arrow2: string; blocked: string;
+}> = {
+  en: {
+    aria: 'Plumego three-layer architecture: app layer, extension families, stable roots, and control plane',
+    appTitle: 'YOUR APPLICATION',
+    appSub: 'reference/standard-service  ·  internal/app/  ·  cmd/myservice',
+    appHint: 'explicit wiring in internal/app/routes.go',
+    extTitle: 'EXTENSION FAMILIES (x/*)',
+    betaLabel: 'BETA',
+    expLabel: 'EXPERIMENTAL',
+    expBadgeW: 106,
+    expBadgeCx: 83,
+    expMore: '+ 10 more families',
+    stableTitle: 'STABLE ROOTS',
+    stableSub: '9 modules · v1 GA · zero external deps · stdlib-only kernel',
+    cpTitle: 'CONTROL PLANE',
+    cpItems: [
+      { label: 'specs/', desc: 'dependency rules · task routing · change recipes' },
+      { label: 'docs/', desc: 'module primers · concept guides' },
+      { label: 'tasks/', desc: 'milestones · task cards' },
+      { label: 'module.yaml', desc: 'local scope · allowed imports · validation' },
+    ],
+    arrow1: 'app imports from extensions and stable roots',
+    arrow2: 'x/* imports stable roots (not vice versa)',
+    blocked: 'stable → x/* blocked',
+  },
+  zh: {
+    aria: 'Plumego 三层架构图：应用层、扩展家族、稳定根与控制面',
+    appTitle: '你的应用',
+    appSub: 'reference/standard-service  ·  internal/app/  ·  cmd/myservice',
+    appHint: '显式路由注册在 internal/app/routes.go',
+    extTitle: '扩展家族 (x/*)',
+    betaLabel: 'BETA',
+    expLabel: '实验性',
+    expBadgeW: 70,
+    expBadgeCx: 65,
+    expMore: '+ 10 个更多',
+    stableTitle: '稳定根',
+    stableSub: '9 个模块 · v1 GA · 零外部依赖 · stdlib-only 内核',
+    cpTitle: '控制面',
+    cpItems: [
+      { label: 'specs/', desc: '依赖规则 · 任务路由 · 变更配方' },
+      { label: 'docs/', desc: '模块手册 · 概念指南' },
+      { label: 'tasks/', desc: '里程碑 · 任务卡片' },
+      { label: 'module.yaml', desc: '本地作用域 · 允许导入 · 验证规则' },
+    ],
+    arrow1: '应用层可导入扩展与稳定根',
+    arrow2: 'x/* 可导入稳定根',
+    blocked: '稳定根 → x/* 禁止',
+  },
+};
+
+const labels = copy[locale];
 
 const betaModules = ['x/rest', 'x/gateway', 'x/websocket', 'x/observability'];
 const expModules = ['x/ai', 'x/tenant', 'x/data', 'x/resilience', 'x/messaging', 'x/frontend'];
@@ -176,9 +192,9 @@ const SVG_H     = STABLE_Y + STABLE_H + 15;    // 506
 
     <!-- Experimental row -->
     <!-- EXP badge -->
-    <rect x="30" y={EXT_Y + 70} width={locale === 'zh' ? 70 : 106} height={CHIP_H} rx={CHIP_R}
+    <rect x="30" y={EXT_Y + 70} width={labels.expBadgeW} height={CHIP_H} rx={CHIP_R}
       fill="var(--fg-soft)" opacity="0.55"/>
-    <text x={30 + (locale === 'zh' ? 35 : 53)} y={EXT_Y + 70 + 12}
+    <text x={labels.expBadgeCx} y={EXT_Y + 70 + 12}
       font-family="var(--font-mono)" font-size="9" font-weight="600"
       fill="var(--bg)" text-anchor="middle" dominant-baseline="middle">{labels.expLabel}</text>
     <!-- Exp chips -->
