@@ -8,6 +8,8 @@
 
 - `experimental` in the Plumego v1 support matrix
 - Included in repository release scope, but compatibility is not frozen
+- `x/data/file` and `x/data/idempotency` are beta surfaces as of v1.1.0;
+  root `x/data` and topology-heavy surfaces remain experimental.
 - Stable readiness review on 2026-05-04: core correctness blockers from the
   follow-up cards are addressed, but the module remains experimental until the
   public API surface, SQL support policy, and operational limits are frozen.

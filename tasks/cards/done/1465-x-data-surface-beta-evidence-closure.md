@@ -3,7 +3,7 @@
 Milestone: M-003
 Recipe: specs/change-recipes/analysis-only.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: x/data
 Owned Files:
 - `specs/extension-beta-evidence.yaml`
@@ -47,4 +47,8 @@ Done Definition:
 - Selected `x/data` surfaces have checked-in snapshots, two release refs, release snapshots, and owner sign-off, or blockers remain explicit.
 
 Outcome:
--
+- Done. Generated release-backed snapshots for `x/data/file` and
+  `x/data/idempotency` across `v1.0.0` to `v1.1.0`; both comparisons reported
+  API unchanged. Updated the evidence ledger, recorded `persistence` sign-off,
+  cleared blockers for the selected surfaces, and kept root `x/data`
+  experimental.

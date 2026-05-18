@@ -69,6 +69,6 @@ status.
 | `x/frontend` | evidence doc, current-head snapshot | second-release evidence, release-backed snapshots, owner sign-off | future frontend-owned card |
 | `x/tenant` | beta evidence complete | none | none |
 | `x/ai` stable-tier subpackages | beta evidence complete for provider, session, streaming, and tool | none | root `x/ai` remains experimental |
-| `x/data` selected surfaces | evidence doc, first `v1.0.0` release refs, v1 baseline intake snapshots | second release refs, complete release-backed snapshots, owner sign-off | `tasks/cards/blocked/1371-x-data-surface-beta-evidence-closure.md` |
+| `x/data` selected surfaces | beta evidence complete for `x/data/file` and `x/data/idempotency` | none for selected surfaces | root `x/data` remains experimental |
 | `x/gateway/discovery` core/static surface | evidence doc, first `v1.0.0` release ref, v1 baseline intake snapshot | second release ref, complete release-backed snapshots, owner sign-off | `tasks/cards/blocked/1372-x-discovery-surface-beta-evidence-closure.md` |
 | `x/messaging` app-facing service | evidence doc, first `v1.0.0` release ref, v1 baseline intake snapshot | second release ref, complete release-backed snapshots, owner sign-off | `tasks/cards/blocked/1373-x-messaging-service-beta-evidence-closure.md` |
