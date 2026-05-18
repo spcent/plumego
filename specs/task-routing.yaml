@@ -34,6 +34,7 @@ routing_rules:
       - x/observability
       - x/openapi
       - x/resilience
+      - x/rpc
       - x/data
       - x/ai
       - x/validate
@@ -234,6 +235,15 @@ tasks:
     avoid:
       - core
       - x/gateway
+
+  rpc_transport:
+    start_with:
+      - x/rpc/module.yaml
+      - x/rpc/server/module.yaml
+      - specs/extension-taxonomy.yaml
+    avoid:
+      - core
+      - middleware
 
   messaging:
     start_with:

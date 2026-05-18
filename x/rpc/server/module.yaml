@@ -1,0 +1,70 @@
+name: x/rpc/server
+path: x/rpc/server
+layer: extension
+status: experimental
+owner: rpc
+risk: medium
+summary: gRPC server lifecycle wrapper for x/rpc callers.
+
+parent_family: x/rpc
+
+entrypoint_reads:
+  - AGENTS.md
+  - docs/CANONICAL_STYLE_GUIDE.md
+  - specs/repo.yaml
+  - specs/task-routing.yaml
+  - specs/dependency-rules.yaml
+  - x/rpc/module.yaml
+
+responsibilities:
+  - gRPC server construction
+  - Explicit service registration delegation
+  - Blocking serve lifecycle
+  - Context-aware graceful shutdown
+
+non_goals:
+  - Automatic service discovery registration
+  - Core app bootstrap ownership
+  - Business-specific RPC services
+  - HTTP route ownership
+
+allowed_imports:
+  - stdlib
+  - x/observability
+
+forbidden_imports:
+  - core/**
+  - router/**
+  - contract/**
+  - middleware/**
+  - security/**
+  - store/**
+  - x/tenant/**
+  - x/ai/**
+  - x/data/**
+  - x/fileapi/**
+  - x/frontend/**
+  - x/gateway/**
+  - x/messaging/**
+  - x/openapi/**
+  - x/resilience/**
+  - x/rest/**
+  - x/websocket/**
+  - reference/**
+  - cmd/**
+
+test_commands:
+  - go test -race -timeout 60s ./...
+  - go test -timeout 20s ./...
+  - go vet ./...
+
+review_checklist:
+  - Keep server ownership limited to gRPC lifecycle
+  - Require explicit RegisterService calls
+  - Return context cancellation from graceful shutdown
+  - Avoid hidden process-wide server state
+
+agent_hints:
+  - Start here for gRPC server lifecycle work only
+  - Keep service implementation and application wiring outside this package
+  - Add observability through explicit interceptors

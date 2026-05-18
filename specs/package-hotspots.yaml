@@ -71,6 +71,37 @@ packages:
       - x/gateway
     summary: Reusable resource-interface layer for CRUD-standardized APIs.
 
+  x/rpc:
+    module: x/rpc
+    layer: extension
+    role: app_surface
+    task_families:
+      - rpc_transport
+    start_with:
+      - x/rpc/module.yaml
+      - x/rpc/server/module.yaml
+    avoid:
+      - core
+      - middleware
+      - reference/standard-service
+    summary: Optional RPC transport adapters and lifecycle helpers; keep gRPC dependencies out of stable roots and the main module.
+
+  x/rpc/server:
+    module: x/rpc
+    layer: extension
+    role: primitive
+    task_families:
+      - rpc_transport
+    start_with:
+      - x/rpc/module.yaml
+      - x/rpc/server/module.yaml
+      - x/rpc/server/server.go
+    avoid:
+      - core
+      - middleware
+      - x/gateway
+    summary: gRPC server lifecycle primitive with explicit service registration and context-aware shutdown.
+
   x/gateway:
     module: x/gateway
     layer: extension

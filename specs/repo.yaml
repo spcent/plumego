@@ -89,6 +89,7 @@ layers:
       - x/openapi
       - x/resilience
       - x/rest
+      - x/rpc
       - x/validate
       - x/websocket
 

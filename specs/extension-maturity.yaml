@@ -58,6 +58,10 @@ signals:
     recommended_entrypoint: "RouteInfo-driven OpenAPI document generation"
     docs_signal: docs:primer
     coverage_signal: coverage:generator-tests
+  - module: x/rpc
+    recommended_entrypoint: "Optional gRPC server, client, and gateway adapters"
+    docs_signal: docs:primer
+    coverage_signal: coverage:server-lifecycle
   - module: x/observability/ops
     recommended_entrypoint: "Protected admin and runtime diagnostics routes"
     docs_signal: docs:primer

@@ -44,6 +44,12 @@ families:
     roots:
       - x/openapi
 
+  rpc:
+    canonical_root: x/rpc
+    roots:
+      - x/rpc
+      - x/rpc/server
+
   resilience:
     canonical_root: x/resilience
     roots:

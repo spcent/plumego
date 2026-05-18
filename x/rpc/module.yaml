@@ -1,0 +1,69 @@
+name: x/rpc
+path: x/rpc
+layer: extension
+status: experimental
+owner: rpc
+risk: medium
+summary: Optional RPC transport adapters and lifecycle helpers for gRPC-backed Plumego services.
+
+entrypoint_reads:
+  - AGENTS.md
+  - docs/CANONICAL_STYLE_GUIDE.md
+  - specs/repo.yaml
+  - specs/task-routing.yaml
+  - specs/dependency-rules.yaml
+
+subordinate_families:
+  - package: x/rpc/server
+    role: gRPC server lifecycle wrapper aligned with context cancellation
+
+responsibilities:
+  - gRPC server lifecycle wrappers
+  - RPC client connection helpers
+  - HTTP-to-RPC gateway adapters
+  - Optional RPC transport integration patterns
+
+non_goals:
+  - Core app bootstrap ownership
+  - Stable root-package entrypoints
+  - Service discovery registration
+  - Business-specific RPC service definitions
+
+public_entrypoints:
+  - server
+
+doc_paths:
+  - docs/modules/x-rpc/README.md
+
+allowed_imports:
+  - stdlib
+
+forbidden_imports:
+  - core/**
+  - router/**
+  - middleware/**
+  - security/**
+  - store/**
+  - x/tenant/**
+  - x/ai/**
+  - reference/**
+  - cmd/**
+
+test_commands:
+  - go test -race -timeout 60s ./...
+  - go test -timeout 20s ./...
+  - go vet ./...
+
+review_checklist:
+  - Keep RPC dependencies isolated to this separate module
+  - Preserve explicit lifecycle control
+  - Do not require stable roots to know RPC internals
+  - Keep service registration explicit
+
+agent_hints:
+  - Use x/rpc only for optional RPC transport integration
+  - Keep app wiring in reference apps or user applications
+  - Do not add hidden service registries or globals
+
+landing_zones:
+  server: server/

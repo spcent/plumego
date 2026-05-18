@@ -97,7 +97,6 @@ chain in tasks/milestones/ROADMAP.md.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 1570 | P3 | x/rpc | Create x/rpc/server wrapping grpc.Server with context-aligned lifecycle |
 | 1571 | P3 | x/rpc | Create x/rpc/client connection pool with logging/retry/tracing interceptors |
 | 1572 | P3 | x/rpc | Create x/rpc/gateway HTTPTranscoder; add reference/with-rpc example |
 

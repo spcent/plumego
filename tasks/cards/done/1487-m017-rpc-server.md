@@ -3,7 +3,7 @@
 Milestone: M-017
 Recipe: specs/change-recipes/add-package.yaml
 Priority: P3
-State: active
+State: done
 Primary Module: x/rpc
 Owned Files:
 - `x/rpc/server/server.go`
@@ -64,4 +64,30 @@ Done Definition:
 - `go run ./internal/checks/dependency-rules` exits 0.
 
 Outcome:
--
+- Added the separate `github.com/spcent/plumego/x/rpc` module with gRPC v1.80.0,
+  the newest confirmed version compatible with Go 1.24.4.
+- Implemented `x/rpc/server.Server` with explicit service registration,
+  blocking `Serve`, interceptor option helpers, and context-aware
+  `GracefulStop` that returns `ctx.Err()` when cancellation wins.
+- Added bufconn tests covering register/serve/shutdown round trip, cancelled
+  shutdown context, closed listener failure, and unary interceptor invocation.
+- Added x/rpc manifests, dependency rules, taxonomy/routing/hotspot/maturity
+  metadata, and the x-rpc primer needed for control-plane coverage of the new
+  extension root.
+- Validation:
+  `GOTOOLCHAIN=go1.24.4 GOCACHE=/private/tmp/plumego-gocache go test -race
+  -timeout 60s ./server/...` from x/rpc; `GOTOOLCHAIN=go1.24.4
+  GOCACHE=/private/tmp/plumego-gocache go vet ./server/...` from x/rpc;
+  `GOTOOLCHAIN=go1.24.4 GOCACHE=/private/tmp/plumego-gocache go test -timeout
+  20s ./...` from x/rpc; `GOTOOLCHAIN=go1.24.4
+  GOCACHE=/private/tmp/plumego-gocache go build ./...` from x/rpc;
+  `GOTOOLCHAIN=go1.24.4 GOCACHE=/private/tmp/plumego-gocache go run
+  ./internal/checks/dependency-rules`; `GOTOOLCHAIN=go1.24.4
+  GOCACHE=/private/tmp/plumego-gocache go run ./internal/checks/module-manifests`;
+  `GOTOOLCHAIN=go1.24.4 GOCACHE=/private/tmp/plumego-gocache go run
+  ./internal/checks/agent-workflow`; `GOTOOLCHAIN=go1.24.4
+  GOCACHE=/private/tmp/plumego-gocache go run ./internal/checks/extension-maturity`;
+  `GOTOOLCHAIN=go1.24.4 GOCACHE=/private/tmp/plumego-gocache go run
+  ./internal/checks/public-entrypoints-sync`; `GOTOOLCHAIN=go1.24.4
+  GOCACHE=/private/tmp/plumego-gocache go run ./internal/checks/extension-beta-evidence`;
+  `gofmt -l .`; `git diff --check`.
