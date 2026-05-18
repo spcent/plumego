@@ -3,7 +3,7 @@
 Milestone: M-014
 Recipe: specs/change-recipes/add-package.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: cmd/plumego
 Owned Files:
 - `cmd/plumego/commands/spec.go`
@@ -56,4 +56,16 @@ Done Definition:
 - `go test ./cmd/plumego/...` passes including the integration test.
 
 Outcome:
--
+- Added `plumego generate spec` dispatch under the existing generate command
+  with `--output`, `--format`, and `--app` flags.
+- Kept `cmd/plumego` free of a direct `x/openapi` dependency by running a
+  temporary helper module in the target app context. The helper imports
+  `x/openapi`, registers the canonical app routes, reads optional
+  `plumego.spec.yaml` operation hints, and writes JSON or YAML output.
+- Added CLI integration coverage against `reference/with-rest`, including
+  `/dev/null` output plus JSON and YAML file generation.
+- Added `reference/with-rest` `make spec` support and documented the command in
+  the CLI and reference README files.
+- Validation passed with `cmd/plumego` race tests, `cmd/plumego` vet,
+  `reference/with-rest` build, dependency-rules, module-manifests,
+  reference-layout, agent-workflow, `gofmt -l .`, and `git diff --check`.

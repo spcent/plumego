@@ -157,10 +157,17 @@ plumego generate handler User --methods GET,POST,PUT,DELETE --with-tests
 
 # Generate a model
 plumego generate model Invoice --with-validation
+
+# Generate an OpenAPI 3.1 document from a Plumego app route table
+plumego generate spec --dir reference/with-rest --format yaml --output openapi.yaml
 ```
 
 Generated handlers default to `internal/handler`, middleware defaults to
 `internal/middleware`, and models default to `internal/domain/<name>`.
+`plumego generate spec` uses a temporary helper process so the CLI module does
+not import optional OpenAPI generation packages directly. By default it follows
+the canonical app layout under `internal/app` and reads optional operation hints
+from `plumego.spec.yaml` in the project root.
 
 ### Development Server
 

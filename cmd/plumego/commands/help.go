@@ -104,10 +104,18 @@ func (c *NewCmd) Help() CommandHelp {
 
 func (c *GenerateCmd) Help() CommandHelp {
 	return CommandHelp{
-		Args: "[command-flags] <type> <name>",
+		Args: "[command-flags] <type> [name]",
+		Subcommands: []HelpItem{
+			{"middleware <name>", "Generate middleware"},
+			{"handler <name>", "Generate REST handler stubs"},
+			{"model <name>", "Generate domain model stubs"},
+			{"spec", "Generate an OpenAPI 3.1 document from registered routes"},
+		},
 		Flags: []HelpItem{
 			{"--dir <path>", "Project directory"},
 			{"--output <path>", "Output file path"},
+			{"--format <json|yaml>", "Spec output format"},
+			{"--app <package>", "Application package to introspect for spec generation"},
 			{"--package <name>", "Package name"},
 			{"--methods <list>", "Handler HTTP methods: GET,POST,PUT,DELETE"},
 			{"--with-tests", "Generate tests where supported"},
@@ -118,6 +126,7 @@ func (c *GenerateCmd) Help() CommandHelp {
 			"plumego generate middleware RateLimit",
 			"plumego generate handler User --methods GET,POST,PUT,DELETE --with-tests",
 			"plumego generate model Invoice --with-validation",
+			"plumego generate spec --dir reference/with-rest --format yaml --output openapi.yaml",
 		},
 	}
 }

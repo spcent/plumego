@@ -30,3 +30,10 @@ this scenario reference as wiring guidance, not as a compatibility claim.
 cd reference/with-rest
 go run .
 ```
+
+Generate the OpenAPI document for the registered routes:
+
+```bash
+cd reference/with-rest
+make spec
+```
