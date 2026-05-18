@@ -1,7 +1,7 @@
 # plumego — root Makefile
 # Minimal targets. Most work happens via codex --yolo or go toolchain directly.
 
-.PHONY: help bundle validate-diff validate-diff-dry milestone check-spec check-plan check-card check-verify new-milestone new-plan new-card new-verify gates fmt vet test test-race setup-hooks
+.PHONY: help bundle validate-diff validate-diff-dry milestone check-spec check-plan check-card check-verify new-milestone new-plan new-card new-verify run-card milestone-status gates fmt vet test test-race setup-hooks
 
 # Default: show help
 help:
@@ -188,6 +188,59 @@ new-verify: ## Scaffold a milestone verify report: make new-verify M=active/M-00
 	echo "Next: fill the verify report, then:"; \
 	echo "  make check-verify M=$(M)"
 
+run-card: ## Execute a task card (validate → bundle → codex): make run-card C=active/0001-foo
+	@if [ -z "$(C)" ]; then \
+	  echo "Error: C is required. Example: make run-card C=active/0001-foo"; \
+	  exit 1; \
+	fi
+	@CARD=tasks/cards/$(C).md; \
+	if [ ! -f "$$CARD" ]; then \
+	  echo "Error: $$CARD not found."; \
+	  echo "Available cards:"; \
+	  ls tasks/cards/active/*.md 2>/dev/null | sed 's|tasks/cards/||; s|\.md||'; \
+	  exit 1; \
+	fi; \
+	echo "Validating card before launch ..."; \
+	scripts/check-spec "$$CARD" || { echo "Fix card errors above, then re-run."; exit 1; }; \
+	MODULE=$$(grep -m1 '^Primary Module:' "$$CARD" | sed 's/Primary Module:[[:space:]]*//' | tr -d '\r'); \
+	RECIPE=$$(grep -m1 '^Recipe:' "$$CARD" | sed 's|Recipe:[[:space:]]*specs/change-recipes/||; s|\.yaml$$||' | tr -d '\r'); \
+	if [ -z "$$MODULE" ] || [ -z "$$RECIPE" ]; then \
+	  echo "Error: card must have 'Primary Module:' and 'Recipe:' filled before running."; \
+	  exit 1; \
+	fi; \
+	echo "Generating bundle for task=$$RECIPE module=$$MODULE ..."; \
+	(cd cmd/plumego && go run . agents bundle \
+	  --task "$$RECIPE" \
+	  --module "$$MODULE" \
+	  --dir ../.. \
+	  --output ../../.agent-bundle.yaml) || { echo "Bundle generation failed."; exit 1; }; \
+	echo "Bundle written to .agent-bundle.yaml"; \
+	echo "Launching codex --yolo on $$CARD ..."; \
+	codex --yolo "$$(cat "$$CARD")"
+
+milestone-status: ## Show checkpoint progress for a milestone: make milestone-status M=active/M-001
+	@if [ -z "$(M)" ]; then \
+	  echo "Error: M is required. Example: make milestone-status M=active/M-001"; \
+	  exit 1; \
+	fi
+	@ID=$${M##*/}; \
+	CHECKPOINT=tasks/milestones/$$ID.checkpoint.json; \
+	PLAN=tasks/milestones/$$ID.plan.md; \
+	echo "=== Milestone $$ID Status ==="; \
+	if [ ! -f "$$PLAN" ]; then \
+	  echo "  Plan:        NOT FOUND  (run: make new-plan M=$(M))"; \
+	else \
+	  echo "  Plan:        found"; \
+	fi; \
+	if [ ! -f "$$CHECKPOINT" ]; then \
+	  echo "  Checkpoints: none recorded"; \
+	else \
+	  echo "  Checkpoints:"; \
+	  grep -o '"phase":"[^"]*","passed":[^,}]*' "$$CHECKPOINT" 2>/dev/null | \
+	    sed 's/"phase":"//; s/","passed"://; s/true/ ✓ passed/; s/false/ ✗ failed/' | \
+	    sed 's/^/    /' || echo "    (could not parse checkpoint file)"; \
+	fi
+
 new-card: ## Scaffold a task card: make new-card ID=0001 SLUG=slice-router-work M=M-001 R=fix-bug
 	@if [ -z "$(ID)" ] || [ -z "$(SLUG)" ] || [ -z "$(M)" ]; then \
 	  echo "Error: ID, SLUG, and M are required."; \
@@ -231,6 +284,7 @@ gates: ## Run all required quality gates (mirrors CI)
 	go run ./internal/checks/extension-maturity
 	go run ./internal/checks/extension-beta-evidence
 	go run ./internal/checks/deprecation-inventory -strict
+	go run ./internal/checks/public-entrypoints-sync
 	bash scripts/check-stable-api-snapshots.sh
 	bash scripts/check-doc-snippets-compile.sh
 	go vet ./...

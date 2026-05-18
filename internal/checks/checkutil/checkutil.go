@@ -1241,6 +1241,16 @@ func isStableRoot(path string) bool {
 	return false
 }
 
+// ReadModulePublicEntrypoints reads the public_entrypoints list from a module.yaml file.
+// Returns nil if the file does not exist or declares no public_entrypoints.
+func ReadModulePublicEntrypoints(manifestPath string) ([]string, error) {
+	doc, err := parseManifest(manifestPath)
+	if err != nil {
+		return nil, err
+	}
+	return doc.Lists["public_entrypoints"], nil
+}
+
 // ValidateStableBoundaryDeclarations checks that every stable root module.yaml
 // declares a non-empty strict_boundary field.
 func ValidateStableBoundaryDeclarations(repoRoot string) ([]string, error) {

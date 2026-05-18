@@ -52,6 +52,8 @@ func annotate(checkName, violation string) annotation {
 		return annotateAgentWorkflow(violation)
 	case "reference-layout":
 		return annotateReferenceLayout(violation)
+	case "public-entrypoints-sync":
+		return annotatePublicEntrypointsSync(violation)
 	default:
 		return annotation{}
 	}
@@ -277,6 +279,17 @@ func extractQuoted(s string) string {
 		return ""
 	}
 	return s[start+1 : start+1+end]
+}
+
+func annotatePublicEntrypointsSync(v string) annotation {
+	if strings.Contains(v, "not found in") {
+		return annotation{
+			fix:   "Either remove the stale entry from module.yaml public_entrypoints, or ensure the exported symbol exists in the module source. If the symbol was renamed, update both source and module.yaml in the same PR.",
+			rule:  "AGENTS.md — Symbol Change Protocol: update module.yaml when removing or renaming exported symbols",
+			guide: "docs/CANONICAL_STYLE_GUIDE.md",
+		}
+	}
+	return annotation{}
 }
 
 // extractExtensionRoot returns the x/* path from a violation about an orphaned root.

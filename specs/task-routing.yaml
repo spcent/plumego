@@ -61,6 +61,8 @@ tasks:
       - specs/repo.yaml
       - specs/task-routing.yaml
       - specs/dependency-rules.yaml
+      - specs/stop-condition-handlers.yaml
+      - specs/request-flows.yaml
     avoid:
       - reference/with-messaging
       - reference/with-gateway

@@ -1,0 +1,192 @@
+version: 1
+
+metadata:
+  purpose: >
+    Machine-readable request flow diagrams. Agents working on cross-module
+    tasks read this file to understand which layers a request passes through
+    and which modules own each step.
+  read_when:
+    - Cross-module task affects request lifecycle
+    - Middleware ordering must be verified
+    - Handler or transport contract is being modified
+    - Tracing or observability spans must be placed correctly
+
+flows:
+  standard_http_request:
+    description: The baseline request lifecycle for every HTTP endpoint in plumego.
+    layers:
+      - step: 1
+        name: server_accept
+        module: core
+        file: core/lifecycle.go
+        entry: App.ServeHTTP
+        owns: Accept connection, delegate to router
+
+      - step: 2
+        name: middleware_chain
+        module: middleware
+        file: core/middleware.go
+        entry: Chain.ServeHTTP
+        owns: >
+          Run registered middleware in registration order.
+          Each middleware calls next exactly once.
+          Transport concerns only: logging, request ID, timeout, CORS, recovery.
+
+      - step: 3
+        name: route_matching
+        module: router
+        file: router/router.go
+        entry: Router.Match
+        owns: Match path pattern, extract params, select handler. No response writing.
+
+      - step: 4
+        name: handler_execution
+        module: reference/standard-service
+        file: reference/standard-service/internal/handler/api.go
+        entry: func(http.ResponseWriter, *http.Request)
+        owns: Decode request, invoke domain logic, write response via contract.
+
+      - step: 5
+        name: response_write
+        module: contract
+        file: contract/response.go
+        entry: contract.WriteResponse / contract.WriteError
+        owns: Serialize response envelope or error, set headers, write status code.
+
+    invariants:
+      - Middleware runs before route matching.
+      - Handler shape is always func(http.ResponseWriter, *http.Request).
+      - contract.WriteResponse and contract.WriteError are the only canonical write paths.
+      - next is called exactly once per middleware.
+
+  tenant_aware_request:
+    description: >
+      Request flow when multi-tenancy is enabled via x/tenant. Tenant resolution
+      middleware runs after standard transport middleware and before handlers.
+    extends: standard_http_request
+    additions:
+      - after_step: 2
+        name: tenant_resolution
+        module: x/tenant
+        file: x/tenant/core/middleware.go
+        entry: ResolutionMiddleware
+        owns: >
+          Resolve tenant identity from request context (header, subdomain, JWT claim).
+          Attach tenant context via contract.WithTenant.
+          Reject unknown tenants with contract.WriteError (403).
+
+      - after_step: 2
+        name: tenant_policy
+        module: x/tenant
+        file: x/tenant/core/policy.go
+        entry: PolicyMiddleware
+        owns: >
+          Enforce tenant-scoped rate limits and quotas.
+          Reject over-limit requests with contract.WriteError (429).
+
+    invariants:
+      - Tenant resolution must run before any handler that reads tenant context.
+      - Tenant policy must run after tenant resolution.
+      - core/ and middleware/ must not contain any tenant-aware logic.
+
+  authenticated_request:
+    description: >
+      Request flow when JWT or token authentication is enforced.
+      Security middleware wraps the handler, not the full middleware chain.
+    extends: standard_http_request
+    additions:
+      - after_step: 2
+        name: auth_verification
+        module: security
+        file: security/jwt.go
+        entry: JWTMiddleware / TokenMiddleware
+        owns: >
+          Verify token signature using timing-safe comparison.
+          Attach verified claims via contract.WithClaims.
+          Reject invalid tokens fail-closed with contract.WriteError (401).
+
+    invariants:
+      - Auth failures are always fail-closed (401/403, never allow-through on error).
+      - Secret comparison uses constant-time operations.
+      - Never log or return token values, signatures, or private keys.
+
+  file_upload_request:
+    description: >
+      Request flow for multipart file upload through x/fileapi, stored via x/data/file.
+    extends: standard_http_request
+    additions:
+      - at_step: 4
+        name: file_handler
+        module: x/fileapi
+        file: x/fileapi/handler.go
+        entry: UploadHandler
+        owns: >
+          Parse multipart form data.
+          Validate file type, size, and tenant quota via x/tenant.
+          Delegate storage to x/data/file.
+          Return upload metadata via contract.WriteResponse.
+
+      - after_step: 4
+        name: file_storage
+        module: x/data
+        file: x/data/file/local.go
+        entry: FileStore.Put
+        owns: Persist file bytes, write metadata. Scoped to tenant if tenant context present.
+
+    invariants:
+      - x/fileapi does not import store/file directly; it uses x/data/file.
+      - Tenant quota check must happen before storage write.
+
+  messaging_dispatch:
+    description: >
+      Flow when an HTTP handler dispatches a message via x/messaging.
+      The HTTP response returns before message delivery completes.
+    extends: standard_http_request
+    additions:
+      - at_step: 4
+        name: message_dispatch
+        module: x/messaging
+        file: x/messaging/service.go
+        entry: MessagingService.Send
+        owns: >
+          Validate message schema.
+          Route to the correct backend: x/messaging/mq, x/messaging/pubsub,
+          x/messaging/scheduler, or x/messaging/webhook.
+          Return delivery receipt or correlation ID to handler.
+
+    invariants:
+      - x/messaging is the canonical app-facing entrypoint; handlers do not import sub-packages directly.
+      - HTTP response is sent before async delivery completes.
+      - Delivery failures must not propagate as HTTP 500 unless synchronous delivery was requested.
+
+  websocket_upgrade:
+    description: >
+      Flow for HTTP upgrade to WebSocket via x/websocket.
+    extends: standard_http_request
+    additions:
+      - at_step: 4
+        name: upgrade_handler
+        module: x/websocket
+        file: x/websocket/websocket.go
+        entry: Hub.ServeHTTP
+        owns: >
+          Perform HTTP upgrade handshake.
+          Register connection with Hub.
+          Manage connection lifecycle and message dispatch.
+
+    invariants:
+      - The upgrade handler receives the standard net/http ResponseWriter and Request.
+      - Hub lifecycle (start/stop) is managed outside the request path.
+      - x/websocket must not import core or router directly.
+
+module_ownership_by_layer:
+  accept_and_lifecycle: core
+  transport_middleware: middleware
+  route_matching: router
+  auth_verification: security
+  tenant_resolution: x/tenant
+  handler_transport: contract
+  file_operations: x/fileapi + x/data
+  messaging: x/messaging
+  websocket: x/websocket
+  observability: x/observability
