@@ -3,6 +3,10 @@
 Plumego is not a Gin replacement. It is not a faster Echo. It does not compete
 on request throughput benchmarks or middleware count.
 
+Release benchmark evidence is recorded separately in
+`docs/benchmarks/results-v1.1.0.md`; those numbers are for regression context,
+not the adoption claim.
+
 Plumego is a toolkit for teams that need their Go services to remain
 understandable and auditable after the first hundred pull requests — and for
 codebases where both human engineers and AI coding agents share maintenance

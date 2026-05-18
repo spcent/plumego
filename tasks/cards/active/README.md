@@ -57,7 +57,6 @@ chain in tasks/milestones/ROADMAP.md.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 1512 | P0 | benchmark | Write benchmark/go.mod, benchmark/README.md, and docs/benchmarks/results-v1.1.0.md |
 
 ### M-009 — Beta Promotions Round 1 (P1, depends on M-008)
 

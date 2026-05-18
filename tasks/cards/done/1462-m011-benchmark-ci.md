@@ -3,7 +3,7 @@
 Milestone: M-011
 Recipe: specs/change-recipes/update-docs.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: benchmark
 Owned Files:
 - `benchmark/go.mod`
@@ -52,4 +52,7 @@ Done Definition:
 - docs/why-plumego.md references docs/benchmarks/results-v1.1.0.md by path.
 
 Outcome:
--
+- Done. Added benchmark README and v1.1.0 benchmark results with machine
+  metadata and verbatim `count=3` output, kept chi isolated to the benchmark
+  module, and referenced the result file from docs/why-plumego.md. Validated
+  benchmark run, dependency-rules, and module-manifests.
