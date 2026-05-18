@@ -426,6 +426,31 @@ func TestCLI_MigrateRuntimeRequiresRegisteredDriver(t *testing.T) {
 	}
 }
 
+func TestCLI_MigrateReadsConfigFile(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "plumego.migrate.yaml")
+	if err := os.WriteFile(configPath, []byte("driver: plumego_missing_driver\ndb_url: postgres://localhost/plumego\ndir: migrations\n"), 0644); err != nil {
+		t.Fatalf("write migrate config: %v", err)
+	}
+
+	stdout, _, err := runCLI(t, []string{
+		"--format", "json",
+		"migrate", "status",
+		"--config", configPath,
+	}, tmpDir)
+	if err == nil {
+		t.Fatalf("expected unsupported driver error")
+	}
+
+	var payload cliJSONEnvelope
+	if err := json.Unmarshal([]byte(stdout), &payload); err != nil {
+		t.Fatalf("failed to parse output: %v\noutput: %s", err, stdout)
+	}
+	if payload.Status != "error" || !strings.Contains(payload.Message, "plumego_missing_driver") {
+		t.Fatalf("unexpected migrate config response: %#v", payload)
+	}
+}
+
 func TestCLI_MigrateRejectsInvalidSteps(t *testing.T) {
 	tests := []struct {
 		name    string

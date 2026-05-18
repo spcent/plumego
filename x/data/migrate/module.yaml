@@ -1,0 +1,61 @@
+name: x/data/migrate
+path: x/data/migrate
+layer: extension
+status: experimental
+owner: persistence
+risk: medium
+summary: goose-backed database migration runner for x/data callers.
+
+parent_family: x/data
+
+entrypoint_reads:
+  - AGENTS.md
+  - docs/CANONICAL_STYLE_GUIDE.md
+  - specs/repo.yaml
+  - specs/task-routing.yaml
+  - specs/dependency-rules.yaml
+  - x/data/module.yaml
+
+responsibilities:
+  - goose provider construction
+  - migration up/down execution
+  - migration status projection
+
+non_goals:
+  - Migration file creation
+  - CLI database driver registration
+  - ORM behavior
+  - Stable store/db interface changes
+
+allowed_imports:
+  - stdlib
+
+forbidden_imports:
+  - core/**
+  - router/**
+  - middleware/**
+  - security/**
+  - x/tenant/**
+  - reference/**
+  - cmd/**
+
+test_commands:
+  - go test -race -timeout 60s ./...
+  - go test -timeout 20s ./...
+  - go vet ./...
+
+change_risks:
+  - migration ordering regression
+  - rollback regression
+  - accidental live database test dependency
+
+review_checklist:
+  - Keep goose isolated to this separately versioned module
+  - Keep tests offline with in-memory SQLite
+  - Preserve context propagation
+  - Do not add database drivers to the main module or CLI module
+
+agent_hints:
+  - Use New for SQLite-backed tests and NewWithDialect for explicit production dialects
+  - Keep migration file creation in the CLI internal migrate package
+  - Keep goose dependencies out of cmd/plumego

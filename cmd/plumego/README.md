@@ -266,6 +266,8 @@ connection or loading migration state. `migrate status` reads the existing
 `schema_migrations` table without creating it; `migrate up` and `migrate down`
 ensure the table before changing migration state. No-op `up` and `down` results
 return the warning envelope with exit code 2.
+Runtime commands read `plumego.migrate.yaml` when present, with `driver`,
+`db_url`, and `dir` keys. Command flags override config-file values.
 
 ## Exit Codes
 

@@ -204,6 +204,7 @@ func (c *MigrateCmd) Help() CommandHelp {
 			{"--dir <path>", "Migrations directory"},
 			{"--driver <name>", "Registered database/sql driver name"},
 			{"--db-url <url>", "Database connection string"},
+			{"--config <path>", "Migration config file"},
 			{"--steps <n>", "Number of migrations to apply or roll back"},
 		},
 	}

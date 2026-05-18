@@ -214,6 +214,20 @@ modules:
       - reference/**
       - cmd/**
 
+  x/data/migrate:
+    path: x/data/migrate
+    layer: extension
+    allow:
+      - stdlib
+    deny:
+      - core/**
+      - router/**
+      - middleware/**
+      - security/**
+      - x/tenant/**
+      - reference/**
+      - cmd/**
+
   x/tenant:
     path: x/tenant
     layer: extension

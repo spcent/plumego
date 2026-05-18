@@ -3,7 +3,7 @@
 Milestone: M-015
 Recipe: specs/change-recipes/add-package.yaml
 Priority: P2
-State: active
+State: done
 Primary Module: x/data
 Owned Files:
 - `x/data/migrate/migrate.go`
@@ -67,4 +67,21 @@ Done Definition:
 - All migrate_test.go test cases pass with `go test -race`.
 
 Outcome:
--
+- Added `x/data/migrate` as a separate Go module wrapping goose v3.24.3 with
+  an in-memory SQLite test driver, keeping goose and sqlite out of the main and
+  CLI modules.
+- Implemented `Migrator`, `New`, `NewWithDialect`, `NewWithFS`, `Up`, `Down`,
+  `Status`, and `Close`. `Status` projects goose status into the card's
+  `MigrationStatus` shape.
+- Added offline tests for missing directory, empty migrations, applying one
+  pending migration, and rolling it back.
+- The CLI already had `migrate status/up/down` runtime commands without a goose
+  dependency. This card extends it with `plumego.migrate.yaml` loading for
+  `driver`, `db_url`, and `dir`, while preserving flag override behavior and
+  keeping database drivers out of the bundled CLI module.
+- Synced `x/data/migrate/module.yaml`, `x/data/module.yaml`, dependency rules,
+  CLI help, CLI tests, and CLI README migration docs.
+- Validation passed with `x/data/migrate` race tests, `x/data/migrate` vet,
+  `cmd/plumego` migrate tests, full `cmd/plumego` race tests, `cmd/plumego`
+  vet, dependency-rules, module-manifests, agent-workflow, `gofmt -l .`, and
+  `git diff --check`.

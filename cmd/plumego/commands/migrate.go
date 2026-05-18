@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"os"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/spcent/plumego/cmd/plumego/internal/migrate"
 	"github.com/spcent/plumego/cmd/plumego/internal/output"
+	"gopkg.in/yaml.v3"
 )
 
 type MigrateCmd struct{}
@@ -27,6 +29,7 @@ func (c *MigrateCmd) Run(ctx *Context, args []string) error {
 	dir := fs.String("dir", "./migrations", "Migrations directory")
 	dbURL := fs.String("db-url", "", "Database connection string")
 	driver := fs.String("driver", "", "Database driver name")
+	configPath := fs.String("config", "plumego.migrate.yaml", "Migration config file")
 	steps := fs.Int("steps", 0, "Number of migrations to apply/rollback (0 = all)")
 
 	positionals, err := parseInterspersedFlags(fs, args)
@@ -52,6 +55,23 @@ func (c *MigrateCmd) Run(ctx *Context, args []string) error {
 	}
 	if subcommand == "status" && stepsProvided {
 		return out.Error("--steps is not supported for migrate status", 1)
+	}
+	providedFlags := make(map[string]bool)
+	fs.Visit(func(f *flag.Flag) {
+		providedFlags[f.Name] = true
+	})
+	cfg, err := loadMigrateConfig(*configPath)
+	if err != nil {
+		return out.Error(fmt.Sprintf("failed to load migrate config: %v", err), 1)
+	}
+	if !providedFlags["dir"] && cfg.Dir != "" {
+		*dir = cfg.Dir
+	}
+	if !providedFlags["db-url"] && cfg.DBURL != "" {
+		*dbURL = cfg.DBURL
+	}
+	if !providedFlags["driver"] && cfg.Driver != "" {
+		*driver = cfg.Driver
 	}
 
 	absDir, err := filepath.Abs(*dir)
@@ -97,6 +117,30 @@ func (c *MigrateCmd) Run(ctx *Context, args []string) error {
 	default:
 		return out.Error(fmt.Sprintf("unknown subcommand: %s", subcommand), 1)
 	}
+}
+
+type migrateConfig struct {
+	Dir    string `yaml:"dir"`
+	DBURL  string `yaml:"db_url"`
+	Driver string `yaml:"driver"`
+}
+
+func loadMigrateConfig(path string) (migrateConfig, error) {
+	if strings.TrimSpace(path) == "" {
+		return migrateConfig{}, nil
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return migrateConfig{}, nil
+		}
+		return migrateConfig{}, err
+	}
+	var cfg migrateConfig
+	if err := yaml.Unmarshal(data, &cfg); err != nil {
+		return migrateConfig{}, err
+	}
+	return cfg, nil
 }
 
 func (c *MigrateCmd) runWithDatabase(out *output.Formatter, subcommand, dir, driver, dbURL string, steps int) error {
