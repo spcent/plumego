@@ -44,6 +44,11 @@ families:
     roots:
       - x/resilience
 
+  validate:
+    canonical_root: x/validate
+    roots:
+      - x/validate
+
   frontend:
     canonical_root: x/frontend
     roots:

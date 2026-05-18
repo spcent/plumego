@@ -3,7 +3,7 @@
 Milestone: M-012
 Recipe: specs/change-recipes/add-package.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: x/validate
 Owned Files:
 - `x/validate/validate.go`
@@ -62,4 +62,12 @@ Done Definition:
 - `go run ./internal/checks/dependency-rules` exits 0.
 
 Outcome:
--
+- Created the experimental `x/validate` module with `Validator`, `Bind[T]`,
+  `BindJSON[T]`, and `ValidationError`.
+- Added focused tests for successful binding, validation failure, malformed
+  JSON, empty body, and nil validation errors.
+- Synced the new extension root into repo/taxonomy/dependency/maturity control
+  plane so repo gates continue to see `x/validate`.
+- Validation passed with module `go test -race`, module `go vet`,
+  dependency-rules, module-manifests, agent-workflow, extension-maturity, and
+  `git diff --check`.

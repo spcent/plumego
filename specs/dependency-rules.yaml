@@ -221,6 +221,22 @@ modules:
       - reference/**
       - cmd/**
 
+  x/validate:
+    path: x/validate
+    layer: extension
+    allow:
+      - stdlib
+      - contract
+    deny:
+      - core/**
+      - router/**
+      - middleware/**
+      - security/**
+      - store/**
+      - x/**
+      - reference/**
+      - cmd/**
+
   x/messaging/webhook:
     path: x/messaging/webhook
     layer: extension

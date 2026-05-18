@@ -35,6 +35,7 @@ routing_rules:
       - x/resilience
       - x/data
       - x/ai
+      - x/validate
 
   app_wiring:
     intent: Change application wiring, bootstrap shape, dependency injection, or route registration.

@@ -78,6 +78,10 @@ signals:
     recommended_entrypoint: "Resolution, policy, quota, rate limit, session, and tenant-aware stores"
     docs_signal: docs:primer
     coverage_signal: coverage:tenant-chain-tests
+  - module: x/validate
+    recommended_entrypoint: "Explicit `Bind` or `BindJSON` call sites in handlers"
+    docs_signal: docs:primer
+    coverage_signal: coverage:binding-tests
   - module: x/messaging/webhook
     recommended_entrypoint: "Start from `x/messaging` unless webhook transport is direct"
     docs_signal: docs:primer

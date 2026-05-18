@@ -1,0 +1,68 @@
+name: x/validate
+path: x/validate
+layer: extension
+status: experimental
+owner: api
+risk: medium
+summary: Explicit request binding and validation helpers for application handlers.
+
+entrypoint_reads:
+  - AGENTS.md
+  - docs/CANONICAL_STYLE_GUIDE.md
+  - specs/repo.yaml
+  - specs/task-routing.yaml
+  - specs/dependency-rules.yaml
+
+responsibilities:
+  - JSON request binding
+  - Explicit validator invocation
+  - Validation error adaptation to contract API errors
+
+non_goals:
+  - Validation tag parsing
+  - Third-party validator ownership
+  - Middleware or route registration
+  - Stable contract binding behavior
+
+allowed_imports:
+  - stdlib
+  - contract
+
+forbidden_imports:
+  - core/**
+  - router/**
+  - middleware/**
+  - security/**
+  - store/**
+  - x/**
+  - reference/**
+  - cmd/**
+
+test_commands:
+  - go test -race -timeout 60s ./...
+  - go test -timeout 20s ./...
+  - go vet ./...
+
+doc_paths:
+  - docs/modules/x-validate/README.md
+
+change_risks:
+  - decode-before-validation regression
+  - validation error classification regression
+  - accidental validator dependency creep
+
+stop_conditions:
+  - The change introduces a validation tag language or reflection-based parser.
+  - The change requires a third-party validation dependency in the core package.
+  - The change turns validation into implicit middleware or route registration.
+
+review_checklist:
+  - Keep validation explicit at call sites
+  - Preserve net/http request compatibility
+  - Do not add third-party dependencies in this module
+  - Return contract-shaped validation errors
+
+agent_hints:
+  - Keep adapters in subordinate packages
+  - Decode JSON before calling validators
+  - Prefer contract.NewErrorBuilder for API errors
