@@ -3,7 +3,7 @@
 Milestone: M-018
 Recipe: specs/change-recipes/add-http-endpoint.yaml
 Priority: P3
-State: active
+State: done
 Primary Module: reference/with-tenant-admin
 Owned Files:
 - `reference/with-tenant-admin/internal/quota/admin/handler.go`
@@ -54,4 +54,13 @@ Done Definition:
 - `go build ./reference/with-tenant-admin/...` exits 0.
 
 Outcome:
--
+- Implemented quota admin get, set, and reset handlers backed by the
+  reference app's tenant store plus `x/tenant/core` in-memory config and quota
+  store primitives.
+- Wired `/admin/quota/:tenantID`, `PUT /admin/quota/:tenantID`, and
+  `/admin/quota/:tenantID/reset` behind the admin token middleware.
+- Validated with `go test -timeout 30s ./internal/quota/...`,
+  `go test -timeout 30s ./...`, `go vet ./...`, and `go build ./...` from
+  `reference/with-tenant-admin`.
+- Ran `go run ./internal/checks/reference-layout`, touched-file `gofmt -l`,
+  and `git diff --check` from the repository root.

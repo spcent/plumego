@@ -11,6 +11,7 @@ import (
 	"github.com/spcent/plumego/middleware/recovery"
 	"github.com/spcent/plumego/middleware/requestid"
 	"github.com/spcent/plumego/reference/with-tenant-admin/internal/config"
+	quotaadmin "github.com/spcent/plumego/reference/with-tenant-admin/internal/quota/admin"
 	tenantadmin "github.com/spcent/plumego/reference/with-tenant-admin/internal/tenant/admin"
 	tenantcore "github.com/spcent/plumego/x/tenant/core"
 )
@@ -19,6 +20,7 @@ type Deps struct {
 	Logger       plumelog.StructuredLogger
 	TenantConfig *tenantcore.InMemoryConfigManager
 	QuotaManager tenantcore.QuotaManager
+	QuotaStore   *tenantcore.InMemoryQuotaStore
 	TenantStore  *tenantadmin.InMemoryStore
 }
 
@@ -28,7 +30,9 @@ type App struct {
 	Logger       plumelog.StructuredLogger
 	TenantConfig *tenantcore.InMemoryConfigManager
 	QuotaManager tenantcore.QuotaManager
+	QuotaStore   *tenantcore.InMemoryQuotaStore
 	Tenants      *tenantadmin.Handler
+	Quotas       *quotaadmin.Handler
 }
 
 func New(cfg config.Config, deps Deps) (*App, error) {
@@ -52,9 +56,13 @@ func New(cfg config.Config, deps Deps) (*App, error) {
 	if tenantConfig == nil {
 		tenantConfig = tenantcore.NewInMemoryConfigManager()
 	}
+	quotaStore := deps.QuotaStore
+	if quotaStore == nil {
+		quotaStore = tenantcore.NewInMemoryQuotaStore()
+	}
 	quotaManager := deps.QuotaManager
 	if quotaManager == nil {
-		quotaManager = tenantcore.NewFixedWindowQuotaManager(tenantConfig)
+		quotaManager = tenantcore.NewWindowQuotaManager(tenantConfig, quotaStore)
 	}
 	tenantStore := deps.TenantStore
 	if tenantStore == nil {
@@ -67,7 +75,9 @@ func New(cfg config.Config, deps Deps) (*App, error) {
 		Logger:       logger,
 		TenantConfig: tenantConfig,
 		QuotaManager: quotaManager,
+		QuotaStore:   quotaStore,
 		Tenants:      tenantadmin.NewHandler(tenantStore),
+		Quotas:       quotaadmin.NewHandler(tenantStore, tenantConfig, quotaStore),
 	}, nil
 }
 

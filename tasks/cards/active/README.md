@@ -102,7 +102,6 @@ chain in tasks/milestones/ROADMAP.md.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 1582 | P3 | reference/with-tenant-admin | Implement quota admin handlers (get, set, reset) using x/tenant/quota |
 | 1583 | P3 | reference/with-tenant-admin | Implement usage recording handlers; write README.md |
 
 ### M-019 — Module Ecosystem Foundation (P3, depends on M-017)

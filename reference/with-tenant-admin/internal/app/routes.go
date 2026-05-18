@@ -32,7 +32,13 @@ func (a *App) registerTenantAdminRoutes(admin func(http.Handler) http.Handler) e
 }
 
 func (a *App) registerQuotaAdminRoutes(admin func(http.Handler) http.Handler) error {
-	return a.Core.Get("/admin/quota", admin(http.HandlerFunc(notImplemented("quota admin handlers are added in card 1582"))))
+	if err := a.Core.Get("/admin/quota/:tenantID", admin(http.HandlerFunc(a.Quotas.GetQuota))); err != nil {
+		return err
+	}
+	if err := a.Core.Put("/admin/quota/:tenantID", admin(http.HandlerFunc(a.Quotas.SetQuota))); err != nil {
+		return err
+	}
+	return a.Core.Post("/admin/quota/:tenantID/reset", admin(http.HandlerFunc(a.Quotas.ResetQuota)))
 }
 
 func (a *App) registerUsageAdminRoutes(admin func(http.Handler) http.Handler) error {
