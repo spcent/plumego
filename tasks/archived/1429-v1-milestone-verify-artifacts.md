@@ -6,9 +6,9 @@ Priority: P0
 State: done
 Primary Module: release
 Owned Files:
-- `tasks/milestones/M-001.verify.md`
-- `tasks/milestones/M-002.verify.md`
-- `tasks/milestones/M-003.verify.md`
+- `tasks/milestones/done/M-001-v1-trust-baseline/verify-M-001.md`
+- `tasks/milestones/done/M-002-stable-roots-freeze-and-reliability/verify-M-002.md`
+- `tasks/milestones/done/M-003-extension-evidence-pipeline/verify-M-003.md`
 - `tasks/milestones/STATUS.md`
 - `tasks/milestones/ROADMAP.md`
 Depends On:
@@ -29,9 +29,9 @@ Non-goals:
 - Do not promote extension status.
 
 Files:
-- `tasks/milestones/M-001.verify.md`
-- `tasks/milestones/M-002.verify.md`
-- `tasks/milestones/M-003.verify.md`
+- `tasks/milestones/done/M-001-v1-trust-baseline/verify-M-001.md`
+- `tasks/milestones/done/M-002-stable-roots-freeze-and-reliability/verify-M-002.md`
+- `tasks/milestones/done/M-003-extension-evidence-pipeline/verify-M-003.md`
 - `tasks/milestones/STATUS.md`
 - `tasks/milestones/ROADMAP.md`
 
@@ -49,9 +49,9 @@ Done Definition:
 - Control-plane checks pass.
 
 Outcome:
-- Created `tasks/milestones/M-001.verify.md`,
-  `tasks/milestones/M-002.verify.md`, and
-  `tasks/milestones/M-003.verify.md`.
+- Created `tasks/milestones/done/M-001-v1-trust-baseline/verify-M-001.md`,
+  `tasks/milestones/done/M-002-stable-roots-freeze-and-reliability/verify-M-002.md`, and
+  `tasks/milestones/done/M-003-extension-evidence-pipeline/verify-M-003.md`.
 - Updated `tasks/milestones/STATUS.md` and `tasks/milestones/ROADMAP.md` to
   show that verify artifacts now exist and remaining release work moves to
   M-005 cards.

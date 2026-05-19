@@ -230,7 +230,7 @@ Document implemented behavior only.
 ## 10. Milestones
 
 Milestones are human-scoped, single-PR execution units in
-`tasks/milestones/active/M-NNN.md`.
+`tasks/milestones/active/M-NNN-short-name/M-NNN.md`.
 
 When executing a milestone:
 

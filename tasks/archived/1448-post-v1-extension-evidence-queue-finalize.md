@@ -9,7 +9,7 @@ Owned Files:
 - `tasks/cards/active/README.md`
 - `tasks/cards/active/`
 - `tasks/cards/done/`
-- `tasks/milestones/M-007.verify.md`
+- `tasks/milestones/done/M-007-extension-v1-baseline-evidence-intake/verify-M-007.md`
 - `docs/release/POST_V1_EVIDENCE.md`
 Depends On:
 - 1447
@@ -33,7 +33,7 @@ Files:
 - `tasks/cards/active/README.md`
 - `tasks/cards/active/`
 - `tasks/cards/done/`
-- `tasks/milestones/M-007.verify.md`
+- `tasks/milestones/done/M-007-extension-v1-baseline-evidence-intake/verify-M-007.md`
 - `docs/release/POST_V1_EVIDENCE.md`
 
 Tests:
@@ -50,7 +50,7 @@ Done Definition:
 - Extension evidence blockers remain accurate.
 
 Outcome:
-- Added `tasks/milestones/M-007.verify.md`.
+- Added `tasks/milestones/done/M-007-extension-v1-baseline-evidence-intake/verify-M-007.md`.
 - Removed completed M-007 cards from the front of the active queue.
 - Updated remaining blocked cards to reflect first `v1.0.0` evidence intake
   and the remaining second-release/sign-off blockers.

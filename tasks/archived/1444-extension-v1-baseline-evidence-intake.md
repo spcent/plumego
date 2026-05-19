@@ -6,8 +6,8 @@ Priority: P1
 State: done
 Primary Module: extension evidence
 Owned Files:
-- `tasks/milestones/active/M-007.md`
-- `tasks/milestones/M-007.plan.md`
+- `tasks/milestones/done/M-007-extension-v1-baseline-evidence-intake/M-007.md`
+- `tasks/milestones/done/M-007-extension-v1-baseline-evidence-intake/plan-M-007.md`
 - `tasks/cards/active/README.md`
 - `tasks/cards/active/1445-x-tenant-v1-baseline-evidence.md`
 - `tasks/cards/active/1446-x-ai-stable-tier-v1-baseline-evidence.md`
@@ -33,8 +33,8 @@ Non-goals:
 - Do not add or modify owner sign-off.
 
 Files:
-- `tasks/milestones/active/M-007.md`
-- `tasks/milestones/M-007.plan.md`
+- `tasks/milestones/done/M-007-extension-v1-baseline-evidence-intake/M-007.md`
+- `tasks/milestones/done/M-007-extension-v1-baseline-evidence-intake/plan-M-007.md`
 - `tasks/cards/`
 - `docs/extension-evidence/release-artifacts.md`
 - `docs/release/POST_V1_EVIDENCE.md`

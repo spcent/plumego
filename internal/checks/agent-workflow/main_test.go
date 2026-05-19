@@ -55,8 +55,8 @@ func TestTaskQueueLifecycleViolationsPass(t *testing.T) {
 	writeFile(t, repoRoot, "tasks/cards/blocked/0002-waiting.md", "# Card 0002\nState: blocked\n")
 	writeFile(t, repoRoot, "tasks/cards/done/0003-finished.md", "# Card 0003\nState: done\n")
 	writeFile(t, repoRoot, "tasks/milestones/active/.gitkeep", "")
-	writeFile(t, repoRoot, "tasks/milestones/active/M-002.md", "# M-002\n")
-	writeFile(t, repoRoot, "tasks/milestones/done/M-001.md", "# M-001\n\n## Outcome\n\nDone.\n")
+	writeFile(t, repoRoot, "tasks/milestones/active/M-002-next/M-002.md", "# M-002\n")
+	writeFile(t, repoRoot, "tasks/milestones/done/M-001-done/M-001.md", "# M-001\n\n## Outcome\n\nDone.\n")
 
 	violations, err := taskQueueLifecycleViolations(repoRoot)
 	if err != nil {
@@ -72,8 +72,8 @@ func TestTaskQueueLifecycleViolationsReportDirectoryDrift(t *testing.T) {
 	writeFile(t, repoRoot, "tasks/cards/active/0001-waiting.md", "# Card 0001\nState: blocked\n")
 	writeFile(t, repoRoot, "tasks/cards/blocked/0002-ready.md", "# Card 0002\nState: active\n")
 	writeFile(t, repoRoot, "tasks/cards/done/0003-stale.md", "# Card 0003\nState: active\n")
-	writeFile(t, repoRoot, "tasks/milestones/active/M-001.md", "# M-001\n\n## Outcome\n\nDone.\n")
-	writeFile(t, repoRoot, "tasks/milestones/done/M-002.md", "# M-002\n")
+	writeFile(t, repoRoot, "tasks/milestones/active/M-001-next/M-001.md", "# M-001\n\n## Outcome\n\nDone.\n")
+	writeFile(t, repoRoot, "tasks/milestones/done/M-002-done/M-002.md", "# M-002\n")
 
 	violations, err := taskQueueLifecycleViolations(repoRoot)
 	if err != nil {
@@ -83,8 +83,8 @@ func TestTaskQueueLifecycleViolationsReportDirectoryDrift(t *testing.T) {
 		"tasks/cards/active/0001-waiting.md has State: blocked but lives under tasks/cards/active",
 		"tasks/cards/blocked/0002-ready.md has State: active but lives under tasks/cards/blocked",
 		"tasks/cards/done/0003-stale.md has State: active but lives under tasks/cards/done",
-		"tasks/milestones/active/M-001.md has an Outcome section but still lives under tasks/milestones/active",
-		"tasks/milestones/done/M-002.md is archived but has no Outcome section",
+		"tasks/milestones/active/M-001-next/M-001.md has an Outcome section but still lives under tasks/milestones/active",
+		"tasks/milestones/done/M-002-done/M-002.md is archived but has no Outcome section",
 	}
 	for _, want := range expected {
 		if !slices.Contains(violations, want) {

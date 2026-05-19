@@ -7,7 +7,7 @@ State: done
 Primary Module: release
 Owned Files:
 - `docs/release/`
-- `tasks/milestones/M-006.verify.md`
+- `tasks/milestones/done/M-006-v1-0-1-maintenance-lane/verify-M-006.md`
 Depends On:
 - 1442
 
@@ -17,7 +17,7 @@ Goal:
 
 Scope:
 - Create or update release evidence index docs under `docs/release/`.
-- Create `tasks/milestones/M-006.verify.md` with M-006 card evidence.
+- Create `tasks/milestones/done/M-006-v1-0-1-maintenance-lane/verify-M-006.md` with M-006 card evidence.
 - Keep extension blocker state synchronized with
   `specs/extension-beta-evidence.yaml`.
 
@@ -28,7 +28,7 @@ Non-goals:
 
 Files:
 - `docs/release/`
-- `tasks/milestones/M-006.verify.md`
+- `tasks/milestones/done/M-006-v1-0-1-maintenance-lane/verify-M-006.md`
 
 Tests:
 - `go run ./internal/checks/extension-beta-evidence`
@@ -45,5 +45,5 @@ Done Definition:
 
 Outcome:
 - Added `docs/release/POST_V1_EVIDENCE.md`.
-- Added `tasks/milestones/M-006.verify.md`.
+- Added `tasks/milestones/done/M-006-v1-0-1-maintenance-lane/verify-M-006.md`.
 - Extension beta blockers remain explicit; no extension status was promoted.

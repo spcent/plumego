@@ -8,7 +8,7 @@ Primary Module: release
 Owned Files:
 - `docs/release/v1.0.0.md`
 - `docs/release/v1.0.0-rc.1.md`
-- `tasks/milestones/M-005.verify.md`
+- `tasks/milestones/done/M-005-v1-release-execution/verify-M-005.md`
 - `tasks/cards/done/1438-v1-final-tag-remote-evidence.md`
 Depends On:
 - 1436
@@ -30,7 +30,7 @@ Non-goals:
 Files:
 - `docs/release/v1.0.0.md`
 - `docs/release/v1.0.0-rc.1.md`
-- `tasks/milestones/M-005.verify.md`
+- `tasks/milestones/done/M-005-v1-release-execution/verify-M-005.md`
 
 Tests:
 - `gh run view 25922384589 --repo spcent/plumego --json status,conclusion,url,headSha,event,displayTitle`

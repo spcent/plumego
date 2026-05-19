@@ -6,7 +6,7 @@ Priority: P0
 State: done
 Primary Module: contract
 Owned Files:
-- tasks/milestones/active/M-004.md
+- tasks/milestones/done/M-004-stable-root-cleanup-freeze/M-004.md
 - tasks/cards/active/1401-stable-root-cleanup-gate-evidence.md
 Depends On:
 - 1394
@@ -37,7 +37,7 @@ Non-goals:
 - Do not modify runtime code except to fix validation failures found by this card.
 
 Files:
-- tasks/milestones/active/M-004.md
+- tasks/milestones/done/M-004-stable-root-cleanup-freeze/M-004.md
 - tasks/cards/active/1401-stable-root-cleanup-gate-evidence.md
 
 Tests:

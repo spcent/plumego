@@ -36,20 +36,29 @@ bundle: ## Generate a task execution bundle: make bundle TASK=http_endpoint MODU
 # ── Milestone Runner ──────────────────────────────────────────────────────────
 
 ## Run a milestone spec through codex --yolo.
-## Usage: make milestone M=active/M-001
-##   M must be a path relative to tasks/milestones/, without the .md extension.
-milestone: ## Run a milestone spec: make milestone M=active/M-001
+## Usage: make milestone M=active/M-001-short-name
+##   M must be a milestone directory path relative to tasks/milestones/.
+milestone: ## Run a milestone spec: make milestone M=active/M-001-short-name
 	@if [ -z "$(M)" ]; then \
-	  echo "Error: M is required. Example: make milestone M=active/M-001"; \
+	  echo "Error: M is required. Example: make milestone M=active/M-001-short-name"; \
 	  exit 1; \
 	fi
-	@SPEC=tasks/milestones/$(M).md; \
-	PLAN=tasks/milestones/$${SPEC##*/}; \
-	PLAN=$${PLAN%.md}.plan.md; \
+	@INPUT="$(M)"; \
+	BASE=$${INPUT##*/}; \
+	ID=$$(printf '%s\n' "$$BASE" | sed -nE 's/.*(M-[0-9][0-9][0-9]).*/\1/p'); \
+	if [ -z "$$ID" ]; then echo "Error: M must include a milestone id like M-001"; exit 1; fi; \
+	SPEC=tasks/milestones/$$INPUT/$$ID.md; \
+	if [ ! -f "$$SPEC" ]; then SPEC=tasks/milestones/$$INPUT.md; fi; \
+	if [ ! -f "$$SPEC" ]; then \
+	  for candidate in tasks/milestones/active/$$ID-*/$$ID.md tasks/milestones/done/$$ID-*/$$ID.md; do \
+	    if [ -f "$$candidate" ]; then SPEC=$$candidate; break; fi; \
+	  done; \
+	fi; \
+	PLAN=$$(dirname "$$SPEC")/plan-$$ID.md; \
 	if [ ! -f "$$SPEC" ]; then \
 	  echo "Error: $$SPEC not found."; \
 	  echo "Available specs:"; \
-	  ls tasks/milestones/active/*.md 2>/dev/null | sed 's|tasks/milestones/||; s|\.md||'; \
+	  find tasks/milestones/active -mindepth 1 -maxdepth 1 -type d -print 2>/dev/null | sed 's|tasks/milestones/||'; \
 	  exit 1; \
 	fi; \
 	if [ ! -f "$$PLAN" ]; then \
@@ -65,20 +74,41 @@ milestone: ## Run a milestone spec: make milestone M=active/M-001
 	echo "Launching codex --yolo on $$SPEC ..."; \
 	codex --yolo "$$(cat "$$SPEC")"
 
-check-spec: ## Validate a milestone spec: make check-spec M=active/M-001
+check-spec: ## Validate a milestone spec: make check-spec M=active/M-001-short-name
 	@if [ -z "$(M)" ]; then \
-	  echo "Error: M is required. Example: make check-spec M=active/M-001"; \
+	  echo "Error: M is required. Example: make check-spec M=active/M-001-short-name"; \
 	  exit 1; \
 	fi
-	@internal/tools/check-spec tasks/milestones/$(M).md
+	@INPUT="$(M)"; \
+	BASE=$${INPUT##*/}; \
+	ID=$$(printf '%s\n' "$$BASE" | sed -nE 's/.*(M-[0-9][0-9][0-9]).*/\1/p'); \
+	if [ -z "$$ID" ]; then echo "Error: M must include a milestone id like M-001"; exit 1; fi; \
+	SPEC=tasks/milestones/$$INPUT/$$ID.md; \
+	if [ ! -f "$$SPEC" ]; then SPEC=tasks/milestones/$$INPUT.md; fi; \
+	if [ ! -f "$$SPEC" ]; then \
+	  for candidate in tasks/milestones/active/$$ID-*/$$ID.md tasks/milestones/done/$$ID-*/$$ID.md; do \
+	    if [ -f "$$candidate" ]; then SPEC=$$candidate; break; fi; \
+	  done; \
+	fi; \
+	internal/tools/check-spec "$$SPEC"
 
-check-plan: ## Validate a milestone plan: make check-plan M=active/M-001
+check-plan: ## Validate a milestone plan: make check-plan M=active/M-001-short-name
 	@if [ -z "$(M)" ]; then \
-	  echo "Error: M is required. Example: make check-plan M=active/M-001"; \
+	  echo "Error: M is required. Example: make check-plan M=active/M-001-short-name"; \
 	  exit 1; \
 	fi
-	@ID=$${M##*/}; \
-	PLAN=tasks/milestones/$$ID.plan.md; \
+	@INPUT="$(M)"; \
+	BASE=$${INPUT##*/}; \
+	ID=$$(printf '%s\n' "$$BASE" | sed -nE 's/.*(M-[0-9][0-9][0-9]).*/\1/p'); \
+	if [ -z "$$ID" ]; then echo "Error: M must include a milestone id like M-001"; exit 1; fi; \
+	SPEC=tasks/milestones/$$INPUT/$$ID.md; \
+	if [ ! -f "$$SPEC" ]; then SPEC=tasks/milestones/$$INPUT.md; fi; \
+	if [ ! -f "$$SPEC" ]; then \
+	  for candidate in tasks/milestones/active/$$ID-*/$$ID.md tasks/milestones/done/$$ID-*/$$ID.md; do \
+	    if [ -f "$$candidate" ]; then SPEC=$$candidate; break; fi; \
+	  done; \
+	fi; \
+	PLAN=$$(dirname "$$SPEC")/plan-$$ID.md; \
 	if [ ! -f "$$PLAN" ]; then \
 	  echo "Error: $$PLAN not found."; \
 	  echo "Create it with: make new-plan M=$(M)"; \
@@ -86,13 +116,23 @@ check-plan: ## Validate a milestone plan: make check-plan M=active/M-001
 	fi; \
 	internal/tools/check-spec "$$PLAN"
 
-check-verify: ## Validate a milestone verify report: make check-verify M=active/M-001
+check-verify: ## Validate a milestone verify report: make check-verify M=active/M-001-short-name
 	@if [ -z "$(M)" ]; then \
-	  echo "Error: M is required. Example: make check-verify M=active/M-001"; \
+	  echo "Error: M is required. Example: make check-verify M=active/M-001-short-name"; \
 	  exit 1; \
 	fi
-	@ID=$${M##*/}; \
-	VERIFY=tasks/milestones/$$ID.verify.md; \
+	@INPUT="$(M)"; \
+	BASE=$${INPUT##*/}; \
+	ID=$$(printf '%s\n' "$$BASE" | sed -nE 's/.*(M-[0-9][0-9][0-9]).*/\1/p'); \
+	if [ -z "$$ID" ]; then echo "Error: M must include a milestone id like M-001"; exit 1; fi; \
+	SPEC=tasks/milestones/$$INPUT/$$ID.md; \
+	if [ ! -f "$$SPEC" ]; then SPEC=tasks/milestones/$$INPUT.md; fi; \
+	if [ ! -f "$$SPEC" ]; then \
+	  for candidate in tasks/milestones/active/$$ID-*/$$ID.md tasks/milestones/done/$$ID-*/$$ID.md; do \
+	    if [ -f "$$candidate" ]; then SPEC=$$candidate; break; fi; \
+	  done; \
+	fi; \
+	VERIFY=$$(dirname "$$SPEC")/verify-$$ID.md; \
 	if [ ! -f "$$VERIFY" ]; then \
 	  echo "Error: $$VERIFY not found."; \
 	  echo "Create it with: make new-verify M=$(M)"; \
@@ -113,10 +153,13 @@ new-milestone: ## Scaffold a new milestone spec: make new-milestone N=001 TITLE=
 	  echo "  Example: make new-milestone N=001 TITLE=\"Add ResourceHandler\""; \
 	  exit 1; \
 	fi
-	@DEST=tasks/milestones/active/M-$(N).md; \
-	if [ -f "$$DEST" ]; then \
-	  echo "Error: $$DEST already exists."; exit 1; \
+	@SLUG=$$(printf '%s\n' "$(TITLE)" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g; s/^-//; s/-$$//'); \
+	DEST_DIR=tasks/milestones/active/M-$(N)-$$SLUG; \
+	DEST=$$DEST_DIR/M-$(N).md; \
+	if [ -e "$$DEST_DIR" ]; then \
+	  echo "Error: $$DEST_DIR already exists."; exit 1; \
 	fi; \
+	mkdir -p "$$DEST_DIR"; \
 	rewrite() { expr="$$1"; file="$$2"; tmp=$$(mktemp); sed "$$expr" "$$file" > "$$tmp" && mv "$$tmp" "$$file"; }; \
 	cp tasks/milestones/TEMPLATE.md "$$DEST"; \
 	TITLE_ESC=$$(printf '%s\n' "$(TITLE)" | sed 's/[&/]/\\&/g'); \
@@ -124,14 +167,23 @@ new-milestone: ## Scaffold a new milestone spec: make new-milestone N=001 TITLE=
 	rewrite "s|milestone/M-XXX-<slug>|milestone/M-$(N)-<slug>|" "$$DEST"; \
 	echo "Created: $$DEST"; \
 	echo "Next: fill in Goal, Architecture Decisions, Context, Tasks, then:"; \
-	echo "  make check-spec M=active/M-$(N)"
+	echo "  make check-spec M=active/M-$(N)-$$SLUG"
 
-new-plan: ## Scaffold a milestone plan: make new-plan M=active/M-001
+new-plan: ## Scaffold a milestone plan: make new-plan M=active/M-001-short-name
 	@if [ -z "$(M)" ]; then \
-	  echo "Error: M is required. Example: make new-plan M=active/M-001"; \
+	  echo "Error: M is required. Example: make new-plan M=active/M-001-short-name"; \
 	  exit 1; \
 	fi
-	@SPEC=tasks/milestones/$(M).md; \
+	@INPUT="$(M)"; \
+	BASE=$${INPUT##*/}; \
+	ID_HINT=$$(printf '%s\n' "$$BASE" | sed -nE 's/.*(M-[0-9][0-9][0-9]).*/\1/p'); \
+	SPEC=tasks/milestones/$$INPUT/$$ID_HINT.md; \
+	if [ ! -f "$$SPEC" ]; then SPEC=tasks/milestones/$$INPUT.md; fi; \
+	if [ ! -f "$$SPEC" ]; then \
+	  for candidate in tasks/milestones/active/$$ID_HINT-*/$$ID_HINT.md tasks/milestones/done/$$ID_HINT-*/$$ID_HINT.md; do \
+	    if [ -f "$$candidate" ]; then SPEC=$$candidate; break; fi; \
+	  done; \
+	fi; \
 	if [ ! -f "$$SPEC" ]; then \
 	  echo "Error: $$SPEC not found."; \
 	  exit 1; \
@@ -142,7 +194,7 @@ new-plan: ## Scaffold a milestone plan: make new-plan M=active/M-001
 	  echo "Error: could not derive milestone ID/title from $$SPEC"; \
 	  exit 1; \
 	fi; \
-	DEST=tasks/milestones/$$ID.plan.md; \
+	DEST=$$(dirname "$$SPEC")/plan-$$ID.md; \
 	if [ -f "$$DEST" ]; then \
 	  echo "Error: $$DEST already exists."; \
 	  exit 1; \
@@ -157,12 +209,21 @@ new-plan: ## Scaffold a milestone plan: make new-plan M=active/M-001
 	echo "Next: fill the plan fields, then:"; \
 	echo "  make check-plan M=$(M)"
 
-new-verify: ## Scaffold a milestone verify report: make new-verify M=active/M-001
+new-verify: ## Scaffold a milestone verify report: make new-verify M=active/M-001-short-name
 	@if [ -z "$(M)" ]; then \
-	  echo "Error: M is required. Example: make new-verify M=active/M-001"; \
+	  echo "Error: M is required. Example: make new-verify M=active/M-001-short-name"; \
 	  exit 1; \
 	fi
-	@SPEC=tasks/milestones/$(M).md; \
+	@INPUT="$(M)"; \
+	BASE=$${INPUT##*/}; \
+	ID_HINT=$$(printf '%s\n' "$$BASE" | sed -nE 's/.*(M-[0-9][0-9][0-9]).*/\1/p'); \
+	SPEC=tasks/milestones/$$INPUT/$$ID_HINT.md; \
+	if [ ! -f "$$SPEC" ]; then SPEC=tasks/milestones/$$INPUT.md; fi; \
+	if [ ! -f "$$SPEC" ]; then \
+	  for candidate in tasks/milestones/active/$$ID_HINT-*/$$ID_HINT.md tasks/milestones/done/$$ID_HINT-*/$$ID_HINT.md; do \
+	    if [ -f "$$candidate" ]; then SPEC=$$candidate; break; fi; \
+	  done; \
+	fi; \
 	if [ ! -f "$$SPEC" ]; then \
 	  echo "Error: $$SPEC not found."; \
 	  exit 1; \
@@ -173,7 +234,7 @@ new-verify: ## Scaffold a milestone verify report: make new-verify M=active/M-00
 	  echo "Error: could not derive milestone ID/title from $$SPEC"; \
 	  exit 1; \
 	fi; \
-	DEST=tasks/milestones/$$ID.verify.md; \
+	DEST=$$(dirname "$$SPEC")/verify-$$ID.md; \
 	if [ -f "$$DEST" ]; then \
 	  echo "Error: $$DEST already exists."; \
 	  exit 1; \
@@ -218,14 +279,25 @@ run-card: ## Execute a task card (validate → bundle → codex): make run-card 
 	echo "Launching codex --yolo on $$CARD ..."; \
 	codex --yolo "$$(cat "$$CARD")"
 
-milestone-status: ## Show checkpoint progress for a milestone: make milestone-status M=active/M-001
+milestone-status: ## Show checkpoint progress for a milestone: make milestone-status M=active/M-001-short-name
 	@if [ -z "$(M)" ]; then \
-	  echo "Error: M is required. Example: make milestone-status M=active/M-001"; \
+	  echo "Error: M is required. Example: make milestone-status M=active/M-001-short-name"; \
 	  exit 1; \
 	fi
-	@ID=$${M##*/}; \
-	CHECKPOINT=tasks/milestones/$$ID.checkpoint.json; \
-	PLAN=tasks/milestones/$$ID.plan.md; \
+	@INPUT="$(M)"; \
+	BASE=$${INPUT##*/}; \
+	ID=$$(printf '%s\n' "$$BASE" | sed -nE 's/.*(M-[0-9][0-9][0-9]).*/\1/p'); \
+	if [ -z "$$ID" ]; then echo "Error: M must include a milestone id like M-001"; exit 1; fi; \
+	SPEC=tasks/milestones/$$INPUT/$$ID.md; \
+	if [ ! -f "$$SPEC" ]; then SPEC=tasks/milestones/$$INPUT.md; fi; \
+	if [ ! -f "$$SPEC" ]; then \
+	  for candidate in tasks/milestones/active/$$ID-*/$$ID.md tasks/milestones/done/$$ID-*/$$ID.md; do \
+	    if [ -f "$$candidate" ]; then SPEC=$$candidate; break; fi; \
+	  done; \
+	fi; \
+	DIR=$$(dirname "$$SPEC"); \
+	CHECKPOINT=$$DIR/checkpoint-$$ID.json; \
+	PLAN=$$DIR/plan-$$ID.md; \
 	echo "=== Milestone $$ID Status ==="; \
 	if [ ! -f "$$PLAN" ]; then \
 	  echo "  Plan:        NOT FOUND  (run: make new-plan M=$(M))"; \

@@ -8,7 +8,7 @@ Primary Module: stable-roots
 Owned Files:
 - `docs/stable-api/README.md`
 - `docs/release/v1.0.0-rc.1.md`
-- `tasks/milestones/M-005.verify.md`
+- `tasks/milestones/done/M-005-v1-release-execution/verify-M-005.md`
 Depends On:
 - 1430
 
@@ -28,7 +28,7 @@ Non-goals:
 Files:
 - `docs/stable-api/README.md`
 - `docs/release/v1.0.0-rc.1.md`
-- `tasks/milestones/M-005.verify.md`
+- `tasks/milestones/done/M-005-v1-release-execution/verify-M-005.md`
 
 Tests:
 - `go run ./internal/checks/deprecation-inventory -strict`
@@ -44,7 +44,7 @@ Done Definition:
 - No unapproved public API change is introduced.
 
 Outcome:
-- Recorded stable-root final freeze evidence in `tasks/milestones/M-005.verify.md`.
+- Recorded stable-root final freeze evidence in `tasks/milestones/done/M-005-v1-release-execution/verify-M-005.md`.
 - Updated `docs/release/v1.0.0-rc.1.md` with the stable-root final freeze command evidence.
 - Validation passed:
   - `go run ./internal/checks/deprecation-inventory -strict`

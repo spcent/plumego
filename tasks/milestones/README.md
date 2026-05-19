@@ -18,16 +18,22 @@ tasks/milestones/
 ├── README.md         ← this file
 ├── TEMPLATE.md       ← copy this for every new milestone
 ├── active/           ← specs ready for agent execution
-│   └── M-001.md
+│   └── M-001-short-name/
+│       ├── M-001.md
+│       ├── plan-M-001.md
+│       └── verify-M-001.md
 └── done/             ← completed milestones with outcome notes
-    └── M-000.md
+    └── M-000-short-name/
+        ├── M-000.md
+        ├── plan-M-000.md
+        └── verify-M-000.md
 ```
 
 ## How to Invoke
 
 ```bash
 # Single milestone
-make milestone M=active/M-001
+make milestone M=active/M-001-short-name
 ```
 
 The agent reads `AGENTS.md` for behavior boundaries before touching any code.
@@ -36,16 +42,17 @@ and acceptance criteria.
 
 Launch gate:
 
-- `make milestone M=active/M-001` now requires `tasks/milestones/M-001.plan.md`
-  to exist and pass `make check-plan M=active/M-001`.
+- `make milestone M=active/M-001-short-name` requires
+  `tasks/milestones/active/M-001-short-name/plan-M-001.md` to exist and pass
+  `make check-plan M=active/M-001-short-name`.
 
 Optional scaffold helpers:
 
 ```bash
-make new-plan M=active/M-001
-make check-plan M=active/M-001
-make new-verify M=active/M-001
-make check-verify M=active/M-001
+make new-plan M=active/M-001-short-name
+make check-plan M=active/M-001-short-name
+make new-verify M=active/M-001-short-name
+make check-verify M=active/M-001-short-name
 ```
 
 ## How to Write an Effective Spec
@@ -70,16 +77,17 @@ Keep specs under ~80 lines. If it grows longer, split it into two milestones.
 
 | State  | Location              | Meaning                          |
 |--------|-----------------------|----------------------------------|
-| active | `milestones/active/`  | Ready to run; spec is complete   |
-| done   | `milestones/done/`    | Executed; PR merged or closed    |
+| active | `milestones/active/M-NNN-short-name/` | Ready to run; spec is complete |
+| done   | `milestones/done/M-NNN-short-name/`   | Executed; PR merged or closed  |
 
-Move a file from `active/` to `done/` after the PR is merged.
-Add an `## Outcome` section to the done file with the PR number and
-which validation commands actually ran.
+Move the whole milestone directory from `active/` to `done/` after the PR is
+merged. Add an `## Outcome` section to the milestone spec with the PR number
+and which validation commands actually ran.
 
 ## Numbering
 
-Format: `M-NNN.md` (e.g., `M-001.md`, `M-042.md`).  
+Canonical milestone ID format: `M-NNN` (e.g., `M-001`, `M-042`). Directory
+format: `M-NNN-short-name`. The spec file inside the directory is `M-NNN.md`.
 Pick the next available integer. No gaps required.
 
 ## What Makes a Good Milestone Boundary

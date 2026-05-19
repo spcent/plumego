@@ -9,7 +9,7 @@ Owned Files:
 - `docs/EXTENSION_MATURITY.md`
 - `specs/extension-beta-evidence.yaml`
 - `docs/release/v1.0.0-rc.1.md`
-- `tasks/milestones/M-005.verify.md`
+- `tasks/milestones/done/M-005-v1-release-execution/verify-M-005.md`
 Depends On:
 - 1432
 
@@ -30,7 +30,7 @@ Files:
 - `docs/EXTENSION_MATURITY.md`
 - `specs/extension-beta-evidence.yaml`
 - `docs/release/v1.0.0-rc.1.md`
-- `tasks/milestones/M-005.verify.md`
+- `tasks/milestones/done/M-005-v1-release-execution/verify-M-005.md`
 
 Tests:
 - `go run ./internal/checks/extension-maturity`
@@ -47,7 +47,7 @@ Done Definition:
 
 Outcome:
 - Recorded extension maturity boundary evidence in
-  `tasks/milestones/M-005.verify.md`.
+  `tasks/milestones/done/M-005-v1-release-execution/verify-M-005.md`.
 - Updated `docs/release/v1.0.0-rc.1.md` with final extension maturity
   boundary evidence for the rc.
 - Validation passed:

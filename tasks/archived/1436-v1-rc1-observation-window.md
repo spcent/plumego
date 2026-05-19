@@ -8,7 +8,7 @@ Primary Module: release
 Owned Files:
 - `docs/release/v1.0.0.md`
 - `docs/release/v1.0.0-rc.1.md`
-- `tasks/milestones/M-005.verify.md`
+- `tasks/milestones/done/M-005-v1-release-execution/verify-M-005.md`
 - `tasks/cards/active/README.md`
 Depends On:
 - 1434
@@ -32,7 +32,7 @@ Non-goals:
 Files:
 - `docs/release/v1.0.0.md`
 - `docs/release/v1.0.0-rc.1.md`
-- `tasks/milestones/M-005.verify.md`
+- `tasks/milestones/done/M-005-v1-release-execution/verify-M-005.md`
 - `tasks/cards/active/README.md`
 
 Tests:

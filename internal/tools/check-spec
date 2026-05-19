@@ -238,14 +238,14 @@ validate_milestone() {
     elif [[ "$TARGET" == */done/* ]]; then
       ok_message "Companion plan not required for archived milestone"
     else
-      warn_message "Companion plan missing — scaffold with: make new-plan M=active/${milestone_id}"
+      warn_message "Companion plan missing — scaffold with: make new-plan M=<state>/${milestone_id}-short-name"
     fi
     if [ -f "$verify_path" ]; then
       ok_message "Companion verify exists: $verify_path"
     elif [[ "$TARGET" == */done/* ]]; then
       warn_message "Archived milestone has no companion verify artifact"
     else
-      warn_message "Companion verify missing — scaffold with: make new-verify M=active/${milestone_id}"
+      warn_message "Companion verify missing — scaffold with: make new-verify M=<state>/${milestone_id}-short-name"
     fi
   else
     warn_message "Milestone ID not resolved from title; companion artifact lookup skipped"
@@ -291,7 +291,7 @@ validate_plan() {
   echo ""
   echo "Plan structure:"
   check "Card inventory header"       "^\| Card \| Goal \| Primary Module \| Owned Files \| Depends On \| Quick Gates \|$"
-  check "Dependency edge example"     '^- `C-[0-9][0-9][0-9].*`$|^- `C-001 -> C-002`$'
+  check "Dependency edge example"     '^- `(C-)?[0-9][0-9][0-9][0-9]?.*`$|^- `C-001 -> C-002`$|^- \(none\)$|^- Cards? |^- All '
 
   echo ""
   echo "Milestone linkage:"
@@ -313,7 +313,7 @@ validate_plan() {
   echo "Template placeholder check:"
   warn "M-XXX placeholder still present"  "M-XXX"          "replace with real milestone ID"
   warn "Title placeholder"                "<Title>"        "replace with real title"
-  warn "C-001 example still present"      "^| C-001 "      "replace with real card inventory"
+  warn "C-001 example still present"      "^\| C-001 "      "replace with real card inventory"
 }
 
 validate_verify() {

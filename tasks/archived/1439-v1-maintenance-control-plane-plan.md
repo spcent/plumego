@@ -6,8 +6,8 @@ Priority: P0
 State: done
 Primary Module: release
 Owned Files:
-- `tasks/milestones/active/M-006.md`
-- `tasks/milestones/M-006.plan.md`
+- `tasks/milestones/done/M-006-v1-0-1-maintenance-lane/M-006.md`
+- `tasks/milestones/done/M-006-v1-0-1-maintenance-lane/plan-M-006.md`
 - `tasks/cards/active/README.md`
 - `tasks/milestones/ROADMAP.md`
 - `tasks/milestones/STATUS.md`
@@ -29,8 +29,8 @@ Non-goals:
 - Do not promote experimental extensions.
 
 Files:
-- `tasks/milestones/active/M-006.md`
-- `tasks/milestones/M-006.plan.md`
+- `tasks/milestones/done/M-006-v1-0-1-maintenance-lane/M-006.md`
+- `tasks/milestones/done/M-006-v1-0-1-maintenance-lane/plan-M-006.md`
 - `tasks/cards/active/README.md`
 - `tasks/milestones/ROADMAP.md`
 - `tasks/milestones/STATUS.md`
