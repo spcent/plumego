@@ -1,12 +1,11 @@
 ---
 import AgentFirstShowcase from '../../components/home/AgentFirstShowcase.astro';
+import CoreDifferentiators from '../../components/home/CoreDifferentiators.astro';
 import FinalCta from '../../components/home/FinalCta.astro';
 import Hero from '../../components/home/Hero.astro';
 import MinimalExample from '../../components/home/MinimalExample.astro';
-import ScenarioCards from '../../components/home/ScenarioCards.astro';
 import StabilityBand from '../../components/home/StabilityBand.astro';
 import ValueProps from '../../components/home/ValueProps.astro';
-import WiringContrast from '../../components/home/WiringContrast.astro';
 import MarketingLayout from '../../layouts/MarketingLayout.astro';
 import { HOME_COPY } from '../../data/site';
 
@@ -21,28 +20,7 @@ const copy = HOME_COPY.zh;
 >
   <Hero copy={copy} />
 
-  <section class="quick-spec-strip" aria-label="快速规格">
-    <div class="quick-spec-strip__inner">
-      <span class="quick-spec-item"><code>go 1.24+</code></span>
-      <span class="quick-spec-sep" aria-hidden="true">/</span>
-      <span class="quick-spec-item">零外部依赖</span>
-      <span class="quick-spec-sep" aria-hidden="true">/</span>
-      <span class="quick-spec-item"><code>9</code> 个稳定模块</span>
-      <span class="quick-spec-sep" aria-hidden="true">/</span>
-      <span class="quick-spec-item"><code>4</code> 个 beta 扩展</span>
-      <span class="quick-spec-sep" aria-hidden="true">/</span>
-      <span class="quick-spec-item">MIT</span>
-      <span class="quick-spec-sep" aria-hidden="true">/</span>
-      <a class="quick-spec-link quick-spec-item--pre" href="/zh/status">v1.0.0 · 发布状态 →</a>
-    </div>
-  </section>
-
-  <WiringContrast copy={{
-    contrastTitle: copy.contrastTitle,
-    contrastLead: copy.contrastLead,
-    contrastBeforeLabel: copy.contrastBeforeLabel,
-    contrastAfterLabel: copy.contrastAfterLabel,
-  }} />
+  <CoreDifferentiators locale="zh" />
 
   <MinimalExample locale="zh" />
 
@@ -51,8 +29,6 @@ const copy = HOME_COPY.zh;
     items={copy.stabilityBandItems}
     cta={copy.stabilityBandCta}
   />
-
-  <ScenarioCards cards={copy.scenarioCards} />
 
   <AgentFirstShowcase locale="zh" />
 
@@ -64,7 +40,7 @@ const copy = HOME_COPY.zh;
       <p>{copy.adoptionBody}</p>
     </div>
     <div class="entry-points-grid reveal-stagger">
-      {copy.adoptionCards.slice(0, 3).map((card: { kicker: string; title: string; body: string; href: string; label: string }) => (
+      {copy.adoptionCards.map((card: { kicker: string; title: string; body: string; href: string; label: string }) => (
         <article class="entry-point-card">
           <p class="entry-point-card__kicker">{card.kicker}</p>
           <h3>{card.title}</h3>

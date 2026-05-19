@@ -5,8 +5,8 @@ import JourneyBar from '../components/marketing/JourneyBar.astro';
 
 const journeySteps = [
   { label: 'Why Plumego', href: '/why-plumego' },
+  { label: 'Ecosystem', href: '/ecosystem' },
   { label: 'Agent Workflow', href: '/agent-workflow' },
-  { label: 'Docs', href: '/docs' },
 ];
 
 const controlPlaneFiles = [
@@ -279,8 +279,38 @@ const comparisonRows = [
     </div>
   </section>
 
-  <!-- CTA -->
+  <!-- Stop condition handlers — new section -->
   <section class="section">
+    <div class="section-inner section-inner--narrow">
+      <p class="section-eyebrow">stop conditions</p>
+      <h2 class="section-title">What happens when the agent hits a blocker</h2>
+      <p class="section-lead">
+        Not every task has a clear path. When an agent reaches a stop condition — unclear ownership, conflicting specs, missing acceptance criteria — the resolution path is also machine-readable.
+      </p>
+      <div class="stop-grid">
+        <div class="stop-card">
+          <p class="stop-card__trigger">Owning module is unclear</p>
+          <p class="stop-card__action">Read <code>specs/task-routing.yaml</code> → escalate with the specific routing conflict to a human reviewer</p>
+        </div>
+        <div class="stop-card">
+          <p class="stop-card__trigger">Change would force a stable root to import x/*</p>
+          <p class="stop-card__action">Stop immediately → record the blocker in the task card → do not widen scope without explicit approval</p>
+        </div>
+        <div class="stop-card">
+          <p class="stop-card__trigger">Task lacks acceptance criteria</p>
+          <p class="stop-card__action">Switch to analysis mode only → produce a preflight checklist → ask for acceptance criteria before editing</p>
+        </div>
+        <div class="stop-card">
+          <p class="stop-card__trigger">Spec, manifest, and local pattern conflict</p>
+          <p class="stop-card__action">Read <code>specs/stop-condition-handlers.yaml</code> → follow the deterministic resolution path for that condition</p>
+        </div>
+      </div>
+      <p class="stop-note">Every stop condition in <code>specs/stop-condition-handlers.yaml</code> maps to concrete next steps, an escalation action, and unblock criteria — not an open-ended decision tree.</p>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section class="section section--alt">
     <div class="section-inner section-inner--narrow">
       <div class="final-cta-panel">
         <p class="final-cta-panel__eyebrow">go deeper</p>
@@ -552,4 +582,75 @@ const comparisonRows = [
     border: 1px solid var(--hero-button-ghost-border);
   }
   .btn:hover { opacity: 0.88; }
+
+  /* Stop conditions grid */
+  .stop-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.85rem;
+    margin-bottom: 1.25rem;
+  }
+
+  @media (min-width: 640px) {
+    .stop-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+
+  .stop-card {
+    background: var(--bg-elevated);
+    border: 1px solid var(--line);
+    border-left: 3px solid color-mix(in srgb, #b45309 50%, var(--line));
+    border-radius: 0.6rem;
+    padding: 1rem 1.2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  :root[data-theme="dark"] .stop-card {
+    border-left-color: color-mix(in srgb, #fbbf4a 35%, var(--line));
+  }
+
+  .stop-card__trigger {
+    font-size: 0.84rem;
+    font-weight: 600;
+    color: var(--fg);
+    margin: 0;
+  }
+
+  .stop-card__action {
+    font-size: 0.82rem;
+    color: var(--fg-soft);
+    line-height: 1.55;
+    margin: 0;
+  }
+
+  .stop-card__action code {
+    font-family: var(--font-mono);
+    font-size: 0.76rem;
+    color: var(--accent);
+    background: var(--accent-soft);
+    padding: 0.08rem 0.35rem;
+    border-radius: 0.2rem;
+  }
+
+  .stop-note {
+    font-size: 0.83rem;
+    color: var(--fg-soft);
+    font-style: italic;
+    line-height: 1.55;
+    border-left: 2px solid var(--line);
+    padding-left: 0.75rem;
+    margin: 0;
+  }
+
+  .stop-note code {
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    color: var(--accent);
+    background: var(--accent-soft);
+    padding: 0.08rem 0.35rem;
+    border-radius: 0.2rem;
+  }
 </style>

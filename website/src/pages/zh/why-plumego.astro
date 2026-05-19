@@ -7,8 +7,8 @@ import CautionIcon from '../../components/shared/CautionIcon.astro';
 
 const journeySteps = [
   { label: '为什么选择', href: '/zh/why-plumego' },
-  { label: '示例', href: '/zh/examples' },
-  { label: '状态', href: '/zh/status' },
+  { label: '生态系统', href: '/zh/ecosystem' },
+  { label: '发布', href: '/zh/releases' },
 ];
 
 const fitChecks = [
@@ -521,16 +521,61 @@ const frameworkRows = [
     </div>
   </section>
 
+  <!-- 迁移引导入口 -->
+  <section class="section section--tinted">
+    <div class="section__intro reveal">
+      <h2>正在从其他框架迁移？</h2>
+      <p>
+        Plumego 使用标准的 <code>func(w http.ResponseWriter, r *http.Request)</code> handler，
+        现有的 stdlib 兼容中间件无需适配器即可移植。迁移指南覆盖最常见的切换路径。
+      </p>
+    </div>
+    <div class="migration-grid reveal-stagger">
+      <a class="migration-card" href="/zh/docs/guides/migrate-from-gin-echo">
+        <span class="migration-card__from">From Gin</span>
+        <span class="migration-card__arrow">→</span>
+        <div class="migration-card__body">
+          <strong>Gin → Plumego</strong>
+          <p>handler 签名、context 类型、中间件适配与响应封装变更。</p>
+        </div>
+      </a>
+      <a class="migration-card" href="/zh/docs/guides/migrate-from-gin-echo">
+        <span class="migration-card__from">From Echo</span>
+        <span class="migration-card__arrow">→</span>
+        <div class="migration-card__body">
+          <strong>Echo → Plumego</strong>
+          <p>echo.Context 替换、BindJSON 等效写法与中间件注册差异。</p>
+        </div>
+      </a>
+      <a class="migration-card" href="/zh/docs/guides/migrate-from-chi">
+        <span class="migration-card__from">From Chi</span>
+        <span class="migration-card__arrow">→</span>
+        <div class="migration-card__body">
+          <strong>Chi → Plumego</strong>
+          <p>路由组迁移、参数提取，以及添加 contract 响应层。</p>
+        </div>
+      </a>
+      <a class="migration-card" href="/zh/docs/guides/migrate-from-gin-echo">
+        <span class="migration-card__from">现有中间件</span>
+        <span class="migration-card__arrow">→</span>
+        <div class="migration-card__body">
+          <strong>中间件兼容性</strong>
+          <p>所有 stdlib 兼容中间件无需适配器。基于自定义 context 的中间件需要移植。</p>
+        </div>
+      </a>
+    </div>
+  </section>
+
   <section class="section">
-    <div class="section__intro">
+    <div class="section__intro reveal">
       <h2>下一步。</h2>
       <p>
-        适配判断已经完成。进入架构页查看完整分层图和 canonical 代码布局，在扩大采用范围前确认模块稳定性，或直接进入实现路径。
+        适配判断已经完成。进入生态系统页选择合适的 x/* 能力家族，查看架构页了解完整分层图，或直接进入实现路径。
       </p>
     </div>
     <div class="page-links">
+      <a class="text-link" href="/zh/ecosystem">生态系统——浏览所有 x/* 家族 →</a>
       <a class="text-link" href="/zh/architecture">架构——分层图与模块布局 →</a>
-      <a class="text-link" href="/zh/stability">模块稳定性矩阵 →</a>
       <a class="text-link" href="/zh/docs/getting-started">开始使用 →</a>
     </div>
   </section>
@@ -680,6 +725,87 @@ const frameworkRows = [
 
   .agent-first-callout__point span {
     color: var(--fg-soft);
+    line-height: 1.5;
+  }
+
+  /* ── 迁移引导卡片 ────────────────────────────────────────── */
+  .migration-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.85rem;
+    max-width: 64rem;
+    margin-inline: auto;
+  }
+
+  @media (min-width: 640px) {
+    .migration-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+
+  @media (min-width: 960px) {
+    .migration-grid {
+      grid-template-columns: repeat(4, 1fr);
+    }
+  }
+
+  .migration-card {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 1.1rem 1.2rem;
+    background: var(--bg-elevated);
+    border: 1px solid var(--line);
+    border-radius: 0.65rem;
+    text-decoration: none;
+    color: inherit;
+    transition: border-color 0.18s, box-shadow 0.18s;
+  }
+
+  .migration-card:hover {
+    border-color: color-mix(in srgb, var(--accent) 30%, var(--line));
+    box-shadow: var(--shadow);
+  }
+
+  .migration-card__from {
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--accent);
+    background: var(--accent-soft);
+    padding: 0.15rem 0.45rem;
+    border-radius: 0.25rem;
+    white-space: nowrap;
+    flex-shrink: 0;
+    margin-top: 0.15rem;
+  }
+
+  .migration-card__arrow {
+    color: var(--fg-soft);
+    font-size: 0.9rem;
+    flex-shrink: 0;
+    margin-top: 0.1rem;
+  }
+
+  .migration-card__body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    min-width: 0;
+  }
+
+  .migration-card__body strong {
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: var(--fg);
+    display: block;
+  }
+
+  .migration-card__body p {
+    font-size: 0.8rem;
+    color: var(--fg-soft);
+    margin: 0;
     line-height: 1.5;
   }
 </style>
