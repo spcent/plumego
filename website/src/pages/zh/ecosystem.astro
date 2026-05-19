@@ -1,0 +1,449 @@
+---
+import MarketingLayout from '../../layouts/MarketingLayout.astro';
+import PageHero from '../../components/marketing/PageHero.astro';
+import JourneyBar from '../../components/marketing/JourneyBar.astro';
+import { ECOSYSTEM_COPY } from '../../data/site';
+
+const copy = ECOSYSTEM_COPY.zh;
+
+const journeySteps = [
+  { label: '为什么选择', href: '/zh/why-plumego' },
+  { label: '生态系统', href: '/zh/ecosystem' },
+  { label: '发布', href: '/zh/releases' },
+];
+
+type FamilyCard = {
+  name: string;
+  scenario: string;
+  useCase: string;
+  maturity: string;
+  docsHref: string;
+};
+---
+
+<MarketingLayout
+  locale="zh"
+  title="生态系统 — x/* 扩展家族"
+  description={copy.description}
+  currentPath="/zh/ecosystem"
+>
+  <PageHero
+    eyebrow={copy.eyebrow}
+    title={copy.title}
+    description={copy.description}
+    locale="zh"
+  />
+
+  <JourneyBar steps={journeySteps} current="/zh/ecosystem" />
+
+  <section class="section eco-intro-section">
+    <div class="eco-intro">
+      <h2>{copy.introTitle}</h2>
+      <p>{copy.introBody}</p>
+      <p class="eco-maturity-note">
+        {copy.maturityNote}
+        <a href={copy.maturityNoteLink.href}>{copy.maturityNoteLink.label}</a>
+        {copy.maturityNoteSuffix}
+      </p>
+    </div>
+
+    <div class="eco-guide-steps">
+      {copy.guideSteps.map((step) => (
+        <div class="eco-guide-step">
+          <span class="eco-guide-step__num">{step.label}</span>
+          <div>
+            <strong class="eco-guide-step__title">{step.title}</strong>
+            <p class="eco-guide-step__body">{step.body}</p>
+          </div>
+        </div>
+      ))}
+    </div>
+  </section>
+
+  <section class="section eco-group-section">
+    <div class="eco-group-header">
+      <div class="eco-group-header__badge eco-group-header__badge--beta">beta</div>
+      <div>
+        <h2 class="eco-group-title">{copy.betaTitle}</h2>
+        <p class="eco-group-body">{copy.betaBody}</p>
+      </div>
+    </div>
+    <div class="eco-family-grid">
+      {copy.betaFamilies.map((family: FamilyCard) => (
+        <article class="eco-card eco-card--beta">
+          <div class="eco-card__top">
+            <code class="eco-card__name">{family.name}</code>
+            <span class="eco-card__badge eco-card__badge--beta">beta</span>
+          </div>
+          <p class="eco-card__scenario">{family.scenario}</p>
+          <p class="eco-card__usecase">{family.useCase}</p>
+          <a class="eco-card__link" href={family.docsHref}>模块文档 →</a>
+        </article>
+      ))}
+    </div>
+  </section>
+
+  <section class="section eco-group-section">
+    <div class="eco-group-header">
+      <div class="eco-group-header__badge eco-group-header__badge--experimental">experimental</div>
+      <div>
+        <h2 class="eco-group-title">{copy.experimentalTitle}</h2>
+        <p class="eco-group-body">{copy.experimentalBody}</p>
+      </div>
+    </div>
+    <div class="eco-family-grid eco-family-grid--experimental">
+      {copy.experimentalFamilies.map((family: FamilyCard) => (
+        <article class="eco-card eco-card--experimental">
+          <div class="eco-card__top">
+            <code class="eco-card__name">{family.name}</code>
+            <span class="eco-card__badge eco-card__badge--experimental">experimental</span>
+          </div>
+          <p class="eco-card__scenario">{family.scenario}</p>
+          <p class="eco-card__usecase">{family.useCase}</p>
+          <a class="eco-card__link" href={family.docsHref}>模块文档 →</a>
+        </article>
+      ))}
+    </div>
+  </section>
+
+  <section class="section eco-cta-section">
+    <div class="eco-cta-inner">
+      <h2>从稳定内核开始。</h2>
+      <p>
+        9 个稳定根是接触任何 x/* 家族之前推荐的起步点。
+        先读 reference app，再按需添加你真正需要的能力家族。
+      </p>
+      <div class="eco-cta-actions">
+        <a class="button button--primary" href="/zh/docs/getting-started">开始使用</a>
+        <a class="button button--ghost" href="/zh/releases">查看成熟度矩阵</a>
+      </div>
+    </div>
+  </section>
+</MarketingLayout>
+
+<style>
+  .eco-intro-section {
+    padding-block: 3rem 2rem;
+  }
+
+  .eco-intro {
+    max-width: 52rem;
+    margin-inline: auto;
+    margin-bottom: 2rem;
+  }
+
+  .eco-intro h2 {
+    font-size: 1.35rem;
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    margin: 0 0 0.75rem;
+    color: var(--fg);
+  }
+
+  .eco-intro p {
+    font-size: 0.95rem;
+    color: var(--fg-soft);
+    line-height: 1.7;
+    margin: 0 0 0.65rem;
+  }
+
+  .eco-maturity-note {
+    font-size: 0.85rem;
+    color: var(--fg-soft);
+    border-left: 2px solid var(--line);
+    padding-left: 0.75rem;
+  }
+
+  .eco-maturity-note a {
+    color: var(--accent);
+    text-decoration: none;
+  }
+
+  .eco-maturity-note a:hover {
+    text-decoration: underline;
+  }
+
+  .eco-guide-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+    max-width: 52rem;
+    margin-inline: auto;
+  }
+
+  .eco-guide-step {
+    display: flex;
+    gap: 1rem;
+    align-items: flex-start;
+    padding: 0.9rem 1.1rem;
+    background: var(--bg-elevated);
+    border: 1px solid var(--line);
+    border-radius: 0.6rem;
+  }
+
+  .eco-guide-step__num {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: var(--accent);
+    background: var(--accent-soft);
+    padding: 0.18rem 0.5rem;
+    border-radius: 0.25rem;
+    flex-shrink: 0;
+    margin-top: 0.1rem;
+  }
+
+  .eco-guide-step__title {
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: var(--fg);
+    display: block;
+    margin-bottom: 0.2rem;
+  }
+
+  .eco-guide-step__body {
+    font-size: 0.83rem;
+    color: var(--fg-soft);
+    margin: 0;
+    line-height: 1.55;
+  }
+
+  .eco-group-section {
+    padding-block: 2.5rem;
+  }
+
+  .eco-group-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+    max-width: 72rem;
+    margin-inline: auto;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+  }
+
+  .eco-group-header__badge {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    padding: 0.25rem 0.6rem;
+    border-radius: 0.3rem;
+    flex-shrink: 0;
+    margin-top: 0.3rem;
+    white-space: nowrap;
+  }
+
+  .eco-group-header__badge--beta {
+    background: color-mix(in srgb, #2a7d4f 12%, var(--bg-elevated));
+    color: #2a7d4f;
+    border: 1px solid color-mix(in srgb, #2a7d4f 25%, transparent);
+  }
+
+  :root[data-theme="dark"] .eco-group-header__badge--beta {
+    color: #5ecf8a;
+    background: color-mix(in srgb, #5ecf8a 12%, var(--bg-elevated));
+    border-color: color-mix(in srgb, #5ecf8a 22%, transparent);
+  }
+
+  .eco-group-header__badge--experimental {
+    background: color-mix(in srgb, #b45309 12%, var(--bg-elevated));
+    color: #b45309;
+    border: 1px solid color-mix(in srgb, #b45309 22%, transparent);
+  }
+
+  :root[data-theme="dark"] .eco-group-header__badge--experimental {
+    color: #fbbf4a;
+    background: color-mix(in srgb, #fbbf4a 12%, var(--bg-elevated));
+    border-color: color-mix(in srgb, #fbbf4a 22%, transparent);
+  }
+
+  .eco-group-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    margin: 0 0 0.3rem;
+    color: var(--fg);
+  }
+
+  .eco-group-body {
+    font-size: 0.88rem;
+    color: var(--fg-soft);
+    margin: 0;
+    max-width: 56rem;
+    line-height: 1.6;
+  }
+
+  .eco-family-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1rem;
+    max-width: 72rem;
+    margin-inline: auto;
+  }
+
+  @media (min-width: 600px) {
+    .eco-family-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+
+  @media (min-width: 900px) {
+    .eco-family-grid {
+      grid-template-columns: repeat(4, 1fr);
+    }
+
+    .eco-family-grid--experimental {
+      grid-template-columns: repeat(3, 1fr);
+    }
+  }
+
+  .eco-card {
+    background: var(--bg-elevated);
+    border: 1px solid var(--line);
+    border-radius: 0.75rem;
+    padding: 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+    transition: border-color 0.18s, box-shadow 0.18s;
+  }
+
+  .eco-card:hover {
+    box-shadow: var(--shadow);
+  }
+
+  .eco-card--beta:hover {
+    border-color: color-mix(in srgb, #2a7d4f 30%, var(--line));
+  }
+
+  :root[data-theme="dark"] .eco-card--beta:hover {
+    border-color: color-mix(in srgb, #5ecf8a 25%, var(--line));
+  }
+
+  .eco-card--experimental:hover {
+    border-color: color-mix(in srgb, #b45309 25%, var(--line));
+  }
+
+  :root[data-theme="dark"] .eco-card--experimental:hover {
+    border-color: color-mix(in srgb, #fbbf4a 22%, var(--line));
+  }
+
+  .eco-card__top {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+  }
+
+  .eco-card__name {
+    font-family: var(--font-mono);
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--accent);
+    background: var(--accent-soft);
+    padding: 0.12rem 0.45rem;
+    border-radius: 0.25rem;
+  }
+
+  .eco-card__badge {
+    font-size: 0.65rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    padding: 0.1rem 0.4rem;
+    border-radius: 0.2rem;
+  }
+
+  .eco-card__badge--beta {
+    background: color-mix(in srgb, #2a7d4f 12%, var(--bg-elevated));
+    color: #2a7d4f;
+    border: 1px solid color-mix(in srgb, #2a7d4f 22%, transparent);
+  }
+
+  :root[data-theme="dark"] .eco-card__badge--beta {
+    color: #5ecf8a;
+    background: color-mix(in srgb, #5ecf8a 10%, var(--bg-elevated));
+    border-color: color-mix(in srgb, #5ecf8a 20%, transparent);
+  }
+
+  .eco-card__badge--experimental {
+    background: color-mix(in srgb, #b45309 10%, var(--bg-elevated));
+    color: #b45309;
+    border: 1px solid color-mix(in srgb, #b45309 20%, transparent);
+  }
+
+  :root[data-theme="dark"] .eco-card__badge--experimental {
+    color: #fbbf4a;
+    background: color-mix(in srgb, #fbbf4a 10%, var(--bg-elevated));
+    border-color: color-mix(in srgb, #fbbf4a 18%, transparent);
+  }
+
+  .eco-card__scenario {
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--fg-soft);
+    margin: 0;
+  }
+
+  .eco-card__usecase {
+    font-size: 0.84rem;
+    color: var(--fg-soft);
+    line-height: 1.6;
+    margin: 0;
+    flex: 1;
+  }
+
+  .eco-card__link {
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: var(--accent);
+    text-decoration: none;
+    margin-top: 0.2rem;
+    transition: color 0.15s;
+  }
+
+  .eco-card__link:hover {
+    color: var(--accent-strong);
+    text-decoration: underline;
+  }
+
+  .eco-cta-section {
+    padding-block: 4rem;
+  }
+
+  .eco-cta-inner {
+    max-width: 44rem;
+    margin-inline: auto;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+    align-items: center;
+  }
+
+  .eco-cta-inner h2 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    margin: 0;
+    color: var(--fg);
+  }
+
+  .eco-cta-inner p {
+    font-size: 0.95rem;
+    color: var(--fg-soft);
+    line-height: 1.65;
+    margin: 0;
+    max-width: 36rem;
+  }
+
+  .eco-cta-actions {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin-top: 0.5rem;
+  }
+</style>

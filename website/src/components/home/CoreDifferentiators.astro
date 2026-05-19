@@ -116,6 +116,22 @@ const t = copy[locale];
   </div>
 </section>
 
+<script>
+  const initDiffSpotlight = () => {
+    document.querySelectorAll<HTMLElement>('.diff-card').forEach((card) => {
+      card.addEventListener('mousemove', (e) => {
+        const r = card.getBoundingClientRect();
+        card.style.setProperty('--spotlight-x', ((e.clientX - r.left) / r.width * 100).toFixed(1) + '%');
+        card.style.setProperty('--spotlight-y', ((e.clientY - r.top) / r.height * 100).toFixed(1) + '%');
+        card.style.setProperty('--spotlight-op', '1');
+      });
+      card.addEventListener('mouseleave', () => card.style.setProperty('--spotlight-op', '0'));
+    });
+  };
+  document.addEventListener('astro:page-load', initDiffSpotlight);
+  initDiffSpotlight();
+</script>
+
 <style>
   .differentiators-section {
     padding-block: 4rem;
