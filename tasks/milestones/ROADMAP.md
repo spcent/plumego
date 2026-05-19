@@ -45,6 +45,8 @@ Update this file when you add, complete, or reorder milestones.
 | M-017 | gRPC Support | [ ] | M-014 | Parallel with M-015/M-018; x/rpc server, client, gateway |
 | M-018 | Multi-Tenant Admin Reference | [ ] | M-010 | Parallel; reference/with-tenant-admin using x/tenant primitives |
 | M-019 | Module Ecosystem Foundation | [ ] | M-017 | Community extension schema, plumego add command, authoring guide |
+| M-020 | Community Discovery & Documentation Overhaul | [ ] | M-008 | Parallel; README overhaul, stdlib comparison table, stable root pkg.go.dev doc comments |
+| M-021 | Agent-First Ecosystem Visibility | [ ] | M-019 | docs/AGENT_FIRST.md, three GitHub Actions CI templates, README agent-first section |
 
 ---
 
@@ -65,13 +67,16 @@ M-001 ──► M-002 ──► M-003 ──┐
              └────► M-004 ──┼──► M-005
                               │
 M-001 ────────────────────────┘
-M-005 ───────────────────────────► M-006 ──► M-007 ──► M-008 ──► M-009 ──► M-010 ──► M-016
-                                                                  │         │
-                                                                  ├──────── ├──────────────► M-014 ──► M-017 ──► M-019
-                                                                  │         │
-                                                                  ├── M-011 └──────────────► M-015
-                                                                  ├── M-012               M-009 ──► M-015
-                                                                  └── M-013             M-010 ──► M-018
+M-005 ──► M-006 ──► M-007 ──► M-008 ──► M-009 ──► M-010 ──► M-016
+                               │         │                    │
+                               │         ├──► M-014 ──► M-017 ──► M-019 ──► M-021
+                               │         │
+                               │         └──► M-015
+                               │
+                               ├──► M-011   M-009 ──► M-015
+                               ├──► M-012   M-010 ──► M-018
+                               ├──► M-013
+                               └──► M-020
 ```
 
 ---
