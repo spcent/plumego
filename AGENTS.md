@@ -6,6 +6,10 @@ Plumego is an agent-first Go toolkit built on the standard-library HTTP model.
 Keep the stable surface small, ownership obvious, and every change easy to
 review and reverse.
 
+Go module: `github.com/spcent/plumego`
+Go version: `go 1.24.0`, toolchain `go1.24.4`
+Main module policy: standard library only unless explicitly approved.
+
 ## 1. Authority
 
 Use this file for hard rules and validation order. Read only the control-plane
@@ -99,6 +103,26 @@ Hard boundaries:
   top-level roots such as `net`, `utils`, `validator`, `tenant`, `ai`, `rest`,
   `frontend`, or `pubsub`.
 
+### Other Directories
+
+| Path | Purpose |
+|---|---|
+| `reference/standard-service` | Canonical application layout |
+| `reference/production-service` | Production-oriented explicit wiring reference |
+| `reference/with-*` | Scenario-specific reference apps |
+| `reference/workerfleet` | Separate worker-oriented submodule reference |
+| `cmd/plumego/` | CLI: dev server, dashboard, scaffold |
+| `internal/checks/` | Boundary, manifest, workflow, and maturity validation |
+| `internal/testutil/` | Shared test helpers |
+| `specs/` | Machine-readable authority: routing, taxonomy, dependency rules, quality rules |
+| `specs/change-recipes/` | Reusable prompt recipes for standard task shapes |
+| `specs/stop-condition-handlers.yaml` | Resolution paths for every agent stop condition |
+| `specs/request-flows.yaml` | Machine-readable request flow diagrams (module ownership per step) |
+| `tasks/milestones/` | Milestone specs and execution plans |
+| `tasks/cards/` | Incremental task cards |
+| `docs/` | All control-plane documentation |
+| `website/` | Documentation generation |
+
 ## 4. Canonical Defaults
 
 - Handler shape: `func(http.ResponseWriter, *http.Request)`
@@ -107,7 +131,7 @@ Hard boundaries:
 - Error write path: `contract.WriteError` with structured error codes
 - Success write path: `contract.WriteResponse`
 - DI: constructor-based and visible in route wiring
-- Middleware: `func(http.Handler) http.Handler`, transport-only
+- Middleware: `func(http.Handler) http.Handler`, transport-only; `next` called exactly once; no service injection, business DTO assembly, or domain-policy branching
 - Reference app: `reference/standard-service`
 
 Do not add one-off handler styles, response envelopes, error helper families, or
@@ -135,10 +159,21 @@ For review requests, do not patch unless explicitly asked. Findings come first,
 ordered by severity, with boundary violations, regressions, hidden coupling, and
 missing tests prioritized.
 
-Before editing, follow the preflight checklist in
-`docs/AGENT_CODE_QUALITY_RULES.md`: identify the owning module, in-scope and
-out-of-scope paths, public API impact, dependency impact, behavior impact,
-security impact, docs impact, and validation plan.
+Before editing, complete the following preflight checklist (full rules in
+`docs/AGENT_CODE_QUALITY_RULES.md`):
+
+```text
+Owning module:
+Target module.yaml read:
+In-scope paths:
+Out-of-scope paths:
+Public API impact: none / yes
+Dependency impact: none / yes
+Behavior impact: none / yes
+Security impact: none / yes
+Docs impact: none / yes
+Validation plan:
+```
 
 ## 6. Change Rules
 
@@ -204,9 +239,17 @@ Extra focus:
 - tenant: quota, policy, and isolation
 - store: concurrency and persistence correctness
 
-Use `specs/agent-quality-rules.yaml` to select the lightest sufficient gate
-profile: docs-only, single-module behavior, stable-root change,
-router/middleware/security, or cross-module/public-API/release-relevant.
+Select the lightest sufficient gate profile:
+
+| Change type | Gate |
+|---|---|
+| Docs only | Check accuracy, links, authority order. No Go gates unless code/config changed. |
+| Single module behavior | `go test -race ./<module>/...`, `go vet ./<module>/...` |
+| Stable root change | Single-module gates + dependency-rules + agent-workflow + module-manifests |
+| router / middleware / security | Module gates + dependency-rules; confirm negative-path and ordering tests |
+| Cross-module, public API, release | Full `make gates` + extension maturity/beta-evidence + `deprecation-inventory -strict` |
+
+See `specs/agent-quality-rules.yaml` for the machine-readable version of these profiles.
 
 Do not expand checked-in baselines or generated snapshots casually.
 
@@ -218,7 +261,6 @@ semantics, lifecycle behavior, or boundaries change. Common sync targets:
 - `README.md`
 - `README_CN.md`
 - `AGENTS.md`
-- `CLAUDE.md`
 - `env.example`
 
 Also update module primers under `docs/modules/`, `docs/EXTENSION_MATURITY.md`,
@@ -242,5 +284,32 @@ When executing a milestone:
 - run the full acceptance criteria before pushing
 - package the PR with `docs/github-workflows/milestone-pr-template.md`
 
-Use `docs/MILESTONE_PIPELINE.md`, `tasks/milestones/README.md`, and the milestone
-templates for detailed planning, card, verify, and PR packaging rules.
+Scaffold commands: `make new-milestone`, `make new-plan`, `make new-card`,
+`make new-verify`. Use milestones for multi-step work; use task cards for small
+fixes.
+
+Additional targets:
+
+- `make run-card C=active/NNNN-slug` — validate card, generate bundle, launch execution
+- `make milestone-status M=active/M-NNN` — display phase checkpoint progress
+
+See `docs/MILESTONE_PIPELINE.md` and `tasks/milestones/README.md` for detailed
+planning, card, verify, and PR packaging rules.
+
+## 11. Anti-Patterns
+
+Do not introduce:
+
+- Stable package imports of `x/*`
+- New dependencies without approval
+- Context-based service lookup or package-level mutable registries
+- `init()` side-effect registration
+- Route auto-discovery or reflection-based wiring
+- Middleware that builds business DTOs or injects services
+- Ad hoc JSON response helpers or per-feature error envelopes
+- New handler signatures
+- New panic-only constructors for fallible behavior
+- Generic `utils` packages
+- Compatibility wrappers without a removal plan
+- New broad root names: `ai`, `tenant`, `net`, `pubsub`, `rest`, `validator`,
+  `utils`, `frontend`
