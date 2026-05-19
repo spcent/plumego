@@ -3,7 +3,7 @@
 Milestone: M-020
 Recipe: specs/change-recipes/update-docs.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: docs
 Owned Files:
 - `README.md`
@@ -82,4 +82,12 @@ gofmt -l .
 
 ## Outcome
 
-<!-- Agent fills after completion -->
+Completed in commit `756ce330`.
+
+Updated `README.md` and `README_CN.md` with mirrored quick-start, comparison,
+package overview, and help sections.
+
+Validation run:
+
+- `go run ./internal/checks/module-manifests`
+- `gofmt -l .`

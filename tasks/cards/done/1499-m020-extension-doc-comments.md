@@ -3,7 +3,7 @@
 Milestone: M-020
 Recipe: specs/change-recipes/update-docs.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: security
 Owned Files:
 - `security/authn/*.go`
@@ -89,4 +89,19 @@ go run ./internal/checks/module-manifests
 
 ## Outcome
 
-<!-- Agent fills after completion -->
+Completed in commit `1456908d`.
+
+Added remaining stable-root godoc coverage and examples for JWT verification,
+memory cache get/set, and logger construction.
+
+Validation run:
+
+- `go test -run=Example ./security/...`
+- `go test -run=Example ./store/...`
+- `go test -run=Example ./health/...`
+- `go test -run=Example ./log/...`
+- `go test -run=Example ./metrics/...`
+- `go vet ./security/... ./store/... ./health/... ./log/... ./metrics/...`
+- `gofmt -l ./security/ ./store/ ./health/ ./log/ ./metrics/`
+- `go run ./internal/checks/public-entrypoints-sync`
+- `go run ./internal/checks/module-manifests`

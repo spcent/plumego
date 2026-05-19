@@ -3,7 +3,7 @@
 Milestone: M-020
 Recipe: specs/change-recipes/update-docs.yaml
 Priority: P1
-State: active
+State: done
 Primary Module: core
 Owned Files:
 - `core/*.go`
@@ -82,4 +82,17 @@ go run ./internal/checks/public-entrypoints-sync
 
 ## Outcome
 
-<!-- Agent fills after completion -->
+Completed in commit `f1bae9a3`.
+
+Added package-level godoc and examples for `core`, `router`, `contract`, and
+selected `middleware` subpackages.
+
+Validation run:
+
+- `go test -run=Example ./core/...`
+- `go test -run=Example ./router/...`
+- `go test -run=Example ./contract/...`
+- `go test -run=Example ./middleware/...`
+- `go vet ./core/... ./router/... ./contract/... ./middleware/...`
+- `gofmt -l ./core/ ./router/ ./contract/ ./middleware/`
+- `go run ./internal/checks/public-entrypoints-sync`
