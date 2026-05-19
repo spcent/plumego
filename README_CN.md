@@ -1,291 +1,112 @@
-# Plumego — 仅基于golang标准库的 Web 工具包
+# Plumego — 标准库优先的 Go Web 工具包
 
 [![Go 版本](https://img.shields.io/badge/Go-1.24%2B-00ADD8?style=flat&logo=go)](https://go.dev/)
 [![状态](https://img.shields.io/badge/status-v1.0.0-blue)](https://github.com/spcent/plumego/releases/tag/v1.0.0)
 [![许可证](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-Plumego 是一个小型 Go HTTP 工具包，完全基于标准库实现，同时覆盖路由、中间件、优雅关闭、安全辅助、传输适配器以及可选的 `x/*` 能力包。它设计为嵌入到你自己的 `main` 包中，而不是作为一个独立的框架二进制文件运行。
+Plumego 是一个基于 Go 标准库构建的小型 HTTP 工具包。它把 `net/http`
+兼容性放在核心位置：处理器仍是普通的
+`func(http.ResponseWriter, *http.Request)`，中间件仍包装 `http.Handler`，
+应用装配仍显式写在你自己的 `main` 包中。
 
-**专为人类工程师与 AI 代码代理共同维护而设计的 Go Web 工具包。**
-
-Plumego 的采用路径应保持收敛：
-
-1. 先从兼容标准库的 HTTP 处理器开始
-2. 保持稳定内核足够小（`core`、`router`、`contract`、`middleware`）
-3. 按规范参考应用显式装配
-4. 使用 agent-first 控制面完成变更和评审
-5. 只有在场景需要时才添加 `x/*` 能力
-
-5 分钟、30 分钟和 1 天采用路径见 [`docs/ADOPTION_PATH.md`](./docs/ADOPTION_PATH.md)。
-
-## 为人类工程师与 AI 代理团队设计
-
-大多数 Go 框架以初始启动速度为优化目标。Plumego 以长期可维护性为核心，适合人类工程师与 AI 代码代理共享代码库、共同承担评审与执行责任的团队。
-
-| 特性 | 价值 |
-|---|---|
-| **小 API 面** | 代理无需扫描宽泛的 API，直接将改动定位到正确模块 |
-| **清晰的归属边界** | `specs/task-routing.yaml` 在编辑前就告诉代理改动属于哪里 |
-| **机器可读规范** | `specs/` 是一等控制面，依赖规则、变更配方和高风险区域标记均为 YAML 格式 |
-| **每模块 `module.yaml`** | 每个模块声明各自的检查项和作用域，代理只运行相关的检查 |
-| **标准化检查命令** | `make gates` 与 `go run ./internal/checks/...` 提供可重复的验证循环 |
-| **显式任务卡** | `tasks/cards/` 提供范围明确、可验证的工作单元，代理执行时不会扩大范围 |
-| **高风险区域显式标记** | `specs/package-hotspots.yaml` 在改动落地前标记模糊边界 |
-| **文档与行为同步检查** | 自动化检查防止文档与实现行为产生漂移 |
-
-## 仓库演进方向
-
-目标仓库结构已经稳定为：
-
-- 稳定根级包：`core`、`router`、`contract`、`middleware`、`security`、`store`、`health`、`log`、`metrics`
-- 扩展能力包：`x/*`
-- 架构权威文档：`docs/architecture/*`
-- 机器可读规则：`specs/*`
-- 仓库原生执行面：`tasks/*`
-
-仓库控制面拆分如下：
-
-- `docs/`：面向人的说明、架构、模块导读与路线图
-- `specs/`：机器可读规则、归属边界、依赖策略与变更配方
-- `tasks/`：可执行工作卡与代理面向的任务队列
-
-不要把 `specs/` 挪进 `docs/`。在 Plumego 中，`specs/` 是一等仓库控制面，而不是附属说明文档。
-
-后续架构规划与重构请优先参考：
-
-- `docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md`
-- `docs/CANONICAL_STYLE_GUIDE.md`
-- `docs/ADOPTION_PATH.md`
-- `docs/stable-api/README.md`
-- `docs/release/PRE_V1_RELEASE_CHECKLIST.md`
-- `specs/repo.yaml`
-- `specs/task-routing.yaml`
-- `specs/extension-taxonomy.yaml`
-- `specs/package-hotspots.yaml`
-- `specs/dependency-rules.yaml`
-- `specs/checks.yaml`
-- `specs/change-recipes/*`
-- `<模块>/module.yaml`
-
-当前优先级与剩余扩展工作见 `docs/ROADMAP.md`。
-
-机器强制执行的仓库护栏位于 `internal/checks/*`，并直接在 CI 中执行。
-
-新的应用结构工作应遵循唯一规范路径：
-
-- 先看 `reference/standard-service`，以它作为目录结构和装配方式的标准
-- `reference/standard-service` 有意只依赖稳定根级包；`x/*` 示例都不属于规范路径
-
-## 当前支持矩阵
-
-该矩阵描述的是当前仓库在 `v1.0.0` 标签之后的状态。不同层级的兼容性承诺并不相同。
-
-| 范围 | 状态 | 兼容性承诺 | 模块 |
-| --- | --- | --- | --- |
-| 稳定根级库 | `ga` | 这些公开包承载 v1 稳定根兼容性承诺 | `core`、`router`、`contract`、`middleware`、`security`、`store`、`health`、`log`、`metrics` |
-| 规范参考应用 | 支持的参考实现 | 保持与规范启动路径和稳定根级用法一致，但不作为扩展能力目录 | `reference/standard-service` |
-| CLI | 受支持工具 | 作为命令行工具受支持，而不是 Go import 面；命令行为和生成产物必须与规范文档保持一致 | `cmd/plumego` |
-| Beta 扩展族 | `beta` | API 表面在次版本发布引用之间已冻结；通过两个连续打标引用无导出 API 变化并经负责人签字后晋升 | `x/gateway`、`x/observability`、`x/rest`、`x/websocket` |
-| 面向应用的扩展族 | 实验性 | 纳入仓库质量门禁和发布范围，但 API / 配置兼容性尚未冻结 | `x/ai`、`x/data`、`x/fileapi`、`x/frontend`、`x/messaging`、`x/resilience`、`x/tenant` |
-| 从属扩展原语 | 实验性 | 保持维护和测试，但发现入口应先从所属能力族开始，兼容性尚未冻结 | `x/cache`、`x/devtools`、`x/gateway/discovery`、`x/gateway/ipc`、`x/messaging/mq`、`x/messaging/pubsub`、`x/messaging/scheduler`、`x/messaging/webhook`、`x/ops` |
-
-## 亮点
-- **路由器支持分组和参数**：基于 Trie 的匹配器，支持 `/:param` 段、路由冻结，以及每路由/分组的中件栈。
-- **中间件链**：日志、恢复、gzip、CORS、超时（默认缓冲上限 10 MiB）、限流、并发限制、请求体大小限制、安全头，以及认证辅助工具，全部包装标准 `http.Handler`。
-- **安全辅助**：JWT + 密码工具、安全头策略、输入安全校验与基础防滥用组件，便于进行安全基线加固。
-- **集成扩展**：提供 `database/sql`、Redis 缓存，以及扩展层的服务发现与消息能力。优先从 `x/data`、`x/gateway` 与 `x/messaging` 入手；只有在需要直接操作对应原语时才进入 `x/cache`、`x/gateway/discovery` 或 `x/messaging/mq`。
-- **幂等工具**：`store/idempotency` 保留稳定幂等记录与接口；KV/SQL 持久化 provider 位于 `x/data/idempotency`。
-- **结构化日志钩子**：接入自定义日志器，并通过中间件钩子收集指标/链路追踪。
-- **优雅生命周期**：显式的准备、启动与关闭流程，包含连接排水，以及可选的 TLS/HTTP2 配置，带有合理默认值。
-- **可选服务**：WebSocket、Webhook、前端托管、网关、消息等能力都位于 `x/*`，并且有意不进入规范应用路径。
-- **任务调度**：通过 `x/messaging/scheduler` 提供进程内 cron、延迟任务与可重试任务。
-
-新代码应在应用自己的装配包中显式注册路由、中间件和后台任务。Plumego 已经移除了 `core` 中的兼容组件层。
+稳定表面刻意保持收敛。先从 `core`、`router`、`contract` 和
+`middleware` 开始；只有在职责需要时，再加入 `security`、`store`、
+`health`、`log` 和 `metrics`。
 
 ## 快速开始
 
-建议先读 [`docs/getting-started.md`](./docs/getting-started.md)，再打开 [`reference/standard-service`](./reference/standard-service) 查看规范应用结构。
-
-推荐的上手顺序：
-
-1. [`docs/getting-started.md`](./docs/getting-started.md) 先跑通最小可运行示例
-2. [`reference/standard-service`](./reference/standard-service) 再看规范应用结构与路由装配
-3. [`docs/README.md`](./docs/README.md) 再进入面向人的文档入口
-4. 当参考路径不再够用时，再进入 `specs/*` 和 `tasks/*`
-
-最小可运行示例：
+创建 `main.go`：
 
 ```go
 package main
 
 import (
-    "log"
-    "net/http"
+	"log"
+	"net/http"
 
-    "github.com/spcent/plumego/contract"
-    "github.com/spcent/plumego/core"
+	"github.com/spcent/plumego/contract"
+	"github.com/spcent/plumego/core"
 )
 
 func main() {
-    cfg := core.DefaultConfig()
-    cfg.Addr = ":8080"
-
-    app := core.New(cfg, core.AppDependencies{})
-    if err := app.Get("/ping", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-        if err := contract.WriteResponse(w, r, http.StatusOK, map[string]string{
-            "message": "pong",
-        }, nil); err != nil {
-            http.Error(w, "write response", http.StatusInternalServerError)
-        }
-    })); err != nil {
-        log.Fatalf("register route: %v", err)
-    }
-
-    if err := app.Prepare(); err != nil {
-        log.Fatalf("prepare server: %v", err)
-    }
-    srv, err := app.Server()
-    if err != nil {
-        log.Fatalf("get server: %v", err)
-    }
-
-    log.Println("server started at :8080")
-    log.Fatal(srv.ListenAndServe())
+	cfg := core.DefaultConfig()
+	cfg.Addr = ":8080"
+	app := core.New(cfg, core.AppDependencies{})
+	if err := app.Get("/ping", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = contract.WriteResponse(w, r, http.StatusOK, map[string]string{"message": "pong"}, nil)
+	})); err != nil {
+		log.Fatal(err)
+	}
+	if err := app.Prepare(); err != nil {
+		log.Fatal(err)
+	}
+	srv, err := app.Server()
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Fatal(srv.ListenAndServe())
 }
 ```
 
-如果想走 `app.Run()` 这种将准备与启动合并的路径，可以直接使用它；如果需要显式生命周期控制，例如拿到 `*http.Server` 后再包一层、调整 TLS 策略或自定义关闭行为，则使用 `app.Prepare()` + `app.Server()`。这两种路径在 [`docs/getting-started.md`](./docs/getting-started.md) 里都有并排说明。
-
-## 配置基础
-- 环境变量应在 `main` 包中显式加载。若应用本地工具需要知道当前 `.env` 路径，例如 `devtools` 热重载，请把它放在应用本地配置里，例如参考实现中的 `cfg.App.EnvFile`。
-- `core` 现在走配置优先构造：先从 `core.DefaultConfig()` 取得基线，再调整类型化的 `core.AppConfig`，最后传给 `core.New(cfg, ...)`。
-- `core.New(cfg, ...)` 默认使用丢弃型日志器。如果希望有请求日志或运行期日志，请显式注入 `core.AppDependencies{Logger: ...}`。
-- 日志器生命周期归调用方所有。`Prepare()` 和 `Shutdown(ctx)` 不会替你初始化、刷新或关闭注入的日志实现。
-- 常用变量：`AUTH_TOKEN`（`x/ops` 组件默认鉴权配置）、`WS_SECRET`（WebSocket JWT 签名密钥，至少 32 字节）、`WEBHOOK_TRIGGER_TOKEN`、`GITHUB_WEBHOOK_SECRET` 和 `STRIPE_WEBHOOK_SECRET`（详见 `env.example`）。
-- `core.AppConfig` 负责服务地址、TLS 以及 HTTP 服务超时/硬化设置。请求体限制与并发限制属于显式中间件装配，不属于 `core` 自身配置。
-- `core.AppConfig.HTTP2Enabled` 通过 `TLSNextProto` 控制准备好的 `http.Server` TLS HTTP/2 策略；它不是 h2c 或所有 HTTP/2 场景的总开关。
-- TLS 仍走同一条显式启动路径：core 的稳定 TLS API 只负责基础证书/私钥加载，`Prepare()` 会把这些材料加载进准备好的 `*http.Server`，高级 TLS 策略由调用方在 `Server().TLSConfig` 上调整，再选择 `ListenAndServe()` 或 `ListenAndServeTLS("", "")`。
-- `Server()` 返回准备好的 `*http.Server` 以保持 `net/http` 兼容。若调用方替换 `Handler`、`ConnState`、`TLSConfig` 或 `TLSNextProto` 等字段，该覆盖行为归调用方所有，并可能绕过 core middleware、打开连接跟踪、已加载 TLS 材料或 HTTP/2 策略。
-- `Shutdown(ctx)` 成功后，app 仍保持 `server_prepared` 并保留同一个已关闭的 `*http.Server`；需要新的可监听服务时应创建新的 `core.App`，而 `ServeHTTP` 仍可用于处理器风格测试或嵌入。
-- 安全基线建议通过 `app.Use(...)` 显式组合，例如 `middleware/security.Middleware(security.Config{...})` 与 `middleware/ratelimit.NewAbuseGuard(...).Middleware()`。
-- 调试模式与 devtools 已拆分：调试开关应放在应用本地配置里，例如参考实现中的 `cfg.App.Debug`；如果需要 devtools，请在应用本地装配中显式注册相关路由，不要把它视为规范内核路径的一部分。
-- `/_debug` 下的调试端点（路由表、中间件、配置快照、指标、`pprof`、手动重载）现在由 `x/devtools` 提供，而不是 `core` 内建。这些端点仅用于本地开发或受保护环境，生产环境应关闭或加访问控制。
-- 当接入 `x/devtools` 时，`/_debug/config` 会暴露仓库自带工具使用的稳定运行时快照：地址、环境文件、服务超时、drain 配置、TLS 配置以及内核的 `preparation_state`。
-
-## 代理优先工作流
-- 规范应用启动路径从 `reference/standard-service` 开始。
-- 机器可读的任务入口规则位于 `specs/task-routing.yaml`。
-- 模块负责人、风险级别和默认验证入口统一写在各自的 `<模块>/module.yaml` 中。
-- 标准变更配方位于 `specs/change-recipes/*`。
-- 模块导读文档位于 `docs/modules/*`，并应与各模块清单的 `doc_paths` 保持一致。
-- 次级任务族入口也已固定：前端静态资源从 `x/frontend` 开始，本地调试能力从 `x/devtools` 开始，服务发现通过 `x/gateway` 能力族进入 `x/gateway/discovery`，受保护管理端点从 `x/ops` 开始。
-- 这些次级扩展根是能力入口，不是应用启动面。
-
-## 能力导览
-
-根 README 作为入口页使用。具体能力说明统一放在 `docs/modules/*`。
-
-稳定根级模块：
-
-- [core](./docs/modules/core/README.md) — 应用内核、生命周期与共享运行时装配
-- [router](./docs/modules/router/README.md) — 路由匹配、参数、分组与反向路由
-- [middleware](./docs/modules/middleware/README.md) — 传输层中间件
-- [contract](./docs/modules/contract/README.md) — 响应与错误契约
-- [security](./docs/modules/security/README.md) — 认证、安全头、输入安全、防滥用
-- [store](./docs/modules/store/README.md) — 持久化原语
-- [health](./docs/modules/health/README.md) — 就绪状态与健康模型
-- [log](./docs/modules/log/README.md) 与 [metrics](./docs/modules/metrics/README.md) — 基础日志与指标契约
-
-面向应用的扩展能力族：
-
-- [x/tenant](./docs/modules/x-tenant/README.md) — 多租户、配额、策略与租户感知数据路径
-- [x/rest](./docs/modules/x-rest/README.md) — 资源 API 与 CRUD 标准化
-- [x/websocket](./docs/modules/x-websocket/README.md) — WebSocket 传输
-- [x/messaging](./docs/modules/x-messaging/README.md) — 消息能力入口
-- [x/fileapi](./docs/modules/x-fileapi/README.md) — 文件上传/下载传输
-- [x/gateway](./docs/modules/x-gateway/README.md) — 边缘传输、IPC 辅助与服务发现
-- [x/frontend](./docs/modules/x-frontend/README.md) — 前端静态资源托管
-- [x/observability](./docs/modules/x-observability/README.md)、[x/ops](./docs/modules/x-ops/README.md) 与 [x/devtools](./docs/modules/x-devtools/README.md) — 可观测性、受保护运维面与本地调试工具
-- [x/data](./docs/modules/x-data/README.md)、[x/cache](./docs/modules/x-cache/README.md)、[x/resilience](./docs/modules/x-resilience/README.md) 与 [x/ai](./docs/modules/x-ai/README.md) — 拓扑型数据能力、缓存适配器、可复用韧性原语与 AI 能力
-
-## 参考应用
-`reference/standard-service` 是规范参考应用。它只依赖稳定根级包，并演示：
-
-- 默认应用目录结构
-- `main.go` 中的显式启动流程
-- `internal/app/routes.go` 中的显式路由注册
-- `internal/config` 下的应用本地配置
-- 最小稳定根级装配
-
-运行方式：
+运行：
 
 ```bash
-cd reference/standard-service
-go run .
+go mod init example.com/hello
+go get github.com/spcent/plumego@latest
+go run main.go
 ```
 
-## 延伸阅读
+打开 `http://localhost:8080/ping`。
 
-- [`docs/getting-started.md`](./docs/getting-started.md) — 最小可运行示例
-- [`reference/standard-service`](./reference/standard-service) — 规范参考应用
-- [`docs/README.md`](./docs/README.md) — 文档入口
-- [`env.example`](./env.example) — 环境变量参考
-- [`cmd/plumego/DEV_SERVER.md`](./cmd/plumego/DEV_SERVER.md) — 开发服务器与仪表盘细节
+完成这个示例后，再阅读
+[`reference/standard-service`](./reference/standard-service)，查看生产风格的规范应用结构。
 
-## 开发与测试
-- 安装 Go 1.24+（匹配 `go.mod`）。
-- 运行与 CI 等价的完整门禁：`make gates`。
-- 聚焦修改时，先运行目标包的 `go test -timeout 20s ./<package>` 和
-  `go vet ./<package>`。
-- 使用 `gofmt -w <paths>` 格式化改过的 Go 文件。
+## 为什么选择 plumego
 
-## 开发服务器与仪表盘
+Plumego 适合那些需要比原生 `http.ServeMux` 更多结构、但又不想引入大型框架模型的 Go 服务。
 
-`plumego` CLI 包含一个强大的开发服务器，它本身就是使用 plumego 框架构建的。它提供热重载、实时监控和 Web 仪表盘，大大提升开发体验。
+| 原则 | plumego 的做法 |
+| --- | --- |
+| 标准库优先 | 使用普通 handler、中间件、request、response writer 和 `*http.Server`。 |
+| 显式装配 | 路由、中间件、依赖和生命周期都能在构造位置直接看到。 |
+| 小型稳定表面 | 稳定根包职责清晰，避免变成功能目录。 |
+| 便于代理维护 | `specs/`、`tasks/` 和每模块 `module.yaml` 让范围与验证方式可发现。 |
+| 可选能力 | 产品功能和协议适配放在稳定学习路径之外。 |
 
-仪表盘**默认启用** - 只需运行 `plumego dev` 即可开始使用。
+## 标准库对比
 
-**定位差异与生产建议**
-- `cfg.App.Debug` 是应用本地元数据。需要 `/_debug` 端点时应显式挂载 `x/devtools` 路由；生产环境应关闭或加访问控制。
-- `plumego dev` 仪表盘是本地开发工具，运行独立的仪表盘服务，不建议在生产环境对外暴露。
-- 仪表盘可能读取应用的 `/_debug` 端点用于路由/配置/指标/pprof 展示，因此仅建议在本地或受控环境启用。
+| 能力 | `http.ServeMux` | plumego |
+| --- | --- | --- |
+| 基础路由 | 方法处理由调用方自行判断。 | 通过 `Get`、`Post` 和 `AddRoute` 等方法注册一个方法、一个路径、一个处理器。 |
+| `{param}` 路径提取 | 调用方手动解析路径段。 | 路由器匹配路径参数，并通过请求上下文读取。 |
+| 路由分组 | 调用方手动重复路径前缀。 | 分组为相关路由注册统一前缀。 |
+| 分组中间件 | 调用方手动为每棵子树组合处理器。 | 分组可携带共享中间件，同时保持 `http.Handler` 形状。 |
+| 命名路由与反向 URL | 调用方手动拼接 URL。 | 命名路由通过 app/router API 支持反向 URL 生成。 |
+| 准备后冻结路由 | 调用方只要继续改装配代码，路由就可能变化。 | `Prepare` 在服务启动前冻结路由变更。 |
+| 结构化错误响应 | 调用方定义每一种响应形状。 | `contract.WriteError` 提供规范结构化错误路径。 |
+| Request ID 上下文传递 | 调用方自行选择并传播约定。 | Request ID 辅助函数使用显式上下文访问器，并提供中间件支持。 |
+| 优雅生命周期 | 调用方自行组织 server 设置与关闭策略。 | `Prepare`、`Server` 和 `Shutdown` 让生命周期显式且可复用。 |
 
-### 启动开发服务器
+## 包导览
 
-```bash
-plumego dev
-# 仪表盘：http://localhost:9999
-# 你的应用：http://localhost:8080
-```
+| 包 | 职责 |
+| --- | --- |
+| `core` | 应用构造、路由注册入口、中间件挂载和服务生命周期。 |
+| `router` | 路由匹配、路径参数、分组、路由元数据和反向 URL 生成。 |
+| `contract` | 规范响应写入、结构化错误构造、请求元数据和传输绑定辅助。 |
+| `middleware` | 传输层中间件组合和一方中间件包。 |
+| `security` | 认证、JWT、密码、安全头、输入安全和防滥用原语。 |
+| `store` | 面向缓存、KV、文件、数据库和幂等场景的稳定存储契约与内存原语。 |
+| `health` | 面向应用与依赖状态的健康和就绪模型。 |
+| `log` | 最小日志接口和默认日志器实现。 |
+| `metrics` | 面向计数器、仪表、耗时和收集器的最小指标契约。 |
 
-### 仪表盘功能
+可选能力族位于 `x/*`。应把它们视为稳定根路径上的显式增量，而不是另一套应用结构。
 
-每个 `plumego dev` 会话都包含：
+## 获取帮助
 
-- **实时日志**：流式传输应用程序的 stdout/stderr，支持过滤
-- **路由浏览器**：自动发现并展示应用程序的所有 HTTP 路由
-- **指标仪表盘**：监控运行时间、PID、健康状态和性能
-- **构建管理**：查看构建输出并手动触发重新构建
-- **应用控制**：从 UI 中启动、停止和重启应用程序
-- **热重载**：文件更改时自动重新构建和重启（< 5 秒）
-
-### 自定义配置
-
-```bash
-# 自定义应用端口
-plumego dev --addr :3000
-
-# 自定义仪表盘端口
-plumego dev --dashboard-addr :8888
-
-# 自定义监听模式
-plumego dev --watch "**/*.go,**/*.yaml"
-
-# 调整热重载灵敏度
-plumego dev --debounce 1s
-```
-
-完整文档请参见 `cmd/plumego/DEV_SERVER.md`。
-
-## 文档
-规范文档入口与优先级顺序：`docs/README.md`。
+- 从 [`docs/getting-started.md`](./docs/getting-started.md) 开始，查看最小可运行教程。
+- 使用 [`reference/standard-service`](./reference/standard-service) 作为规范应用结构。
+- 阅读 [`docs/CANONICAL_STYLE_GUIDE.md`](./docs/CANONICAL_STYLE_GUIDE.md)，了解处理器、中间件、路由和依赖注入约定。
+- 浏览 [`docs/modules`](./docs/modules)，查看各包的模块导读。
+- 查看 [`docs/ADOPTION_PATH.md`](./docs/ADOPTION_PATH.md)，了解 5 分钟、30 分钟和 1 天采用路径。
