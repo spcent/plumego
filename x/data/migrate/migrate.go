@@ -1,34 +1,33 @@
-// Package migrate wraps goose migration execution for independently versioned
-// x/data migration runners.
+// Package migrate defines a dependency-free migration runner contract for
+// x/data callers.
 package migrate
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
-	"io/fs"
-	"os"
-	"path/filepath"
-	"strconv"
-	"strings"
 	"time"
-
-	"github.com/pressly/goose/v3"
 )
 
 var (
 	// ErrInvalidConfig is returned when migrator construction input is invalid.
 	ErrInvalidConfig = errors.New("migrate: invalid config")
 
-	// ErrMigrationFailed is returned when a goose operation fails.
+	// ErrMigrationFailed is returned when a migration operation fails.
 	ErrMigrationFailed = errors.New("migrate: operation failed")
 )
 
-// Migrator executes SQL migrations through goose.
+// Runner executes migration operations.
+type Runner interface {
+	Up(context.Context) error
+	Down(context.Context) error
+	Status(context.Context) ([]MigrationStatus, error)
+	Close() error
+}
+
+// Migrator executes SQL migrations through a caller-provided runner.
 type Migrator struct {
-	provider *goose.Provider
-	empty    bool
+	runner Runner
 }
 
 // MigrationStatus describes one migration and whether it is pending or applied.
@@ -39,61 +38,20 @@ type MigrationStatus struct {
 	AppliedAt *time.Time `json:"applied_at,omitempty"`
 }
 
-// New creates a migrator using SQLite3 dialect. Use NewWithDialect for other databases.
-func New(db *sql.DB, migrationsDir string) (*Migrator, error) {
-	return NewWithDialect(goose.DialectSQLite3, db, migrationsDir)
-}
-
-// NewWithDialect creates a migrator for an explicit goose dialect.
-func NewWithDialect(dialect goose.Dialect, db *sql.DB, migrationsDir string) (*Migrator, error) {
-	if db == nil {
-		return nil, fmt.Errorf("%w: database is nil", ErrInvalidConfig)
+// New creates a migrator from a caller-provided runner.
+func New(runner Runner) (*Migrator, error) {
+	if runner == nil {
+		return nil, fmt.Errorf("%w: runner is nil", ErrInvalidConfig)
 	}
-	info, err := os.Stat(migrationsDir)
-	if err != nil {
-		return nil, fmt.Errorf("%w: migrations directory: %w", ErrInvalidConfig, err)
-	}
-	if !info.IsDir() {
-		return nil, fmt.Errorf("%w: migrations path is not a directory", ErrInvalidConfig)
-	}
-
-	provider, err := goose.NewProvider(dialect, db, os.DirFS(migrationsDir), goose.WithDisableGlobalRegistry(true))
-	if err != nil {
-		if isNoMigrationsError(err) {
-			return &Migrator{empty: true}, nil
-		}
-		return nil, fmt.Errorf("%w: create goose provider: %w", ErrInvalidConfig, err)
-	}
-	return &Migrator{provider: provider}, nil
-}
-
-// NewWithFS creates a migrator from a caller-provided filesystem.
-func NewWithFS(dialect goose.Dialect, db *sql.DB, fsys fs.FS) (*Migrator, error) {
-	if db == nil {
-		return nil, fmt.Errorf("%w: database is nil", ErrInvalidConfig)
-	}
-	if fsys == nil {
-		return nil, fmt.Errorf("%w: filesystem is nil", ErrInvalidConfig)
-	}
-	provider, err := goose.NewProvider(dialect, db, fsys, goose.WithDisableGlobalRegistry(true))
-	if err != nil {
-		if isNoMigrationsError(err) {
-			return &Migrator{empty: true}, nil
-		}
-		return nil, fmt.Errorf("%w: create goose provider: %w", ErrInvalidConfig, err)
-	}
-	return &Migrator{provider: provider}, nil
+	return &Migrator{runner: runner}, nil
 }
 
 // Up applies all pending migrations.
 func (m *Migrator) Up(ctx context.Context) error {
-	if m == nil || m.provider == nil {
-		if m != nil && m.empty {
-			return nil
-		}
+	if m == nil || m.runner == nil {
 		return fmt.Errorf("%w: migrator is nil", ErrMigrationFailed)
 	}
-	if _, err := m.provider.Up(ctx); err != nil {
+	if err := m.runner.Up(ctx); err != nil {
 		return fmt.Errorf("%w: up: %w", ErrMigrationFailed, err)
 	}
 	return nil
@@ -101,13 +59,10 @@ func (m *Migrator) Up(ctx context.Context) error {
 
 // Down rolls back one applied migration.
 func (m *Migrator) Down(ctx context.Context) error {
-	if m == nil || m.provider == nil {
-		if m != nil && m.empty {
-			return nil
-		}
+	if m == nil || m.runner == nil {
 		return fmt.Errorf("%w: migrator is nil", ErrMigrationFailed)
 	}
-	if _, err := m.provider.Down(ctx); err != nil {
+	if err := m.runner.Down(ctx); err != nil {
 		return fmt.Errorf("%w: down: %w", ErrMigrationFailed, err)
 	}
 	return nil
@@ -115,50 +70,20 @@ func (m *Migrator) Down(ctx context.Context) error {
 
 // Status returns pending and applied migration state.
 func (m *Migrator) Status(ctx context.Context) ([]MigrationStatus, error) {
-	if m == nil || m.provider == nil {
-		if m != nil && m.empty {
-			return nil, nil
-		}
+	if m == nil || m.runner == nil {
 		return nil, fmt.Errorf("%w: migrator is nil", ErrMigrationFailed)
 	}
-	statuses, err := m.provider.Status(ctx)
+	statuses, err := m.runner.Status(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("%w: status: %w", ErrMigrationFailed, err)
 	}
-	out := make([]MigrationStatus, 0, len(statuses))
-	for _, status := range statuses {
-		if status == nil || status.Source == nil {
-			continue
-		}
-		entry := MigrationStatus{
-			Version: status.Source.Version,
-			Name:    migrationName(status.Source.Path, status.Source.Version),
-			State:   string(status.State),
-		}
-		if !status.AppliedAt.IsZero() {
-			appliedAt := status.AppliedAt
-			entry.AppliedAt = &appliedAt
-		}
-		out = append(out, entry)
-	}
-	return out, nil
+	return append([]MigrationStatus(nil), statuses...), nil
 }
 
 // Close releases provider resources.
 func (m *Migrator) Close() error {
-	if m == nil || m.provider == nil {
+	if m == nil || m.runner == nil {
 		return nil
 	}
-	return m.provider.Close()
-}
-
-func migrationName(path string, version int64) string {
-	base := filepath.Base(path)
-	base = strings.TrimSuffix(base, filepath.Ext(base))
-	prefix := strconv.FormatInt(version, 10) + "_"
-	return strings.TrimPrefix(base, prefix)
-}
-
-func isNoMigrationsError(err error) bool {
-	return strings.Contains(err.Error(), "no migrations found")
+	return m.runner.Close()
 }

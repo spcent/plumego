@@ -1,30 +1,54 @@
-// Package gateway adapts grpc-gateway runtime handlers to net/http.
+// Package gateway adapts caller-owned RPC HTTP handlers to net/http.
 package gateway
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"strings"
-
-	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 )
 
+var ErrHandlerNil = errors.New("rpc gateway handler is nil")
+
+// HandlerFunc is a dependency-free RPC-to-HTTP handler shape.
+type HandlerFunc func(http.ResponseWriter, *http.Request, map[string]string)
+
+// Option configures HTTPTranscoder construction.
+type Option func(*HTTPTranscoder)
+
 type HTTPTranscoder struct {
-	mux    *runtime.ServeMux
+	mux    *http.ServeMux
 	target string
 }
 
-func New(target string, opts ...runtime.ServeMuxOption) *HTTPTranscoder {
-	return &HTTPTranscoder{
-		mux:    runtime.NewServeMux(opts...),
+func New(target string, opts ...Option) *HTTPTranscoder {
+	t := &HTTPTranscoder{
+		mux:    http.NewServeMux(),
 		target: strings.TrimSpace(target),
 	}
+	for _, opt := range opts {
+		if opt != nil {
+			opt(t)
+		}
+	}
+	return t
 }
 
-func (t *HTTPTranscoder) Register(ctx context.Context, handler runtime.HandlerFunc, pattern string) error {
+func (t *HTTPTranscoder) Register(ctx context.Context, handler HandlerFunc, pattern string) error {
 	_ = ctx
+	if handler == nil {
+		return ErrHandlerNil
+	}
 	method, path := splitPattern(pattern)
-	return t.mux.HandlePath(method, path, handler)
+	t.mux.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != method {
+			w.Header().Set("Allow", method)
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		handler(w, r, nil)
+	})
+	return nil
 }
 
 func (t *HTTPTranscoder) Handler() http.Handler {

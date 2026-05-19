@@ -4,7 +4,7 @@ layer: extension
 status: experimental
 owner: persistence
 risk: medium
-summary: goose-backed database migration runner for x/data callers.
+summary: Dependency-free database migration runner contract for x/data callers.
 
 parent_family: x/data
 
@@ -17,7 +17,7 @@ entrypoint_reads:
   - x/data/module.yaml
 
 responsibilities:
-  - goose provider construction
+  - migration runner wrapping
   - migration up/down execution
   - migration status projection
 
@@ -50,12 +50,12 @@ change_risks:
   - accidental live database test dependency
 
 review_checklist:
-  - Keep goose isolated to this separately versioned module
+  - Keep concrete migration engines outside this package
   - Keep tests offline with in-memory SQLite
   - Preserve context propagation
   - Do not add database drivers to the main module or CLI module
 
 agent_hints:
-  - Use New for SQLite-backed tests and NewWithDialect for explicit production dialects
+  - Use New with a caller-owned runner implementation
   - Keep migration file creation in the CLI internal migrate package
-  - Keep goose dependencies out of cmd/plumego
+  - Keep migration engine dependencies out of core and extension packages

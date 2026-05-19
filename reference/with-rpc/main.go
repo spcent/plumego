@@ -38,8 +38,10 @@ func run(ctx context.Context) error {
 	defer cancel()
 
 	lis := bufconn.Listen(bufSize)
-	grpcServer := rpcserver.New()
-	grpcServer.RegisterService(&helloServiceDesc, helloService{})
+	grpcServer := rpcserver.New(grpcRuntime{server: grpc.NewServer()})
+	if err := grpcServer.RegisterService(&helloServiceDesc, helloService{}); err != nil {
+		return fmt.Errorf("register grpc service: %w", err)
+	}
 	grpcDone := make(chan error, 1)
 	go func() {
 		grpcDone <- grpcServer.Serve(lis)
@@ -57,7 +59,7 @@ func run(ctx context.Context) error {
 	}
 
 	transcoder := rpcgateway.New("bufconn")
-	if err := transcoder.Register(ctx, helloHTTPHandler(conn), "GET /v1/hello"); err != nil {
+	if err := transcoder.Register(ctx, adaptRuntimeHandler(helloGatewayHandler(conn)), "GET /v1/hello"); err != nil {
 		return fmt.Errorf("register transcoder: %w", err)
 	}
 
@@ -103,7 +105,7 @@ func run(ctx context.Context) error {
 	return nil
 }
 
-func helloHTTPHandler(conn *grpc.ClientConn) runtime.HandlerFunc {
+func helloGatewayHandler(conn *grpc.ClientConn) runtime.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request, _ map[string]string) {
 		var out wrapperspb.StringValue
 		err := conn.Invoke(r.Context(), helloMethod, &emptypb.Empty{}, &out)
@@ -114,6 +116,37 @@ func helloHTTPHandler(conn *grpc.ClientConn) runtime.HandlerFunc {
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]string{"message": out.Value})
 	}
+}
+
+func adaptRuntimeHandler(handler runtime.HandlerFunc) rpcgateway.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request, params map[string]string) {
+		handler(w, r, params)
+	}
+}
+
+type grpcRuntime struct {
+	server *grpc.Server
+}
+
+func (r grpcRuntime) RegisterService(desc any, impl any) error {
+	serviceDesc, ok := desc.(*grpc.ServiceDesc)
+	if !ok {
+		return fmt.Errorf("unexpected service descriptor %T", desc)
+	}
+	r.server.RegisterService(serviceDesc, impl)
+	return nil
+}
+
+func (r grpcRuntime) Serve(lis net.Listener) error {
+	return r.server.Serve(lis)
+}
+
+func (r grpcRuntime) GracefulStop() {
+	r.server.GracefulStop()
+}
+
+func (r grpcRuntime) Stop() {
+	r.server.Stop()
 }
 
 type helloServiceAPI interface {

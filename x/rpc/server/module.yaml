@@ -4,7 +4,7 @@ layer: extension
 status: experimental
 owner: rpc
 risk: medium
-summary: gRPC server lifecycle wrapper for x/rpc callers.
+summary: Caller-owned RPC server lifecycle wrapper for x/rpc callers.
 
 parent_family: x/rpc
 
@@ -17,7 +17,7 @@ entrypoint_reads:
   - x/rpc/module.yaml
 
 responsibilities:
-  - gRPC server construction
+  - RPC runtime lifecycle wrapping
   - Explicit service registration delegation
   - Blocking serve lifecycle
   - Context-aware graceful shutdown
@@ -59,7 +59,7 @@ test_commands:
   - go vet ./...
 
 review_checklist:
-  - Keep server ownership limited to gRPC lifecycle
+  - Keep server ownership limited to runtime lifecycle
   - Require explicit RegisterService calls
   - Return context cancellation from graceful shutdown
   - Avoid hidden process-wide server state

@@ -35,7 +35,6 @@ type Error struct {
 	Fields []FieldError `json:"fields"`
 }
 
-// Error implements the error interface.
 func (e Error) Error() string {
 	if len(e.Fields) == 0 {
 		return "validation failed"

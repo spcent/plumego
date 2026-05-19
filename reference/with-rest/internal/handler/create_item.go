@@ -5,8 +5,8 @@ import (
 	"net/http"
 
 	"github.com/spcent/plumego/contract"
+	"github.com/spcent/plumego/reference/with-rest/internal/validation/playground"
 	plumego "github.com/spcent/plumego/x/validate"
-	"github.com/spcent/plumego/x/validate/playground"
 )
 
 // CreateItemRequest is the validated request body for the demo create handler.

@@ -176,12 +176,6 @@ func specHelperGoMod(appDir string, target specTarget, modules []goModuleInfo) s
 			continue
 		}
 		replaces[module.Path] = module.Replace.Dir
-		if module.Path == "github.com/spcent/plumego" {
-			openapiDir := filepath.Join(module.Replace.Dir, "x", "openapi")
-			if _, err := os.Stat(openapiDir); err == nil {
-				replaces["github.com/spcent/plumego/x/openapi"] = openapiDir
-			}
-		}
 	}
 
 	keys := make([]string, 0, len(replaces))
@@ -195,7 +189,7 @@ func specHelperGoMod(appDir string, target specTarget, modules []goModuleInfo) s
 	b.WriteString("go 1.24.0\n\n")
 	b.WriteString("require (\n")
 	fmt.Fprintf(&b, "\t%s v0.0.0\n", target.ModulePath)
-	b.WriteString("\tgithub.com/spcent/plumego/x/openapi v0.0.0\n")
+	b.WriteString("\tgithub.com/spcent/plumego v0.0.0\n")
 	b.WriteString("\tgopkg.in/yaml.v3 v3.0.1\n")
 	b.WriteString(")\n\n")
 	for _, key := range keys {

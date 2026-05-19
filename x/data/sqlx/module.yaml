@@ -4,7 +4,7 @@ layer: extension
 status: experimental
 owner: persistence
 risk: medium
-summary: sqlx adapter for database/sql-backed data access in the x/data family.
+summary: database/sql-backed query and transaction interfaces in the x/data family.
 
 parent_family: x/data
 
@@ -17,9 +17,8 @@ entrypoint_reads:
   - x/data/module.yaml
 
 responsibilities:
-  - sqlx database construction
-  - sqlx query and transaction adapter methods
-  - named query and named exec helpers
+  - database/sql construction
+  - database/sql query and transaction adapter methods
 
 non_goals:
   - ORM behavior
@@ -51,12 +50,12 @@ change_risks:
   - accidental live database test dependency
 
 review_checklist:
-  - Keep sqlx isolated to this separately versioned module
+  - Keep concrete sqlx imports outside this package
   - Preserve explicit context arguments
   - Keep tests offline with go-sqlmock
   - Do not modify stable store/db interfaces
 
 agent_hints:
-  - Use New for production sqlx.Open construction
-  - Use NewWithDB when the application already owns the sqlx.DB lifecycle
+  - Use New for production sql.Open construction
+  - Use NewWithDB when the application already owns the sql.DB lifecycle
   - Keep SQL helper behavior in this module rather than store/db

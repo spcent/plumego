@@ -1,43 +1,49 @@
-// Package server wraps grpc.Server with explicit lifecycle helpers.
+// Package server wraps caller-owned RPC runtimes with explicit lifecycle
+// helpers.
 package server
 
 import (
 	"context"
+	"errors"
 	"net"
-
-	"google.golang.org/grpc"
 )
 
-type Option = grpc.ServerOption
+var ErrRuntimeNil = errors.New("rpc server runtime is nil")
+
+// Runtime is the dependency-free lifecycle surface required by Server.
+type Runtime interface {
+	RegisterService(desc any, impl any) error
+	Serve(net.Listener) error
+	GracefulStop()
+	Stop()
+}
 
 type Server struct {
-	grpc *grpc.Server
+	runtime Runtime
 }
 
-func New(opts ...grpc.ServerOption) *Server {
-	return &Server{grpc: grpc.NewServer(opts...)}
+func New(runtime Runtime) *Server {
+	return &Server{runtime: runtime}
 }
 
-func WithInterceptors(unary grpc.UnaryServerInterceptor, stream grpc.StreamServerInterceptor) []Option {
-	opts := make([]Option, 0, 2)
-	if unary != nil {
-		opts = append(opts, grpc.ChainUnaryInterceptor(unary))
+func (s *Server) RegisterService(desc any, impl any) error {
+	if s == nil || s.runtime == nil {
+		return ErrRuntimeNil
 	}
-	if stream != nil {
-		opts = append(opts, grpc.ChainStreamInterceptor(stream))
-	}
-	return opts
-}
-
-func (s *Server) RegisterService(desc *grpc.ServiceDesc, impl any) {
-	s.grpc.RegisterService(desc, impl)
+	return s.runtime.RegisterService(desc, impl)
 }
 
 func (s *Server) Serve(lis net.Listener) error {
-	return s.grpc.Serve(lis)
+	if s == nil || s.runtime == nil {
+		return ErrRuntimeNil
+	}
+	return s.runtime.Serve(lis)
 }
 
 func (s *Server) GracefulStop(ctx context.Context) error {
+	if s == nil || s.runtime == nil {
+		return ErrRuntimeNil
+	}
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
@@ -46,7 +52,7 @@ func (s *Server) GracefulStop(ctx context.Context) error {
 
 	done := make(chan struct{})
 	go func() {
-		s.grpc.GracefulStop()
+		s.runtime.GracefulStop()
 		close(done)
 	}()
 
@@ -54,7 +60,7 @@ func (s *Server) GracefulStop(ctx context.Context) error {
 	case <-done:
 		return nil
 	case <-ctx.Done():
-		s.grpc.Stop()
+		s.runtime.Stop()
 		<-done
 		return ctx.Err()
 	}

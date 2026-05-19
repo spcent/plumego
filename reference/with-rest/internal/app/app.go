@@ -13,8 +13,8 @@ import (
 	"github.com/spcent/plumego/reference/with-rest/internal/config"
 	"github.com/spcent/plumego/reference/with-rest/internal/domain/user"
 	"github.com/spcent/plumego/reference/with-rest/internal/handler"
+	"github.com/spcent/plumego/reference/with-rest/internal/validation/playground"
 	"github.com/spcent/plumego/x/rest"
-	"github.com/spcent/plumego/x/validate/playground"
 )
 
 // App holds application-wide dependencies.

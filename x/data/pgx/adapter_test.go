@@ -6,16 +6,13 @@ import (
 	"fmt"
 	"reflect"
 	"testing"
-
-	driver "github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
 )
 
 func TestQueryRowReturnsScannedValue(t *testing.T) {
 	pool := &fakePool{
 		row: fakeRow{values: []any{"plumego"}},
 	}
-	db := newWithRunner(pool)
+	db := NewWithPool(pool)
 
 	var got string
 	if err := db.QueryRow(t.Context(), "select name").Scan(&got); err != nil {
@@ -33,7 +30,7 @@ func TestQueryReturnsMultipleRows(t *testing.T) {
 	pool := &fakePool{
 		rows: &fakeRows{values: [][]any{{"alpha"}, {"beta"}}},
 	}
-	db := newWithRunner(pool)
+	db := NewWithPool(pool)
 
 	rows, err := db.Query(t.Context(), "select name")
 	if err != nil {
@@ -59,9 +56,9 @@ func TestQueryReturnsMultipleRows(t *testing.T) {
 
 func TestExecAffectsRowCount(t *testing.T) {
 	pool := &fakePool{
-		execTag: pgconn.NewCommandTag("UPDATE 3"),
+		execTag: fakeCommandTag{rows: 3},
 	}
-	db := newWithRunner(pool)
+	db := NewWithPool(pool)
 
 	tag, err := db.Exec(t.Context(), "update widgets set active = true")
 	if err != nil {
@@ -74,9 +71,9 @@ func TestExecAffectsRowCount(t *testing.T) {
 
 func TestBeginTxCommitSucceeds(t *testing.T) {
 	tx := &fakeTx{}
-	db := newWithRunner(&fakePool{tx: tx})
+	db := NewWithPool(&fakePool{tx: tx})
 
-	started, err := db.BeginTx(t.Context(), driver.TxOptions{})
+	started, err := db.BeginTx(t.Context(), nil)
 	if err != nil {
 		t.Fatalf("begin tx: %v", err)
 	}
@@ -90,9 +87,9 @@ func TestBeginTxCommitSucceeds(t *testing.T) {
 
 func TestBeginTxRollbackSucceeds(t *testing.T) {
 	tx := &fakeTx{}
-	db := newWithRunner(&fakePool{tx: tx})
+	db := NewWithPool(&fakePool{tx: tx})
 
-	started, err := db.BeginTx(t.Context(), driver.TxOptions{})
+	started, err := db.BeginTx(t.Context(), nil)
 	if err != nil {
 		t.Fatalf("begin tx: %v", err)
 	}
@@ -104,24 +101,30 @@ func TestBeginTxRollbackSucceeds(t *testing.T) {
 	}
 }
 
-func TestNewConnectionFailureReturnsError(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
-
-	if _, err := New(ctx, "postgres://user:pass@127.0.0.1:1/plumego"); err == nil {
-		t.Fatal("expected connection error")
+func TestNewPingsPool(t *testing.T) {
+	pool := &fakePool{}
+	db, err := New(t.Context(), pool)
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+	if db.Pool() != pool {
+		t.Fatal("New() did not wrap pool")
+	}
+	if !pool.pinged {
+		t.Fatal("expected pool to be pinged")
 	}
 }
 
 type fakePool struct {
-	row         driver.Row
-	rows        driver.Rows
-	tx          driver.Tx
-	execTag     pgconn.CommandTag
+	row         Row
+	rows        Rows
+	tx          Tx
+	execTag     CommandTag
 	queryRowSQL string
+	pinged      bool
 }
 
-func (p *fakePool) QueryRow(_ context.Context, query string, _ ...any) driver.Row {
+func (p *fakePool) QueryRow(_ context.Context, query string, _ ...any) Row {
 	p.queryRowSQL = query
 	if p.row == nil {
 		return fakeRow{err: errors.New("row not configured")}
@@ -129,18 +132,18 @@ func (p *fakePool) QueryRow(_ context.Context, query string, _ ...any) driver.Ro
 	return p.row
 }
 
-func (p *fakePool) Query(context.Context, string, ...any) (driver.Rows, error) {
+func (p *fakePool) Query(context.Context, string, ...any) (Rows, error) {
 	if p.rows == nil {
 		return nil, errors.New("rows not configured")
 	}
 	return p.rows, nil
 }
 
-func (p *fakePool) Exec(context.Context, string, ...any) (pgconn.CommandTag, error) {
+func (p *fakePool) Exec(context.Context, string, ...any) (CommandTag, error) {
 	return p.execTag, nil
 }
 
-func (p *fakePool) BeginTx(context.Context, driver.TxOptions) (driver.Tx, error) {
+func (p *fakePool) BeginTx(context.Context, TxOptions) (Tx, error) {
 	if p.tx == nil {
 		return nil, errors.New("tx not configured")
 	}
@@ -148,10 +151,19 @@ func (p *fakePool) BeginTx(context.Context, driver.TxOptions) (driver.Tx, error)
 }
 
 func (p *fakePool) Ping(context.Context) error {
+	p.pinged = true
 	return nil
 }
 
 func (p *fakePool) Close() {}
+
+type fakeCommandTag struct {
+	rows int64
+}
+
+func (t fakeCommandTag) RowsAffected() int64 {
+	return t.rows
+}
 
 type fakeRow struct {
 	values []any
@@ -180,14 +192,6 @@ func (r *fakeRows) Err() error {
 	return r.err
 }
 
-func (r *fakeRows) CommandTag() pgconn.CommandTag {
-	return pgconn.NewCommandTag(fmt.Sprintf("SELECT %d", len(r.values)))
-}
-
-func (r *fakeRows) FieldDescriptions() []pgconn.FieldDescription {
-	return nil
-}
-
 func (r *fakeRows) Next() bool {
 	if r.index >= len(r.values) {
 		r.closed = true
@@ -204,28 +208,9 @@ func (r *fakeRows) Scan(dest ...any) error {
 	return scanValues(dest, r.values[r.index-1])
 }
 
-func (r *fakeRows) Values() ([]any, error) {
-	if r.index == 0 || r.index > len(r.values) {
-		return nil, errors.New("values called without current row")
-	}
-	return append([]any(nil), r.values[r.index-1]...), nil
-}
-
-func (r *fakeRows) RawValues() [][]byte {
-	return nil
-}
-
-func (r *fakeRows) Conn() *driver.Conn {
-	return nil
-}
-
 type fakeTx struct {
 	committed  bool
 	rolledBack bool
-}
-
-func (t *fakeTx) Begin(context.Context) (driver.Tx, error) {
-	return &fakeTx{}, nil
 }
 
 func (t *fakeTx) Commit(context.Context) error {
@@ -238,36 +223,16 @@ func (t *fakeTx) Rollback(context.Context) error {
 	return nil
 }
 
-func (t *fakeTx) CopyFrom(context.Context, driver.Identifier, []string, driver.CopyFromSource) (int64, error) {
-	return 0, nil
-}
-
-func (t *fakeTx) SendBatch(context.Context, *driver.Batch) driver.BatchResults {
-	return nil
-}
-
-func (t *fakeTx) LargeObjects() driver.LargeObjects {
-	return driver.LargeObjects{}
-}
-
-func (t *fakeTx) Prepare(context.Context, string, string) (*pgconn.StatementDescription, error) {
-	return nil, nil
-}
-
-func (t *fakeTx) Exec(context.Context, string, ...any) (pgconn.CommandTag, error) {
-	return pgconn.CommandTag{}, nil
-}
-
-func (t *fakeTx) Query(context.Context, string, ...any) (driver.Rows, error) {
-	return &fakeRows{}, nil
-}
-
-func (t *fakeTx) QueryRow(context.Context, string, ...any) driver.Row {
+func (t *fakeTx) QueryRow(context.Context, string, ...any) Row {
 	return fakeRow{}
 }
 
-func (t *fakeTx) Conn() *driver.Conn {
-	return nil
+func (t *fakeTx) Query(context.Context, string, ...any) (Rows, error) {
+	return &fakeRows{}, nil
+}
+
+func (t *fakeTx) Exec(context.Context, string, ...any) (CommandTag, error) {
+	return fakeCommandTag{}, nil
 }
 
 func scanValues(dest []any, values []any) error {

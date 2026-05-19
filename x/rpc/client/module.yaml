@@ -4,7 +4,7 @@ layer: extension
 status: experimental
 owner: rpc
 risk: medium
-summary: gRPC client connection pool and unary interceptors for x/rpc callers.
+summary: Transport-neutral RPC client connection pool and unary interceptors for x/rpc callers.
 
 parent_family: x/rpc
 
@@ -17,10 +17,10 @@ entrypoint_reads:
   - x/rpc/module.yaml
 
 responsibilities:
-  - Target-keyed gRPC client connection pooling
+  - Target-keyed RPC client connection pooling
   - Explicit connection close lifecycle
   - Unary client logging interceptor
-  - Unary client trace propagation interceptor
+  - Unary client trace metadata helper
   - Unary client retry interceptor
 
 non_goals:
@@ -64,9 +64,9 @@ review_checklist:
   - Keep connection ownership explicit
   - Do not hide service discovery or load balancing policy
   - Keep retry policy caller-selected
-  - Preserve outgoing trace propagation only through metadata
+  - Preserve outgoing trace propagation through explicit metadata helpers
 
 agent_hints:
   - Use Pool when callers want target-keyed connection reuse
-  - Compose interceptors explicitly in grpc.DialOption
+  - Compose interceptors explicitly in transport-specific adapters outside x/rpc
   - Put resilience wrappers in x/resilience, not this package

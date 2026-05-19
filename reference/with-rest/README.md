@@ -12,7 +12,7 @@ this scenario reference as wiring guidance, not as a compatibility claim.
 
 - normal explicit handlers and `x/rest` resource controllers in the same app
 - in-memory repository implementation with no external database
-- explicit `x/validate.Bind[T]` request validation with the playground adapter
+- explicit `x/validate.Bind[T]` request validation with an app-local validator
 - visible route registration through `core.App`
 - standard `contract.WriteResponse` for app-local handlers
 

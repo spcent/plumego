@@ -1,46 +1,65 @@
-// Package client provides gRPC client pooling and unary interceptors.
+// Package client provides transport-neutral RPC client pooling and unary
+// interceptor helpers.
 package client
 
 import (
 	"context"
 	"errors"
 	"sync"
-
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/keepalive"
 )
 
-var ErrPoolClosed = errors.New("rpc client pool is closed")
+var (
+	ErrPoolClosed = errors.New("rpc client pool is closed")
+	ErrNoDialer   = errors.New("rpc client dialer is nil")
+)
+
+// Conn is the minimal connection lifecycle required by Pool.
+type Conn interface {
+	Close() error
+}
+
+// DialOption is an opaque caller-owned option passed through to Dialer.
+type DialOption any
+
+// Dialer opens an RPC connection for a target.
+type Dialer func(context.Context, string, ...DialOption) (Conn, error)
 
 type Pool struct {
 	mu         sync.Mutex
-	defaultOps []grpc.DialOption
-	conns      map[string]*grpc.ClientConn
+	dial       Dialer
+	defaultOps []DialOption
+	conns      map[string]Conn
 	closed     bool
 }
 
-func New(defaultOpts ...grpc.DialOption) *Pool {
+func New(dial Dialer, defaultOpts ...DialOption) *Pool {
 	return &Pool{
-		defaultOps: append([]grpc.DialOption(nil), defaultOpts...),
-		conns:      make(map[string]*grpc.ClientConn),
+		dial:       dial,
+		defaultOps: append([]DialOption(nil), defaultOpts...),
+		conns:      make(map[string]Conn),
 	}
 }
 
-func (p *Pool) Dial(ctx context.Context, target string, opts ...grpc.DialOption) (*grpc.ClientConn, error) {
+func (p *Pool) Dial(ctx context.Context, target string, opts ...DialOption) (Conn, error) {
 	p.mu.Lock()
 	if p.closed {
 		p.mu.Unlock()
 		return nil, ErrPoolClosed
 	}
+	if p.dial == nil {
+		p.mu.Unlock()
+		return nil, ErrNoDialer
+	}
 	if conn, ok := p.conns[target]; ok {
 		p.mu.Unlock()
 		return conn, nil
 	}
-	dialOpts := append([]grpc.DialOption(nil), p.defaultOps...)
+	dial := p.dial
+	dialOpts := append([]DialOption(nil), p.defaultOps...)
 	dialOpts = append(dialOpts, opts...)
 	p.mu.Unlock()
 
-	conn, err := grpc.DialContext(ctx, target, dialOpts...)
+	conn, err := dial(ctx, target, dialOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -66,7 +85,7 @@ func (p *Pool) Close() error {
 		return nil
 	}
 	p.closed = true
-	conns := make([]*grpc.ClientConn, 0, len(p.conns))
+	conns := make([]Conn, 0, len(p.conns))
 	for target, conn := range p.conns {
 		conns = append(conns, conn)
 		delete(p.conns, target)
@@ -80,8 +99,4 @@ func (p *Pool) Close() error {
 		}
 	}
 	return errors.Join(errs...)
-}
-
-func WithKeepAlive(params keepalive.ClientParameters) grpc.DialOption {
-	return grpc.WithKeepaliveParams(params)
 }

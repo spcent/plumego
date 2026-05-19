@@ -4,7 +4,7 @@ layer: extension
 status: experimental
 owner: rpc
 risk: medium
-summary: HTTP transcoder adapter over grpc-gateway runtime ServeMux for x/rpc callers.
+summary: Dependency-free HTTP route adapter for caller-owned RPC handlers.
 
 parent_family: x/rpc
 
@@ -17,7 +17,7 @@ entrypoint_reads:
   - x/rpc/module.yaml
 
 responsibilities:
-  - grpc-gateway ServeMux construction
+  - HTTP mux construction
   - HTTP path handler registration
   - Exposing the mux as net/http Handler
   - Keeping target gRPC address explicit
@@ -65,5 +65,5 @@ review_checklist:
 
 agent_hints:
   - Use Handler with core.App or router.AddRoute
-  - Keep grpc dialers and generated service handlers outside this package
+  - Keep concrete RPC clients and generated service handlers outside this package
   - Use reference/with-rpc for end-to-end wiring guidance

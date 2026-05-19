@@ -84,7 +84,7 @@ packages:
       - core
       - middleware
       - reference/standard-service
-    summary: Optional RPC transport adapters and lifecycle helpers; keep gRPC dependencies out of stable roots and the main module.
+    summary: Dependency-free RPC transport contracts and lifecycle helpers; keep concrete transports outside core and extension packages.
 
   x/rpc/client:
     module: x/rpc
@@ -100,7 +100,7 @@ packages:
       - core
       - middleware
       - x/gateway
-    summary: gRPC client connection pool and unary interceptors with caller-selected retry policy.
+    summary: Transport-neutral client connection pool and unary interceptors with caller-selected retry policy.
 
   x/rpc/server:
     module: x/rpc
@@ -116,7 +116,7 @@ packages:
       - core
       - middleware
       - x/gateway
-    summary: gRPC server lifecycle primitive with explicit service registration and context-aware shutdown.
+    summary: RPC server lifecycle primitive with explicit service registration and context-aware shutdown.
 
   x/rpc/gateway:
     module: x/rpc
@@ -132,7 +132,7 @@ packages:
       - core
       - router
       - x/gateway
-    summary: HTTP-to-gRPC transcoding adapter over grpc-gateway runtime; not the edge gateway family.
+    summary: HTTP route adapter for caller-owned RPC handlers; not the edge gateway family.
 
   x/gateway:
     module: x/gateway

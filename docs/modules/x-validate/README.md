@@ -12,4 +12,4 @@ This module is experimental. The first release includes only the standard
 library JSON decoder, the `Validator` interface, `Bind`, `BindJSON`, and
 `ValidationError`.
 
-Validation adapters for third-party libraries live outside this package.
+Validation adapters for third-party libraries live outside the `x/` tree.

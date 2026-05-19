@@ -4,7 +4,7 @@ layer: extension
 status: experimental
 owner: rpc
 risk: medium
-summary: Optional RPC transport adapters and lifecycle helpers for gRPC-backed Plumego services.
+summary: Dependency-free RPC transport interfaces and lifecycle helpers for Plumego services.
 
 entrypoint_reads:
   - AGENTS.md
@@ -15,14 +15,14 @@ entrypoint_reads:
 
 subordinate_families:
   - package: x/rpc/server
-    role: gRPC server lifecycle wrapper aligned with context cancellation
+    role: Caller-owned RPC server lifecycle wrapper aligned with context cancellation
   - package: x/rpc/client
-    role: gRPC client connection pool and unary interceptors
+    role: Transport-neutral client connection pool and unary interceptors
   - package: x/rpc/gateway
-    role: HTTP transcoder over grpc-gateway runtime ServeMux
+    role: HTTP route adapter for caller-owned RPC handlers
 
 responsibilities:
-  - gRPC server lifecycle wrappers
+  - RPC server lifecycle wrappers
   - RPC client connection helpers
   - HTTP-to-RPC gateway adapters
   - Optional RPC transport integration patterns
@@ -63,14 +63,14 @@ test_commands:
   - go vet ./...
 
 review_checklist:
-  - Keep RPC dependencies isolated to this separate module
+  - Keep concrete RPC dependencies outside x/rpc
   - Preserve explicit lifecycle control
   - Do not require stable roots to know RPC internals
   - Keep service registration explicit
 
 agent_hints:
-  - Use x/rpc only for optional RPC transport integration
-  - Keep app wiring in reference apps or user applications
+  - Use x/rpc only for optional RPC transport contracts
+  - Keep concrete gRPC, Connect, or other transport wiring in user applications or adapters
   - Do not add hidden service registries or globals
 
 landing_zones:

@@ -4,7 +4,7 @@ layer: extension
 status: experimental
 owner: persistence
 risk: medium
-summary: pgx v5 adapter for PostgreSQL access in the x/data family.
+summary: PostgreSQL-style query and transaction interfaces in the x/data family.
 
 parent_family: x/data
 
@@ -17,9 +17,9 @@ entrypoint_reads:
   - x/data/module.yaml
 
 responsibilities:
-  - pgx pool construction
-  - pgx query and transaction adapter methods
-  - explicit context propagation to pgx calls
+  - Caller-owned pool wrapping
+  - PostgreSQL-style query and transaction adapter methods
+  - explicit context propagation to caller-owned pools
 
 non_goals:
   - ORM behavior
@@ -51,12 +51,12 @@ change_risks:
   - accidental live database test dependency
 
 review_checklist:
-  - Keep pgx isolated to this separately versioned module
+  - Keep concrete pgx imports outside this package
   - Preserve explicit context arguments
   - Keep tests offline
   - Do not modify stable store/db interfaces
 
 agent_hints:
-  - Use New for production pgxpool creation
+  - Use New when the application provides a pool and wants a ping check
   - Use NewWithPool when the application already owns the pool lifecycle
-  - Keep PostgreSQL-specific behavior in this module rather than store/db
+  - Keep PostgreSQL-specific behavior in adapters outside stable store/db
