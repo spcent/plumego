@@ -18,7 +18,8 @@ Graduate `x/validate` from Experimental to Beta by implementing a `Validator` in
 - Validation errors map to `contract.APIError` with code `"validation_error"` and a `fields` detail map — no new error envelope type.
 - `Bind[T]` reads JSON via `json.NewDecoder(r.Body).Decode` — the same pattern as CLAUDE.md.
 - The `Validator` interface is a single-method interface: `Validate() error`. Types opt in by implementing it; no struct tags.
-- `x/validate` is a separate Go module under `x/validate/go.mod`. It may import `contract` but not any other `x/*`.
+- Superseded note: `x/validate` now remains part of the main module; `go.mod`
+  files under `x/**` are forbidden. It may import `contract` but not any other `x/*`.
 - No external validation library dependency (e.g., no `go-playground/validator`). Stdlib only.
 - After promotion, update `specs/extension-maturity.yaml` and `docs/EXTENSION_MATURITY.md`.
 

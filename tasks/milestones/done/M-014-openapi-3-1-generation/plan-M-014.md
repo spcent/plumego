@@ -48,9 +48,9 @@ Affected Modules: x/openapi, cmd/plumego, reference/with-rest.
   a meaningful spec.
   Mitigation: card 1540 reads router/router.go and router/module.yaml before writing;
   stop and flag if RouteInfo is missing required fields.
-- Risk: YAML serialisation requires a third-party library (gopkg.in/yaml.v3).
-  Mitigation: x/openapi/go.mod may include yaml.v3 as it is a separate module from
-  the main module; confirm dependency-rules check passes.
+- Risk: YAML serialisation tempts a third-party dependency.
+  Mitigation: keep x/openapi in the main module and use dependency-free
+  serialization; no `go.mod` may exist under `x/**`.
 
 ## Verification Strategy
 

@@ -12,7 +12,7 @@ This module is experimental. The root package includes only the standard
 library JSON decoder, the `Validator` interface, `Bind`, `BindJSON`, and
 `ValidationError`.
 
-The optional `x/validate/playground` submodule adapts
-`github.com/go-playground/validator/v10` to the same `Validator` interface.
-It has its own `go.mod`, so the main module remains dependency-free beyond the
-standard library.
+Third-party validation adapters are intentionally not shipped under `x/*`.
+Applications that want `github.com/go-playground/validator/v10` or another
+validator should keep the adapter in their own module, as shown by
+`reference/with-rest`, or publish it as an external module.

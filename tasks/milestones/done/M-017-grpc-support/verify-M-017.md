@@ -56,7 +56,7 @@ Verified Cards: 1487, 1488, 1489
 
 ## Open Issues
 
-- `x/rpc` is currently a transport-neutral wrapper; concrete gRPC dependencies live in `reference/with-rpc` rather than an `x/rpc/go.mod` submodule. This is a deliberate boundary-preserving implementation choice and should be reflected in any future M-017 follow-up spec.
+- `x/rpc` is currently a transport-neutral wrapper; concrete gRPC dependencies live in `reference/with-rpc`. This is a deliberate boundary-preserving implementation choice and should be reflected in any future M-017 follow-up spec.
 
 ## Final Verdict
 

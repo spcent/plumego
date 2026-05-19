@@ -6,33 +6,32 @@ Verified Cards: 1470, 1471, 1472
 
 ## Scope Check
 
-- In-scope files touched: `x/validate`, `x/validate/playground`, `reference/with-rest`, `docs/modules/x-validate/README.md`, and this verify artifact.
+- In-scope files touched: `x/validate`, `reference/with-rest`, `docs/modules/x-validate/README.md`, and this verify artifact.
 - Out-of-scope files touched: none identified.
 
 ## Ownership Check
 
 - overlapping card ownership: `reference/with-rest` keeps an app-local playground adapter for its scenario module.
-- unresolved ownership conflicts: none; reusable adapter now exists in `x/validate/playground` as an opt-in submodule.
+- unresolved ownership conflicts: none; reusable third-party adapters are intentionally outside `x/*`.
 
 ## Symbol Completeness Check
 
-- exported symbol changes: additive `x/validate/playground` package only.
-- residual reference grep: root `x/validate` remains dependency-free and does not import playground or third-party validators.
+- exported symbol changes: additive `x/validate` package only.
+- residual reference grep: root `x/validate` remains dependency-free and no `go.mod` exists under `x/**`.
 
 ## Acceptance Test Results
 
 | Check | Result |
 | --- | --- |
 | `x/validate/validate.go` with `Validator`, `Bind`, and `BindJSON` | PASS |
-| `x/validate/playground/adapter.go` with go-playground adapter | PASS |
+| go-playground adapter remains app-local in reference/with-rest | PASS |
 | missing field, type mismatch, and empty body negative paths | PASS |
 | reference/with-rest validation example | PASS |
 
 ## Module Test Summary
 
 - primary module tests: `go test -timeout 60s ./x/validate` PASS.
-- playground submodule tests: `go test -timeout 60s ./...` from `x/validate/playground` PASS.
-- playground submodule vet: `go vet ./...` from `x/validate/playground` PASS.
+- x go.mod policy: `find x -name go.mod` returns no files.
 
 ## Boundary Check Summary
 
@@ -52,7 +51,7 @@ Verified Cards: 1470, 1471, 1472
 ## Checkpoint Summary
 
 - Phase 1: existing validation root and reference adapter were inspected.
-- Phase 2: root validation helpers and opt-in playground adapter are present.
+- Phase 2: root validation helpers are present and third-party adapter code stays outside `x/*`.
 - Phase 3: focused validation tests passed.
 
 ## Open Issues
@@ -62,4 +61,4 @@ Verified Cards: 1470, 1471, 1472
 ## Final Verdict
 
 - `PASS`
-- rationale: the canonical M-012 implementation requirements are satisfied while preserving the main module dependency boundary.
+- rationale: the canonical M-012 implementation requirements are satisfied while preserving the main module and `x/*` dependency boundaries.

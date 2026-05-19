@@ -131,6 +131,7 @@ top_level_rules:
     - frontend
   rules:
     - New library packages must live under a stable root or x/*
+    - x/* extension packages are part of the main module; go.mod files under x/** are forbidden
     - Every top-level x/* extension root must be declared in layers.extension.paths
     - Root package facade is forbidden in the target layout
     - Reference apps define the canonical app structure

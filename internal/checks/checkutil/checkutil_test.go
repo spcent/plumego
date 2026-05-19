@@ -137,6 +137,21 @@ import (
 	}
 }
 
+func TestFindXGoModFiles(t *testing.T) {
+	repo := t.TempDir()
+	writeFile(t, filepath.Join(repo, "x", "validate", "module.yaml"), "name: x/validate\n")
+	writeFile(t, filepath.Join(repo, "x", "validate", "playground", "go.mod"), "module example.com/bad\n")
+	writeFile(t, filepath.Join(repo, "reference", "with-rest", "go.mod"), "module with-rest\n")
+
+	violations, err := FindXGoModFiles(repo)
+	if err != nil {
+		t.Fatalf("FindXGoModFiles: %v", err)
+	}
+	if len(violations) != 1 || violations[0] != "x/validate/playground/go.mod" {
+		t.Fatalf("unexpected violations: %#v", violations)
+	}
+}
+
 func TestValidateManifestDependencyRuleConsistencyReportsContradictions(t *testing.T) {
 	repo := t.TempDir()
 	writeRepoSpec(t, repo)

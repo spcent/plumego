@@ -43,6 +43,9 @@ When guidance conflicts, follow this order:
 - Preserve `net/http` compatibility.
 - Keep the main module dependency-free beyond the standard library unless
   explicitly approved.
+- Do not add `go.mod` anywhere under `x/**`; extension packages are part of the
+  main module. Optional third-party adapters belong in reference apps or
+  external modules.
 - Stable roots must not import `x/*`.
 - Do not introduce hidden globals, `init()` registration, or context
   service-locator patterns.

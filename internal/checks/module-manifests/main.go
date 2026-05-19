@@ -32,6 +32,13 @@ func main() {
 		failf("validate stable boundary declarations: %v", err)
 	}
 	violations = append(violations, boundaryViolations...)
+	xGoModFiles, err := checkutil.FindXGoModFiles(repoRoot)
+	if err != nil {
+		failf("find x go.mod files: %v", err)
+	}
+	for _, path := range xGoModFiles {
+		violations = append(violations, path+": x/* packages must not contain go.mod")
+	}
 
 	if len(missing) == 0 && len(violations) == 0 {
 		return
