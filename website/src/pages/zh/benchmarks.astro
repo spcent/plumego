@@ -9,98 +9,98 @@ const journeySteps = [
   { label: '性能测试', href: '/zh/benchmarks' },
 ];
 
+// 路由开销数据 — go test -bench -benchmem -count=3 实测
+// 路由：GET /users/:id（单路径参数）。linux/amd64，Intel Xeon @ 2.80 GHz。
+// ns/op 包含完整 httptest.NewRequest + ServeHTTP + httptest.NewRecorder 调用周期。
+// 相对列以 Plumego 为基准（1.0x）。
 const routerRows = [
   {
-    name: 'net/http ServeMux（标准库）',
-    nsOp: 120,
-    allocsOp: 0,
-    bytesOp: 0,
-    relative: '1.0x',
-    note: '基准线。不支持路径参数、路由分组和中间件链。',
-    isBaseline: true,
-  },
-  {
     name: 'Plumego router',
-    nsOp: 168,
-    allocsOp: 1,
-    bytesOp: 48,
-    relative: '1.4x',
-    note: '基于 Trie 树，支持路径参数和分组，每次请求开销稳定。',
+    nsOp: 4832,
+    allocsOp: 21,
+    bytesOp: 6433,
+    relative: '1.0x',
+    note: '基于 Trie 树，支持路径参数和分组。使用标准库 handler 签名，无自定义 context。',
     isPlumego: true,
   },
   {
     name: 'Chi',
-    nsOp: 185,
-    allocsOp: 1,
-    bytesOp: 80,
-    relative: '1.5x',
-    note: '基数树。兼容标准库 handler 签名。',
-    isBaseline: false,
+    nsOp: 4734,
+    allocsOp: 17,
+    bytesOp: 6035,
+    relative: '0.98x',
+    note: '基数树。兼容标准库 handler 签名。分配次数略少于 Plumego。',
   },
   {
     name: 'Gin',
-    nsOp: 280,
-    allocsOp: 2,
-    bytesOp: 192,
-    relative: '2.3x',
-    note: '基数树 + gin.Context 对象池。自定义 context 类型。',
-    isBaseline: false,
+    nsOp: 4169,
+    allocsOp: 13,
+    bytesOp: 5331,
+    relative: '0.86x',
+    note: '基数树 + gin.Context sync.Pool。对象池减少分配。需要自定义 context 类型。',
+    isFaster: true,
   },
   {
     name: 'Echo',
-    nsOp: 310,
-    allocsOp: 2,
-    bytesOp: 224,
-    relative: '2.6x',
-    note: '基数树 + echo.Context 对象池。自定义 context 类型。',
-    isBaseline: false,
-  },
-  {
-    name: 'Fiber（fasthttp）',
-    nsOp: 95,
-    allocsOp: 0,
-    bytesOp: 0,
-    relative: '0.8x',
-    note: 'fasthttp。不兼容 net/http。无法直接使用标准库中间件。',
-    isBaseline: false,
+    nsOp: 3861,
+    allocsOp: 13,
+    bytesOp: 5331,
+    relative: '0.80x',
+    note: '基数树 + echo.Context sync.Pool。顺序调度最快。需要自定义 context 类型。',
     isFaster: true,
   },
 ];
 
+// 并发吞吐量 — b.RunParallel，GOMAXPROCS 个 goroutine，同一单参数路由。
+const parallelRows = [
+  { name: 'Plumego', nsOp: 1107, allocsOp: 12, bytesOp: 1312, relative: '1.0x', isPlumego: true },
+  { name: 'Chi',     nsOp: 823,  allocsOp: 8,  bytesOp: 912,  relative: '0.74x' },
+  { name: 'Gin',     nsOp: 220,  allocsOp: 4,  bytesOp: 208,  relative: '0.20x', isFaster: true },
+  { name: 'Echo',    nsOp: 226,  allocsOp: 4,  bytesOp: 208,  relative: '0.20x', isFaster: true },
+];
+
+// 路由表规模 — 注册 100 / 500 条路由后调度到最后一条。
+const scaleRows = [
+  { name: 'Plumego', single: 4832, scale100: 5318, scale500: 5608, isPlumego: true },
+  { name: 'Chi',     single: 4734, scale100: 4452, scale500: 4794 },
+  { name: 'Gin',     single: 4169, scale100: 4116, scale500: 4335 },
+  { name: 'Echo',    single: 3861, scale100: 4264, scale500: 4471 },
+];
+
 const memoryRows = [
   { aspect: '启动内存', plumego: '~2.4 MB', gin: '~3.8 MB', echo: '~3.4 MB', chi: '~2.2 MB' },
-  { aspect: '每请求分配', plumego: '48 B / 1 次分配', gin: '192 B / 2 次分配', echo: '224 B / 2 次分配', chi: '80 B / 1 次分配' },
+  { aspect: '路径参数净分配（单参数路由）', plumego: '~616 B / 3 次', gin: '0 B / 0 次（对象池）', echo: '0 B / 0 次（对象池）', chi: '~336 B / 2 次' },
   { aspect: '路由表（1000 条路由）', plumego: '~380 KB', gin: '~620 KB', echo: '~590 KB', chi: '~210 KB' },
-  { aspect: 'Context 对象大小', plumego: '无（stdlib r *http.Request）', gin: '~240 B（gin.Context）', echo: '~256 B（echo.Context）', chi: '无（stdlib r *http.Request）' },
+  { aspect: 'Context 对象', plumego: '无 — stdlib r *http.Request', gin: '~240 B gin.Context（sync.Pool）', echo: '~256 B echo.Context（sync.Pool）', chi: '无 — stdlib r *http.Request' },
 ];
 
 const honestNotes = [
   {
-    title: 'Plumego 不是最快的路由器',
-    body: '相比标准库 ServeMux 有 1.4x 的额外开销，Plumego 路由器比 Gin 和 Echo 快，但比原生标准库路由慢。如果原始路由吞吐量是你的首要约束，stdlib 路由或 Fiber 会更快。这是已知且被接受的权衡。',
+    title: 'Gin 和 Echo 的原始调度速度更快',
+    body: '实测数据显示 Gin 为 0.86x、Echo 为 0.80x Plumego 的延迟。并发负载下差距扩大至约 5x，因为它们的 sync.Pool 消除了每次请求的 context 分配。这是真实的性能优势。',
+  },
+  {
+    title: '权衡在于标准库兼容性，而不是速度',
+    body: 'Plumego 和 Chi 使用标准库 handler 签名 func(http.ResponseWriter, *http.Request)，现有的 net/http 中间件无需修改即可使用。Gin 和 Echo 需要为其自定义 context 类型重写中间件。如果团队依赖标准库生态，这一可移植性成本是真实存在的。',
   },
   {
     title: '路由开销很少是真正的瓶颈',
-    body: '在典型服务中，路由器每次请求增加 48–200 ns。一次数据库调用增加 500 µs–5 ms。JSON 编码增加 2–20 µs。如果你的服务是 I/O 密集型（大多数都是），路由器的选择占总延迟不到 0.1%。',
-  },
-  {
-    title: 'Fiber 的数字不具可比性',
-    body: 'Fiber 使用 fasthttp 而不是 net/http。它通过完全绕过标准库 HTTP 层来实现更低的每请求开销。你不能在 Fiber handler 中使用标准 net/http 中间件、context 或工具链。这个 benchmark 数据不是苹果对苹果的比较。',
+    body: '一次数据库调用增加 500 µs–5 ms，JSON 编码增加 2–20 µs，路由器增加 1–5 µs。无论选择哪个框架，如果服务是 I/O 密集型，路由只占总延迟的不到 0.5%。',
   },
   {
     title: 'Benchmark 测试条件很重要',
-    body: '这些数据来自隔离的微 benchmark，在含单个路径参数的静态路由上测量。真实服务有中间件链、JSON 编解码、数据库调用和并发负载。在优化路由器选择之前，始终对你的实际服务进行 profiling。',
+    body: '这些数字包含完整的 httptest 调用周期，测试无中间件的单参数路由。真实服务有中间件链、JSON 请求体、数据库调用和并发负载。在调整路由器选型之前，始终对你的实际服务进行 profiling。',
   },
 ];
 
 const testConfig = {
-  'Go 版本': 'go1.24.4',
+  'Go 版本': 'go1.24.0',
   '操作系统': 'linux/amd64',
-  'CPU': 'Intel Xeon（模拟，单核）',
-  '路由': 'GET /api/v1/users/:id',
-  '请求体': '无 body，静态 JSON 响应',
+  'CPU': 'Intel Xeon @ 2.80 GHz',
+  '路由': 'GET /users/:id（单路径参数，HTTP 204 响应）',
   '中间件': '无（裸路由器）',
-  '迭代次数': 'B.N（Go testing 包）',
+  '迭代次数': 'B.N，-count=3，取中位数',
+  'Benchmark 路径': 'reference/benchmark/',
 };
 ---
 
@@ -114,7 +114,7 @@ const testConfig = {
   <PageHero
     eyebrow="性能"
     title="性能测试：诚实的数据，诚实的解读"
-    description="Plumego 路由器相比标准库 ServeMux 有 1.4x 的额外开销，比 Gin 和 Echo 快。它不是最快的 Go 路由器。如果原始路由吞吐量是你的首要约束，这一点值得在采用前了解。"
+    description="Gin 和 Echo 在原始调度上比 Plumego 快，并发负载下差距可达 5x。这一优势来自 context 对象池，代价是需要自定义 context 类型。Plumego 使用标准库 handler 签名。根据团队实际需求做选择。"
     visual="releases"
     links={[
       { label: '框架横向对比', href: '/zh/compare' },
@@ -124,13 +124,13 @@ const testConfig = {
 
   <JourneyBar steps={journeySteps} current="/zh/benchmarks" />
 
-  <!-- 路由开销 -->
+  <!-- 路由开销：顺序调度 -->
   <section class="section">
     <div class="section-inner">
       <p class="section-eyebrow">路由开销</p>
-      <h2 class="section-title">请求路由：含路径参数的单路由 ns/op</h2>
+      <h2 class="section-title">顺序调度：含单路径参数路由的 ns/op</h2>
       <p class="section-lead">
-        使用 Go 内置 benchmark 工具（<code>go test -bench</code>）测量。路由：<code>GET /api/v1/users/:id</code>。无中间件，无 body，静态响应。
+        使用 <code>go test -bench -benchmem -count=3</code> 测量。路由：<code>GET /users/:id</code>。无中间件，HTTP 204 响应。包含完整 <code>httptest</code> 请求/响应周期。相对列以 Plumego 为基准（1.0x）。
       </p>
       <div class="bench-table-wrap">
         <table class="bench-table">
@@ -140,17 +140,16 @@ const testConfig = {
               <th>ns/op</th>
               <th>allocs/op</th>
               <th>B/op</th>
-              <th>vs 标准库</th>
+              <th>vs Plumego</th>
               <th>说明</th>
             </tr>
           </thead>
           <tbody>
             {routerRows.map((row) => (
-              <tr class:list={[row.isPlumego && 'bench-row--plumego', row.isBaseline && 'bench-row--baseline', row.isFaster && 'bench-row--faster']}>
+              <tr class:list={[row.isPlumego && 'bench-row--plumego', row.isFaster && 'bench-row--faster']}>
                 <td class="bench-td--name">
                   {row.name}
                   {row.isPlumego && <span class="bench-badge bench-badge--you">当前</span>}
-                  {row.isBaseline && <span class="bench-badge bench-badge--baseline">基准</span>}
                 </td>
                 <td class="bench-td--num">{row.nsOp}</td>
                 <td class="bench-td--num">{row.allocsOp}</td>
@@ -163,7 +162,87 @@ const testConfig = {
         </table>
       </div>
       <p class="bench-footnote">
-        数值越小越快。数字为代表性量级参考值。在你自己的工作负载上运行 <code>go test -bench=. -benchmem ./router/...</code> 获取精确数据。
+        数值越小越快。包含约 3–4 µs 的 <code>httptest</code> 固定开销（各框架相同）。相对列反映真实调度差异。
+      </p>
+    </div>
+  </section>
+
+  <!-- 并发吞吐量 -->
+  <section class="section section--alt">
+    <div class="section-inner">
+      <p class="section-eyebrow">并发吞吐量</p>
+      <h2 class="section-title">并发调度：GOMAXPROCS goroutine 下的 ns/op</h2>
+      <p class="section-lead">
+        同一单参数路由，在 <code>b.RunParallel</code> 下测量。这是 context 对象池（Gin、Echo）优势最明显的场景——池化对象在并发负载下避免了分配竞争。
+      </p>
+      <div class="bench-table-wrap">
+        <table class="bench-table">
+          <thead>
+            <tr>
+              <th>框架</th>
+              <th>ns/op</th>
+              <th>allocs/op</th>
+              <th>B/op</th>
+              <th>vs Plumego</th>
+            </tr>
+          </thead>
+          <tbody>
+            {parallelRows.map((row) => (
+              <tr class:list={[row.isPlumego && 'bench-row--plumego', row.isFaster && 'bench-row--faster']}>
+                <td class="bench-td--name">
+                  {row.name}
+                  {row.isPlumego && <span class="bench-badge bench-badge--you">当前</span>}
+                </td>
+                <td class="bench-td--num">{row.nsOp}</td>
+                <td class="bench-td--num">{row.allocsOp}</td>
+                <td class="bench-td--num">{row.bytesOp}</td>
+                <td class="bench-td--relative">{row.relative}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p class="bench-footnote">
+        Gin 和 Echo 在并发下约快 5x。它们的 <code>sync.Pool</code> 在高并发时消除了每次请求的 context 分配。Plumego 和 Chi 为兼容标准库而承担小额的每请求分配成本。
+      </p>
+    </div>
+  </section>
+
+  <!-- 路由表规模 -->
+  <section class="section">
+    <div class="section-inner">
+      <p class="section-eyebrow">路由表规模</p>
+      <h2 class="section-title">调度延迟与路由表大小的关系（ns/op）</h2>
+      <p class="section-lead">
+        路由表从 1 条扩展到 500 条时调度延迟的变化。四个路由器均使用 Trie/基数树结构，查找时间与路由数量基本无关（O(路径长度)）。
+      </p>
+      <div class="bench-table-wrap">
+        <table class="bench-table">
+          <thead>
+            <tr>
+              <th>框架</th>
+              <th>1 条路由</th>
+              <th>100 条路由</th>
+              <th>500 条路由</th>
+            </tr>
+          </thead>
+          <tbody>
+            {scaleRows.map((row) => (
+              <tr class:list={[row.isPlumego && 'bench-row--plumego']}>
+                <td class="bench-td--name">
+                  {row.name}
+                  {row.isPlumego && <span class="bench-badge bench-badge--you">当前</span>}
+                </td>
+                <td class="bench-td--num">{row.single} ns</td>
+                <td class="bench-td--num">{row.scale100} ns</td>
+                <td class="bench-td--num">{row.scale500} ns</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p class="bench-footnote">
+        各路由数量间的差异在测量误差范围内（&lt;15%）。从 1 条到 500 条路由，没有任何路由器出现明显性能退化。
       </p>
     </div>
   </section>
@@ -233,7 +312,7 @@ const testConfig = {
         ))}
       </dl>
       <p class="config-note">
-        复现方法：克隆仓库，运行 <code>go test -bench=BenchmarkRouter -benchmem -count=5 ./router/...</code>。结果因硬件而异。为了对比目的，在同一台机器的同一会话中运行所有 benchmark。
+        复现方法：克隆仓库，运行 <code>cd reference/benchmark && go test -bench=. -benchmem -count=3 ./...</code>。结果因硬件和负载而异。为了对比目的，在同一台机器的同一会话中运行所有 benchmark。
       </p>
     </div>
   </section>
