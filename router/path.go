@@ -32,23 +32,3 @@ func fastNormalizePath(path string) string {
 func fastBuildCacheKey(method, path string) string {
 	return method + ":" + path
 }
-
-// buildParamMap creates a parameter map for the given keys and values.
-// The map is handed to the request context and GC'd with the request.
-func buildParamMap(paramValues []string, paramKeys []string) map[string]string {
-	if len(paramValues) == 0 || len(paramKeys) == 0 {
-		return nil
-	}
-
-	minLen := len(paramValues)
-	if len(paramKeys) < minLen {
-		minLen = len(paramKeys)
-	}
-
-	params := make(map[string]string, minLen)
-	for i := 0; i < minLen; i++ {
-		params[paramKeys[i]] = paramValues[i]
-	}
-
-	return params
-}
