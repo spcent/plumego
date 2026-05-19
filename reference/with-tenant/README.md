@@ -28,5 +28,6 @@ curl -H 'X-Tenant-ID: tenant-a' -H 'X-Model: gpt-4o' http://localhost:8085/api/m
 ## Run
 
 ```bash
-go run ./reference/with-tenant
+cd reference/with-tenant
+go run .
 ```

@@ -9,7 +9,7 @@ Owned Files:
 - `specs/extension-beta-evidence.yaml`
 - `docs/extension-evidence/x-discovery.md`
 - `docs/extension-evidence/release-artifacts.md`
-Depends On: second release ref and owner sign-off
+Depends On: path-migration release evidence and owner sign-off
 
 Goal:
 - Complete beta evidence closure for the `x/gateway/discovery` core/static surface.
@@ -47,4 +47,9 @@ Done Definition:
 - `x/gateway/discovery:core-static` has checked-in snapshots, two release refs, release snapshots, and owner sign-off, or blockers remain explicit.
 
 Outcome:
--
+- Blocked. `go run ./internal/checks/extension-release-evidence -module
+  ./x/gateway/discovery -base v1.0.0 -head v1.1.0` cannot generate a base
+  snapshot because `x/gateway/discovery` does not exist at `v1.0.0`; the
+  checked-in v1 baseline uses the old `./x/discovery` path. Promotion needs an
+  explicit path-migration evidence card or another release interval where the
+  `x/gateway/discovery` path exists at both refs.

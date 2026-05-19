@@ -6,14 +6,15 @@
 
 ## v1 Status
 
-- `experimental` in the Plumego v1 support matrix
-- Included in repository release scope, but compatibility is not frozen
+- `beta` in the Plumego v1.1 support matrix
+- Included in repository release scope with beta compatibility obligations for
+  the documented public surface
 - Hardened coverage exists for path safety, symlink escape rejection,
   precompressed negotiation, cache variance, custom page policy, navigation-only
   fallback, and basic mount behavior. Basic benchmarks cover normal and
   precompressed asset serving.
-- Current-head API snapshot evidence exists, but stable promotion still requires
-  release-backed snapshot comparisons, release history, and owner sign-off
+- Release-backed API snapshot evidence and `frontend` owner sign-off are
+  recorded in `docs/extension-evidence/x-frontend.md`.
 
 ## Use this module when
 

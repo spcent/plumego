@@ -11,8 +11,8 @@ package main
 import (
 	"log"
 
-	"github.com/spcent/plumego/reference/standard-service/internal/app"
-	"github.com/spcent/plumego/reference/standard-service/internal/config"
+	"standard-service/internal/app"
+	"standard-service/internal/config"
 )
 
 func main() {

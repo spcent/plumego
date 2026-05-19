@@ -218,7 +218,7 @@ You must:
 
 ```text
 Execute this milestone:
-[tasks/milestones/active/M-NNN.md]
+[tasks/milestones/active/M-NNN-short-name/M-NNN.md]
 
 Follow AGENTS.md milestone rules exactly:
 - read every Context file first
@@ -276,8 +276,8 @@ High-level loop:
 
 1. scaffold the spec with `make new-milestone N=NNN TITLE="..."`
 2. fill Goal, Architecture Decisions, Context, Tasks, Acceptance Criteria, and Out of Scope
-3. validate with `make check-spec M=active/M-NNN`
-4. launch with `make milestone M=active/M-NNN`
+3. validate with `make check-spec M=active/M-NNN-short-name`
+4. launch with `make milestone M=active/M-NNN-short-name`
 5. let the agent execute autonomously on the milestone branch
 6. review the PR as the only manual checkpoint
 7. archive the spec and update the roadmap

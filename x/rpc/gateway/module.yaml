@@ -1,0 +1,69 @@
+name: x/rpc/gateway
+path: x/rpc/gateway
+layer: extension
+status: experimental
+owner: rpc
+risk: medium
+summary: Dependency-free HTTP route adapter for caller-owned RPC handlers.
+
+parent_family: x/rpc
+
+entrypoint_reads:
+  - AGENTS.md
+  - docs/CANONICAL_STYLE_GUIDE.md
+  - specs/repo.yaml
+  - specs/task-routing.yaml
+  - specs/dependency-rules.yaml
+  - x/rpc/module.yaml
+
+responsibilities:
+  - HTTP mux construction
+  - HTTP path handler registration
+  - Exposing the mux as net/http Handler
+  - Keeping target gRPC address explicit
+
+non_goals:
+  - Protobuf code generation
+  - Service discovery
+  - Edge gateway proxy ownership
+  - Core app bootstrap ownership
+
+allowed_imports:
+  - stdlib
+
+forbidden_imports:
+  - core/**
+  - router/**
+  - contract/**
+  - middleware/**
+  - security/**
+  - store/**
+  - x/tenant/**
+  - x/ai/**
+  - x/data/**
+  - x/fileapi/**
+  - x/frontend/**
+  - x/gateway/**
+  - x/messaging/**
+  - x/openapi/**
+  - x/resilience/**
+  - x/rest/**
+  - x/websocket/**
+  - reference/**
+  - cmd/**
+
+test_commands:
+  - go test -race -timeout 60s ./...
+  - go test -timeout 20s ./...
+  - go vet ./...
+
+review_checklist:
+  - Keep transcoding registration explicit
+  - Do not add code generation behavior
+  - Keep edge proxy behavior in x/gateway
+  - Preserve net/http Handler compatibility
+
+agent_hints:
+  - Use Handler with core.App or router.AddRoute
+  - Keep concrete RPC clients and generated service handlers outside this package
+  - Use reference/with-rpc for end-to-end wiring guidance

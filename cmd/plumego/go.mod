@@ -1,6 +1,6 @@
 module github.com/spcent/plumego/cmd/plumego
 
-go 1.24.7
+go 1.24.0
 
 // Use local plumego package
 replace github.com/spcent/plumego => ../..

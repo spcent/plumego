@@ -89,16 +89,16 @@ M-005 ────────────────────────�
 
 ### Adding a Milestone
 
-1. Copy `TEMPLATE.md` → `active/M-NNN.md`.
+1. Copy `TEMPLATE.md` → `active/M-NNN-short-name/M-NNN.md`.
 2. Fill all sections.
 3. Add a row to the Pipeline table above.
 4. If it depends on another milestone, add the edge to the Dependency Graph.
-5. Run `make check-spec M=active/M-NNN` to validate the spec before committing.
+5. Run `make check-spec M=active/M-NNN-short-name` to validate the spec before committing.
 
 ### Completing a Milestone
 
 1. PR merged to `main`.
-2. Move `active/M-NNN.md` → `done/M-NNN.md`.
+2. Move `active/M-NNN-short-name/` → `done/M-NNN-short-name/`.
 3. Add `## Outcome` to the done file (PR number + gate output summary).
 4. Update the Pipeline table row: `[ ]` → `[✓]`.
 5. If dependents exist, update their status to `[ ]` (now unblocked).

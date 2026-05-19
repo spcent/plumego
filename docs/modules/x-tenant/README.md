@@ -6,11 +6,11 @@
 
 ## v1 Status
 
-- `experimental` in the Plumego v1 support matrix
-- Included in repository release scope, but compatibility is not frozen
-- A `beta` candidate once the extension stability policy's two-release API freeze
-  evidence is available. Current blocker: no repository release history proves
-  two consecutive minor releases without exported `x/tenant/*` API changes.
+- `beta` in the Plumego v1.1 support matrix
+- Included in repository release scope with beta compatibility obligations for
+  the documented public surface
+- Promotion evidence is recorded in `docs/extension-evidence/x-tenant.md` with
+  `v1.0.0` to `v1.1.0` release-backed API snapshots.
 
 ## Use this module when
 
@@ -104,9 +104,8 @@ quota exhaustion, rate-limit isolation, tenant-aware store/db fail-closed
 behavior, and the combined resolve → policy → quota → ratelimit chain have
 focused tests.
 
-The module remains `experimental` until the release-history criterion is
-verifiable. Promotion to `beta` requires evidence that exported `x/tenant/*`
-symbols have not changed for two consecutive minor releases, plus owner
-sign-off recorded with the promotion card. Until then, resolution, policy,
-quota, rate-limit, session, and tenant-aware store subpackages should be treated
-as production-readiness candidates rather than compatibility-frozen APIs.
+The module is `beta` as of v1.1.0. Promotion evidence records unchanged
+exported `x/tenant/*` APIs across `v1.0.0` to `v1.1.0`, release-backed
+snapshots, and `multitenancy` owner sign-off. Resolution, policy, quota,
+rate-limit, session, and tenant-aware store subpackages now carry beta
+compatibility obligations for their documented public surface.

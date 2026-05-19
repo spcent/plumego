@@ -25,7 +25,7 @@ plumego/                           # Main module
 
 ### Dependencies:
 - **Core plumego**: `go 1.24` - **zero external dependencies**
-- **CLI**: `go 1.24.7` - `gopkg.in/yaml.v3` for YAML output support
+- **CLI**: `go 1.24.0` - `gopkg.in/yaml.v3` for YAML output support
 
 ## How It Works
 
@@ -33,7 +33,7 @@ plumego/                           # Main module
 ```go
 module github.com/spcent/plumego/cmd/plumego
 
-go 1.24.7
+go 1.24.0
 
 // Use local plumego package
 replace github.com/spcent/plumego => ../..

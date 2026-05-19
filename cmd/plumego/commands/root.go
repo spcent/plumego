@@ -38,6 +38,7 @@ func Execute(info BuildInfo) error {
 	// Register commands
 	root.Register(&NewCmd{})
 	root.Register(&GenerateCmd{})
+	root.Register(&AddCmd{})
 	root.Register(NewDevCmd())
 	root.Register(&RoutesCmd{})
 	root.Register(&CheckCmd{})

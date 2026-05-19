@@ -1,0 +1,192 @@
+package sqlx
+
+import (
+	"context"
+	"database/sql"
+	"database/sql/driver"
+	"errors"
+	"io"
+	"testing"
+)
+
+func init() {
+	sql.Register("plumego-sqlx-test", testDriver{})
+}
+
+func TestQueryRowReturnsScannedValue(t *testing.T) {
+	db := newTestDB(t)
+	defer db.Close()
+
+	var got string
+	if err := db.QueryRow(t.Context(), "select single name").Scan(&got); err != nil {
+		t.Fatalf("scan row: %v", err)
+	}
+	if got != "plumego" {
+		t.Fatalf("got %q, want plumego", got)
+	}
+}
+
+func TestQueryReturnsMultipleRows(t *testing.T) {
+	db := newTestDB(t)
+	defer db.Close()
+
+	rows, err := db.Query(t.Context(), "select name")
+	if err != nil {
+		t.Fatalf("query: %v", err)
+	}
+	defer rows.Close()
+
+	var got []string
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			t.Fatalf("scan: %v", err)
+		}
+		got = append(got, name)
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatalf("rows err: %v", err)
+	}
+	if len(got) != 2 || got[0] != "alpha" || got[1] != "beta" {
+		t.Fatalf("rows = %#v, want [alpha beta]", got)
+	}
+}
+
+func TestExecAffectsRowCount(t *testing.T) {
+	db := newTestDB(t)
+	defer db.Close()
+
+	result, err := db.Exec(t.Context(), "update widgets set active = true")
+	if err != nil {
+		t.Fatalf("exec: %v", err)
+	}
+	if got, err := result.RowsAffected(); err != nil || got != 3 {
+		t.Fatalf("rows affected = %d, %v; want 3, nil", got, err)
+	}
+}
+
+func TestBeginTxCommitAndRollbackSucceed(t *testing.T) {
+	db := newTestDB(t)
+	defer db.Close()
+
+	tx, err := db.BeginTx(t.Context(), nil)
+	if err != nil {
+		t.Fatalf("begin tx: %v", err)
+	}
+	if err := tx.Commit(); err != nil {
+		t.Fatalf("commit: %v", err)
+	}
+
+	tx, err = db.BeginTx(t.Context(), nil)
+	if err != nil {
+		t.Fatalf("begin tx: %v", err)
+	}
+	if err := tx.Rollback(); err != nil {
+		t.Fatalf("rollback: %v", err)
+	}
+}
+
+func TestNilDBQueryReturnsError(t *testing.T) {
+	if _, err := (*DB)(nil).Query(t.Context(), "select 1"); err == nil {
+		t.Fatal("Query() error = nil, want error")
+	}
+}
+
+func newTestDB(t *testing.T) *DB {
+	t.Helper()
+	raw, err := sql.Open("plumego-sqlx-test", "")
+	if err != nil {
+		t.Fatalf("open test db: %v", err)
+	}
+	return NewWithDB(raw)
+}
+
+type testDriver struct{}
+
+func (testDriver) Open(string) (driver.Conn, error) {
+	return testConn{}, nil
+}
+
+type testConn struct{}
+
+func (testConn) Prepare(query string) (driver.Stmt, error) {
+	return testStmt{query: query}, nil
+}
+
+func (testConn) Close() error {
+	return nil
+}
+
+func (testConn) Begin() (driver.Tx, error) {
+	return testTx{}, nil
+}
+
+func (testConn) BeginTx(context.Context, driver.TxOptions) (driver.Tx, error) {
+	return testTx{}, nil
+}
+
+func (testConn) Ping(context.Context) error {
+	return nil
+}
+
+type testStmt struct {
+	query string
+}
+
+func (s testStmt) Close() error {
+	return nil
+}
+
+func (s testStmt) NumInput() int {
+	return -1
+}
+
+func (s testStmt) Exec([]driver.Value) (driver.Result, error) {
+	return driver.RowsAffected(3), nil
+}
+
+func (s testStmt) Query([]driver.Value) (driver.Rows, error) {
+	switch s.query {
+	case "select name":
+		return &testRows{columns: []string{"name"}, values: [][]driver.Value{{"alpha"}, {"beta"}}}, nil
+	default:
+		return &testRows{columns: []string{"name"}, values: [][]driver.Value{{"plumego"}}}, nil
+	}
+}
+
+type testTx struct{}
+
+func (testTx) Commit() error {
+	return nil
+}
+
+func (testTx) Rollback() error {
+	return nil
+}
+
+type testRows struct {
+	columns []string
+	values  [][]driver.Value
+	index   int
+}
+
+func (r *testRows) Columns() []string {
+	return r.columns
+}
+
+func (r *testRows) Close() error {
+	return nil
+}
+
+func (r *testRows) Next(dest []driver.Value) error {
+	if r.index >= len(r.values) {
+		return io.EOF
+	}
+	row := r.values[r.index]
+	r.index++
+	if len(dest) != len(row) {
+		return errors.New("destination count mismatch")
+	}
+	copy(dest, row)
+	return nil
+}

@@ -8,8 +8,8 @@ package main
 import (
 	"log"
 
-	"github.com/spcent/plumego/reference/production-service/internal/app"
-	"github.com/spcent/plumego/reference/production-service/internal/config"
+	"production-service/internal/app"
+	"production-service/internal/config"
 )
 
 func main() {

@@ -1,0 +1,72 @@
+name: x/rpc/client
+path: x/rpc/client
+layer: extension
+status: experimental
+owner: rpc
+risk: medium
+summary: Transport-neutral RPC client connection pool and unary interceptors for x/rpc callers.
+
+parent_family: x/rpc
+
+entrypoint_reads:
+  - AGENTS.md
+  - docs/CANONICAL_STYLE_GUIDE.md
+  - specs/repo.yaml
+  - specs/task-routing.yaml
+  - specs/dependency-rules.yaml
+  - x/rpc/module.yaml
+
+responsibilities:
+  - Target-keyed RPC client connection pooling
+  - Explicit connection close lifecycle
+  - Unary client logging interceptor
+  - Unary client trace metadata helper
+  - Unary client retry interceptor
+
+non_goals:
+  - Load balancing ownership
+  - Streaming interceptors
+  - Circuit breaker behavior
+  - Service discovery
+
+allowed_imports:
+  - stdlib
+  - contract
+  - log
+  - x/observability
+
+forbidden_imports:
+  - core/**
+  - router/**
+  - middleware/**
+  - security/**
+  - store/**
+  - x/tenant/**
+  - x/ai/**
+  - x/data/**
+  - x/fileapi/**
+  - x/frontend/**
+  - x/gateway/**
+  - x/messaging/**
+  - x/openapi/**
+  - x/resilience/**
+  - x/rest/**
+  - x/websocket/**
+  - reference/**
+  - cmd/**
+
+test_commands:
+  - go test -race -timeout 60s ./...
+  - go test -timeout 20s ./...
+  - go vet ./...
+
+review_checklist:
+  - Keep connection ownership explicit
+  - Do not hide service discovery or load balancing policy
+  - Keep retry policy caller-selected
+  - Preserve outgoing trace propagation through explicit metadata helpers
+
+agent_hints:
+  - Use Pool when callers want target-keyed connection reuse
+  - Compose interceptors explicitly in transport-specific adapters outside x/rpc
+  - Put resilience wrappers in x/resilience, not this package

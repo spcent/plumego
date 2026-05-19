@@ -1,0 +1,62 @@
+name: x/data/pgx
+path: x/data/pgx
+layer: extension
+status: experimental
+owner: persistence
+risk: medium
+summary: PostgreSQL-style query and transaction interfaces in the x/data family.
+
+parent_family: x/data
+
+entrypoint_reads:
+  - AGENTS.md
+  - docs/CANONICAL_STYLE_GUIDE.md
+  - specs/repo.yaml
+  - specs/task-routing.yaml
+  - specs/dependency-rules.yaml
+  - x/data/module.yaml
+
+responsibilities:
+  - Caller-owned pool wrapping
+  - PostgreSQL-style query and transaction adapter methods
+  - explicit context propagation to caller-owned pools
+
+non_goals:
+  - ORM behavior
+  - Query builder ownership
+  - Live database test dependency
+  - Stable store/db interface changes
+
+allowed_imports:
+  - stdlib
+  - store/db
+
+forbidden_imports:
+  - core/**
+  - router/**
+  - middleware/**
+  - security/**
+  - x/tenant/**
+  - reference/**
+  - cmd/**
+
+test_commands:
+  - go test -race -timeout 60s ./...
+  - go test -timeout 20s ./...
+  - go vet ./...
+
+change_risks:
+  - transaction lifecycle regression
+  - context propagation regression
+  - accidental live database test dependency
+
+review_checklist:
+  - Keep concrete pgx imports outside this package
+  - Preserve explicit context arguments
+  - Keep tests offline
+  - Do not modify stable store/db interfaces
+
+agent_hints:
+  - Use New when the application provides a pool and wants a ping check
+  - Use NewWithPool when the application already owns the pool lifecycle
+  - Keep PostgreSQL-specific behavior in adapters outside stable store/db

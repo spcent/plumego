@@ -86,18 +86,22 @@ layers:
       - x/gateway
       - x/messaging
       - x/observability
+      - x/openapi
       - x/resilience
       - x/rest
+      - x/rpc
+      - x/validate
       - x/websocket
 
   tooling:
     description: Developer tools, checks, and CLI.
     paths:
+      - benchmark
       - cmd
+      - .githooks
       - internal/checks
       - internal/testutil
       - internal/tools
-      - scripts
 
   reference:
     description: Canonical implementations.

@@ -220,7 +220,8 @@ func main() {
 运行方式：
 
 ```bash
-go run ./reference/standard-service
+cd reference/standard-service
+go run .
 ```
 
 ## 延伸阅读

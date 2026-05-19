@@ -71,28 +71,29 @@ candidates:
 
   - module: x/frontend
     owner: frontend
-    current_status: experimental
+    current_status: beta
     evidence_doc: docs/extension-evidence/x-frontend.md
-    release_refs: []
+    release_refs:
+      - 6a99c5e0bc61c12378bcdab5a6a7c4d756b9fa96
+      - v1.1.0
     api_snapshots:
-      - docs/extension-evidence/snapshots/first-batch/x-frontend-head.snapshot
-    blockers:
-      - release_history_missing
-      - api_snapshot_missing
-      - owner_signoff_missing
+      - docs/extension-evidence/snapshots/x-frontend/base.snapshot
+      - docs/extension-evidence/snapshots/x-frontend/head.snapshot
+    owner_signoff: signed
+    blockers: []
 
   - module: x/tenant
     owner: multitenancy
-    current_status: experimental
+    current_status: beta
     evidence_doc: docs/extension-evidence/x-tenant.md
     release_refs:
       - 6a99c5e0bc61c12378bcdab5a6a7c4d756b9fa96
+      - v1.1.0
     api_snapshots:
-      - docs/extension-evidence/snapshots/first-batch/x-tenant-head.snapshot
-    blockers:
-      - release_history_missing
-      - api_snapshot_missing
-      - owner_signoff_missing
+      - docs/extension-evidence/snapshots/x-tenant/base.snapshot
+      - docs/extension-evidence/snapshots/x-tenant/head.snapshot
+    owner_signoff: signed
+    blockers: []
 
   - module: x/observability
     owner: observability
@@ -130,12 +131,12 @@ subpackage_candidates:
     evidence_doc: docs/extension-evidence/x-ai-provider.md
     release_refs:
       - 6a99c5e0bc61c12378bcdab5a6a7c4d756b9fa96
+      - v1.1.0
     api_snapshots:
-      - docs/extension-evidence/snapshots/ai-stable-tier/x-ai-provider-head.snapshot
-    blockers:
-      - release_history_missing
-      - api_snapshot_missing
-      - owner_signoff_missing
+      - docs/extension-evidence/snapshots/x-ai-provider/base.snapshot
+      - docs/extension-evidence/snapshots/x-ai-provider/head.snapshot
+    owner_signoff: signed
+    blockers: []
 
   - module: x/ai
     subpackage: session
@@ -144,12 +145,12 @@ subpackage_candidates:
     evidence_doc: docs/extension-evidence/x-ai-session.md
     release_refs:
       - 6a99c5e0bc61c12378bcdab5a6a7c4d756b9fa96
+      - v1.1.0
     api_snapshots:
-      - docs/extension-evidence/snapshots/ai-stable-tier/x-ai-session-head.snapshot
-    blockers:
-      - release_history_missing
-      - api_snapshot_missing
-      - owner_signoff_missing
+      - docs/extension-evidence/snapshots/x-ai-session/base.snapshot
+      - docs/extension-evidence/snapshots/x-ai-session/head.snapshot
+    owner_signoff: signed
+    blockers: []
 
   - module: x/ai
     subpackage: streaming
@@ -158,12 +159,12 @@ subpackage_candidates:
     evidence_doc: docs/extension-evidence/x-ai-streaming.md
     release_refs:
       - 6a99c5e0bc61c12378bcdab5a6a7c4d756b9fa96
+      - v1.1.0
     api_snapshots:
-      - docs/extension-evidence/snapshots/ai-stable-tier/x-ai-streaming-head.snapshot
-    blockers:
-      - release_history_missing
-      - api_snapshot_missing
-      - owner_signoff_missing
+      - docs/extension-evidence/snapshots/x-ai-streaming/base.snapshot
+      - docs/extension-evidence/snapshots/x-ai-streaming/head.snapshot
+    owner_signoff: signed
+    blockers: []
 
   - module: x/ai
     subpackage: tool
@@ -172,12 +173,12 @@ subpackage_candidates:
     evidence_doc: docs/extension-evidence/x-ai-tool.md
     release_refs:
       - 6a99c5e0bc61c12378bcdab5a6a7c4d756b9fa96
+      - v1.1.0
     api_snapshots:
-      - docs/extension-evidence/snapshots/ai-stable-tier/x-ai-tool-head.snapshot
-    blockers:
-      - release_history_missing
-      - api_snapshot_missing
-      - owner_signoff_missing
+      - docs/extension-evidence/snapshots/x-ai-tool/base.snapshot
+      - docs/extension-evidence/snapshots/x-ai-tool/head.snapshot
+    owner_signoff: signed
+    blockers: []
 
 surface_candidates:
   - module: x/data
@@ -188,12 +189,12 @@ surface_candidates:
     evidence_doc: docs/extension-evidence/x-data.md
     release_refs:
       - 6a99c5e0bc61c12378bcdab5a6a7c4d756b9fa96
+      - v1.1.0
     api_snapshots:
-      - docs/extension-evidence/snapshots/v1-baseline/x-data-file/base.snapshot
-    blockers:
-      - release_history_missing
-      - api_snapshot_missing
-      - owner_signoff_missing
+      - docs/extension-evidence/snapshots/x-data-file/base.snapshot
+      - docs/extension-evidence/snapshots/x-data-file/head.snapshot
+    owner_signoff: signed
+    blockers: []
 
   - module: x/data
     surface: idempotency
@@ -203,12 +204,12 @@ surface_candidates:
     evidence_doc: docs/extension-evidence/x-data.md
     release_refs:
       - 6a99c5e0bc61c12378bcdab5a6a7c4d756b9fa96
+      - v1.1.0
     api_snapshots:
-      - docs/extension-evidence/snapshots/v1-baseline/x-data-idempotency/base.snapshot
-    blockers:
-      - release_history_missing
-      - api_snapshot_missing
-      - owner_signoff_missing
+      - docs/extension-evidence/snapshots/x-data-idempotency/base.snapshot
+      - docs/extension-evidence/snapshots/x-data-idempotency/head.snapshot
+    owner_signoff: signed
+    blockers: []
 
   - module: x/gateway/discovery
     surface: core-static
@@ -218,10 +219,10 @@ surface_candidates:
     evidence_doc: docs/extension-evidence/x-discovery.md
     release_refs:
       - 6a99c5e0bc61c12378bcdab5a6a7c4d756b9fa96
+      - v1.1.0
     api_snapshots:
       - docs/extension-evidence/snapshots/v1-baseline/x-discovery/base.snapshot
     blockers:
-      - release_history_missing
       - api_snapshot_missing
       - owner_signoff_missing
 
@@ -229,13 +230,13 @@ surface_candidates:
     surface: app-facing-service
     package: x/messaging
     owner: messaging
-    current_status: experimental
+    current_status: beta
     evidence_doc: docs/extension-evidence/x-messaging.md
     release_refs:
       - 6a99c5e0bc61c12378bcdab5a6a7c4d756b9fa96
+      - v1.1.0
     api_snapshots:
-      - docs/extension-evidence/snapshots/v1-baseline/x-messaging/base.snapshot
-    blockers:
-      - release_history_missing
-      - api_snapshot_missing
-      - owner_signoff_missing
+      - docs/extension-evidence/snapshots/x-messaging/base.snapshot
+      - docs/extension-evidence/snapshots/x-messaging/head.snapshot
+    owner_signoff: signed
+    blockers: []

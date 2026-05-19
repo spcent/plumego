@@ -1,0 +1,149 @@
+# Verify M-005: v1 Release Execution
+
+Milestone: `M-005`
+Branch: `main` local execution, remote branch `codex/v1-release-execution`
+Verified Cards:
+- 1429: milestone verify artifacts
+- 1430: `v1.0.0-rc.1` local and remote gate evidence
+- 1431: stable-root final freeze evidence
+- 1432: CLI and onboarding smoke evidence
+- 1433: extension maturity final boundary evidence
+- 1434: final v1 GO/NO-GO decision
+- 1436: `v1.0.0-rc.1` observation-window closure
+- 1437: contract conformance testdata scan blocker fix
+
+## Scope Check
+
+- In-scope files touched:
+  - `tasks/milestones/done/M-005-v1-release-execution/verify-M-005.md`
+  - `docs/release/v1.0.0-rc.1.md`
+  - task cards under `tasks/cards/`
+- Out-of-scope files touched: none for card 1431.
+
+## Ownership Check
+
+- overlapping card ownership: none unresolved.
+- unresolved ownership conflicts: none.
+
+## Symbol Completeness Check
+
+- exported symbol changes: none in M-005 release evidence cards so far.
+- residual reference grep: not applicable.
+
+## Release Candidate Summary
+
+- Local rc tag: `v1.0.0-rc.1`
+- Local tag object: `151770bf`
+- Tag target: `a2346813`
+- Remote tag: `refs/tags/v1.0.0-rc.1`
+- Remote branch: `refs/heads/codex/v1-release-execution`
+- GitHub Actions run: `25920615874`
+- GitHub Actions result: PASS
+- RC observation result: PASS
+- Final v1 decision: GO
+- Final local release gate: PASS after card 1437
+- Final tag: `v1.0.0`
+- Final tag object: `cde6de1d`
+- Final tag target: `6a99c5e0`
+- Final tag GitHub Actions run: `25922384589`
+- Final tag GitHub Actions result: PASS
+
+## Stable Root Freeze Summary
+
+| Check | Result |
+| --- | --- |
+| `go run ./internal/checks/deprecation-inventory -strict` | PASS |
+| `go test -race -timeout 60s ./contract ./core ./router ./middleware/... ./security/... ./store/... ./health ./log ./metrics` | PASS |
+| `go vet ./contract ./core ./router ./middleware/... ./security/... ./store/... ./health ./log ./metrics` | PASS |
+| Stable-module coverage in rc gate | 87.2% |
+| Stable-module coverage in final observation gate | 87.2% |
+
+## CLI and Onboarding Summary
+
+| Check | Result |
+| --- | --- |
+| `cd cmd/plumego && go test -timeout 20s ./...` | PASS |
+| `cd cmd/plumego && go vet ./...` | PASS |
+| `cd cmd/plumego && go run . new --template canonical --dry-run trust-check` | PASS |
+| `go install github.com/spcent/plumego/cmd/plumego@v1.0.0-rc.1` with temp Go caches | FAIL: root module tag does not contain nested `cmd/plumego` package |
+
+Tagged CLI install is therefore not part of this rc's advertised installation
+path. CLI validation remains source-checkout based.
+
+## Extension Maturity Summary
+
+| Check | Result |
+| --- | --- |
+| `go run ./internal/checks/extension-maturity` | PASS |
+| `go run ./internal/checks/extension-beta-evidence` | PASS |
+| Beta families | `x/gateway`, `x/observability`, `x/rest`, `x/websocket` |
+| Remaining candidates | Explicit blockers retained |
+
+Remaining candidates and surfaces still blocked by missing release history,
+release-backed API snapshots, or owner sign-off include `x/tenant`,
+`x/frontend`, `x/ai` stable-tier subpackages, selected `x/data` surfaces,
+`x/discovery:core-static`, and `x/messaging:app-facing-service`.
+
+## Module Test Summary
+
+- primary module tests: release, CLI, stable-root, and extension maturity
+  validation are recorded in the summaries above.
+- secondary module tests: see stable-root final freeze, CLI onboarding, and
+  observation summaries.
+
+## Boundary Check Summary
+
+- dependency-rules: PASS in local `make gates` and remote run `25920615874`.
+- agent-workflow: PASS in local `make gates` and remote run `25920615874`.
+- module-manifests: PASS in local `make gates` and remote run `25920615874`.
+- reference-layout: PASS in local `make gates` and remote run `25920615874`.
+
+## Repo Gate Summary
+
+- `go test -race -timeout 60s ./...`: PASS in local `make gates` and remote run `25920615874`.
+- `go test -timeout 20s ./...`: PASS in local `make gates` and remote run `25920615874`.
+- `go vet ./...`: PASS in local `make gates` and remote run `25920615874`.
+- `gofmt -l .`: PASS in local `make gates` and remote run `25920615874`.
+
+## Final v1 Decision
+
+- Decision: GO on May 15, 2026.
+- Rationale: `v1.0.0-rc.1` local and remote gates are green, stable-root freeze
+  and CLI/onboarding evidence are recorded, extension beta boundaries remain
+  locked, and card 1436 found no P0/P1 release blocker during observation.
+- Follow-up: monitor post-release issues and keep experimental extension
+  promotions blocked until release refs, release-backed snapshots, and owner
+  sign-off are complete.
+
+## Observation Summary
+
+- `gh run view 25920615874 --repo spcent/plumego --json status,conclusion,url,headSha,event,displayTitle`
+  returned success for tag target `a2346813`.
+- `gh issue list --repo spcent/plumego --state open --limit 100 --json number,title,labels,updatedAt,url`
+  returned no open issues.
+- `gh pr list --repo spcent/plumego --state open --limit 50 --json number,title,labels,headRefName,updatedAt,url`
+  returned one unrelated PR, `#241 Add framework comparison and stability pages`,
+  with no release-blocker label.
+- `go run ./internal/checks/extension-beta-evidence` passed; beta remains
+  limited to `x/gateway`, `x/observability`, `x/rest`, and `x/websocket`.
+- `GOCACHE=/private/tmp/plumego-gocache GOMODCACHE=/private/tmp/plumego-gomodcache make gates`
+  passed after card 1437; website sync/check/build completed without generated
+  drift and stable-module coverage remained 87.2%.
+- `git push origin HEAD:refs/heads/codex/v1-release-execution v1.0.0` pushed
+  the final tag and rejected the already-stale release-execution branch as
+  non-fast-forward. The tag push succeeded; `main` already contains the
+  release-control-plane content at commit `f684bc87`.
+- `gh run view 25922384589 --repo spcent/plumego --json status,conclusion,url,headSha,event,displayTitle`
+  returned success for `v1.0.0` tag target `6a99c5e0`.
+- `gh run view 25922373632 --repo spcent/plumego --json status,conclusion,url,headSha,event,displayTitle`
+  returned success for `main` commit `f684bc87`.
+
+## Open Issues
+
+- No unresolved P0/P1 release blockers were found during card 1436.
+
+## Final Verdict
+
+- `GO`
+- rationale: rc evidence is healthy, observation is clean, final `v1.0.0` is
+  tagged, and remote final-tag gates passed.

@@ -39,10 +39,28 @@ families:
       - x/observability/ops
       - x/observability/devtools
 
+  openapi:
+    canonical_root: x/openapi
+    roots:
+      - x/openapi
+
+  rpc:
+    canonical_root: x/rpc
+    roots:
+      - x/rpc
+      - x/rpc/client
+      - x/rpc/gateway
+      - x/rpc/server
+
   resilience:
     canonical_root: x/resilience
     roots:
       - x/resilience
+
+  validate:
+    canonical_root: x/validate
+    roots:
+      - x/validate
 
   frontend:
     canonical_root: x/frontend

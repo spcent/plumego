@@ -1,6 +1,6 @@
 <!--
   Milestone Spec Template — plumego
-  Copy to tasks/milestones/active/M-NNN.md and fill every section.
+  Copy to tasks/milestones/active/M-NNN-short-name/M-NNN.md and fill every section.
   Lines starting with <!-- are comments; delete them in your spec.
   Keep the spec under ~100 lines. If longer, split into two milestones.
 -->
@@ -19,12 +19,12 @@
 
 <!--
   Companion artifacts expected for this milestone:
-  - Plan:   tasks/milestones/M-XXX.plan.md
-  - Verify: tasks/milestones/M-XXX.verify.md
+  - Plan:   tasks/milestones/<state>/M-XXX-short-name/plan-M-XXX.md
+  - Verify: tasks/milestones/<state>/M-XXX-short-name/verify-M-XXX.md
   Before `make milestone`, scaffold the plan with:
-    make new-plan M=active/M-XXX
+    make new-plan M=active/M-XXX-short-name
   Before PR packaging, fill the verify report with:
-    make new-verify M=active/M-XXX
+    make new-verify M=active/M-XXX-short-name
 -->
 
 ---
@@ -155,8 +155,8 @@ Expected: all exit 0; `gofmt -l .` outputs nothing.
 
 - [ ] All Acceptance Criteria commands exit 0.
 - [ ] `gofmt -l .` produces no output.
-- [ ] `tasks/milestones/M-XXX.plan.md` exists and matches the milestone scope.
-- [ ] `tasks/milestones/M-XXX.verify.md` is filled before PR packaging.
+- [ ] `plan-M-XXX.md` exists in this milestone directory and matches the milestone scope.
+- [ ] `verify-M-XXX.md` is filled in this milestone directory before PR packaging.
 - [ ] Branch `milestone/M-XXX-<slug>` pushed.
 - [ ] PR open, title `milestone(M-XXX): <Title>`.
 - [ ] PR body filled from milestone-pr-template.md with actual gate output.

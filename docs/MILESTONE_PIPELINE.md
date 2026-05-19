@@ -20,7 +20,7 @@ Milestone Spec
 
 | Stage | Purpose | Owner | Output |
 |------|---------|-------|--------|
-| Milestone | Define scope and hard constraints | Human | `tasks/milestones/active/M-XXX.md` |
+| Milestone | Define scope and hard constraints | Human | `tasks/milestones/active/M-XXX-short-name/M-XXX.md` |
 | Plan | Turn scope into ordered execution units | Planner | `tasks/milestones/PLAN_TEMPLATE.md` shape |
 | Cards | Small reversible work units | Decomposer / Workers | `tasks/cards/TEMPLATE.md` shape |
 | Verify | Collect evidence and final verdict | Verifier | `tasks/milestones/VERIFY_TEMPLATE.md` shape |
@@ -76,7 +76,7 @@ Plan is the execution manifest produced from the milestone before worker code ch
 
 Recommended file name:
 
-- `tasks/milestones/M-XXX.plan.md`
+- `tasks/milestones/<state>/M-XXX-short-name/plan-M-XXX.md`
 
 Required fields:
 
@@ -137,7 +137,7 @@ Verify is the milestone-level evidence bundle.
 
 Recommended file name:
 
-- `tasks/milestones/M-XXX.verify.md`
+- `tasks/milestones/<state>/M-XXX-short-name/verify-M-XXX.md`
 
 Required fields:
 

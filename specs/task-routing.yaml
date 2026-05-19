@@ -32,9 +32,12 @@ routing_rules:
       - x/websocket
       - x/frontend
       - x/observability
+      - x/openapi
       - x/resilience
+      - x/rpc
       - x/data
       - x/ai
+      - x/validate
 
   app_wiring:
     intent: Change application wiring, bootstrap shape, dependency injection, or route registration.
@@ -232,6 +235,15 @@ tasks:
     avoid:
       - core
       - x/gateway
+
+  rpc_transport:
+    start_with:
+      - x/rpc/module.yaml
+      - x/rpc/server/module.yaml
+      - specs/extension-taxonomy.yaml
+    avoid:
+      - core
+      - middleware
 
   messaging:
     start_with:

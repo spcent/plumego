@@ -11,16 +11,16 @@ Use this file as the first release evidence read after `v1.0.0`.
 - Final tag result: PASS
 - Release notes: `docs/release/v1.0.0.md`
 - RC notes: `docs/release/v1.0.0-rc.1.md`
-- v1 release execution verify artifact: `tasks/milestones/M-005.verify.md`
+- v1 release execution verify artifact: `tasks/milestones/done/M-005-v1-release-execution/verify-M-005.md`
 
 Do not rewrite the published tag. Any post-v1 fix belongs in a later patch or
 minor release lane.
 
 ## Post-v1 Maintenance Lane
 
-- Milestone: `tasks/milestones/done/M-006.md`
-- Plan: `tasks/milestones/M-006.plan.md`
-- Verify artifact: `tasks/milestones/M-006.verify.md`
+- Milestone: `tasks/milestones/done/M-006-v1-0-1-maintenance-lane/M-006.md`
+- Plan: `tasks/milestones/done/M-006-v1-0-1-maintenance-lane/plan-M-006.md`
+- Verify artifact: `tasks/milestones/done/M-006-v1-0-1-maintenance-lane/verify-M-006.md`
 - First maintenance CI run after action-runtime cleanup: `25954419567`
 
 M-006 is for generated data, CI upkeep, onboarding truth, release evidence, and
@@ -60,9 +60,9 @@ go run ./internal/checks/extension-maturity
 
 ## Extension v1 Baseline Intake
 
-- Milestone: `tasks/milestones/done/M-007.md`
-- Plan: `tasks/milestones/M-007.plan.md`
-- Verify artifact: `tasks/milestones/M-007.verify.md`
+- Milestone: `tasks/milestones/done/M-007-extension-v1-baseline-evidence-intake/M-007.md`
+- Plan: `tasks/milestones/done/M-007-extension-v1-baseline-evidence-intake/plan-M-007.md`
+- Verify artifact: `tasks/milestones/done/M-007-extension-v1-baseline-evidence-intake/verify-M-007.md`
 
 M-007 recorded the `v1.0.0` tag target as the first post-v1 release evidence
 point for selected remaining candidates. This was not a promotion lane:

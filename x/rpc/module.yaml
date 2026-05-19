@@ -1,0 +1,77 @@
+name: x/rpc
+path: x/rpc
+layer: extension
+status: experimental
+owner: rpc
+risk: medium
+summary: Dependency-free RPC transport interfaces and lifecycle helpers for Plumego services.
+
+entrypoint_reads:
+  - AGENTS.md
+  - docs/CANONICAL_STYLE_GUIDE.md
+  - specs/repo.yaml
+  - specs/task-routing.yaml
+  - specs/dependency-rules.yaml
+
+subordinate_families:
+  - package: x/rpc/server
+    role: Caller-owned RPC server lifecycle wrapper aligned with context cancellation
+  - package: x/rpc/client
+    role: Transport-neutral client connection pool and unary interceptors
+  - package: x/rpc/gateway
+    role: HTTP route adapter for caller-owned RPC handlers
+
+responsibilities:
+  - RPC server lifecycle wrappers
+  - RPC client connection helpers
+  - HTTP-to-RPC gateway adapters
+  - Optional RPC transport integration patterns
+
+non_goals:
+  - Core app bootstrap ownership
+  - Stable root-package entrypoints
+  - Service discovery registration
+  - Business-specific RPC service definitions
+
+public_entrypoints:
+  - server
+
+doc_paths:
+  - docs/modules/x-rpc/README.md
+  - reference/with-rpc
+
+allowed_imports:
+  - stdlib
+  - contract
+  - log
+  - x/observability
+
+forbidden_imports:
+  - core/**
+  - router/**
+  - middleware/**
+  - security/**
+  - store/**
+  - x/tenant/**
+  - x/ai/**
+  - reference/**
+  - cmd/**
+
+test_commands:
+  - go test -race -timeout 60s ./...
+  - go test -timeout 20s ./...
+  - go vet ./...
+
+review_checklist:
+  - Keep concrete RPC dependencies outside x/rpc
+  - Preserve explicit lifecycle control
+  - Do not require stable roots to know RPC internals
+  - Keep service registration explicit
+
+agent_hints:
+  - Use x/rpc only for optional RPC transport contracts
+  - Keep concrete gRPC, Connect, or other transport wiring in user applications or adapters
+  - Do not add hidden service registries or globals
+
+landing_zones:
+  server: server/

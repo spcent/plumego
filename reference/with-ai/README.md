@@ -24,5 +24,6 @@ behavior and does not call live providers.
 ## Run
 
 ```bash
-go run ./reference/with-ai
+cd reference/with-ai
+go run .
 ```

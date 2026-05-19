@@ -46,8 +46,8 @@ Verified Cards:
 
 ## Checkpoint Summary
 
-<!-- Read tasks/milestones/M-XXX.checkpoint.json and summarize.
-     Or run: make milestone-status M=active/M-XXX -->
+<!-- Read checkpoint-M-XXX.json from this milestone directory and summarize.
+     Or run: make milestone-status M=active/M-XXX-short-name -->
 
 - Phase 1:
 - Phase 2:

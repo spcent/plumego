@@ -11,9 +11,9 @@ import (
 	"github.com/spcent/plumego/middleware/accesslog"
 	"github.com/spcent/plumego/middleware/recovery"
 	"github.com/spcent/plumego/middleware/requestid"
-	"github.com/spcent/plumego/reference/with-messaging/internal/config"
-	"github.com/spcent/plumego/reference/with-messaging/internal/handler"
 	"github.com/spcent/plumego/x/messaging"
+	"with-messaging/internal/config"
+	"with-messaging/internal/handler"
 )
 
 // App holds application-wide dependencies including the messaging broker.

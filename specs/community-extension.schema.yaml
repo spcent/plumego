@@ -1,0 +1,36 @@
+required:
+  - name
+  - module_path
+  - status
+  - handler_shape
+  - test_commands
+  - forbidden_imports
+  - no_init_side_effects
+  - no_globals
+  - owner
+
+status_enum:
+  - experimental
+  - beta
+  - ga
+
+handler_shape_const: "func(http.ResponseWriter, *http.Request)"
+
+list_min_lengths:
+  test_commands: 1
+  forbidden_imports: 9
+
+boolean_true:
+  - no_init_side_effects
+  - no_globals
+
+stable_root_forbidden_imports:
+  - github.com/spcent/plumego/core
+  - github.com/spcent/plumego/router
+  - github.com/spcent/plumego/contract
+  - github.com/spcent/plumego/middleware
+  - github.com/spcent/plumego/security
+  - github.com/spcent/plumego/store
+  - github.com/spcent/plumego/health
+  - github.com/spcent/plumego/log
+  - github.com/spcent/plumego/metrics

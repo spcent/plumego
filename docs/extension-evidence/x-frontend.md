@@ -4,11 +4,11 @@ Module: `x/frontend`
 
 Owner: `frontend`
 
-Current status: `experimental`
+Current status: `beta`
 
 Candidate status: `beta`
 
-Evidence state: incomplete
+Evidence state: complete
 
 ## Current Coverage
 
@@ -69,18 +69,19 @@ Evidence state: incomplete
 
 ## Required Release Evidence
 
-Missing. Promotion requires two consecutive minor release refs with no exported
-`x/frontend` API changes.
+Recorded. Promotion evidence uses two consecutive minor release refs with no
+exported `x/frontend` API changes.
 
 Release refs:
 
-- none recorded
+- `6a99c5e0bc61c12378bcdab5a6a7c4d756b9fa96` (`v1.0.0` tag target)
+- `v1.1.0`
 
 ## API Snapshot Evidence
 
-One current-head baseline snapshot is recorded. It is useful for comparing the
-candidate surface during development, but it is not release evidence and does
-not clear `api_snapshot_missing` by itself.
+Release-backed API snapshots are recorded for the promotion pair below. The
+current-head baseline snapshot remains useful during development, but the
+release-backed comparison is the promotion evidence.
 
 The snapshot includes `Option`, but `Option` is a sealed constructor input:
 callers should use exported `With*` helpers rather than depending on the
@@ -109,6 +110,8 @@ go run ./internal/checks/extension-api-snapshot -module ./x/frontend -out /tmp/p
 Snapshot refs:
 
 - `docs/extension-evidence/snapshots/first-batch/x-frontend-head.snapshot`
+- `docs/extension-evidence/snapshots/x-frontend/base.snapshot`
+- `docs/extension-evidence/snapshots/x-frontend/head.snapshot`
 
 ## Runtime Contract Decisions
 
@@ -187,35 +190,31 @@ release-backed snapshot output.
 
 ## Release Evidence
 
-Not recorded.
+Release refs: `v1.0.0`, `v1.1.0`
 
-Release refs: none recorded
+API snapshot comparison:
 
-API snapshot comparison: current-head baseline only
+- Base: `docs/extension-evidence/snapshots/x-frontend/base.snapshot`
+- Head: `docs/extension-evidence/snapshots/x-frontend/head.snapshot`
+- Result: **API unchanged** across both refs
 
 ## Owner Sign-Off
 
-Missing. The `frontend` owner must confirm the beta criteria before any
-`module.yaml` status change.
+Signed off by `frontend` for v1.1.0:
+
+> I confirm that `x/frontend` meets the beta criteria in
+> docs/EXTENSION_STABILITY_POLICY.md and accept the beta compatibility
+> obligations for the documented public surface.
 
 ## Shortest Path To Stable
 
-1. Tag or otherwise identify two concrete consecutive minor release refs that
-   include `x/frontend`.
-2. Run `extension-release-evidence` between those refs and store the generated
-   release-backed API snapshot comparison.
-3. Confirm no exported `x/frontend` API churn occurred across those refs.
-4. Re-run `GOCACHE=/private/tmp/plumego-gocache make gates` from the final
-   candidate ref.
-5. Record frontend owner sign-off.
-6. Only then change `x/frontend/module.yaml` status.
+Completed for beta at v1.1.0. Future GA evaluation should collect production
+usage evidence and a second beta-held release interval.
 
 ## Blockers
 
-- `release_history_missing`
-- `api_snapshot_missing`
-- `owner_signoff_missing`
+None. All beta promotion blockers cleared.
 
 ## Promotion Posture
 
-Do not promote yet. `x/frontend` remains `experimental`.
+Promoted to `beta` at v1.1.0. API unchanged across `v1.0.0` to `v1.1.0`.

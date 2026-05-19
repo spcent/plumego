@@ -71,6 +71,69 @@ packages:
       - x/gateway
     summary: Reusable resource-interface layer for CRUD-standardized APIs.
 
+  x/rpc:
+    module: x/rpc
+    layer: extension
+    role: app_surface
+    task_families:
+      - rpc_transport
+    start_with:
+      - x/rpc/module.yaml
+      - x/rpc/server/module.yaml
+    avoid:
+      - core
+      - middleware
+      - reference/standard-service
+    summary: Dependency-free RPC transport contracts and lifecycle helpers; keep concrete transports outside core and extension packages.
+
+  x/rpc/client:
+    module: x/rpc
+    layer: extension
+    role: primitive
+    task_families:
+      - rpc_transport
+    start_with:
+      - x/rpc/module.yaml
+      - x/rpc/client/module.yaml
+      - x/rpc/client/pool.go
+    avoid:
+      - core
+      - middleware
+      - x/gateway
+    summary: Transport-neutral client connection pool and unary interceptors with caller-selected retry policy.
+
+  x/rpc/server:
+    module: x/rpc
+    layer: extension
+    role: primitive
+    task_families:
+      - rpc_transport
+    start_with:
+      - x/rpc/module.yaml
+      - x/rpc/server/module.yaml
+      - x/rpc/server/server.go
+    avoid:
+      - core
+      - middleware
+      - x/gateway
+    summary: RPC server lifecycle primitive with explicit service registration and context-aware shutdown.
+
+  x/rpc/gateway:
+    module: x/rpc
+    layer: extension
+    role: adapter
+    task_families:
+      - rpc_transport
+    start_with:
+      - x/rpc/module.yaml
+      - x/rpc/gateway/module.yaml
+      - x/rpc/gateway/transcoder.go
+    avoid:
+      - core
+      - router
+      - x/gateway
+    summary: HTTP route adapter for caller-owned RPC handlers; not the edge gateway family.
+
   x/gateway:
     module: x/gateway
     layer: extension

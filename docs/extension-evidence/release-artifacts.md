@@ -9,7 +9,7 @@ first release evidence read after `v1.0.0`.
 
 ## Current Release Ref State
 
-As of M-007, the working copy sees these local and remote release tags:
+As of M-009, the working copy sees these local and remote release tags:
 
 ```bash
 git tag --sort=version:refname
@@ -23,13 +23,15 @@ Known release refs:
 | `v0.2.0` | lightweight tag | historical pre-v1 tag |
 | `v1.0.0-rc.1` | annotated tag | release-candidate evidence |
 | `v1.0.0` | annotated tag | first post-v1 baseline evidence point |
+| `v1.1.0` | annotated tag | second post-v1 release evidence point |
 
-Use the `v1.0.0` tag target commit, not the annotated tag object, when recording
-release refs in `specs/extension-beta-evidence.yaml`.
+Use the release tag target commit, not the annotated tag object, when recording
+commit-hash release refs in `specs/extension-beta-evidence.yaml`. The ledger may
+also record a release tag string such as `v1.1.0` when the tag resolves locally.
 
 Do not use branch heads, arbitrary commits, or `HEAD` as substitutes for release
-evidence. A single `v1.0.0` release ref is an intake artifact only; it does not
-satisfy the two-release promotion rule by itself.
+evidence. A single release ref is an intake artifact only; it does not satisfy
+the two-release promotion rule by itself.
 
 ## Artifact Rules
 
@@ -64,9 +66,9 @@ status.
 | `x/websocket` | beta evidence complete | none | none |
 | `x/observability` | beta evidence complete | none | none |
 | `x/gateway` | beta evidence complete | none | none |
-| `x/frontend` | evidence doc, current-head snapshot | second-release evidence, release-backed snapshots, owner sign-off | future frontend-owned card |
-| `x/tenant` | evidence doc, current-head snapshot, first `v1.0.0` release ref, v1 baseline intake snapshot | second release ref, release-backed snapshots, owner sign-off | `tasks/cards/blocked/1367-x-tenant-beta-evidence-closure.md` |
-| `x/ai` stable-tier subpackages | evidence docs, current-head snapshots, first `v1.0.0` release refs, v1 baseline intake snapshots | second release refs, release-backed snapshots, owner sign-off | `tasks/cards/blocked/1370-x-ai-stable-tier-beta-evidence-closure.md` |
-| `x/data` selected surfaces | evidence doc, first `v1.0.0` release refs, v1 baseline intake snapshots | second release refs, complete release-backed snapshots, owner sign-off | `tasks/cards/blocked/1371-x-data-surface-beta-evidence-closure.md` |
+| `x/frontend` | beta evidence complete | none | none |
+| `x/tenant` | beta evidence complete | none | none |
+| `x/ai` stable-tier subpackages | beta evidence complete for provider, session, streaming, and tool | none | root `x/ai` remains experimental |
+| `x/data` selected surfaces | beta evidence complete for `x/data/file` and `x/data/idempotency` | none for selected surfaces | root `x/data` remains experimental |
 | `x/gateway/discovery` core/static surface | evidence doc, first `v1.0.0` release ref, v1 baseline intake snapshot | second release ref, complete release-backed snapshots, owner sign-off | `tasks/cards/blocked/1372-x-discovery-surface-beta-evidence-closure.md` |
-| `x/messaging` app-facing service | evidence doc, first `v1.0.0` release ref, v1 baseline intake snapshot | second release ref, complete release-backed snapshots, owner sign-off | `tasks/cards/blocked/1373-x-messaging-service-beta-evidence-closure.md` |
+| `x/messaging` app-facing service | beta evidence complete | none for app-facing service | subordinate primitives remain experimental |

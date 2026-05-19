@@ -42,6 +42,7 @@ open the relevant capability primer:
 | Realtime service | `modules/x-websocket/README.md`, `modules/x-messaging/README.md` |
 | Messaging service | `../reference/with-messaging/README.md`, `modules/x-messaging/README.md`, including `x/messaging/mq` or `x/messaging/pubsub` only for narrow primitive work |
 | Webhook ingress or delivery | `../reference/with-webhook/README.md`, `modules/x-messaging/README.md`, including `x/messaging/webhook` for narrow transport work |
+| RPC transport | `../reference/with-rpc/README.md`, `modules/x-rpc/README.md`, starting with `x/rpc/server`, `x/rpc/client`, or `x/rpc/gateway` for the direct transport task |
 | File API service | `../reference/standard-service/README.md`, `modules/x-fileapi/README.md`, `modules/x-data/README.md` for storage and metadata backends |
 | AI service | `../reference/with-ai/README.md`, `modules/x-ai/README.md`, starting with provider, session, streaming, and tool subpackages |
 | Observability and ops | `../reference/with-ops/README.md`, `modules/x-observability/README.md`, `modules/x-ops/README.md`, `modules/x-devtools/README.md` |

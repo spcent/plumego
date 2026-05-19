@@ -18,6 +18,12 @@ entrypoint_reads:
 subordinate_families:
   - package: x/data/cache
     role: distributed cache with consistent hashing, replication, failover, and Redis adapter
+  - package: x/data/pgx
+    role: PostgreSQL-style driver interface wrapper for x/data callers
+  - package: x/data/sqlx
+    role: database/sql query and transaction interface wrapper for x/data callers
+  - package: x/data/migrate
+    role: migration runner interface wrapper for x/data callers
 
 responsibilities:
   - Read-write splitting orchestration

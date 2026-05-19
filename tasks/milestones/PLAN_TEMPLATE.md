@@ -39,9 +39,9 @@ Affected Modules:
 ## Checkpoints
 
 <!-- One checkpoint per phase. Agent writes checkpoint file after each phase passes.
-     Checkpoint file: tasks/milestones/M-XXX.checkpoint.json
+     Checkpoint file: tasks/milestones/<state>/M-XXX-short-name/checkpoint-M-XXX.json
      Format per phase entry: {"phase": "phase_1", "passed": true, "timestamp": "2026-01-01T00:00:00Z", "gate": "<command run>"}
-     Use `make milestone-status M=active/M-XXX` to read checkpoint state. -->
+     Use `make milestone-status M=active/M-XXX-short-name` to read checkpoint state. -->
 
 | Phase | Checkpoint Gate | Status |
 |-------|-----------------|--------|
