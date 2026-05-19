@@ -1,0 +1,253 @@
+---
+import type { Locale } from '../../lib/locales';
+
+const { locale = 'en' } = Astro.props as { locale?: Locale };
+
+const copy = {
+  en: {
+    pillars: [
+      {
+        icon: 'zero-deps',
+        kicker: 'stdlib-only',
+        title: 'Zero external dependencies in the kernel.',
+        body: 'The 9 stable roots import only the Go standard library. No transitive dependency risk, no forced upgrades, no version conflicts in your module graph.',
+        detail: 'go get github.com/spcent/plumego',
+        detailLabel: 'single import path, no dependency tree',
+        href: '/stability',
+        linkLabel: 'Stability & compatibility →',
+      },
+      {
+        icon: 'explicit',
+        kicker: 'explicit wiring',
+        title: 'Every route visible in one file, every review.',
+        body: 'Route registration, middleware order, and dependency wiring all live in internal/app/routes.go. A reviewer sees the full request map without opening a single package.',
+        detail: 'func (a *App) Routes() http.Handler { … }',
+        detailLabel: 'all routes declared in one canonical location',
+        href: '/why-plumego',
+        linkLabel: 'Why explicit matters →',
+      },
+      {
+        icon: 'agent',
+        kicker: 'agent-ready',
+        title: 'Machine-readable specs guide every change.',
+        body: 'specs/task-routing.yaml routes work to the right module before a line is written. specs/dependency-rules.yaml enforces boundaries in CI. Agents and humans share the same operating model.',
+        detail: 'specs/ · tasks/ · module.yaml',
+        detailLabel: 'control plane readable by humans and agents alike',
+        href: '/agent-workflow',
+        linkLabel: 'See the control plane →',
+      },
+    ],
+  },
+  zh: {
+    pillars: [
+      {
+        icon: 'zero-deps',
+        kicker: 'stdlib only',
+        title: '内核零外部依赖。',
+        body: '9 个稳定根只 import Go 标准库。没有传递依赖风险，没有被迫升级，你的 module graph 里不会引入任何版本冲突。',
+        detail: 'go get github.com/spcent/plumego',
+        detailLabel: '单一 import 路径，无依赖树',
+        href: '/zh/stability',
+        linkLabel: '稳定性与兼容性 →',
+      },
+      {
+        icon: 'explicit',
+        kicker: '显式 wiring',
+        title: '每条路由在一个文件里，每次评审可见。',
+        body: '路由注册、中间件顺序和依赖装配全在 internal/app/routes.go 里。评审者无需打开任何包就能看到完整请求地图。',
+        detail: 'func (a *App) Routes() http.Handler { … }',
+        detailLabel: '所有路由在一处声明',
+        href: '/zh/why-plumego',
+        linkLabel: '为什么显式很重要 →',
+      },
+      {
+        icon: 'agent',
+        kicker: 'Agent-ready',
+        title: '机器可读规范引导每一次变更。',
+        body: 'specs/task-routing.yaml 在写下第一行代码前就把工作路由到正确模块。specs/dependency-rules.yaml 在 CI 中执行边界约束。Agent 和人共享同一套操作模型。',
+        detail: 'specs/ · tasks/ · module.yaml',
+        detailLabel: '人与 Agent 均可读取的控制平面',
+        href: '/zh/agent-workflow',
+        linkLabel: '查看控制平面 →',
+      },
+    ],
+  },
+} as const;
+
+const t = copy[locale];
+---
+
+<section class="section differentiators-section" aria-label="Core differentiators">
+  <div class="differentiators-grid">
+    {t.pillars.map((pillar) => (
+      <article class="diff-card">
+        <div class="diff-card__icon-wrap" data-icon={pillar.icon} aria-hidden="true">
+          {pillar.icon === 'zero-deps' && (
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="9" />
+              <path d="M12 8v4l2.5 2.5" />
+              <path d="M8 3.5C9.2 3 10.5 2.75 12 2.75" />
+            </svg>
+          )}
+          {pillar.icon === 'explicit' && (
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M4 6h16M4 10h10M4 14h16M4 18h10" />
+            </svg>
+          )}
+          {pillar.icon === 'agent' && (
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="3" />
+              <path d="M8 9h8M8 13h5" />
+              <circle cx="17" cy="17" r="3" fill="currentColor" stroke="none" opacity="0.4"/>
+              <path d="M16 17h2M17 16v2" stroke="currentColor" stroke-width="1.2" />
+            </svg>
+          )}
+        </div>
+        <p class="diff-card__kicker">{pillar.kicker}</p>
+        <h2 class="diff-card__title">{pillar.title}</h2>
+        <p class="diff-card__body">{pillar.body}</p>
+        <div class="diff-card__detail">
+          <code class="diff-card__detail-code">{pillar.detail}</code>
+          <span class="diff-card__detail-label">{pillar.detailLabel}</span>
+        </div>
+        <a class="diff-card__link" href={pillar.href}>{pillar.linkLabel}</a>
+      </article>
+    ))}
+  </div>
+</section>
+
+<style>
+  .differentiators-section {
+    padding-block: 4rem;
+  }
+
+  .differentiators-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1.25rem;
+    max-width: 72rem;
+    margin-inline: auto;
+  }
+
+  @media (min-width: 768px) {
+    .differentiators-grid {
+      grid-template-columns: repeat(3, 1fr);
+    }
+  }
+
+  .diff-card {
+    background: var(--bg-elevated);
+    border: 1px solid var(--line);
+    border-radius: 0.875rem;
+    padding: 1.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+    position: relative;
+    overflow: hidden;
+    transition: border-color 0.18s, box-shadow 0.18s;
+  }
+
+  .diff-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(
+      circle at var(--spotlight-x, 50%) var(--spotlight-y, 0%),
+      var(--accent-soft) 0%,
+      transparent 65%
+    );
+    opacity: var(--spotlight-op, 0);
+    transition: opacity 0.3s;
+    pointer-events: none;
+  }
+
+  .diff-card:hover {
+    border-color: color-mix(in srgb, var(--accent) 28%, var(--line));
+    box-shadow: var(--shadow);
+  }
+
+  .diff-card__icon-wrap {
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 0.5rem;
+    background: var(--accent-soft);
+    color: var(--accent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    margin-bottom: 0.25rem;
+  }
+
+  .diff-card__icon-wrap svg {
+    width: 1.2rem;
+    height: 1.2rem;
+  }
+
+  .diff-card__kicker {
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0;
+  }
+
+  .diff-card__title {
+    font-size: 1.05rem;
+    font-weight: 700;
+    line-height: 1.3;
+    letter-spacing: -0.02em;
+    color: var(--fg);
+    margin: 0;
+  }
+
+  .diff-card__body {
+    font-size: 0.875rem;
+    color: var(--fg-soft);
+    line-height: 1.65;
+    margin: 0;
+    flex: 1;
+  }
+
+  .diff-card__detail {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    padding: 0.6rem 0.8rem;
+    background: var(--bg-strong);
+    border: 1px solid var(--line);
+    border-radius: 0.4rem;
+    margin-top: 0.25rem;
+  }
+
+  .diff-card__detail-code {
+    font-family: var(--font-mono);
+    font-size: 0.74rem;
+    color: var(--accent);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .diff-card__detail-label {
+    font-size: 0.68rem;
+    color: var(--fg-soft);
+    line-height: 1.4;
+  }
+
+  .diff-card__link {
+    font-size: 0.82rem;
+    font-weight: 500;
+    color: var(--accent);
+    text-decoration: none;
+    margin-top: 0.15rem;
+    transition: color 0.15s;
+  }
+
+  .diff-card__link:hover {
+    color: var(--accent-strong);
+    text-decoration: underline;
+  }
+</style>

@@ -20,8 +20,11 @@ export const MODULE_FACTS = {
     "x/gateway",
     "x/messaging",
     "x/observability",
+    "x/openapi",
     "x/resilience",
     "x/rest",
+    "x/rpc",
+    "x/validate",
     "x/websocket"
   ],
   "betaExtensionFamilies": [
@@ -39,9 +42,12 @@ export const MODULE_FACTS = {
     "x/websocket",
     "x/frontend",
     "x/observability",
+    "x/openapi",
     "x/resilience",
+    "x/rpc",
     "x/data",
-    "x/ai"
+    "x/ai",
+    "x/validate"
   ],
   "discouragedRoots": [
     "ai",
