@@ -198,7 +198,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 func runAddCommand(t *testing.T, runner *fakeAddRunner, args []string) (int, string) {
 	t.Helper()
 	projectDir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(projectDir, "go.mod"), []byte("module example.com/app\n\ngo 1.24\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(projectDir, "go.mod"), []byte("module example.com/app\n\ngo 1.26.0\n"), 0o644); err != nil {
 		t.Fatalf("write project go.mod: %v", err)
 	}
 	prev, err := os.Getwd()

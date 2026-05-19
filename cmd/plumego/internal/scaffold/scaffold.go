@@ -275,7 +275,7 @@ func resolveProjectOptions(options []ProjectOptions) ProjectOptions {
 
 func getGoModContent(module string, opts ProjectOptions) string {
 	opts = resolveProjectOptions([]ProjectOptions{opts})
-	content := fmt.Sprintf("module %s\n\ngo 1.24\n\nrequire github.com/spcent/plumego %s\n", module, opts.PlumegoVersion)
+	content := fmt.Sprintf("module %s\n\ngo 1.26.0\n\nrequire github.com/spcent/plumego %s\n", module, opts.PlumegoVersion)
 	if opts.PlumegoReplace != "" {
 		content += fmt.Sprintf("\nreplace github.com/spcent/plumego => %s\n", filepath.ToSlash(opts.PlumegoReplace))
 	}

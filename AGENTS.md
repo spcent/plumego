@@ -7,7 +7,7 @@ Keep the stable surface small, ownership obvious, and every change easy to
 review and reverse.
 
 Go module: `github.com/spcent/plumego`
-Go version: `go 1.24.0`, toolchain `go1.24.4`
+Go version: `go 1.26.0` with Go toolchain `go1.26.0` or a newer patch release.
 Main module policy: standard library only unless explicitly approved.
 
 ## 1. Authority

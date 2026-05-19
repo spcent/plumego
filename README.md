@@ -1,6 +1,6 @@
 # Plumego — Standard Library Web Toolkit
 
-[![Go Version](https://img.shields.io/badge/Go-1.24%2B-00ADD8?style=flat&logo=go)](https://go.dev/)
+[![Go Version](https://img.shields.io/badge/Go-1.26%2B-00ADD8?style=flat&logo=go)](https://go.dev/)
 [![Status](https://img.shields.io/badge/status-v1.0.0-blue)](https://github.com/spcent/plumego/releases/tag/v1.0.0)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
@@ -105,6 +105,16 @@ without taking on a large framework model.
 
 Optional capability families live under `x/*`. Treat them as additions to the
 stable root path, not as alternate application layouts.
+
+## Agent-First Design
+
+Plumego is maintained with an agent-first control plane: `docs/` explains the
+architecture, `specs/` records machine-checkable boundaries, `tasks/` defines
+reviewable execution units, and `reference/` shows canonical wiring. The checks
+under `internal/checks/` enforce the most important boundaries locally and in
+CI, so automated changes produce reviewable evidence instead of relying on
+implicit convention. See [`docs/AGENT_FIRST.md`](./docs/AGENT_FIRST.md) for the
+full model and adoption path.
 
 ## Getting Help
 

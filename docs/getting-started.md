@@ -8,7 +8,7 @@ For the broader adoption sequence, read `docs/ADOPTION_PATH.md`.
 
 ## Requirements
 
-- Go 1.24 or later
+- Go 1.26 or later
 - no external runtime dependencies in the main module
 
 Install:

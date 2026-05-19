@@ -78,7 +78,7 @@ func TestValidateReferenceModules(t *testing.T) {
 	repo := t.TempDir()
 	writeFile(t, filepath.Join(repo, "reference", "standard-service", "go.mod"), `module standard-service
 
-go 1.24.0
+go 1.26.0
 
 require github.com/spcent/plumego v0.0.0
 
@@ -107,7 +107,7 @@ func main() {}
 `)
 	writeFile(t, filepath.Join(repo, "reference", "bad-module", "go.mod"), `module github.com/spcent/plumego/reference/bad-module
 
-go 1.24.0
+go 1.26.0
 `)
 	writeFile(t, filepath.Join(repo, "reference", "bad-module", "main.go"), `package main
 

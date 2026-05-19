@@ -2,6 +2,11 @@ name: quality-gates
 
 on:
   pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - labeled
   push:
     branches:
       - main
@@ -208,6 +213,50 @@ jobs:
       - name: Build website
         working-directory: website
         run: pnpm build
+
+  benchmark-quality-gates:
+    if: github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'benchmark')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: benchmark/go.mod
+
+      - name: Run benchmarks
+        id: bench
+        working-directory: benchmark
+        run: |
+          set -euo pipefail
+          go test -bench=. -benchmem -count=3 -timeout 180s ./... 2>&1 | tee benchmark.txt
+
+      - name: Comment benchmark results
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require("fs");
+            const output = fs.readFileSync("benchmark/benchmark.txt", "utf8");
+            const body = [
+              "### Plumego benchmark results",
+              "",
+              "```text",
+              output.slice(0, 60000),
+              "```"
+            ].join("\n");
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body
+            });
 
   v1-release-readiness:
     needs:

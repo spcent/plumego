@@ -8,8 +8,11 @@ Use `BindJSON[T]` when a handler only needs JSON decoding. Use `Bind[T]` when a
 handler has a `Validator` implementation and wants validation errors adapted to
 the canonical `contract.APIError` shape.
 
-This module is experimental. The first release includes only the standard
+This module is experimental. The root package includes only the standard
 library JSON decoder, the `Validator` interface, `Bind`, `BindJSON`, and
 `ValidationError`.
 
-Validation adapters for third-party libraries live outside the `x/` tree.
+The optional `x/validate/playground` submodule adapts
+`github.com/go-playground/validator/v10` to the same `Validator` interface.
+It has its own `go.mod`, so the main module remains dependency-free beyond the
+standard library.

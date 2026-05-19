@@ -84,7 +84,7 @@ func writeTinyCanonicalProject(t *testing.T, dir string) {
 	if err := os.MkdirAll(appDir, 0755); err != nil {
 		t.Fatalf("mkdir app dir: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module example.com/tiny\n\ngo 1.24\n"), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module example.com/tiny\n\ngo 1.26.0\n"), 0644); err != nil {
 		t.Fatalf("write go.mod: %v", err)
 	}
 	mainGo := []byte(`package main
@@ -111,7 +111,7 @@ func main() {
 
 func writeTinyTestProject(t *testing.T, dir string) {
 	t.Helper()
-	if err := os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module example.com/testproject\n\ngo 1.24\n"), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module example.com/testproject\n\ngo 1.26.0\n"), 0644); err != nil {
 		t.Fatalf("write go.mod: %v", err)
 	}
 	if err := os.WriteFile(filepath.Join(dir, "calc.go"), []byte(`package testproject
@@ -846,7 +846,7 @@ func TestCLI_TestParsesPackagesBeforeFlags(t *testing.T) {
 
 func TestCLI_TestFailureIncludesStructuredFailures(t *testing.T) {
 	tmpDir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(tmpDir, "go.mod"), []byte("module example.com/failtest\n\ngo 1.24\n"), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(tmpDir, "go.mod"), []byte("module example.com/failtest\n\ngo 1.26.0\n"), 0644); err != nil {
 		t.Fatalf("write go.mod: %v", err)
 	}
 	if err := os.WriteFile(filepath.Join(tmpDir, "fail_test.go"), []byte(`package failtest
@@ -1032,7 +1032,7 @@ func TestCLI_CheckRejectsUnexpectedArguments(t *testing.T) {
 
 func TestCLI_CheckDegradedUsesWarningEnvelope(t *testing.T) {
 	tmpDir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(tmpDir, "go.mod"), []byte("module example.com/degraded\n\ngo 1.24\n"), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(tmpDir, "go.mod"), []byte("module example.com/degraded\n\ngo 1.26.0\n"), 0644); err != nil {
 		t.Fatalf("write go.mod: %v", err)
 	}
 

@@ -24,8 +24,8 @@ plumego/                           # Main module
 4. **Better Compatibility**: Core library remains ultra-lightweight
 
 ### Dependencies:
-- **Core plumego**: `go 1.24` - **zero external dependencies**
-- **CLI**: `go 1.24.0` - `gopkg.in/yaml.v3` for YAML output support
+- **Core plumego**: `go 1.26.0` - **zero external dependencies**
+- **CLI**: `go 1.26.0` - `gopkg.in/yaml.v3` for YAML output support
 
 ## How It Works
 
@@ -33,7 +33,7 @@ plumego/                           # Main module
 ```go
 module github.com/spcent/plumego/cmd/plumego
 
-go 1.24.0
+go 1.26.0
 
 // Use local plumego package
 replace github.com/spcent/plumego => ../..

@@ -78,9 +78,7 @@ func run() error {
 func writeModuleFile(tmp string, root string) error {
 	content := fmt.Sprintf(`module github.com/spcent/plumego-doc-snippets
 
-go 1.24.0
-
-toolchain go1.24.4
+go 1.26.0
 
 require github.com/spcent/plumego v0.0.0
 

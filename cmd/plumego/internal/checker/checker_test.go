@@ -82,7 +82,7 @@ func TestCheckSecurityUsesSharedRequiredSecrets(t *testing.T) {
 
 func TestCheckDependenciesSkipsUpdatesByDefault(t *testing.T) {
 	tmp := t.TempDir()
-	writeCheckerFile(t, filepath.Join(tmp, "go.mod"), "module example.com/checkdeps\n\ngo 1.24\n")
+	writeCheckerFile(t, filepath.Join(tmp, "go.mod"), "module example.com/checkdeps\n\ngo 1.26.0\n")
 
 	var calls [][]string
 	run := func(_ context.Context, opts executil.Options) (executil.Result, error) {
@@ -104,7 +104,7 @@ func TestCheckDependenciesSkipsUpdatesByDefault(t *testing.T) {
 
 func TestCheckDependenciesRunsUpdatesWhenRequested(t *testing.T) {
 	tmp := t.TempDir()
-	writeCheckerFile(t, filepath.Join(tmp, "go.mod"), "module example.com/checkdeps\n\ngo 1.24\n")
+	writeCheckerFile(t, filepath.Join(tmp, "go.mod"), "module example.com/checkdeps\n\ngo 1.26.0\n")
 
 	var calls [][]string
 	run := func(_ context.Context, opts executil.Options) (executil.Result, error) {
