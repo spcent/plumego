@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/spcent/plumego/contract"
-	tenantadmin "github.com/spcent/plumego/reference/with-tenant-admin/internal/tenant/admin"
 	tenantcore "github.com/spcent/plumego/x/tenant/core"
+	tenantadmin "with-tenant-admin/internal/tenant/admin"
 )
 
 type TenantLookup interface {

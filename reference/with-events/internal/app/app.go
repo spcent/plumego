@@ -9,10 +9,10 @@ import (
 	plumelog "github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/middleware/recovery"
 	"github.com/spcent/plumego/middleware/requestid"
-	"github.com/spcent/plumego/reference/with-events/internal/config"
-	"github.com/spcent/plumego/reference/with-events/internal/order"
-	orderwebhook "github.com/spcent/plumego/reference/with-events/internal/webhook"
 	"github.com/spcent/plumego/x/messaging"
+	"with-events/internal/config"
+	"with-events/internal/order"
+	orderwebhook "with-events/internal/webhook"
 )
 
 // Deps contains optional dependencies supplied by tests or embedders.

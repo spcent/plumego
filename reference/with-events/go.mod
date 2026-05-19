@@ -1,4 +1,4 @@
-module github.com/spcent/plumego/reference/with-events
+module with-events
 
 go 1.24.0
 

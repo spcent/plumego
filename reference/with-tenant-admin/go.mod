@@ -1,4 +1,4 @@
-module github.com/spcent/plumego/reference/with-tenant-admin
+module with-tenant-admin
 
 go 1.24.0
 

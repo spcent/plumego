@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/spcent/plumego/reference/with-tenant-admin/internal/auth"
+	"with-tenant-admin/internal/auth"
 )
 
 func TestCreateTenantReturnsCreatedWithID(t *testing.T) {

@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/spcent/plumego/contract"
-	tenantadmin "github.com/spcent/plumego/reference/with-tenant-admin/internal/tenant/admin"
+	tenantadmin "with-tenant-admin/internal/tenant/admin"
 )
 
 type TenantLookup interface {

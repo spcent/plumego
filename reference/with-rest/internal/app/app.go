@@ -10,11 +10,11 @@ import (
 	plumelog "github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/middleware/recovery"
 	"github.com/spcent/plumego/middleware/requestid"
-	"github.com/spcent/plumego/reference/with-rest/internal/config"
-	"github.com/spcent/plumego/reference/with-rest/internal/domain/user"
-	"github.com/spcent/plumego/reference/with-rest/internal/handler"
-	"github.com/spcent/plumego/reference/with-rest/internal/validation/playground"
 	"github.com/spcent/plumego/x/rest"
+	"with-rest/internal/config"
+	"with-rest/internal/domain/user"
+	"with-rest/internal/handler"
+	"with-rest/internal/validation/playground"
 )
 
 // App holds application-wide dependencies.

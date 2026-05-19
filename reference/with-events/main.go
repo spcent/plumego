@@ -8,8 +8,8 @@ import (
 	"context"
 	"log"
 
-	"github.com/spcent/plumego/reference/with-events/internal/app"
-	"github.com/spcent/plumego/reference/with-events/internal/config"
+	"with-events/internal/app"
+	"with-events/internal/config"
 )
 
 func main() {

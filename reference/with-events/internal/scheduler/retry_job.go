@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/spcent/plumego/reference/with-events/internal/order"
 	xscheduler "github.com/spcent/plumego/x/messaging/scheduler"
+	"with-events/internal/order"
 )
 
 const (

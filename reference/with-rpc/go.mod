@@ -1,4 +1,4 @@
-module github.com/spcent/plumego/reference/with-rpc
+module with-rpc
 
 go 1.25.0
 

@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/spcent/plumego/reference/with-tenant-admin/internal/auth"
-	tenantadmin "github.com/spcent/plumego/reference/with-tenant-admin/internal/tenant/admin"
 	tenantcore "github.com/spcent/plumego/x/tenant/core"
+	"with-tenant-admin/internal/auth"
+	tenantadmin "with-tenant-admin/internal/tenant/admin"
 )
 
 func TestGetQuotaExistingTenantReturnsLimitAndRemaining(t *testing.T) {

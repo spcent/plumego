@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/spcent/plumego/reference/with-events/internal/order"
+	"with-events/internal/order"
 )
 
 func TestSenderSuccessFirstAttempt(t *testing.T) {

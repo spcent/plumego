@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/spcent/plumego/reference/with-tenant-admin/internal/auth"
-	tenantadmin "github.com/spcent/plumego/reference/with-tenant-admin/internal/tenant/admin"
+	"with-tenant-admin/internal/auth"
+	tenantadmin "with-tenant-admin/internal/tenant/admin"
 )
 
 func TestRecordUsageAndGetUsageReport(t *testing.T) {

@@ -10,11 +10,11 @@ import (
 	plumelog "github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/middleware/recovery"
 	"github.com/spcent/plumego/middleware/requestid"
-	"github.com/spcent/plumego/reference/with-tenant-admin/internal/config"
-	quotaadmin "github.com/spcent/plumego/reference/with-tenant-admin/internal/quota/admin"
-	tenantadmin "github.com/spcent/plumego/reference/with-tenant-admin/internal/tenant/admin"
-	"github.com/spcent/plumego/reference/with-tenant-admin/internal/usage"
 	tenantcore "github.com/spcent/plumego/x/tenant/core"
+	"with-tenant-admin/internal/config"
+	quotaadmin "with-tenant-admin/internal/quota/admin"
+	tenantadmin "with-tenant-admin/internal/tenant/admin"
+	"with-tenant-admin/internal/usage"
 )
 
 type Deps struct {

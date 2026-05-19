@@ -7,8 +7,8 @@ package main
 import (
 	"log"
 
-	"github.com/spcent/plumego/reference/with-rest/internal/app"
-	"github.com/spcent/plumego/reference/with-rest/internal/config"
+	"with-rest/internal/app"
+	"with-rest/internal/config"
 )
 
 func main() {

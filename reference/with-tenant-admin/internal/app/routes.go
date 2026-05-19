@@ -3,7 +3,7 @@ package app
 import (
 	"net/http"
 
-	"github.com/spcent/plumego/reference/with-tenant-admin/internal/auth"
+	"with-tenant-admin/internal/auth"
 )
 
 func (a *App) RegisterRoutes() error {

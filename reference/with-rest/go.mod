@@ -1,4 +1,4 @@
-module github.com/spcent/plumego/reference/with-rest
+module with-rest
 
 go 1.25.0
 

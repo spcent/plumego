@@ -3,8 +3,8 @@ package main
 import (
 	"log"
 
-	"github.com/spcent/plumego/reference/with-tenant-admin/internal/app"
-	"github.com/spcent/plumego/reference/with-tenant-admin/internal/config"
+	"with-tenant-admin/internal/app"
+	"with-tenant-admin/internal/config"
 )
 
 func main() {

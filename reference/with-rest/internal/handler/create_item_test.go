@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/spcent/plumego/contract"
-	"github.com/spcent/plumego/reference/with-rest/internal/validation/playground"
+	"with-rest/internal/validation/playground"
 )
 
 func TestCreateItemValidRequestPasses(t *testing.T) {
