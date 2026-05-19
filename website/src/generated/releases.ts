@@ -6,7 +6,7 @@ export const RELEASE_FACTS = {
       "area": "Stable library roots",
       "status": "ga",
       "promise": "Public package surface carries the v1 stable-root compatibility promise",
-      "modules": "core, router, contract, middleware, security, store, health, log, metrics"
+      "modules": "contract, core, router, middleware, security, store, health, log, metrics"
     },
     {
       "area": "Canonical reference app",
@@ -30,13 +30,13 @@ export const RELEASE_FACTS = {
       "area": "App-facing extension families",
       "status": "experimental",
       "promise": "Included in repo quality gates and release scope, but API/config compatibility is not frozen",
-      "modules": "x/ai, x/data, x/fileapi, x/frontend, x/messaging, x/resilience, x/tenant"
+      "modules": "x/tenant, x/fileapi, x/messaging, x/frontend, x/openapi, x/resilience, x/rpc, x/data, x/ai, x/validate"
     },
     {
       "area": "Subordinate extension primitives",
       "status": "experimental",
       "promise": "Maintained and tested, but discovery should start from the owning family entrypoint and compatibility is not frozen",
-      "modules": "x/cache, x/devtools, x/gateway/discovery, x/gateway/ipc, x/messaging/mq, x/messaging/pubsub, x/messaging/scheduler, x/messaging/webhook, x/ops"
+      "modules": "x/data/cache, x/data/file, x/data/idempotency, x/data/kvengine, x/data/migrate, x/data/pgx, x/data/rw, x/data/sharding, x/data/sqlx, x/gateway/discovery, x/gateway/ipc, x/messaging/mq, x/messaging/pubsub, x/messaging/scheduler, x/messaging/webhook, x/observability/devtools, x/observability/ops, x/rpc/client, x/rpc/gateway, x/rpc/server"
     }
   ]
 } as const;
