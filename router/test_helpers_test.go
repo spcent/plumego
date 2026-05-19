@@ -62,5 +62,5 @@ func newRouterWithMatchCapacity(capacity int, opts ...RouterOption) *Router {
 func matchCacheEntryCount(cache *matchCache) int {
 	cache.mu.RLock()
 	defer cache.mu.RUnlock()
-	return len(cache.cache)
+	return len(cache.data)
 }

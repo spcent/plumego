@@ -10,42 +10,42 @@ const journeySteps = [
 ];
 
 // Router overhead data — measured with go test -bench -benchmem -count=3
-// Route: GET /users/:id (single path param). linux/amd64, Intel Xeon @ 2.80 GHz.
+// Route: GET /users/:id (single path param). linux/amd64, Intel Xeon @ 2.10 GHz.
 // ns/op includes full httptest.NewRequest + ServeHTTP + httptest.NewRecorder cycle.
-// Relative column is vs Plumego (1.0x baseline).
+// Relative column: ns/op ratio vs Plumego (1.0x = same speed; <1.0x = faster than Plumego).
 const routerRows = [
   {
     name: 'Plumego router',
-    nsOp: 4832,
-    allocsOp: 21,
-    bytesOp: 6433,
+    nsOp: 4291,
+    allocsOp: 16,
+    bytesOp: 5715,
     relative: '1.0x',
-    note: 'Trie-based. Path params, groups. Stdlib handler signature — no custom context.',
+    note: 'Trie-based. Path params, groups. Stdlib handler signature — no custom context. Pooled RouteState; 3 allocs/request (cache key, context node, request copy).',
     isPlumego: true,
   },
   {
     name: 'Chi',
-    nsOp: 4734,
+    nsOp: 4547,
     allocsOp: 17,
-    bytesOp: 6035,
-    relative: '0.98x',
-    note: 'Radix tree. Stdlib-compatible handler signature. Slightly fewer allocs than Plumego.',
+    bytesOp: 6036,
+    relative: '1.06x',
+    note: 'Radix tree. Stdlib-compatible handler signature. Plumego is now faster after Phase 2 allocation reduction.',
   },
   {
     name: 'Gin',
-    nsOp: 4169,
+    nsOp: 3773,
     allocsOp: 13,
     bytesOp: 5331,
-    relative: '0.86x',
+    relative: '0.88x',
     note: 'Radix tree + gin.Context sync.Pool. Fewer allocs due to pooled context. Custom context type required.',
     isFaster: true,
   },
   {
     name: 'Echo',
-    nsOp: 3861,
+    nsOp: 3743,
     allocsOp: 13,
     bytesOp: 5331,
-    relative: '0.80x',
+    relative: '0.87x',
     note: 'Radix tree + echo.Context sync.Pool. Fastest in sequential dispatch. Custom context type required.',
     isFaster: true,
   },
@@ -53,35 +53,35 @@ const routerRows = [
 
 // Parallel throughput — b.RunParallel at GOMAXPROCS goroutines, same single-param route.
 const parallelRows = [
-  { name: 'Plumego', nsOp: 1107, allocsOp: 12, bytesOp: 1312, relative: '1.0x', isPlumego: true },
-  { name: 'Chi',     nsOp: 823,  allocsOp: 8,  bytesOp: 912,  relative: '0.74x' },
-  { name: 'Gin',     nsOp: 220,  allocsOp: 4,  bytesOp: 208,  relative: '0.20x', isFaster: true },
-  { name: 'Echo',    nsOp: 226,  allocsOp: 4,  bytesOp: 208,  relative: '0.20x', isFaster: true },
+  { name: 'Plumego', nsOp: 663,  allocsOp: 7, bytesOp: 592, relative: '1.0x', isPlumego: true },
+  { name: 'Chi',     nsOp: 1013, allocsOp: 8, bytesOp: 912, relative: '1.53x' },
+  { name: 'Gin',     nsOp: 285,  allocsOp: 4, bytesOp: 208, relative: '0.43x', isFaster: true },
+  { name: 'Echo',    nsOp: 231,  allocsOp: 4, bytesOp: 208, relative: '0.35x', isFaster: true },
 ];
 
-// Route table scale — 500 registered routes, dispatch to the last one.
+// Route table scale — dispatch to last route registered (cache miss for first call).
 const scaleRows = [
-  { name: 'Plumego', single: 4832, scale100: 5318, scale500: 5608, isPlumego: true },
-  { name: 'Chi',     single: 4734, scale100: 4452, scale500: 4794 },
-  { name: 'Gin',     single: 4169, scale100: 4116, scale500: 4335 },
-  { name: 'Echo',    single: 3861, scale100: 4264, scale500: 4471 },
+  { name: 'Plumego', single: 4291, scale100: 4342, scale500: 6034, isPlumego: true },
+  { name: 'Chi',     single: 4547, scale100: 4405, scale500: 6258 },
+  { name: 'Gin',     single: 3773, scale100: 3981, scale500: 5593 },
+  { name: 'Echo',    single: 3743, scale100: 5398, scale500: 5508 },
 ];
 
 const memoryRows = [
   { aspect: 'Startup memory', plumego: '~2.4 MB', gin: '~3.8 MB', echo: '~3.4 MB', chi: '~2.2 MB' },
-  { aspect: 'Net param alloc (single-param route)', plumego: '~616 B / 3 allocs', gin: '0 B / 0 allocs (pooled)', echo: '0 B / 0 allocs (pooled)', chi: '~336 B / 2 allocs' },
+  { aspect: 'Net param alloc (single-param, warm cache)', plumego: '~384 B / 3 allocs', gin: '0 B / 0 allocs (pooled)', echo: '0 B / 0 allocs (pooled)', chi: '~336 B / 2 allocs' },
   { aspect: 'Route table (1000 routes)', plumego: '~380 KB', gin: '~620 KB', echo: '~590 KB', chi: '~210 KB' },
   { aspect: 'Context object', plumego: 'none — stdlib r *http.Request', gin: '~240 B gin.Context (sync.Pool\'d)', echo: '~256 B echo.Context (sync.Pool\'d)', chi: 'none — stdlib r *http.Request' },
 ];
 
 const honestNotes = [
   {
-    title: 'Gin and Echo are faster in raw dispatch',
-    body: 'Measured numbers show Gin at 0.86x and Echo at 0.80x Plumego\'s latency. Under concurrent load the gap widens to ~5x because their sync.Pool eliminates per-request context allocation. This is a real performance advantage, not a rounding error.',
+    title: 'Plumego is now faster than Chi',
+    body: 'After Phase 2 (pooled RouteState inline param storage) and Phase 3 (FIFO cache, read-only RLock), Plumego beats Chi in both sequential (4291 vs 4547 ns/op) and parallel (663 vs 1013 ns/op) benchmarks. Both maintain full stdlib handler compatibility.',
   },
   {
-    title: 'The tradeoff is stdlib compatibility, not speed',
-    body: 'Plumego and Chi use the stdlib handler signature func(http.ResponseWriter, *http.Request). Every existing net/http middleware works unchanged. Gin and Echo require you to rewrite middleware for their custom context types. If your team depends on the stdlib ecosystem, that portability cost is real.',
+    title: 'Gin and Echo are still faster — that\'s the stdlib tradeoff',
+    body: 'Gin and Echo are ~12–13% faster sequentially and ~2.5–3× faster under concurrent load. Their advantage comes entirely from context pooling with sync.Pool, which requires a custom context type. Plumego uses func(http.ResponseWriter, *http.Request) — every net/http middleware works unchanged.',
   },
   {
     title: 'Router overhead is rarely the real bottleneck',
@@ -94,9 +94,9 @@ const honestNotes = [
 ];
 
 const testConfig = {
-  go: 'go1.24.0',
+  go: 'go1.24.7',
   os: 'linux/amd64',
-  cpu: 'Intel Xeon @ 2.80 GHz',
+  cpu: 'Intel Xeon @ 2.10 GHz',
   route: 'GET /users/:id (single path param, HTTP 204 response)',
   middleware: 'None (bare router)',
   iterations: 'B.N, -count=3, median reported',
@@ -114,7 +114,7 @@ const testConfig = {
   <PageHero
     eyebrow="performance"
     title="Benchmarks: honest numbers, honest framing"
-    description="Gin and Echo are faster than Plumego in raw dispatch — up to 5x under concurrent load. That advantage comes from context pooling, which requires a custom context type. Plumego uses the stdlib handler signature. Choose based on what matters to your team."
+    description="Plumego is faster than Chi in both sequential and parallel benchmarks. Gin and Echo are still ~12% faster sequentially and ~2.5x faster under concurrent load — their sync.Pool context avoids per-request allocation at the cost of a custom context type. Plumego uses the stdlib handler signature. Choose based on what matters to your team."
     visual="releases"
     links={[
       { label: 'Compare frameworks', href: '/compare' },
@@ -203,7 +203,7 @@ const testConfig = {
         </table>
       </div>
       <p class="bench-footnote">
-        Gin and Echo are ~5x faster under concurrency. Their <code>sync.Pool</code> eliminates per-request context allocation at scale. Plumego and Chi pay a small per-request allocation cost for stdlib compatibility.
+        Plumego is now ~1.5× faster than Chi under concurrency. Gin and Echo are ~2.5–3× faster than Plumego because their <code>sync.Pool</code> eliminates per-request context allocation entirely. Achieving that requires a custom context type incompatible with stdlib <code>net/http</code> middleware.
       </p>
     </div>
   </section>

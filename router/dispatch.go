@@ -44,8 +44,7 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	cacheKey := fastBuildCacheKey(req.Method, cachePath)
 	if cachedResult, exists := r.state.matchCache.Get(cacheKey); exists {
 		effectiveW := responseWriterForMatch(w, req, cachedResult)
-		params := buildParamMap(cachedResult.ParamValues, cachedResult.ParamKeys)
-		r.attachRouteContextAndServe(effectiveW, req, params, cachedResult)
+		r.attachRouteContextAndServe(effectiveW, req, cachedResult)
 		return
 	}
 
@@ -66,12 +65,10 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	params := buildParamMap(result.ParamValues, result.ParamKeys)
-
 	r.state.matchCache.Set(cacheKey, result)
 
 	w = responseWriterForMatch(w, req, result)
-	r.attachRouteContextAndServe(w, req, params, result)
+	r.attachRouteContextAndServe(w, req, result)
 }
 
 func responseWriterForMatch(w http.ResponseWriter, req *http.Request, result *matchResult) http.ResponseWriter {
@@ -157,22 +154,33 @@ func (r *Router) matchRoute(method, path string) *matchResult {
 	return nil
 }
 
-func (r *Router) attachRouteContextAndServe(w http.ResponseWriter, req *http.Request, params map[string]string, result *matchResult) {
+// attachRouteContextAndServe stores route metadata in the request context via
+// a pooled RouteState (zero map allocations for params), calls the handler,
+// then returns the RouteState to the pool.
+//
+// Callers must not retain the RouteState pointer beyond the handler's return.
+// Goroutines that need route params should capture them via
+// contract.RequestContextFromContext before launch.
+func (r *Router) attachRouteContextAndServe(w http.ResponseWriter, req *http.Request, result *matchResult) {
 	if result == nil {
 		return
 	}
 
-	ctx := req.Context()
-	rc := contract.RequestContext{
-		Params:       params,
-		RoutePattern: result.RoutePattern,
-		RouteName:    result.RouteName,
+	rs := contract.RouteStatePool.Get().(*contract.RouteState)
+	rs.SetPattern(result.RoutePattern)
+	rs.SetName(result.RouteName)
+	for i, k := range result.ParamKeys {
+		if i >= len(result.ParamValues) {
+			break
+		}
+		rs.AddParam(k, result.ParamValues[i])
 	}
 
-	ctx = contract.WithRequestContext(ctx, rc)
-	reqWithParams := req.WithContext(ctx)
+	ctx := contract.WithRouteState(req.Context(), rs)
+	result.Handler.ServeHTTP(w, req.WithContext(ctx))
 
-	result.Handler.ServeHTTP(w, reqWithParams)
+	rs.Reset()
+	contract.RouteStatePool.Put(rs)
 }
 
 func (r *Router) allowedMethods(path string) []string {

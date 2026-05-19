@@ -1,24 +1,20 @@
 package router
 
 import (
-	"container/list"
 	"sync"
 )
 
-// cacheEntry represents a cached route match result
-type cacheEntry struct {
-	key   string
-	value *matchResult
-}
-
-// matchCache implements a simple LRU cache for route matching results
-// for concrete request paths. Route selection always comes from the trie before
-// a path is cached so warm-cache dispatch preserves trie precedence.
+// matchCache is a read-optimized route-match cache backed by a ring buffer
+// for O(1) FIFO eviction. Get acquires only an RLock; promotion is
+// intentionally absent so concurrent reads never cause write-lock contention.
+// Set acquires a full Lock and evicts the oldest-inserted entry when full.
 type matchCache struct {
 	capacity int
-	cache    map[string]*list.Element
-	list     *list.List
 	mu       sync.RWMutex
+	data     map[string]*matchResult
+	ring     []string // circular FIFO insertion-order buffer
+	head     int      // index of the oldest entry
+	size     int      // number of live entries
 }
 
 // newMatchCache creates a new route cache with the given capacity.
@@ -28,71 +24,53 @@ func newMatchCache(capacity int) *matchCache {
 	}
 	return &matchCache{
 		capacity: capacity,
-		cache:    make(map[string]*list.Element),
-		list:     list.New(),
+		data:     make(map[string]*matchResult, capacity),
+		ring:     make([]string, capacity),
 	}
 }
 
-// Get retrieves a cached route match result
+// Get retrieves a cached route match result. It acquires only an RLock so
+// concurrent readers never block each other.
 func (rc *matchCache) Get(key string) (*matchResult, bool) {
-	// First try with read lock
 	rc.mu.RLock()
-	element, exists := rc.cache[key]
-	if !exists {
-		rc.mu.RUnlock()
-		return nil, false
-	}
-
-	// Check if already at front - if so, no need to move
-	isAtFront := element == rc.list.Front()
-	value := element.Value.(*cacheEntry).value
+	v, ok := rc.data[key]
 	rc.mu.RUnlock()
-
-	// Only acquire write lock if we need to move the element
-	if !isAtFront {
-		rc.mu.Lock()
-		// Double-check element still exists and reacquire it
-		if elem, ok := rc.cache[key]; ok && elem == element {
-			rc.list.MoveToFront(elem)
-		}
-		rc.mu.Unlock()
-	}
-
-	return value, true
+	return v, ok
 }
 
-// Set adds a route match result to the cache
+// Set adds or updates a route match result. When the cache is full the
+// oldest-inserted entry is evicted (FIFO).
 func (rc *matchCache) Set(key string, value *matchResult) {
 	rc.mu.Lock()
 	defer rc.mu.Unlock()
 
-	// Check if key already exists
-	if element, exists := rc.cache[key]; exists {
-		rc.list.MoveToFront(element)
-		element.Value.(*cacheEntry).value = value
+	if _, exists := rc.data[key]; exists {
+		rc.data[key] = value
 		return
 	}
 
-	// Check if cache is full
-	if len(rc.cache) >= rc.capacity {
-		// Remove least recently used
-		oldest := rc.list.Back()
-		if oldest != nil {
-			rc.list.Remove(oldest)
-			delete(rc.cache, oldest.Value.(*cacheEntry).key)
-		}
+	if rc.size >= rc.capacity {
+		// Evict the oldest entry via the ring-buffer head.
+		oldest := rc.ring[rc.head]
+		delete(rc.data, oldest)
+		rc.ring[rc.head] = key
+		rc.head = (rc.head + 1) % rc.capacity
+		rc.data[key] = value
+		return
 	}
 
-	// Add new entry
-	entry := &cacheEntry{key: key, value: value}
-	element := rc.list.PushFront(entry)
-	rc.cache[key] = element
+	tail := (rc.head + rc.size) % rc.capacity
+	rc.ring[tail] = key
+	rc.size++
+	rc.data[key] = value
 }
 
-// Clear removes all entries from the cache
+// Clear removes all entries from the cache.
 func (rc *matchCache) Clear() {
 	rc.mu.Lock()
-	rc.cache = make(map[string]*list.Element)
-	rc.list = list.New()
+	rc.data = make(map[string]*matchResult, rc.capacity)
+	rc.ring = make([]string, rc.capacity)
+	rc.head = 0
+	rc.size = 0
 	rc.mu.Unlock()
 }

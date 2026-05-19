@@ -10,42 +10,42 @@ const journeySteps = [
 ];
 
 // 路由开销数据 — go test -bench -benchmem -count=3 实测
-// 路由：GET /users/:id（单路径参数）。linux/amd64，Intel Xeon @ 2.80 GHz。
+// 路由：GET /users/:id（单路径参数）。linux/amd64，Intel Xeon @ 2.10 GHz。
 // ns/op 包含完整 httptest.NewRequest + ServeHTTP + httptest.NewRecorder 调用周期。
-// 相对列以 Plumego 为基准（1.0x）。
+// 相对列：ns/op 与 Plumego 的比值（1.0x = 相同速度；<1.0x = 比 Plumego 快）。
 const routerRows = [
   {
     name: 'Plumego router',
-    nsOp: 4832,
-    allocsOp: 21,
-    bytesOp: 6433,
+    nsOp: 4291,
+    allocsOp: 16,
+    bytesOp: 5715,
     relative: '1.0x',
-    note: '基于 Trie 树，支持路径参数和分组。使用标准库 handler 签名，无自定义 context。',
+    note: '基于 Trie 树，支持路径参数和分组。使用标准库 handler 签名，无自定义 context。池化 RouteState，每次请求 3 次分配（缓存键、context 节点、请求副本）。',
     isPlumego: true,
   },
   {
     name: 'Chi',
-    nsOp: 4734,
+    nsOp: 4547,
     allocsOp: 17,
-    bytesOp: 6035,
-    relative: '0.98x',
-    note: '基数树。兼容标准库 handler 签名。分配次数略少于 Plumego。',
+    bytesOp: 6036,
+    relative: '1.06x',
+    note: '基数树。兼容标准库 handler 签名。Phase 2 分配优化后 Plumego 已快于 Chi。',
   },
   {
     name: 'Gin',
-    nsOp: 4169,
+    nsOp: 3773,
     allocsOp: 13,
     bytesOp: 5331,
-    relative: '0.86x',
+    relative: '0.88x',
     note: '基数树 + gin.Context sync.Pool。对象池减少分配。需要自定义 context 类型。',
     isFaster: true,
   },
   {
     name: 'Echo',
-    nsOp: 3861,
+    nsOp: 3743,
     allocsOp: 13,
     bytesOp: 5331,
-    relative: '0.80x',
+    relative: '0.87x',
     note: '基数树 + echo.Context sync.Pool。顺序调度最快。需要自定义 context 类型。',
     isFaster: true,
   },
@@ -53,35 +53,35 @@ const routerRows = [
 
 // 并发吞吐量 — b.RunParallel，GOMAXPROCS 个 goroutine，同一单参数路由。
 const parallelRows = [
-  { name: 'Plumego', nsOp: 1107, allocsOp: 12, bytesOp: 1312, relative: '1.0x', isPlumego: true },
-  { name: 'Chi',     nsOp: 823,  allocsOp: 8,  bytesOp: 912,  relative: '0.74x' },
-  { name: 'Gin',     nsOp: 220,  allocsOp: 4,  bytesOp: 208,  relative: '0.20x', isFaster: true },
-  { name: 'Echo',    nsOp: 226,  allocsOp: 4,  bytesOp: 208,  relative: '0.20x', isFaster: true },
+  { name: 'Plumego', nsOp: 663,  allocsOp: 7, bytesOp: 592, relative: '1.0x', isPlumego: true },
+  { name: 'Chi',     nsOp: 1013, allocsOp: 8, bytesOp: 912, relative: '1.53x' },
+  { name: 'Gin',     nsOp: 285,  allocsOp: 4, bytesOp: 208, relative: '0.43x', isFaster: true },
+  { name: 'Echo',    nsOp: 231,  allocsOp: 4, bytesOp: 208, relative: '0.35x', isFaster: true },
 ];
 
-// 路由表规模 — 注册 100 / 500 条路由后调度到最后一条。
+// 路由表规模 — 注册 100 / 500 条路由后调度到最后一条（首次缓存未命中）。
 const scaleRows = [
-  { name: 'Plumego', single: 4832, scale100: 5318, scale500: 5608, isPlumego: true },
-  { name: 'Chi',     single: 4734, scale100: 4452, scale500: 4794 },
-  { name: 'Gin',     single: 4169, scale100: 4116, scale500: 4335 },
-  { name: 'Echo',    single: 3861, scale100: 4264, scale500: 4471 },
+  { name: 'Plumego', single: 4291, scale100: 4342, scale500: 6034, isPlumego: true },
+  { name: 'Chi',     single: 4547, scale100: 4405, scale500: 6258 },
+  { name: 'Gin',     single: 3773, scale100: 3981, scale500: 5593 },
+  { name: 'Echo',    single: 3743, scale100: 5398, scale500: 5508 },
 ];
 
 const memoryRows = [
   { aspect: '启动内存', plumego: '~2.4 MB', gin: '~3.8 MB', echo: '~3.4 MB', chi: '~2.2 MB' },
-  { aspect: '路径参数净分配（单参数路由）', plumego: '~616 B / 3 次', gin: '0 B / 0 次（对象池）', echo: '0 B / 0 次（对象池）', chi: '~336 B / 2 次' },
+  { aspect: '路径参数净分配（单参数路由，缓存命中）', plumego: '~384 B / 3 次', gin: '0 B / 0 次（对象池）', echo: '0 B / 0 次（对象池）', chi: '~336 B / 2 次' },
   { aspect: '路由表（1000 条路由）', plumego: '~380 KB', gin: '~620 KB', echo: '~590 KB', chi: '~210 KB' },
   { aspect: 'Context 对象', plumego: '无 — stdlib r *http.Request', gin: '~240 B gin.Context（sync.Pool）', echo: '~256 B echo.Context（sync.Pool）', chi: '无 — stdlib r *http.Request' },
 ];
 
 const honestNotes = [
   {
-    title: 'Gin 和 Echo 的原始调度速度更快',
-    body: '实测数据显示 Gin 为 0.86x、Echo 为 0.80x Plumego 的延迟。并发负载下差距扩大至约 5x，因为它们的 sync.Pool 消除了每次请求的 context 分配。这是真实的性能优势。',
+    title: 'Plumego 现在快于 Chi',
+    body: 'Phase 2（池化内联参数存储的 RouteState）和 Phase 3（FIFO 缓存，只读 RLock）优化后，Plumego 在顺序（4291 vs 4547 ns/op）和并发（663 vs 1013 ns/op）基准测试中均优于 Chi，同时保持完整的标准库 handler 兼容性。',
   },
   {
-    title: '权衡在于标准库兼容性，而不是速度',
-    body: 'Plumego 和 Chi 使用标准库 handler 签名 func(http.ResponseWriter, *http.Request)，现有的 net/http 中间件无需修改即可使用。Gin 和 Echo 需要为其自定义 context 类型重写中间件。如果团队依赖标准库生态，这一可移植性成本是真实存在的。',
+    title: 'Gin 和 Echo 仍然更快——这是标准库兼容的代价',
+    body: 'Gin 和 Echo 顺序调度快约 12–13%，并发负载下快约 2.5–3×。其优势完全来自 sync.Pool context 对象池，代价是需要自定义 context 类型。Plumego 使用 func(http.ResponseWriter, *http.Request)——现有 net/http 中间件无需修改。',
   },
   {
     title: '路由开销很少是真正的瓶颈',
@@ -94,9 +94,9 @@ const honestNotes = [
 ];
 
 const testConfig = {
-  'Go 版本': 'go1.24.0',
+  'Go 版本': 'go1.24.7',
   '操作系统': 'linux/amd64',
-  'CPU': 'Intel Xeon @ 2.80 GHz',
+  'CPU': 'Intel Xeon @ 2.10 GHz',
   '路由': 'GET /users/:id（单路径参数，HTTP 204 响应）',
   '中间件': '无（裸路由器）',
   '迭代次数': 'B.N，-count=3，取中位数',
@@ -114,7 +114,7 @@ const testConfig = {
   <PageHero
     eyebrow="性能"
     title="性能测试：诚实的数据，诚实的解读"
-    description="Gin 和 Echo 在原始调度上比 Plumego 快，并发负载下差距可达 5x。这一优势来自 context 对象池，代价是需要自定义 context 类型。Plumego 使用标准库 handler 签名。根据团队实际需求做选择。"
+    description="Plumego 在顺序和并发基准测试中均快于 Chi。Gin 和 Echo 仍然更快——顺序快约 12%，并发快约 2.5×——其优势来自 sync.Pool context 对象池，代价是需要自定义 context 类型。Plumego 使用标准库 handler 签名。根据团队实际需求做选择。"
     visual="releases"
     links={[
       { label: '框架横向对比', href: '/zh/compare' },
@@ -203,7 +203,7 @@ const testConfig = {
         </table>
       </div>
       <p class="bench-footnote">
-        Gin 和 Echo 在并发下约快 5x。它们的 <code>sync.Pool</code> 在高并发时消除了每次请求的 context 分配。Plumego 和 Chi 为兼容标准库而承担小额的每请求分配成本。
+        Plumego 的并发吞吐量现已约 1.5× 快于 Chi。Gin 和 Echo 约 2.5–3× 快于 Plumego，因为它们的 <code>sync.Pool</code> 完全消除了每次请求的 context 分配，代价是需要与标准库 <code>net/http</code> 中间件不兼容的自定义 context 类型。
       </p>
     </div>
   </section>
