@@ -17,7 +17,13 @@ func mergeFields(base, override Fields) Fields {
 	if len(base) == 0 && len(override) == 0 {
 		return Fields{}
 	}
-	merged := make(Fields, len(base)+len(override))
+
+	const maxInt = int(^uint(0) >> 1)
+	merged := make(Fields)
+	if len(base) <= maxInt-len(override) {
+		merged = make(Fields, len(base)+len(override))
+	}
+
 	for k, v := range base {
 		merged[k] = v
 	}
@@ -30,14 +36,23 @@ func mergeFields(base, override Fields) Fields {
 // mergeFieldSets returns a merged copy where later field sets take precedence.
 func mergeFieldSets(fieldSets ...Fields) Fields {
 	total := 0
+	overflowed := false
+	const maxInt = int(^uint(0) >> 1)
 	for _, fields := range fieldSets {
+		if total > maxInt-len(fields) {
+			overflowed = true
+			break
+		}
 		total += len(fields)
 	}
 	if total == 0 {
 		return Fields{}
 	}
 
-	merged := make(Fields, total)
+	merged := make(Fields)
+	if !overflowed {
+		merged = make(Fields, total)
+	}
 	for _, fields := range fieldSets {
 		for k, v := range fields {
 			merged[k] = v
