@@ -74,6 +74,69 @@ func Use() {
 	}
 }
 
+func TestValidateReferenceModules(t *testing.T) {
+	repo := t.TempDir()
+	writeFile(t, filepath.Join(repo, "reference", "standard-service", "go.mod"), `module standard-service
+
+go 1.24.0
+
+require github.com/spcent/plumego v0.0.0
+
+replace github.com/spcent/plumego => ../..
+`)
+	writeFile(t, filepath.Join(repo, "reference", "standard-service", "main.go"), `package main
+
+import "github.com/spcent/plumego/core"
+
+func main() {
+	_ = core.DefaultConfig()
+}
+`)
+
+	violations, err := ValidateReferenceModules(repo)
+	if err != nil {
+		t.Fatalf("ValidateReferenceModules: %v", err)
+	}
+	if len(violations) != 0 {
+		t.Fatalf("expected no violations, got %v", violations)
+	}
+
+	writeFile(t, filepath.Join(repo, "reference", "missing", "main.go"), `package main
+
+func main() {}
+`)
+	writeFile(t, filepath.Join(repo, "reference", "bad-module", "go.mod"), `module github.com/spcent/plumego/reference/bad-module
+
+go 1.24.0
+`)
+	writeFile(t, filepath.Join(repo, "reference", "bad-module", "main.go"), `package main
+
+import (
+	_ "github.com/spcent/plumego/internal/config"
+	_ "github.com/spcent/plumego/reference/other/internal/app"
+)
+`)
+
+	violations, err = ValidateReferenceModules(repo)
+	if err != nil {
+		t.Fatalf("ValidateReferenceModules: %v", err)
+	}
+
+	want := []string{
+		"reference/missing missing go.mod",
+		`reference/bad-module/go.mod module "github.com/spcent/plumego/reference/bad-module" must equal "bad-module"`,
+		"reference/bad-module/go.mod missing github.com/spcent/plumego require",
+		"reference/bad-module/go.mod missing local github.com/spcent/plumego replace",
+		"reference/bad-module/main.go imports repository internal path github.com/spcent/plumego/internal/config",
+		"reference/bad-module/main.go imports repository reference path github.com/spcent/plumego/reference/other/internal/app",
+	}
+	for _, expected := range want {
+		if !hasString(violations, expected) {
+			t.Fatalf("expected violation %q in %v", expected, violations)
+		}
+	}
+}
+
 func TestValidateManifestDependencyRuleConsistencyReportsContradictions(t *testing.T) {
 	repo := t.TempDir()
 	writeRepoSpec(t, repo)
@@ -720,6 +783,15 @@ func validManifestWithParentFamily(path, layer, parent string) string {
 
 func validManifestWithSubordinateFamilies(path, layer string) string {
 	return validManifest(path, layer) + "subordinate_families:\n  - package: x/sub\n    role: subordinate\n"
+}
+
+func hasString(values []string, want string) bool {
+	for _, value := range values {
+		if value == want {
+			return true
+		}
+	}
+	return false
 }
 
 func writeRepoSpec(t *testing.T, repo string) {

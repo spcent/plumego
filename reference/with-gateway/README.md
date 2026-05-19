@@ -30,5 +30,6 @@ same bootstrap structure as `reference/standard-service`.
 ## Run it
 
 ```bash
-GATEWAY_BACKEND=http://localhost:9090 go run ./reference/with-gateway
+cd reference/with-gateway
+GATEWAY_BACKEND=http://localhost:9090 go run .
 ```

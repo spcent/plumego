@@ -27,5 +27,6 @@ Set `OPS_TOKEN` and pass it as `Authorization: Bearer <token>` for `/ops/*`.
 ## Run
 
 ```bash
-OPS_TOKEN=local-admin-token go run ./reference/with-ops
+cd reference/with-ops
+OPS_TOKEN=local-admin-token go run .
 ```

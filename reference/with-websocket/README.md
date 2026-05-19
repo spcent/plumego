@@ -30,7 +30,8 @@ follows the same bootstrap structure as `reference/standard-service`.
 ## Run it
 
 ```bash
-WS_SECRET=changeme-replace-with-32-byte-key go run ./reference/with-websocket
+cd reference/with-websocket
+WS_SECRET=changeme-replace-with-32-byte-key go run .
 ```
 
 Connect a WebSocket client to `ws://localhost:8084/ws`.

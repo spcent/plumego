@@ -9,8 +9,8 @@ package main
 import (
 	"log"
 
-	"github.com/spcent/plumego/reference/with-gateway/internal/app"
-	"github.com/spcent/plumego/reference/with-gateway/internal/config"
+	"with-gateway/internal/app"
+	"with-gateway/internal/config"
 )
 
 func main() {

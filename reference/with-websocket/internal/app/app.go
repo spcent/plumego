@@ -11,8 +11,8 @@ import (
 	"github.com/spcent/plumego/middleware/accesslog"
 	"github.com/spcent/plumego/middleware/recovery"
 	"github.com/spcent/plumego/middleware/requestid"
-	"github.com/spcent/plumego/reference/with-websocket/internal/config"
 	"github.com/spcent/plumego/x/websocket"
+	"with-websocket/internal/config"
 )
 
 // App holds application-wide dependencies including the WebSocket server.

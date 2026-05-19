@@ -8,7 +8,7 @@ port:
 
 ```bash
 cd reference/with-rpc
-go run ./...
+go run .
 ```
 
 The HTTP side is wired through `core.App`; the sample request is executed with

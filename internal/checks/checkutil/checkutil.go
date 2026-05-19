@@ -474,6 +474,82 @@ func FindReferenceXImports(repoRoot, refDir string) ([]string, error) {
 	return violations, nil
 }
 
+// ValidateReferenceModules verifies that every top-level reference example is a
+// standalone module with local module naming and no imports back through the
+// repository's reference or internal paths.
+func ValidateReferenceModules(repoRoot string) ([]string, error) {
+	referenceDir := filepath.Join(repoRoot, "reference")
+	entries, err := os.ReadDir(referenceDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	var violations []string
+	for _, entry := range entries {
+		if !entry.IsDir() || strings.HasPrefix(entry.Name(), ".") {
+			continue
+		}
+
+		relDir := filepath.ToSlash(filepath.Join("reference", entry.Name()))
+		dir := filepath.Join(referenceDir, entry.Name())
+		modPath := filepath.Join(dir, "go.mod")
+		data, err := os.ReadFile(modPath)
+		if err != nil {
+			if os.IsNotExist(err) {
+				violations = append(violations, relDir+" missing go.mod")
+				continue
+			}
+			return nil, err
+		}
+
+		moduleName := parseModuleName(string(data))
+		if moduleName == "" {
+			violations = append(violations, relDir+"/go.mod missing module directive")
+		} else if moduleName != entry.Name() {
+			violations = append(violations, fmt.Sprintf("%s/go.mod module %q must equal %q", relDir, moduleName, entry.Name()))
+		}
+		if !strings.Contains(string(data), "require github.com/spcent/plumego ") &&
+			!strings.Contains(string(data), "\n\tgithub.com/spcent/plumego ") {
+			violations = append(violations, relDir+"/go.mod missing github.com/spcent/plumego require")
+		}
+		if !strings.Contains(string(data), "replace github.com/spcent/plumego => ../..") {
+			violations = append(violations, relDir+"/go.mod missing local github.com/spcent/plumego replace")
+		}
+
+		err = walkGoImports(repoRoot, dir, true, func(relPath, importPath string) {
+			switch {
+			case strings.HasPrefix(importPath, modulePath+"/reference/"):
+				violations = append(violations, relPath+" imports repository reference path "+importPath)
+			case strings.HasPrefix(importPath, modulePath+"/internal/"):
+				violations = append(violations, relPath+" imports repository internal path "+importPath)
+			}
+		})
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	sort.Strings(violations)
+	return violations, nil
+}
+
+func parseModuleName(data string) string {
+	scanner := NewLineScanner(strings.NewReader(data))
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" || strings.HasPrefix(line, "//") {
+			continue
+		}
+		if strings.HasPrefix(line, "module ") {
+			return strings.TrimSpace(strings.TrimPrefix(line, "module "))
+		}
+	}
+	return ""
+}
+
 func FindUnexpectedTopLevelDirs(repoRoot string, allowed, baseline map[string]struct{}) ([]string, error) {
 	entries, err := os.ReadDir(repoRoot)
 	if err != nil {

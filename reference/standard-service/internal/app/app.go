@@ -11,7 +11,7 @@ import (
 	"github.com/spcent/plumego/middleware/accesslog"
 	"github.com/spcent/plumego/middleware/recovery"
 	"github.com/spcent/plumego/middleware/requestid"
-	"github.com/spcent/plumego/reference/standard-service/internal/config"
+	"standard-service/internal/config"
 )
 
 // App holds application-wide dependencies.

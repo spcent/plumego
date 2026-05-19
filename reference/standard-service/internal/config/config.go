@@ -3,15 +3,14 @@
 package config
 
 import (
-	"context"
+	"bufio"
 	"flag"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/spcent/plumego/core"
-	plumecfg "github.com/spcent/plumego/internal/config"
-	plumelog "github.com/spcent/plumego/log"
 )
 
 // Config holds all application configuration.
@@ -64,17 +63,9 @@ func Validate(cfg Config) error {
 }
 
 func applyEnv(cfg *Config) error {
-	manager := plumecfg.NewManager(plumelog.NewLogger())
-	if err := manager.AddSource(plumecfg.NewEnvSource("")); err != nil {
-		return err
-	}
-	if err := manager.Load(context.Background()); err != nil {
-		return err
-	}
-
-	cfg.Core.Addr = manager.GetString("app_addr", cfg.Core.Addr)
-	cfg.App.EnvFile = manager.GetString("app_env_file", cfg.App.EnvFile)
-	cfg.App.Debug = manager.GetBool("app_debug", cfg.App.Debug)
+	cfg.Core.Addr = envString("APP_ADDR", cfg.Core.Addr)
+	cfg.App.EnvFile = envString("APP_ENV_FILE", cfg.App.EnvFile)
+	cfg.App.Debug = envBool("APP_DEBUG", cfg.App.Debug)
 	return nil
 }
 
@@ -113,5 +104,65 @@ func loadEnvFile(path string) error {
 	if _, err := os.Stat(path); err != nil {
 		return nil
 	}
-	return plumecfg.LoadEnvFile(path, true)
+	file, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	scanner.Buffer(make([]byte, 64*1024), 1024*1024)
+	for scanner.Scan() {
+		key, value, ok := parseEnvLine(scanner.Text())
+		if !ok {
+			continue
+		}
+		if err := os.Setenv(key, value); err != nil {
+			return err
+		}
+	}
+	return scanner.Err()
+}
+
+func envString(key, fallback string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
+	}
+	return fallback
+}
+
+func envBool(key string, fallback bool) bool {
+	value, err := strconv.ParseBool(os.Getenv(key))
+	if err != nil {
+		return fallback
+	}
+	return value
+}
+
+func parseEnvLine(line string) (key, value string, ok bool) {
+	line = strings.TrimSpace(line)
+	if line == "" || strings.HasPrefix(line, "#") {
+		return "", "", false
+	}
+
+	idx := strings.IndexByte(line, '=')
+	if idx < 0 {
+		return "", "", false
+	}
+
+	key = strings.TrimSpace(line[:idx])
+	if key == "" {
+		return "", "", false
+	}
+
+	value = strings.TrimSpace(line[idx+1:])
+	if len(value) >= 2 {
+		q := value[0]
+		if (q == '"' || q == '\'') && value[len(value)-1] == q {
+			value = value[1 : len(value)-1]
+			value = strings.ReplaceAll(value, string([]byte{'\\', q}), string(q))
+		}
+	}
+
+	return key, value, true
 }

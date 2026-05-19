@@ -24,7 +24,7 @@ import (
 	securitymw "github.com/spcent/plumego/middleware/security"
 	"github.com/spcent/plumego/middleware/timeout"
 	"github.com/spcent/plumego/middleware/tracing"
-	"github.com/spcent/plumego/reference/production-service/internal/config"
+	"production-service/internal/config"
 )
 
 // App holds application-wide dependencies.

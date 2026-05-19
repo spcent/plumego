@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/spcent/plumego/metrics"
-	"github.com/spcent/plumego/reference/production-service/internal/config"
+	"production-service/internal/config"
 )
 
 type responseEnvelope[T any] struct {

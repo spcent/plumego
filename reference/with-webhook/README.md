@@ -32,7 +32,8 @@ service that follows the same bootstrap structure as `reference/standard-service
 ## Run it
 
 ```bash
-GITHUB_WEBHOOK_SECRET=mysecret go run ./reference/with-webhook
+cd reference/with-webhook
+GITHUB_WEBHOOK_SECRET=mysecret go run .
 ```
 
 Send a test GitHub webhook to `http://localhost:8085/webhooks/github`.

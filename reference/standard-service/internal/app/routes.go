@@ -3,7 +3,7 @@ package app
 import (
 	"net/http"
 
-	"github.com/spcent/plumego/reference/standard-service/internal/handler"
+	"standard-service/internal/handler"
 )
 
 // RegisterRoutes wires all HTTP routes for the reference application.

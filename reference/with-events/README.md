@@ -15,14 +15,16 @@ HTTP -> handler -> publisher -> pubsub -> consumer -> success: done
 ## Run
 
 ```bash
-go run ./...
+cd reference/with-events
+go run .
 ```
 
 Set `WEBHOOK_TARGET_URL` to deliver consumed order events to an external HTTP
 target:
 
 ```bash
-WEBHOOK_TARGET_URL=http://localhost:9000/webhooks go run ./...
+cd reference/with-events
+WEBHOOK_TARGET_URL=http://localhost:9000/webhooks go run .
 ```
 
 The server defaults to `:8083`. Override it with `APP_ADDR` or `--addr`.

@@ -45,7 +45,8 @@ Canonical files:
 Run it with:
 
 ```bash
-go run ./reference/standard-service
+cd reference/standard-service
+go run .
 ```
 
 The CLI `canonical` scaffold template is expected to teach the same layout and

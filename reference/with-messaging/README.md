@@ -24,7 +24,8 @@ that follows the same bootstrap structure as `reference/standard-service`.
 ## Run it
 
 ```bash
-go run ./reference/with-messaging
+cd reference/with-messaging
+go run .
 ```
 
 Then publish an event:

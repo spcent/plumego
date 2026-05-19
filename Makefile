@@ -364,12 +364,14 @@ gates: ## Run all required quality gates (mirrors CI)
 	go run ./internal/checks/extension-api-snapshot -compare docs/stable-api/snapshots/core-head.snapshot "$$TMP/core-head.snapshot"
 	go run ./internal/tools/doc-snippets
 	go vet ./...
+	$(MAKE) reference-vet
 	@UNFORMATTED=$$(gofmt -l .); \
 	if [ -n "$$UNFORMATTED" ]; then \
 	  echo "Unformatted files:"; echo "$$UNFORMATTED"; exit 1; \
 	fi
 	go test -race -timeout 60s ./...
 	go test -timeout 20s ./...
+	$(MAKE) reference-test
 	go test -coverprofile=/tmp/plumego-stable.cover ./core ./router ./middleware/... ./contract ./security/... ./store/... >/tmp/plumego-stable-cover.log
 	@TOTAL=$$(go tool cover -func=/tmp/plumego-stable.cover | awk '/^total:/ {gsub("%","",$$3); print $$3}'); \
 	echo "Stable-module total coverage: $$TOTAL%"; \
@@ -400,11 +402,27 @@ fmt: ## Format all Go source files in-place
 vet: ## Run go vet on all packages
 	go vet ./...
 
+reference-vet: ## Run go vet for every standalone reference module
+	@set -e; \
+	for mod in reference/*/go.mod; do \
+	  dir=$$(dirname "$$mod"); \
+	  echo "==> $$dir"; \
+	  (cd "$$dir" && go vet ./...); \
+	done
+
 test: ## Run tests (standard timeout)
 	go test -timeout 20s ./...
 
 test-race: ## Run tests with race detector
 	go test -race -timeout 60s ./...
+
+reference-test: ## Run tests for every standalone reference module
+	@set -e; \
+	for mod in reference/*/go.mod; do \
+	  dir=$$(dirname "$$mod"); \
+	  echo "==> $$dir"; \
+	  (cd "$$dir" && go test ./...); \
+	done
 
 # ── Git Hooks ─────────────────────────────────────────────────────────────────
 

@@ -9,7 +9,8 @@ primitives.
 ## Run
 
 ```bash
-ADMIN_TOKEN=secret go run ./...
+cd reference/with-tenant-admin
+ADMIN_TOKEN=secret go run .
 ```
 
 The server listens on `:8086` by default. Override it with `APP_ADDR`.

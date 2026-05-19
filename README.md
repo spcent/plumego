@@ -249,7 +249,8 @@ App-facing extension families:
 Run it with:
 
 ```bash
-go run ./reference/standard-service
+cd reference/standard-service
+go run .
 ```
 
 ## Further Reading

@@ -25,6 +25,14 @@ func main() {
 	}
 	violations = append(violations, requiredPathViolations(repoRoot)...)
 
+	moduleViolations, err := checkutil.ValidateReferenceModules(repoRoot)
+	if err != nil {
+		failf("validate reference modules: %v", err)
+	}
+	for _, v := range moduleViolations {
+		violations = append(violations, "reference module: "+v)
+	}
+
 	// Verify reference/standard-service has no x/* imports (canonical drift check).
 	xViolations, err := checkutil.FindReferenceXImports(repoRoot, "reference/standard-service")
 	if err != nil {

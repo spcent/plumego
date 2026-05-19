@@ -50,7 +50,8 @@ explicitly and protect them outside production defaults. Do not expose
 ## Run
 
 ```bash
-go run ./reference/production-service
+cd reference/production-service
+go run .
 ```
 
 Useful environment variables:
@@ -69,14 +70,16 @@ Useful environment variables:
 Example protected metrics request:
 
 ```bash
-OPS_TOKEN=local-admin-token go run ./reference/production-service
+cd reference/production-service
+OPS_TOKEN=local-admin-token go run .
 curl -H 'Authorization: Bearer local-admin-token' http://127.0.0.1:8080/ops/metrics
 ```
 
 Example protected tenant API request:
 
 ```bash
-APP_API_TOKEN=local-api-token go run ./reference/production-service
+cd reference/production-service
+APP_API_TOKEN=local-api-token go run .
 curl \
   -H 'Authorization: Bearer local-api-token' \
   -H 'X-Tenant-ID: tenant-a' \
@@ -118,5 +121,5 @@ Example JSON profile store run:
 APP_PROFILE_STORE_PATH=/tmp/plumego-production-profiles.json \
 APP_API_TOKEN=local-api-token \
 OPS_TOKEN=local-admin-token \
-go run ./reference/production-service
+go run .
 ```

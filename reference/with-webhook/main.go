@@ -9,8 +9,8 @@ package main
 import (
 	"log"
 
-	"github.com/spcent/plumego/reference/with-webhook/internal/app"
-	"github.com/spcent/plumego/reference/with-webhook/internal/config"
+	"with-webhook/internal/app"
+	"with-webhook/internal/config"
 )
 
 func main() {

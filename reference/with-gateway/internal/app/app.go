@@ -11,8 +11,8 @@ import (
 	"github.com/spcent/plumego/middleware/accesslog"
 	"github.com/spcent/plumego/middleware/recovery"
 	"github.com/spcent/plumego/middleware/requestid"
-	"github.com/spcent/plumego/reference/with-gateway/internal/config"
 	"github.com/spcent/plumego/x/gateway"
+	"with-gateway/internal/config"
 )
 
 // App holds application-wide dependencies including the reverse proxy.
