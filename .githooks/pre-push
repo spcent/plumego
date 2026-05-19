@@ -56,7 +56,7 @@ if [[ "$BRANCH" == milestone/* ]]; then
   run_gate "agent-workflow"    go run ./internal/checks/agent-workflow
   run_gate "module-manifests"  go run ./internal/checks/module-manifests
   run_gate "reference-layout"  go run ./internal/checks/reference-layout
-  run_gate "doc snippets"      bash scripts/check-doc-snippets-compile.sh
+  run_gate "doc snippets"      go run ./internal/tools/doc-snippets
   run_gate "go vet"            go vet ./...
   run_fmt
   run_gate "tests"             go test -timeout 20s ./...
@@ -78,7 +78,7 @@ if [[ "$BRANCH" == main ]] || [[ "$BRANCH" == claude/* ]] || [[ "$BRANCH" == cod
   echo -e "\n${BOLD}plumego — quick check (${BRANCH})${RESET}\n"
 
   run_gate "go vet"  go vet ./...
-  run_gate "doc snippets" bash scripts/check-doc-snippets-compile.sh
+  run_gate "doc snippets" go run ./internal/tools/doc-snippets
   run_fmt
   run_gate "tests"   go test -timeout 20s ./...
 

@@ -2,11 +2,11 @@
 # check-spec — validate milestone pipeline artifacts before execution or review.
 #
 # Usage:
-#   scripts/check-spec tasks/milestones/active/M-001.md
-#   scripts/check-spec tasks/milestones/M-001.plan.md
-#   scripts/check-spec tasks/milestones/M-001.verify.md
-#   scripts/check-spec tasks/cards/active/C-001-my-card.md
-#   scripts/check-spec tasks/cards/blocked/C-002-waiting-on-release.md
+#   internal/tools/check-spec tasks/milestones/active/M-001-short-name/M-001.md
+#   internal/tools/check-spec tasks/milestones/active/M-001-short-name/plan-M-001.md
+#   internal/tools/check-spec tasks/milestones/active/M-001-short-name/verify-M-001.md
+#   internal/tools/check-spec tasks/cards/active/C-001-my-card.md
+#   internal/tools/check-spec tasks/cards/blocked/C-002-waiting-on-release.md
 #
 # Exits 0 if the artifact is structurally valid, 1 if it has structural problems.
 # Does NOT check content quality — that is still the author's responsibility.
@@ -19,9 +19,9 @@ BOLD='\033[1m'; RESET='\033[0m'
 usage() {
   echo "Usage: $0 <artifact-file>"
   echo "  Examples:"
-  echo "    $0 tasks/milestones/active/M-001.md"
-  echo "    $0 tasks/milestones/M-001.plan.md"
-  echo "    $0 tasks/milestones/M-001.verify.md"
+  echo "    $0 tasks/milestones/active/M-001-short-name/M-001.md"
+  echo "    $0 tasks/milestones/active/M-001-short-name/plan-M-001.md"
+  echo "    $0 tasks/milestones/active/M-001-short-name/verify-M-001.md"
   echo "    $0 tasks/cards/active/C-001-slice-router-work.md"
   echo "    $0 tasks/cards/blocked/C-002-waiting-on-release.md"
   exit 1
@@ -111,6 +111,8 @@ find_milestone_spec() {
   local milestone_id="$1"
   local candidate
   for candidate in \
+    tasks/milestones/active/${milestone_id}-*/${milestone_id}.md \
+    tasks/milestones/done/${milestone_id}-*/${milestone_id}.md \
     "tasks/milestones/active/${milestone_id}.md" \
     "tasks/milestones/done/${milestone_id}.md"
   do
@@ -121,19 +123,72 @@ find_milestone_spec() {
   done
 }
 
+find_companion_artifact() {
+  local milestone_id="$1"
+  local artifact_kind="$2"
+  local milestone_spec candidate
+
+  milestone_spec="$(find_milestone_spec "$milestone_id" || true)"
+  if [ -n "$milestone_spec" ]; then
+    case "$artifact_kind" in
+      plan)
+        candidate="$(dirname "$milestone_spec")/plan-${milestone_id}.md"
+        ;;
+      verify)
+        candidate="$(dirname "$milestone_spec")/verify-${milestone_id}.md"
+        ;;
+      checkpoint)
+        candidate="$(dirname "$milestone_spec")/checkpoint-${milestone_id}.json"
+        ;;
+      *)
+        return
+        ;;
+    esac
+    if [ -f "$candidate" ]; then
+      printf '%s' "$candidate"
+      return
+    fi
+  fi
+
+  case "$artifact_kind" in
+    plan)
+      candidate="tasks/milestones/${milestone_id}.plan.md"
+      ;;
+    verify)
+      candidate="tasks/milestones/${milestone_id}.verify.md"
+      ;;
+    checkpoint)
+      candidate="tasks/milestones/${milestone_id}.checkpoint.json"
+      ;;
+    *)
+      return
+      ;;
+  esac
+  if [ -f "$candidate" ]; then
+    printf '%s' "$candidate"
+  fi
+}
+
 detect_kind() {
+  local base
+  base="${TARGET##*/}"
+
   case "$TARGET" in
-    */tasks/milestones/*.plan.md|tasks/milestones/*.plan.md)
-      printf 'plan'
-      ;;
-    */tasks/milestones/*.verify.md|tasks/milestones/*.verify.md)
-      printf 'verify'
-      ;;
-    */tasks/milestones/*.md|tasks/milestones/*.md)
-      printf 'milestone'
-      ;;
     */tasks/cards/*.md|tasks/cards/*.md)
       printf 'card'
+      return
+      ;;
+  esac
+
+  case "$base" in
+    plan-M-[0-9][0-9][0-9].md|M-[0-9][0-9][0-9].plan.md)
+      printf 'plan'
+      ;;
+    verify-M-[0-9][0-9][0-9].md|M-[0-9][0-9][0-9].verify.md)
+      printf 'verify'
+      ;;
+    M-[0-9][0-9][0-9].md)
+      printf 'milestone'
       ;;
     *)
       printf 'unknown'
@@ -176,8 +231,8 @@ validate_milestone() {
   echo "Companion artifact check:"
   milestone_id="$(extract_milestone_id)"
   if [ -n "$milestone_id" ]; then
-    plan_path="tasks/milestones/${milestone_id}.plan.md"
-    verify_path="tasks/milestones/${milestone_id}.verify.md"
+    plan_path="$(find_companion_artifact "$milestone_id" plan || true)"
+    verify_path="$(find_companion_artifact "$milestone_id" verify || true)"
     if [ -f "$plan_path" ]; then
       ok_message "Companion plan exists: $plan_path"
     elif [[ "$TARGET" == */done/* ]]; then
@@ -299,7 +354,7 @@ validate_verify() {
       echo -e "  ${RED}MISS${RESET}  Companion milestone spec exists"
       FAILED=1
     fi
-    plan_path="tasks/milestones/${milestone_id}.plan.md"
+    plan_path="$(find_companion_artifact "$milestone_id" plan || true)"
     if [ -f "$plan_path" ]; then
       ok_message "Companion plan exists: $plan_path"
     else
@@ -473,7 +528,7 @@ KIND_LABEL="$(kind_label "$KIND")"
 
 if [ $FAILED -ne 0 ]; then
   echo -e "${RED}${BOLD}${KIND_LABEL} is INVALID — missing required fields or sections.${RESET}"
-  echo -e "Fix the issues above, then re-run ${BOLD}scripts/check-spec $TARGET${RESET}."
+  echo -e "Fix the issues above, then re-run ${BOLD}internal/tools/check-spec $TARGET${RESET}."
   exit 1
 fi
 

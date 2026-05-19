@@ -59,9 +59,9 @@ milestone: ## Run a milestone spec: make milestone M=active/M-001
 	  exit 1; \
 	fi; \
 	echo "Validating spec before launch ..."; \
-	scripts/check-spec "$$SPEC" || { echo "Fix spec errors above, then re-run."; exit 1; }; \
+	internal/tools/check-spec "$$SPEC" || { echo "Fix spec errors above, then re-run."; exit 1; }; \
 	echo "Validating plan before launch ..."; \
-	scripts/check-spec "$$PLAN" || { echo "Fix plan errors above, then re-run."; exit 1; }; \
+	internal/tools/check-spec "$$PLAN" || { echo "Fix plan errors above, then re-run."; exit 1; }; \
 	echo "Launching codex --yolo on $$SPEC ..."; \
 	codex --yolo "$$(cat "$$SPEC")"
 
@@ -70,7 +70,7 @@ check-spec: ## Validate a milestone spec: make check-spec M=active/M-001
 	  echo "Error: M is required. Example: make check-spec M=active/M-001"; \
 	  exit 1; \
 	fi
-	@scripts/check-spec tasks/milestones/$(M).md
+	@internal/tools/check-spec tasks/milestones/$(M).md
 
 check-plan: ## Validate a milestone plan: make check-plan M=active/M-001
 	@if [ -z "$(M)" ]; then \
@@ -84,7 +84,7 @@ check-plan: ## Validate a milestone plan: make check-plan M=active/M-001
 	  echo "Create it with: make new-plan M=$(M)"; \
 	  exit 1; \
 	fi; \
-	scripts/check-spec "$$PLAN"
+	internal/tools/check-spec "$$PLAN"
 
 check-verify: ## Validate a milestone verify report: make check-verify M=active/M-001
 	@if [ -z "$(M)" ]; then \
@@ -98,14 +98,14 @@ check-verify: ## Validate a milestone verify report: make check-verify M=active/
 	  echo "Create it with: make new-verify M=$(M)"; \
 	  exit 1; \
 	fi; \
-	scripts/check-spec "$$VERIFY"
+	internal/tools/check-spec "$$VERIFY"
 
 check-card: ## Validate a task card: make check-card C=active/0001-slice-router-work
 	@if [ -z "$(C)" ]; then \
 	  echo "Error: C is required. Example: make check-card C=active/0001-slice-router-work or C=blocked/0001-waiting-on-release"; \
 	  exit 1; \
 	fi
-	@scripts/check-spec tasks/cards/$(C).md
+	@internal/tools/check-spec tasks/cards/$(C).md
 
 new-milestone: ## Scaffold a new milestone spec: make new-milestone N=001 TITLE="My feature"
 	@if [ -z "$(N)" ] || [ -z "$(TITLE)" ]; then \
@@ -201,7 +201,7 @@ run-card: ## Execute a task card (validate → bundle → codex): make run-card 
 	  exit 1; \
 	fi; \
 	echo "Validating card before launch ..."; \
-	scripts/check-spec "$$CARD" || { echo "Fix card errors above, then re-run."; exit 1; }; \
+	internal/tools/check-spec "$$CARD" || { echo "Fix card errors above, then re-run."; exit 1; }; \
 	MODULE=$$(grep -m1 '^Primary Module:' "$$CARD" | sed 's/Primary Module:[[:space:]]*//' | tr -d '\r'); \
 	RECIPE=$$(grep -m1 '^Recipe:' "$$CARD" | sed 's|Recipe:[[:space:]]*specs/change-recipes/||; s|\.yaml$$||' | tr -d '\r'); \
 	if [ -z "$$MODULE" ] || [ -z "$$RECIPE" ]; then \
@@ -285,8 +285,12 @@ gates: ## Run all required quality gates (mirrors CI)
 	go run ./internal/checks/extension-beta-evidence
 	go run ./internal/checks/deprecation-inventory -strict
 	go run ./internal/checks/public-entrypoints-sync
-	bash scripts/check-stable-api-snapshots.sh
-	bash scripts/check-doc-snippets-compile.sh
+	@set -e; \
+	TMP=$$(mktemp -d "$${TMPDIR:-/tmp}/plumego-stable-api.XXXXXX"); \
+	trap 'rm -rf "$$TMP"' EXIT; \
+	go run ./internal/checks/extension-api-snapshot -module ./core -out "$$TMP/core-head.snapshot"; \
+	go run ./internal/checks/extension-api-snapshot -compare docs/stable-api/snapshots/core-head.snapshot "$$TMP/core-head.snapshot"
+	go run ./internal/tools/doc-snippets
 	go vet ./...
 	@UNFORMATTED=$$(gofmt -l .); \
 	if [ -n "$$UNFORMATTED" ]; then \
@@ -333,7 +337,7 @@ test-race: ## Run tests with race detector
 # ── Git Hooks ─────────────────────────────────────────────────────────────────
 
 setup-hooks: ## Install local git hooks (pre-push quality gates)
-	@cp scripts/pre-push .git/hooks/pre-push
+	@cp .githooks/pre-push .git/hooks/pre-push
 	@chmod +x .git/hooks/pre-push
 	@echo "Installed: .git/hooks/pre-push"
 	@echo "Quality gates now run automatically before every git push."

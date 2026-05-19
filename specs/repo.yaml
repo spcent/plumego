@@ -98,10 +98,10 @@ layers:
     paths:
       - benchmark
       - cmd
+      - .githooks
       - internal/checks
       - internal/testutil
       - internal/tools
-      - scripts
 
   reference:
     description: Canonical implementations.
