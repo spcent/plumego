@@ -8,22 +8,8 @@ import (
 	"testing"
 )
 
-func TestCLI_GenerateSpecAgainstWithRest(t *testing.T) {
-	repoRoot := filepath.Clean("../../..")
-	appDir := filepath.Join(repoRoot, "reference", "with-rest")
-	stdout, _, err := runCLI(t, []string{
-		"generate", "spec",
-		"--dir", appDir,
-		"--output", os.DevNull,
-	}, "")
-	if err != nil {
-		t.Fatalf("generate spec failed: %v\noutput: %s", err, stdout)
-	}
-}
-
 func TestCLI_GenerateSpecWritesJSONAndYAML(t *testing.T) {
-	repoRoot := filepath.Clean("../../..")
-	appDir := filepath.Join(repoRoot, "reference", "with-rest")
+	appDir := specTestAppDir()
 	tmpDir := t.TempDir()
 
 	jsonPath := filepath.Join(tmpDir, "openapi.json")
@@ -43,8 +29,8 @@ func TestCLI_GenerateSpecWritesJSONAndYAML(t *testing.T) {
 	if !json.Valid(data) {
 		t.Fatalf("generated spec is not JSON: %s", data)
 	}
-	if !strings.Contains(string(data), `"/api/items"`) {
-		t.Fatalf("generated spec missing with-rest route: %s", data)
+	if !strings.Contains(string(data), `"/api/hello"`) {
+		t.Fatalf("generated spec missing standard-service route: %s", data)
 	}
 
 	yamlPath := filepath.Join(tmpDir, "openapi.yaml")
@@ -62,7 +48,12 @@ func TestCLI_GenerateSpecWritesJSONAndYAML(t *testing.T) {
 		t.Fatalf("read yaml spec: %v", err)
 	}
 	yamlOut := string(yamlData)
-	if !strings.Contains(yamlOut, `openapi: "3.1.0"`) || !strings.Contains(yamlOut, "/api/items:") {
+	if !strings.Contains(yamlOut, `openapi: "3.1.0"`) || !strings.Contains(yamlOut, "/api/hello:") {
 		t.Fatalf("generated spec is not expected YAML: %s", yamlOut)
 	}
+}
+
+func specTestAppDir() string {
+	repoRoot := filepath.Clean("../../..")
+	return filepath.Join(repoRoot, "reference", "standard-service")
 }

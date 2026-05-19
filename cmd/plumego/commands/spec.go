@@ -150,12 +150,8 @@ func runSpecHelper(appDir string, target specTarget, modules []goModuleInfo, out
 		return err
 	}
 
-	if err := runSpecHelperCommand(tmpDir, "go", "mod", "tidy"); err != nil {
-		return err
-	}
-
 	hintsPath := filepath.Join(appDir, "plumego.spec.yaml")
-	return runSpecHelperCommand(tmpDir, "go", "run", ".", "--output", outputPath, "--format", format, "--hints", hintsPath)
+	return runSpecHelperCommand(tmpDir, "go", "run", "-mod=mod", ".", "--output", outputPath, "--format", format, "--hints", hintsPath)
 }
 
 func runSpecHelperCommand(dir, name string, args ...string) error {
