@@ -23,16 +23,16 @@ export const SITE_COPY: Record<Locale, { footerTagline: string }> = {
 export const NAV_LINKS: Record<Locale, Array<{ label: string; href: string }>> = {
   en: [
     { label: 'Docs', href: '/docs' },
-    { label: 'Why', href: '/why-plumego' },
-    { label: 'Ecosystem', href: '/ecosystem' },
-    { label: 'Agents', href: '/agent-workflow' },
+    { label: 'Why Plumego', href: '/why-plumego' },
+    { label: 'Examples', href: '/examples' },
+    { label: 'Architecture', href: '/architecture' },
     { label: 'Releases', href: '/releases' },
   ],
   zh: [
     { label: '文档', href: '/zh/docs' },
     { label: '为什么选择', href: '/zh/why-plumego' },
-    { label: '生态系统', href: '/zh/ecosystem' },
-    { label: 'Agents', href: '/zh/agent-workflow' },
+    { label: '示例', href: '/zh/examples' },
+    { label: '架构', href: '/zh/architecture' },
     { label: '发布', href: '/zh/releases' },
   ],
 };
@@ -44,12 +44,11 @@ export const FOOTER_GROUPS: Record<Locale, Array<{ title: string; links: Array<{
       links: [
         { label: 'Docs', href: '/docs' },
         { label: 'Why Plumego', href: '/why-plumego' },
-        { label: 'Ecosystem', href: '/ecosystem' },
-        { label: 'Agent Workflow', href: '/agent-workflow' },
-        { label: 'Architecture', href: '/architecture' },
-        { label: 'Compare Frameworks', href: '/compare' },
-        { label: 'Benchmarks', href: '/benchmarks' },
         { label: 'Examples', href: '/examples' },
+        { label: 'Architecture', href: '/architecture' },
+        { label: 'Compare & Benchmarks', href: '/compare' },
+        { label: 'x/* Extensions', href: '/architecture#extensions' },
+        { label: 'Agent Workflow', href: '/docs/concepts/agent-first-workflow' },
       ],
     },
     {
@@ -82,12 +81,11 @@ export const FOOTER_GROUPS: Record<Locale, Array<{ title: string; links: Array<{
       links: [
         { label: '文档', href: '/zh/docs' },
         { label: '为什么选择 Plumego', href: '/zh/why-plumego' },
-        { label: '生态系统', href: '/zh/ecosystem' },
-        { label: 'Agent 工作流', href: '/zh/agent-workflow' },
-        { label: '架构', href: '/zh/architecture' },
-        { label: '框架横向对比', href: '/zh/compare' },
-        { label: '性能测试', href: '/zh/benchmarks' },
         { label: '示例', href: '/zh/examples' },
+        { label: '架构', href: '/zh/architecture' },
+        { label: '框架对比与性能', href: '/zh/compare' },
+        { label: 'x/* 扩展家族', href: '/zh/architecture#extensions' },
+        { label: 'Agent 工作流', href: '/zh/docs/concepts/agent-first-workflow' },
       ],
     },
     {

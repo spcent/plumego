@@ -5,7 +5,7 @@ import JourneyBar from '../components/marketing/JourneyBar.astro';
 import LayerDiagram from '../components/marketing/LayerDiagram.astro';
 import ArchitectureDiagram from '../components/marketing/ArchitectureDiagram.astro';
 import RequestFlowViz from '../components/marketing/RequestFlowViz.astro';
-import { ARCHITECTURE_COPY } from '../data/site';
+import { ARCHITECTURE_COPY, ECOSYSTEM_COPY } from '../data/site';
 import { MODULE_FACTS } from '../generated/modules';
 
 
@@ -456,7 +456,7 @@ const repositorySignals = [
   </section>
 
   <!-- What you can build with x/* -->
-  <section class="section">
+  <section class="section" id="extensions">
     <div class="section__intro">
       <h2>What you can build with x/* extension families.</h2>
       <p>
@@ -473,9 +473,65 @@ const repositorySignals = [
         </article>
       ))}
     </div>
-    <div class="page-links" style="margin-top: 1.5rem;">
-      <a class="text-link" href="/use-cases">All use-case scenarios →</a>
+  </section>
+
+  <!-- Full extension family catalog by maturity -->
+  <section class="section section--tinted">
+    <div class="section__intro">
+      <h2>All x/* families, grouped by maturity.</h2>
+      <p>
+        Beta families have API snapshots, owner sign-off, and promotion evidence — safe to evaluate for production.
+        Experimental families are tested but not API-frozen; start with the family entrypoint and expect iteration.
+      </p>
+    </div>
+
+    <div class="eco-group">
+      <div class="eco-group-header">
+        <span class="eco-maturity-badge eco-maturity-badge--beta">beta</span>
+        <div>
+          <h3 class="eco-group-title">Beta — API frozen between release refs</h3>
+          <p class="eco-group-body">API surface frozen between minor release refs, tested and promoted with owner sign-off. Safe to evaluate for production with known stability.</p>
+        </div>
+      </div>
+      <div class="eco-card-grid">
+        {ECOSYSTEM_COPY.en.betaFamilies.map((family) => (
+          <a class="eco-card" href={family.docsHref}>
+            <div class="eco-card__top">
+              <code class="eco-card__name">{family.name}</code>
+              <span class="eco-card__badge eco-card__badge--beta">beta</span>
+            </div>
+            <p class="eco-card__scenario">{family.scenario}</p>
+            <p class="eco-card__usecase">{family.useCase}</p>
+          </a>
+        ))}
+      </div>
+    </div>
+
+    <div class="eco-group" style="margin-top: 2.5rem;">
+      <div class="eco-group-header">
+        <span class="eco-maturity-badge eco-maturity-badge--exp">experimental</span>
+        <div>
+          <h3 class="eco-group-title">Experimental — evaluate before adopting</h3>
+          <p class="eco-group-body">Included in repo quality gates and tested, but API surface is not frozen. Start from the family entrypoint before exploring sub-packages.</p>
+        </div>
+      </div>
+      <div class="eco-card-grid">
+        {ECOSYSTEM_COPY.en.experimentalFamilies.map((family) => (
+          <a class="eco-card" href={family.docsHref}>
+            <div class="eco-card__top">
+              <code class="eco-card__name">{family.name}</code>
+              <span class="eco-card__badge eco-card__badge--exp">experimental</span>
+            </div>
+            <p class="eco-card__scenario">{family.scenario}</p>
+            <p class="eco-card__usecase">{family.useCase}</p>
+          </a>
+        ))}
+      </div>
+    </div>
+
+    <div class="page-links" style="margin-top: 2rem;">
       <a class="text-link" href="/docs/x-family">Browse all x/* families →</a>
+      <a class="text-link" href="/releases">Check maturity matrix →</a>
     </div>
   </section>
 
@@ -631,5 +687,168 @@ const repositorySignals = [
     background: var(--accent-soft);
     padding: 0.08rem 0.35rem;
     border-radius: 0.22rem;
+  }
+
+  /* ── Extension family catalog ─────────────────────────────── */
+  .eco-group-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+    max-width: 72rem;
+    margin-inline: auto;
+    margin-bottom: 1.25rem;
+    flex-wrap: wrap;
+  }
+
+  .eco-maturity-badge {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    padding: 0.25rem 0.6rem;
+    border-radius: 0.3rem;
+    flex-shrink: 0;
+    margin-top: 0.3rem;
+    white-space: nowrap;
+  }
+
+  .eco-maturity-badge--beta {
+    background: color-mix(in srgb, #2a7d4f 12%, var(--bg-elevated));
+    color: #2a7d4f;
+    border: 1px solid color-mix(in srgb, #2a7d4f 25%, transparent);
+  }
+
+  :root[data-theme="dark"] .eco-maturity-badge--beta {
+    color: #5ecf8a;
+    background: color-mix(in srgb, #5ecf8a 12%, var(--bg-elevated));
+    border-color: color-mix(in srgb, #5ecf8a 22%, transparent);
+  }
+
+  .eco-maturity-badge--exp {
+    background: color-mix(in srgb, #b45309 12%, var(--bg-elevated));
+    color: #b45309;
+    border: 1px solid color-mix(in srgb, #b45309 22%, transparent);
+  }
+
+  :root[data-theme="dark"] .eco-maturity-badge--exp {
+    color: #fbbf4a;
+    background: color-mix(in srgb, #fbbf4a 12%, var(--bg-elevated));
+    border-color: color-mix(in srgb, #fbbf4a 22%, transparent);
+  }
+
+  .eco-group-title {
+    font-size: 1.05rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    margin: 0 0 0.3rem;
+    color: var(--fg);
+  }
+
+  .eco-group-body {
+    font-size: 0.87rem;
+    color: var(--fg-soft);
+    margin: 0;
+    max-width: 56rem;
+    line-height: 1.6;
+  }
+
+  .eco-card-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.9rem;
+    max-width: 72rem;
+    margin-inline: auto;
+  }
+
+  @media (min-width: 600px) {
+    .eco-card-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+
+  @media (min-width: 960px) {
+    .eco-card-grid { grid-template-columns: repeat(4, 1fr); }
+  }
+
+  .eco-card {
+    background: var(--bg-elevated);
+    border: 1px solid var(--line);
+    border-radius: 0.75rem;
+    padding: 1.1rem 1.2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    text-decoration: none;
+    color: inherit;
+    transition: border-color 0.18s, box-shadow 0.18s;
+  }
+
+  .eco-card:hover {
+    box-shadow: var(--shadow);
+    border-color: color-mix(in srgb, var(--accent) 25%, var(--line));
+  }
+
+  .eco-card__top {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+
+  .eco-card__name {
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--accent);
+    background: var(--accent-soft);
+    padding: 0.1rem 0.4rem;
+    border-radius: 0.25rem;
+  }
+
+  .eco-card__badge {
+    font-size: 0.62rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    padding: 0.08rem 0.35rem;
+    border-radius: 0.2rem;
+  }
+
+  .eco-card__badge--beta {
+    background: color-mix(in srgb, #2a7d4f 12%, var(--bg-elevated));
+    color: #2a7d4f;
+    border: 1px solid color-mix(in srgb, #2a7d4f 22%, transparent);
+  }
+
+  :root[data-theme="dark"] .eco-card__badge--beta {
+    color: #5ecf8a;
+    background: color-mix(in srgb, #5ecf8a 10%, var(--bg-elevated));
+    border-color: color-mix(in srgb, #5ecf8a 20%, transparent);
+  }
+
+  .eco-card__badge--exp {
+    background: color-mix(in srgb, #b45309 10%, var(--bg-elevated));
+    color: #b45309;
+    border: 1px solid color-mix(in srgb, #b45309 20%, transparent);
+  }
+
+  :root[data-theme="dark"] .eco-card__badge--exp {
+    color: #fbbf4a;
+    background: color-mix(in srgb, #fbbf4a 10%, var(--bg-elevated));
+    border-color: color-mix(in srgb, #fbbf4a 18%, transparent);
+  }
+
+  .eco-card__scenario {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--fg-soft);
+    margin: 0;
+  }
+
+  .eco-card__usecase {
+    font-size: 0.82rem;
+    color: var(--fg-soft);
+    line-height: 1.58;
+    margin: 0;
+    flex: 1;
   }
 </style>
