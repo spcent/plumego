@@ -117,10 +117,9 @@ entries:
     category: reference_alias
     status: keep
     owner: reference
-    decision: Workerfleet reference layers alias domain records for local platform and handler package readability.
+    decision: Workerfleet reference layers alias domain records for local platform package readability.
     replacement: direct domain types
     paths:
-      - reference/workerfleet/internal/handler/worker_query.go
       - reference/workerfleet/internal/platform/store/types.go
 
   - id: reference-workerfleet-app-compatibility-markers
