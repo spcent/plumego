@@ -232,6 +232,12 @@ Pod 映射：
 - loop 调度已经预留 no-op lease seam，后续接多副本 owner 协调时不需要重写 loop body。
 - 优雅关闭时会先停止该循环，再关闭 runtime store。
 
+当前副本约束：
+
+- 只要启用了 Kubernetes sync、status sweep 或 alert evaluation loop，workerfleet 当前就应以单活副本运行。
+- 如果所有后台 loop 都关闭，多副本只承载 HTTP 查询流量是安全的。
+- 在没有分布式 lease owner 之前，额外副本会重复执行 Kubernetes sync、status sweep、alert evaluation 和 notification delivery。
+
 ## 8. 存储设计
 
 存储接口位于 `internal/platform/store`，属于 workerfleet 应用本地接口。
@@ -478,6 +484,19 @@ Worker 接入认证：
 - 暴露接入耗时和库存同步耗时指标。
 - Grafana 优先看聚合面板，再通过 API 下钻。
 
+多副本 lease 路线：
+
+- owner 粒度：至少按 `kube_sync`、`status_sweep`、`alert_evaluate` 三类 loop 分别持有 lease。
+- lease 后端方向：在启用 Mongo 后端时复用 workerfleet 自己的 Mongo，避免再引入第二套协调系统。
+- lease 文档建议字段：`lease_name`、`holder_id`、`renewed_at`、`expire_at`，以及后续审计可用的 fencing token。
+- 续约模型：当前 owner 在每次 loop 周期内续约；未持有 lease 的副本只跳过本轮工作，并按正常调度间隔继续尝试获取。
+- 失败转移模型：如果 owner 在 `expire_at` 前未续约，其他副本可以重新获取 lease 并接管 loop。
+- rollout 顺序：
+  1. 增加 replica identity 和真实 lease coordinator 实现
+  2. 用 Mongo 文档 + TTL + compare-and-swap 完成 lease 获取与续约
+  3. 按 loop family 独立接入 lease，避免一次性切换全部后台任务
+  4. 在把 Deployment 副本数调高到 1 以上前，先补 lease state metrics 和调试可见性
+
 ## 14. 安全和失败策略
 
 安全要求：
@@ -512,4 +531,5 @@ Worker 接入认证：
 - Kubernetes 和 notifier 的运行时环境变量配置。
 - profile 驱动的状态和告警策略配置，以及启动期 fail-closed 校验。
 - stable / experimental metrics catalog 契约和 label 集冻结测试。
+- Kubernetes 部署、Prometheus 抓取和基线告警规则 reference manifests。
 - Grafana 看板规划文档。

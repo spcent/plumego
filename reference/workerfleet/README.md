@@ -64,6 +64,7 @@ Runtime loop configuration:
 - runtime loop errors are exported as `workerfleet_runtime_errors_total`
 - each runtime loop runs with built-in non-overlap, a default `25s` iteration timeout, a `5s` initial failure backoff, and a `1m` max failure backoff
 - a no-op lease seam is already present in the loop scheduler so future multi-replica ownership can be added without rewriting loop bodies
+- when Kubernetes sync, status sweep, or alert evaluation are enabled, keep the current deployment at `replicas: 1` until distributed lease ownership is implemented
 
 Status and alert policy configuration:
 

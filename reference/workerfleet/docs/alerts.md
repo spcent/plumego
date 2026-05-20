@@ -36,6 +36,7 @@ Runtime behavior:
 - notification delivery errors do not crash the service.
 - alert evaluation and notification delivery errors are observed through `workerfleet_runtime_errors_total` with low-cardinality `operation` and `error_class` labels.
 - startup validation fails closed on contradictory or unsafe thresholds such as `offline_after <= stale_after` or stage-stuck values below the minimum supported floor.
+- until distributed loop ownership exists, alert evaluation plus notification delivery should run on only one active workerfleet replica.
 
 Mongo-backed retention:
 

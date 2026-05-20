@@ -232,6 +232,12 @@ Implemented runtime behavior:
 - Loop scheduling already routes through a no-op lease seam so future multi-replica ownership can be added without changing loop bodies.
 - The loop is stopped during graceful shutdown before the runtime store is closed.
 
+Current replica assumption:
+
+- Workerfleet should currently run with one active replica when Kubernetes sync, status sweep, or alert evaluation loops are enabled.
+- Multiple replicas are safe for HTTP serving only when all background loops remain disabled.
+- Without distributed lease ownership, extra replicas would duplicate Kubernetes sync, status sweep, alert evaluation, and notification delivery work.
+
 ## 8. Storage Design
 
 Store interfaces are app-local under `internal/platform/store`.
@@ -453,6 +459,19 @@ Mitigations:
 - expose ingest and inventory sync duration metrics.
 - use Grafana aggregate panels before drilling into APIs.
 
+Multi-replica lease roadmap:
+
+- ownership unit: one lease per runtime loop family, at minimum `kube_sync`, `status_sweep`, and `alert_evaluate`.
+- lease backend direction: reuse the workerfleet Mongo backend when enabled so replicated deployments do not need a second coordination system.
+- lease document shape: `lease_name`, `holder_id`, `renewed_at`, `expire_at`, and a monotonic fencing token for future auditability.
+- renewal model: the active holder renews on every loop interval; non-holders skip work and retry acquisition after the normal scheduler interval.
+- failure model: if the holder stops renewing before `expire_at`, another replica may acquire the lease and resume loop ownership.
+- rollout order:
+  1. add replica identity and a real lease coordinator implementation
+  2. back Mongo leases with TTL and compare-and-swap acquisition
+  3. gate each loop family independently so sync and alert ownership can roll out separately
+  4. expose lease state metrics and debug visibility before raising deployment replicas above one
+
 ## 14. Security And Failure Policy
 
 Security requirements:
@@ -485,9 +504,5 @@ Implemented:
 - service entrypoint with HTTP server startup and graceful shutdown.
 - periodic Kubernetes inventory sync, status sweep, alert evaluation, and alert notification loops.
 - runtime env config for Kubernetes and notifiers.
+- reference Kubernetes deployment, scraping, and baseline alerting manifests.
 - Grafana dashboard planning documentation.
-
-Recommended next cards:
-
-- add worker register and heartbeat authentication.
-- add operational config examples for Kubernetes deployment.
