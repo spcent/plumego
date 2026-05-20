@@ -95,6 +95,7 @@ Runtime wiring notes:
 - Bootstrap wires explicit components for ingest, query, loop execution, and alert evaluation, then exposes only the lifecycle hooks needed by `App`.
 - Periodic Kubernetes sync and status sweep logic live behind `LoopRunner`.
 - Periodic alert evaluation and notification delivery live behind `AlertRunner`.
+- App config owns the profile-selected `StatusPolicy` and `AlertPolicy` values; bootstrap validates them at startup and injects the effective policies into ingest, loop, and alert components explicitly.
 
 ## 5. Domain Model
 
@@ -130,6 +131,7 @@ Policy surface:
 
 - `StatusPolicy` owns heartbeat stale/offline thresholds plus stage-stuck and restart thresholds used by status evaluation.
 - `AlertPolicy` owns alert-side stage-stuck and restart thresholds and is derived from defaults unless runtime wiring overrides it explicitly.
+- `internal/app/config.go` exposes both policies through env-driven app config, with `dev` and `prod` profile defaults plus validated per-field overrides.
 
 Online means the process is alive and ready to accept tasks. A worker can still be online while busy when it has active tasks but is not accepting additional work. A worker becomes degraded when signals are stale, it reports errors, it is not accepting tasks while idle, or task phases are stuck. A worker becomes offline when the process is not alive, the pod has failed, the pod has disappeared, or heartbeat expiry crosses policy thresholds.
 

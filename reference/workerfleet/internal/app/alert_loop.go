@@ -11,19 +11,27 @@ import (
 	"workerfleet/internal/platform/notifier"
 )
 
-func NewAlertRunner(store runtimeStore, policy domain.StatusPolicy, metrics *workerfleetmetrics.Observer, errors RuntimeErrorObserver) *AlertRunner {
+func NewAlertRunner(store runtimeStore, policy domain.StatusPolicy, alertPolicy domain.AlertPolicy, metrics *workerfleetmetrics.Observer, errors RuntimeErrorObserver) *AlertRunner {
 	runner := &AlertRunner{
-		store:   store,
-		policy:  policy,
-		metrics: metrics,
-		errors:  errors,
-		lease:   nopLoopLease{},
+		store:       store,
+		policy:      policy,
+		alertPolicy: alertPolicy,
+		metrics:     metrics,
+		errors:      errors,
+		lease:       nopLoopLease{},
 	}
 	runner.dispatcherFn = func(cfg Config) alertDispatcher {
 		return newAlertDispatcher(cfg)
 	}
 	runner.engineFactory = func() domainAlertEngine {
-		return domain.NewAlertEngine(runner.store, runner.store, runner.policy, nil, domain.WithAlertMetrics(runner.metrics))
+		return domain.NewAlertEngine(
+			runner.store,
+			runner.store,
+			runner.policy,
+			nil,
+			domain.WithAlertPolicy(runner.alertPolicy),
+			domain.WithAlertMetrics(runner.metrics),
+		)
 	}
 	return runner
 }

@@ -44,6 +44,7 @@ Worker ingress authentication:
 
 Runtime loop configuration:
 
+- `WORKERFLEET_PROFILE=dev|prod`, default `dev`
 - `WORKERFLEET_KUBE_SYNC_ENABLED`, default `false`
 - `WORKERFLEET_STATUS_SWEEP_ENABLED`, default `false`
 - `WORKERFLEET_ALERT_EVALUATION_ENABLED`, default `false`
@@ -60,6 +61,18 @@ Runtime loop configuration:
 - runtime loop errors are exported as `workerfleet_runtime_errors_total`
 - each runtime loop runs with built-in non-overlap, a default `25s` iteration timeout, a `5s` initial failure backoff, and a `1m` max failure backoff
 - a no-op lease seam is already present in the loop scheduler so future multi-replica ownership can be added without rewriting loop bodies
+
+Status and alert policy configuration:
+
+- `WORKERFLEET_PROFILE=dev` uses the app-local development policy defaults
+- `WORKERFLEET_PROFILE=prod` switches to more conservative production defaults for heartbeat, offline, stage-stuck, and restart-burst thresholds
+- `WORKERFLEET_STATUS_STALE_AFTER` overrides worker heartbeat staleness
+- `WORKERFLEET_STATUS_OFFLINE_AFTER` overrides worker offline detection
+- `WORKERFLEET_STATUS_STAGE_STUCK_AFTER` overrides worker stage-stuck detection
+- `WORKERFLEET_STATUS_RESTART_BURST_THRESHOLD` overrides restart-burst status evaluation
+- `WORKERFLEET_ALERT_STAGE_STUCK_AFTER` overrides alert-side stage-stuck firing
+- `WORKERFLEET_ALERT_RESTART_BURST_THRESHOLD` overrides alert-side restart-burst firing
+- policy values are validated at startup; unsafe low thresholds fail closed before the HTTP server is exposed
 
 Single-cluster Kubernetes assumptions:
 

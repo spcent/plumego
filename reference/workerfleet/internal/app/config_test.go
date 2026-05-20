@@ -14,6 +14,9 @@ func TestLoadConfigDefaultsToMemory(t *testing.T) {
 	if cfg.StoreBackend != StoreBackendMemory {
 		t.Fatalf("store backend = %q, want memory", cfg.StoreBackend)
 	}
+	if cfg.Profile != ProfileDevelopment {
+		t.Fatalf("profile = %q, want %q", cfg.Profile, ProfileDevelopment)
+	}
 	if cfg.Retention != 7*24*time.Hour {
 		t.Fatalf("retention = %v, want 7d", cfg.Retention)
 	}
@@ -98,6 +101,42 @@ func TestLoadConfigParsesRuntimeSettings(t *testing.T) {
 	}
 }
 
+func TestLoadConfigParsesStatusAndAlertPolicies(t *testing.T) {
+	cfg, err := LoadConfig(testLookup(map[string]string{
+		"WORKERFLEET_PROFILE":                        "prod",
+		"WORKERFLEET_STATUS_STALE_AFTER":             "70s",
+		"WORKERFLEET_STATUS_OFFLINE_AFTER":           "140s",
+		"WORKERFLEET_STATUS_STAGE_STUCK_AFTER":       "20m",
+		"WORKERFLEET_STATUS_RESTART_BURST_THRESHOLD": "6",
+		"WORKERFLEET_ALERT_STAGE_STUCK_AFTER":        "25m",
+		"WORKERFLEET_ALERT_RESTART_BURST_THRESHOLD":  "8",
+	}))
+	if err != nil {
+		t.Fatalf("load config: %v", err)
+	}
+	if cfg.Profile != ProfileProduction {
+		t.Fatalf("profile = %q, want %q", cfg.Profile, ProfileProduction)
+	}
+	if cfg.Policy.Status.StaleAfter != 70*time.Second {
+		t.Fatalf("status stale after = %v, want 70s", cfg.Policy.Status.StaleAfter)
+	}
+	if cfg.Policy.Status.OfflineAfter != 140*time.Second {
+		t.Fatalf("status offline after = %v, want 140s", cfg.Policy.Status.OfflineAfter)
+	}
+	if cfg.Policy.Status.StageStuckAfter != 20*time.Minute {
+		t.Fatalf("status stage stuck after = %v, want 20m", cfg.Policy.Status.StageStuckAfter)
+	}
+	if cfg.Policy.Status.RestartBurstThreshold != 6 {
+		t.Fatalf("status restart threshold = %d, want 6", cfg.Policy.Status.RestartBurstThreshold)
+	}
+	if cfg.Policy.Alert.StageStuckAfter != 25*time.Minute {
+		t.Fatalf("alert stage stuck after = %v, want 25m", cfg.Policy.Alert.StageStuckAfter)
+	}
+	if cfg.Policy.Alert.RestartBurstThreshold != 8 {
+		t.Fatalf("alert restart threshold = %d, want 8", cfg.Policy.Alert.RestartBurstThreshold)
+	}
+}
+
 func TestLoadConfigRejectsInvalidRuntimeInterval(t *testing.T) {
 	_, err := LoadConfig(testLookup(map[string]string{
 		"WORKERFLEET_KUBE_SYNC_INTERVAL": "0s",
@@ -147,6 +186,18 @@ func TestLoadConfigRejectsMongoWithoutURI(t *testing.T) {
 		"WORKERFLEET_MONGO_DATABASE": "workerfleet",
 	}))
 	assertConfigErrorMentions(t, err, "WORKERFLEET_MONGO_URI")
+}
+
+func TestValidateConfigRejectsUnsafeThresholds(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Policy.Status.StaleAfter = 4 * time.Second
+	err := ValidateConfig(cfg)
+	assertConfigErrorMentions(t, err, "WORKERFLEET_STATUS_STALE_AFTER")
+
+	cfg = DefaultConfig()
+	cfg.Policy.Alert.StageStuckAfter = 20 * time.Second
+	err = ValidateConfig(cfg)
+	assertConfigErrorMentions(t, err, "WORKERFLEET_ALERT_STAGE_STUCK_AFTER")
 }
 
 func assertConfigErrorMentions(t *testing.T, err error, want string) {

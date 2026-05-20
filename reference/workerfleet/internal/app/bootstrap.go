@@ -14,17 +14,29 @@ func Bootstrap(ctx context.Context, cfg Config) (*Runtime, error) {
 	if cfg.StoreBackend == "" {
 		cfg.StoreBackend = StoreBackendMemory
 	}
+	if cfg.Profile == "" {
+		cfg.Profile = DefaultConfig().Profile
+	}
 	if cfg.Retention <= 0 {
 		cfg.Retention = DefaultConfig().Retention
+	}
+	if cfg.Policy.Status == (domain.StatusPolicy{}) {
+		cfg.Policy.Status = defaultStatusPolicyForProfile(cfg.Profile)
+	}
+	if cfg.Policy.Alert == (domain.AlertPolicy{}) {
+		cfg.Policy.Alert = cfg.Policy.Status.AlertPolicy()
 	}
 	if err := ValidateConfig(cfg); err != nil {
 		return nil, err
 	}
+	statusPolicy, alertPolicy := configuredPolicies(cfg)
+	metrics := workerfleetmetrics.NewCollector()
+	metricsObserver := workerfleetmetrics.NewObserver(metrics)
 
 	switch cfg.StoreBackend {
 	case StoreBackendMemory:
 		store := memory.NewStore()
-		return newRuntime(store, func(context.Context) error { return nil }), nil
+		return buildRuntime(store, func(context.Context) error { return nil }, metrics, metricsObserver, statusPolicy, alertPolicy), nil
 	case StoreBackendMongo:
 		client, err := mongostore.Connect(ctx, mongostore.ClientConfig{
 			URI:              cfg.Mongo.URI,
@@ -38,7 +50,7 @@ func Bootstrap(ctx context.Context, cfg Config) (*Runtime, error) {
 			return nil, fmt.Errorf("bootstrap mongo store: %w", err)
 		}
 		store := client.Store()
-		return newRuntime(store, client.Disconnect), nil
+		return buildRuntime(store, client.Disconnect, metrics, metricsObserver, statusPolicy, alertPolicy), nil
 	default:
 		return nil, fmt.Errorf("unsupported store backend %q", cfg.StoreBackend)
 	}
@@ -48,6 +60,18 @@ func newRuntime(store runtimeStore, close func(context.Context) error) *Runtime 
 	metrics := workerfleetmetrics.NewCollector()
 	metricsObserver := workerfleetmetrics.NewObserver(metrics)
 	policy := domain.DefaultStatusPolicy()
+	alertPolicy := policy.AlertPolicy()
+	return buildRuntime(store, close, metrics, metricsObserver, policy, alertPolicy)
+}
+
+func buildRuntime(
+	store runtimeStore,
+	close func(context.Context) error,
+	metrics *workerfleetmetrics.Collector,
+	metricsObserver *workerfleetmetrics.Observer,
+	policy domain.StatusPolicy,
+	alertPolicy domain.AlertPolicy,
+) *Runtime {
 	ingest := domain.NewIngestService(
 		store,
 		store,
@@ -58,7 +82,7 @@ func newRuntime(store runtimeStore, close func(context.Context) error) *Runtime 
 	)
 	service := NewService(ingest, store)
 	loops := NewLoopRunner(store, policy, metricsObserver, metricsObserver)
-	alerts := NewAlertRunner(store, policy, metricsObserver, metricsObserver)
+	alerts := NewAlertRunner(store, policy, alertPolicy, metricsObserver, metricsObserver)
 	return &Runtime{
 		Service: service,
 		Metrics: metrics,

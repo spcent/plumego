@@ -8,28 +8,41 @@ import (
 	"strings"
 	"time"
 
+	"workerfleet/internal/domain"
 	"workerfleet/internal/platform/store"
 )
 
 const (
 	StoreBackendMemory = "memory"
 	StoreBackendMongo  = "mongo"
+	ProfileDevelopment = "dev"
+	ProfileProduction  = "prod"
 
 	nanosecondsPerRetentionDay = uint64((24 * time.Hour) / time.Nanosecond)
 	maxRetentionDays           = uint64(1<<63-1) / nanosecondsPerRetentionDay
 	defaultLoopTimeout         = 25 * time.Second
 	defaultLoopFailureBackoff  = 5 * time.Second
 	defaultLoopMaxBackoff      = 1 * time.Minute
+	minStatusStaleAfter        = 5 * time.Second
+	minStatusOfflineAfter      = 10 * time.Second
+	minStageStuckAfter         = 30 * time.Second
 )
 
 type Config struct {
 	StoreBackend string
+	Profile      string
+	Policy       PolicyConfig
 	Mongo        MongoConfig
 	Retention    time.Duration
 	Runtime      RuntimeConfig
 	Kube         KubeConfig
 	Notifier     NotifierConfig
 	WorkerAuth   WorkerIngressAuthConfig
+}
+
+type PolicyConfig struct {
+	Status domain.StatusPolicy
+	Alert  domain.AlertPolicy
 }
 
 type MongoConfig struct {
@@ -70,8 +83,19 @@ type WorkerIngressAuthConfig struct {
 }
 
 func DefaultConfig() Config {
+	return DefaultConfigForProfile(ProfileDevelopment)
+}
+
+func DefaultConfigForProfile(profile string) Config {
+	normalized := normalizeProfile(profile)
+	statusPolicy := defaultStatusPolicyForProfile(normalized)
 	return Config{
 		StoreBackend: StoreBackendMemory,
+		Profile:      normalized,
+		Policy: PolicyConfig{
+			Status: statusPolicy,
+			Alert:  statusPolicy.AlertPolicy(),
+		},
 		Mongo: MongoConfig{
 			ConnectTimeout:   10 * time.Second,
 			OperationTimeout: 10 * time.Second,
@@ -99,6 +123,13 @@ func LoadConfig(lookup func(string) (string, bool)) (Config, error) {
 	}
 
 	cfg := DefaultConfig()
+	if value, ok := lookup("WORKERFLEET_PROFILE"); ok {
+		profile, err := parseProfileEnv(value)
+		if err != nil {
+			return Config{}, err
+		}
+		cfg = DefaultConfigForProfile(profile)
+	}
 	if value, ok := lookup("WORKERFLEET_STORE_BACKEND"); ok {
 		cfg.StoreBackend = strings.ToLower(strings.TrimSpace(value))
 	}
@@ -198,6 +229,49 @@ func LoadConfig(lookup func(string) (string, bool)) (Config, error) {
 		}
 		cfg.Runtime.NotifierDeliveryTimeout = timeout
 	}
+	if value, ok := lookup("WORKERFLEET_STATUS_STALE_AFTER"); ok {
+		duration, err := parseDurationEnv("WORKERFLEET_STATUS_STALE_AFTER", value)
+		if err != nil {
+			return Config{}, err
+		}
+		cfg.Policy.Status.StaleAfter = duration
+	}
+	if value, ok := lookup("WORKERFLEET_STATUS_OFFLINE_AFTER"); ok {
+		duration, err := parseDurationEnv("WORKERFLEET_STATUS_OFFLINE_AFTER", value)
+		if err != nil {
+			return Config{}, err
+		}
+		cfg.Policy.Status.OfflineAfter = duration
+	}
+	if value, ok := lookup("WORKERFLEET_STATUS_STAGE_STUCK_AFTER"); ok {
+		duration, err := parseDurationEnv("WORKERFLEET_STATUS_STAGE_STUCK_AFTER", value)
+		if err != nil {
+			return Config{}, err
+		}
+		cfg.Policy.Status.StageStuckAfter = duration
+	}
+	if value, ok := lookup("WORKERFLEET_STATUS_RESTART_BURST_THRESHOLD"); ok {
+		threshold, err := parseInt32Env("WORKERFLEET_STATUS_RESTART_BURST_THRESHOLD", value)
+		if err != nil {
+			return Config{}, err
+		}
+		cfg.Policy.Status.RestartBurstThreshold = threshold
+	}
+	cfg.Policy.Alert = cfg.Policy.Status.AlertPolicy()
+	if value, ok := lookup("WORKERFLEET_ALERT_STAGE_STUCK_AFTER"); ok {
+		duration, err := parseDurationEnv("WORKERFLEET_ALERT_STAGE_STUCK_AFTER", value)
+		if err != nil {
+			return Config{}, err
+		}
+		cfg.Policy.Alert.StageStuckAfter = duration
+	}
+	if value, ok := lookup("WORKERFLEET_ALERT_RESTART_BURST_THRESHOLD"); ok {
+		threshold, err := parseInt32Env("WORKERFLEET_ALERT_RESTART_BURST_THRESHOLD", value)
+		if err != nil {
+			return Config{}, err
+		}
+		cfg.Policy.Alert.RestartBurstThreshold = threshold
+	}
 	if value, ok := lookup("WORKERFLEET_KUBE_API_HOST"); ok {
 		cfg.Kube.APIHost = strings.TrimSpace(value)
 	}
@@ -238,6 +312,9 @@ func LoadConfig(lookup func(string) (string, bool)) (Config, error) {
 }
 
 func ValidateConfig(cfg Config) error {
+	if _, err := validateProfile(cfg.Profile); err != nil {
+		return err
+	}
 	switch cfg.StoreBackend {
 	case "", StoreBackendMemory:
 	case StoreBackendMongo:
@@ -253,7 +330,25 @@ func ValidateConfig(cfg Config) error {
 	if cfg.Runtime.KubeSyncEnabled && strings.TrimSpace(cfg.Kube.WorkerContainer) == "" {
 		return errors.New("WORKERFLEET_KUBE_WORKER_CONTAINER is required when WORKERFLEET_KUBE_SYNC_ENABLED=true")
 	}
+	if err := validateStatusPolicyConfig(cfg.Policy.Status); err != nil {
+		return err
+	}
+	if err := validateAlertPolicyConfig(cfg.Policy.Alert); err != nil {
+		return err
+	}
 	return nil
+}
+
+func configuredPolicies(cfg Config) (domain.StatusPolicy, domain.AlertPolicy) {
+	statusPolicy := cfg.Policy.Status
+	if statusPolicy == (domain.StatusPolicy{}) {
+		statusPolicy = defaultStatusPolicyForProfile(cfg.Profile)
+	}
+	alertPolicy := cfg.Policy.Alert
+	if alertPolicy == (domain.AlertPolicy{}) {
+		alertPolicy = statusPolicy.AlertPolicy()
+	}
+	return statusPolicy, alertPolicy
 }
 
 func (cfg RuntimeConfig) kubeSyncLoopSettings() loopExecutionSettings {
@@ -300,6 +395,14 @@ func parseUintEnv(name string, value string) (uint64, error) {
 	return parsed, nil
 }
 
+func parseInt32Env(name string, value string) (int32, error) {
+	parsed, err := strconv.ParseInt(strings.TrimSpace(value), 10, 32)
+	if err != nil {
+		return 0, fmt.Errorf("parse %s: %w", name, err)
+	}
+	return int32(parsed), nil
+}
+
 func parseBoolEnv(name string, value string) (bool, error) {
 	parsed, err := strconv.ParseBool(strings.TrimSpace(value))
 	if err != nil {
@@ -324,4 +427,67 @@ func parseHeadersEnv(name string, value string) (map[string]string, error) {
 		headers[key] = headerValue
 	}
 	return headers, nil
+}
+
+func parseProfileEnv(value string) (string, error) {
+	return validateProfile(strings.TrimSpace(value))
+}
+
+func validateProfile(profile string) (string, error) {
+	switch strings.ToLower(strings.TrimSpace(profile)) {
+	case "", ProfileDevelopment:
+		return ProfileDevelopment, nil
+	case ProfileProduction, "production":
+		return ProfileProduction, nil
+	default:
+		return "", fmt.Errorf("unsupported WORKERFLEET_PROFILE %q", profile)
+	}
+}
+
+func normalizeProfile(profile string) string {
+	normalized, err := validateProfile(profile)
+	if err != nil {
+		return ProfileDevelopment
+	}
+	return normalized
+}
+
+func defaultStatusPolicyForProfile(profile string) domain.StatusPolicy {
+	switch normalizeProfile(profile) {
+	case ProfileProduction:
+		return domain.StatusPolicy{
+			StaleAfter:            60 * time.Second,
+			OfflineAfter:          2 * time.Minute,
+			StageStuckAfter:       15 * time.Minute,
+			RestartBurstThreshold: 5,
+		}
+	default:
+		return domain.DefaultStatusPolicy()
+	}
+}
+
+func validateStatusPolicyConfig(policy domain.StatusPolicy) error {
+	if err := policy.Validate(); err != nil {
+		return fmt.Errorf("invalid worker status policy: %w", err)
+	}
+	if policy.StaleAfter < minStatusStaleAfter {
+		return fmt.Errorf("WORKERFLEET_STATUS_STALE_AFTER must be at least %s", minStatusStaleAfter)
+	}
+	if policy.OfflineAfter < minStatusOfflineAfter {
+		return fmt.Errorf("WORKERFLEET_STATUS_OFFLINE_AFTER must be at least %s", minStatusOfflineAfter)
+	}
+	if policy.StageStuckAfter < minStageStuckAfter {
+		return fmt.Errorf("WORKERFLEET_STATUS_STAGE_STUCK_AFTER must be at least %s", minStageStuckAfter)
+	}
+	return nil
+}
+
+func validateAlertPolicyConfig(policy domain.AlertPolicy) error {
+	if err := policy.Validate(); err != nil {
+		return fmt.Errorf("invalid alert policy: %w", err)
+	}
+	if policy.StageStuckAfter < minStageStuckAfter {
+		return fmt.Errorf("WORKERFLEET_ALERT_STAGE_STUCK_AFTER must be at least %s", minStageStuckAfter)
+	}
+	return nil
 }

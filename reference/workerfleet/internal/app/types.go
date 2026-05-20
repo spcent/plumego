@@ -55,6 +55,7 @@ type LoopRunner struct {
 type AlertRunner struct {
 	store         runtimeStore
 	policy        domain.StatusPolicy
+	alertPolicy   domain.AlertPolicy
 	metrics       *workerfleetmetrics.Observer
 	errors        RuntimeErrorObserver
 	lease         LoopLeaseCoordinator

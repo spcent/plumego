@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/spcent/plumego/core"
 )
@@ -72,6 +73,34 @@ func TestBootstrapMongoFailsClosedWhenMissingConfig(t *testing.T) {
 	_, err := Bootstrap(context.Background(), Config{StoreBackend: StoreBackendMongo})
 	if err == nil || !strings.Contains(err.Error(), "WORKERFLEET_MONGO_URI") {
 		t.Fatalf("error = %v, want missing mongo uri", err)
+	}
+}
+
+func TestBootstrapUsesConfiguredPolicies(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Policy.Status.StaleAfter = 75 * time.Second
+	cfg.Policy.Status.OfflineAfter = 150 * time.Second
+	cfg.Policy.Status.StageStuckAfter = 12 * time.Minute
+	cfg.Policy.Status.RestartBurstThreshold = 7
+	cfg.Policy.Alert.StageStuckAfter = 20 * time.Minute
+	cfg.Policy.Alert.RestartBurstThreshold = 9
+
+	runtime, err := Bootstrap(context.Background(), cfg)
+	if err != nil {
+		t.Fatalf("bootstrap memory: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = runtime.Close(context.Background())
+	})
+
+	if runtime.shell.loops.policy != cfg.Policy.Status {
+		t.Fatalf("loop status policy = %#v, want %#v", runtime.shell.loops.policy, cfg.Policy.Status)
+	}
+	if runtime.shell.alerts.policy != cfg.Policy.Status {
+		t.Fatalf("alert status policy = %#v, want %#v", runtime.shell.alerts.policy, cfg.Policy.Status)
+	}
+	if runtime.shell.alerts.alertPolicy != cfg.Policy.Alert {
+		t.Fatalf("alert policy = %#v, want %#v", runtime.shell.alerts.alertPolicy, cfg.Policy.Alert)
 	}
 }
 
