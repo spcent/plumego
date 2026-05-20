@@ -78,11 +78,13 @@ const fitProfiles = [
   {
     kicker: 'best fit',
     title: '人类工程师与 AI 代码 Agent 共同维护的仓库',
-    body: 'Plumego 专为 AI Agent 参与执行和评审的代码库设计。机器可读规范、每模块 manifest、标准化检查命令和显式任务卡，让 Agent 有清晰的操作模型——让人类评审更容易的结构，同样让 Agent 的贡献可被验证。',
+    body: 'Plumego 专为 AI Agent 参与执行和评审的代码库设计。四个机器可读控制面——<code>docs/</code>、<code>specs/</code>、<code>tasks/</code> 和 <code>reference/</code>——给 Agent 提供确定性操作模型：任务如何分类、先读哪些文件、正确改动应该是什么样子、贡献落地前哪些检查必须通过。让人类评审更容易的结构，同样让 Agent 的贡献可被验证。',
     points: [
-      'specs/ 以 YAML 提供任务路由、依赖规则和改动作用域',
-      'module.yaml 在编辑开始前将改动和检查限定到所属模块',
-      'make gates 提供可重复、Agent 可执行的验证循环',
+      'specs/task-routing.yaml 在打开任何代码文件之前先将任务意图映射到归属模块',
+      'specs/change-recipes/ 为 15 种常见修改类型定义了有序步骤和止步条件',
+      '每个 module/module.yaml 声明该包的改动范围、风险等级、测试命令和评审清单',
+      'internal/checks/ 以程序化方式执行边界规则——本地运行与 CI 运行的检查完全相同',
+      'make gates 在每次推送前提供 Agent 可执行的、等同于 CI 的验证循环',
     ],
   },
 ] as const;
