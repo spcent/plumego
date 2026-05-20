@@ -454,11 +454,61 @@ func TestCanonicalTemplate_FileSetMatchesReferenceContract(t *testing.T) {
 		"env.example",
 		".gitignore",
 		"README.md",
+		"Makefile",
+		".github/workflows/ci.yml",
+		"AGENTS.md",
+		"CLAUDE.md",
 	}
 
 	if !slices.Equal(files, want) {
 		t.Fatalf("canonical file set drifted from reference contract:\n got: %#v\nwant: %#v", files, want)
 	}
+}
+
+func TestTemplatesEmitProjectControlPlaneFiles(t *testing.T) {
+	for _, tmpl := range allTemplates {
+		t.Run(tmpl, func(t *testing.T) {
+			files := GetTemplateFiles(tmpl)
+			assertContainsAll(t, strings.Join(files, "\n"), []string{
+				"Makefile",
+				".github/workflows/ci.yml",
+				"AGENTS.md",
+				"CLAUDE.md",
+			})
+		})
+	}
+}
+
+func TestProjectControlPlaneContent(t *testing.T) {
+	makefile := getTemplateContent("Makefile", "myapp", "example.com/myapp", "canonical")
+	assertContainsAll(t, makefile, []string{
+		"gates: fmt-check vet test build",
+		"go test -timeout 20s ./...",
+		"go vet ./...",
+		"go build -o bin/app ./cmd/app",
+	})
+
+	workflow := getTemplateContent(".github/workflows/ci.yml", "myapp", "example.com/myapp", "canonical")
+	assertContainsAll(t, workflow, []string{
+		"name: ci",
+		"go-version-file: go.mod",
+		"run: make gates",
+	})
+
+	agents := getTemplateContent("AGENTS.md", "myapp", "example.com/myapp", "canonical")
+	assertContainsAll(t, agents, []string{
+		"# AGENTS.md - myapp",
+		"contract.WriteResponse",
+		"contract.WriteError",
+		"make gates",
+	})
+
+	claude := getTemplateContent("CLAUDE.md", "myapp", "example.com/myapp", "canonical")
+	assertContainsAll(t, claude, []string{
+		"# CLAUDE.md - myapp",
+		"AGENTS.md",
+		"make gates",
+	})
 }
 
 func TestStableTemplatesUseCanonicalFileSet(t *testing.T) {
