@@ -166,7 +166,7 @@ func (r *Router) attachRouteContextAndServe(w http.ResponseWriter, req *http.Req
 		return
 	}
 
-	rs := contract.RouteStatePool.Get().(*contract.RouteState)
+	rs := contract.BorrowRouteState()
 	rs.SetPattern(result.RoutePattern)
 	rs.SetName(result.RouteName)
 	for i, k := range result.ParamKeys {
@@ -179,8 +179,7 @@ func (r *Router) attachRouteContextAndServe(w http.ResponseWriter, req *http.Req
 	ctx := contract.WithRouteState(req.Context(), rs)
 	result.Handler.ServeHTTP(w, req.WithContext(ctx))
 
-	rs.Reset()
-	contract.RouteStatePool.Put(rs)
+	contract.ReturnRouteState(rs)
 }
 
 func (r *Router) allowedMethods(path string) []string {

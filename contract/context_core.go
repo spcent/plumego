@@ -51,10 +51,24 @@ func (rs *RouteState) AddParam(key, val string) {
 // Reset zeros the RouteState so it can be returned to a sync.Pool.
 func (rs *RouteState) Reset() { *rs = RouteState{} }
 
-// RouteStatePool is a package-level pool for RouteState objects. The router
-// package uses this to avoid per-request allocations.
-var RouteStatePool = sync.Pool{
+// routeStatePool is an unexported pool for RouteState objects used by the router
+// to avoid per-request heap allocations. Callers outside this package use the
+// BorrowRouteState and ReturnRouteState accessor functions.
+var routeStatePool = sync.Pool{
 	New: func() any { return new(RouteState) },
+}
+
+// BorrowRouteState retrieves a zeroed RouteState from the pool.
+// The caller must call ReturnRouteState when the RouteState is no longer needed.
+func BorrowRouteState() *RouteState {
+	return routeStatePool.Get().(*RouteState)
+}
+
+// ReturnRouteState resets rs and returns it to the pool.
+// The caller must not retain any reference to rs after this call.
+func ReturnRouteState(rs *RouteState) {
+	rs.Reset()
+	routeStatePool.Put(rs)
 }
 
 // Context keys are unexported zero-value structs to avoid collisions with other
