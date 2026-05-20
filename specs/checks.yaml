@@ -11,6 +11,7 @@ repo:
   control_plane_files:
     - specs/repo.yaml
     - specs/task-routing.yaml
+    - docs/AGENT_CONTEXT_BUDGET.md
     - specs/extension-taxonomy.yaml
     - specs/package-hotspots.yaml
     - specs/dependency-rules.yaml

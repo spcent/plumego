@@ -16,7 +16,8 @@ Use this file for hard rules and validation order. Read only the control-plane
 files needed for the task:
 
 - Workflow: `docs/CODEX_WORKFLOW.md`, `docs/AGENT_CODE_QUALITY_RULES.md`,
-  `specs/agent-quality-rules.yaml`, and `specs/change-recipes/`
+  `docs/AGENT_CONTEXT_BUDGET.md`, `specs/agent-quality-rules.yaml`, and
+  `specs/change-recipes/`
 - Style: `docs/CANONICAL_STYLE_GUIDE.md`
 - Architecture: `docs/agent-first.md`,
   `docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md`,
@@ -30,6 +31,12 @@ files needed for the task:
   `specs/stop-condition-handlers.yaml`, and `specs/request-flows.yaml`
 - Local scope: target `<module>/module.yaml`
 - Canonical app wiring: `reference/standard-service`
+
+Default to the smallest safe context package. Read `AGENTS.md`, select the
+matching `specs/task-routing.yaml` entry, then load only that entry's
+`start_with` files and the target `<module>/module.yaml` when module behavior
+changes. Use the full control plane only for architecture, boundary, release, or
+workflow-rule changes.
 
 When guidance conflicts, follow this order:
 
@@ -60,6 +67,20 @@ When guidance conflicts, follow this order:
   caller. Do not leave dead wrappers behind.
 - Keep one canonical success-response path and one canonical error-construction
   path per layer.
+
+## 2.1 Context Budget
+
+- Use `docs/AGENT_CONTEXT_BUDGET.md` for context package selection, task-card
+  limits, output compression, and resume discipline.
+- Prefer the matching `specs/task-routing.yaml` `start_with` list over the full
+  control-plane read order.
+- Stop reading when ownership, boundaries, touched files, and validation are
+  clear.
+- Split broad work before implementation when it spans more than one primary
+  module, more than five files, more than three validation commands, or unclear
+  API/dependency/security impact.
+- Summarize validation with command, status, key failure, and next step instead
+  of pasting full logs.
 
 ## 3. Where To Work
 
@@ -166,6 +187,7 @@ Before editing, complete the following preflight checklist (full rules in
 `docs/AGENT_CODE_QUALITY_RULES.md`):
 
 ```text
+Context package:
 Owning module:
 Target module.yaml read:
 In-scope paths:
@@ -265,6 +287,7 @@ semantics, lifecycle behavior, or boundaries change. Common sync targets:
 - `README.md`
 - `README_CN.md`
 - `AGENTS.md`
+- `docs/AGENT_CONTEXT_BUDGET.md`
 - `env.example`
 
 Also update module primers under `docs/modules/`, `docs/EXTENSION_MATURITY.md`,

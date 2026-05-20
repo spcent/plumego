@@ -72,12 +72,14 @@ capability family is added.
 Read:
 
 1. `AGENTS.md`
-2. `docs/CODEX_WORKFLOW.md`
-3. `docs/CANONICAL_STYLE_GUIDE.md`
-4. `docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md`
-5. `specs/repo.yaml`
-6. `specs/dependency-rules.yaml`
-7. the target module's `module.yaml`
+2. `docs/AGENT_CONTEXT_BUDGET.md`
+3. `docs/CODEX_WORKFLOW.md`
+4. `docs/CANONICAL_STYLE_GUIDE.md`
+5. `docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md`
+6. `specs/task-routing.yaml`
+7. `specs/repo.yaml`
+8. `specs/dependency-rules.yaml`
+9. the target module's `module.yaml`
 
 Done when a developer or agent can answer:
 

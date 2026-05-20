@@ -54,6 +54,7 @@ Recommended execution metadata:
 
 - Milestone
 - Recipe
+- Context Package
 - Primary Module
 - Owned Files
 - Depends On
@@ -72,8 +73,9 @@ Optional operational fields when useful:
 
 - prefer one primary module
 - choose one matching `specs/change-recipes/*.yaml` recipe when possible
-- keep the file set small
-- keep validation short and relevant
+- keep the file set to five files or fewer
+- keep validation to three commands or fewer
+- record the smallest matching context package from `docs/AGENT_CONTEXT_BUDGET.md`
 - avoid mixing unrelated runtime, docs, and architecture changes in one card
 - keep the live queue short enough that the next card is obvious
 - archive completed cards promptly so `active/` remains a working queue rather than a history dump
@@ -93,11 +95,11 @@ Optional operational fields when useful:
 
 When a task card applies, read it after:
 
-1. `docs/CODEX_WORKFLOW.md`
-2. `docs/CANONICAL_STYLE_GUIDE.md`
-3. `docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md`
-4. `specs/repo.yaml`
-5. `specs/task-routing.yaml`
+1. `AGENTS.md`
+2. the matching `specs/task-routing.yaml` entry
+3. the active card itself
+4. the card's `Recipe:` file, if present
+5. the target module manifest, when module behavior changes
 
 Then use the card to drive the concrete change sequence.
 

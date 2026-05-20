@@ -238,16 +238,17 @@ the corresponding docs or the checks will fail at CI time.
 ## Agent Standard Workflow
 
 ```
-1. Identify task type → read specs/task-routing.yaml
-2. Identify owning module → read <module>/module.yaml
-3. Check zone → safe / restricted / frozen
-4. Read change recipe → specs/change-recipes/<type>.yaml
-5. Run preflight checklist from AGENTS.md §5
-6. Make minimal change within scope
-7. Run module test_commands from module.yaml
-8. Run boundary checks
-9. If cross-module or release-relevant: run make gates
-10. Update docs if behavior, API, config, security, lifecycle, or boundary changed
+1. Identify task type → read the matching specs/task-routing.yaml entry
+2. Select context package → docs/AGENT_CONTEXT_BUDGET.md if unclear
+3. Identify owning module → read <module>/module.yaml
+4. Check zone → safe / restricted / frozen
+5. Read change recipe → specs/change-recipes/<type>.yaml
+6. Run preflight checklist from AGENTS.md §5
+7. Make minimal change within scope
+8. Run module test_commands from module.yaml
+9. Run boundary checks selected by the gate profile
+10. If cross-module or release-relevant: run make gates
+11. Update docs if behavior, API, config, security, lifecycle, or boundary changed
 11. Verify against Done Definition in task card
 ```
 

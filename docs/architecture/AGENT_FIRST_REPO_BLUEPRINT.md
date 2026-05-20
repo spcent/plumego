@@ -68,12 +68,13 @@ This split is intentional and should remain stable:
 Agents should treat the repository control plane as a layered contract:
 
 1. `AGENTS.md`: operating rules, task contracts, validation order, milestone protocol
-2. `docs/CODEX_WORKFLOW.md`: repeatable prompting and execution patterns
-3. `docs/CANONICAL_STYLE_GUIDE.md`: canonical implementation path and code shape
-4. `docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md`: repository shape and ownership model
-5. `specs/*.yaml`: machine-readable routing, dependency, taxonomy, and manifest rules
-6. `<module>/module.yaml`: module-local responsibilities, review checklist, and validation commands
-7. `reference/standard-service`: canonical application wiring
+2. `docs/AGENT_CONTEXT_BUDGET.md`: token-bounded context packages and task-card limits
+3. `docs/CODEX_WORKFLOW.md`: repeatable prompting and execution patterns
+4. `docs/CANONICAL_STYLE_GUIDE.md`: canonical implementation path and code shape
+5. `docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md`: repository shape and ownership model
+6. `specs/*.yaml`: machine-readable routing, dependency, taxonomy, and manifest rules
+7. `<module>/module.yaml`: module-local responsibilities, review checklist, and validation commands
+8. `reference/standard-service`: canonical application wiring
 
 The intent is not just documentation. Each layer should make it harder for an
 agent to guess incorrectly about module ownership, allowed imports, or the
@@ -81,19 +82,13 @@ canonical way to implement a change.
 
 ## Canonical Implementation Path
 
-Agents should treat these as the default read and write path:
+Agents should treat these as the default bounded read and write path:
 
 1. `AGENTS.md`
-2. `docs/CODEX_WORKFLOW.md`
-3. `docs/CANONICAL_STYLE_GUIDE.md`
-4. `docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md`
-5. `specs/repo.yaml`
-6. `specs/task-routing.yaml`
-7. `specs/extension-taxonomy.yaml`
-8. `specs/package-hotspots.yaml`
-9. `specs/dependency-rules.yaml`
-10. `<module>/module.yaml`
-11. `reference/standard-service`
+2. matching `specs/task-routing.yaml` entry
+3. selected entry's `start_with` files
+4. `<module>/module.yaml` before editing module behavior
+5. targeted style, architecture, or reference docs only when preflight requires them
 
 Rules:
 
@@ -162,15 +157,15 @@ Avoid growing broad buckets such as:
 ## Canonical Read Path
 
 1. `AGENTS.md`
-2. `docs/CODEX_WORKFLOW.md`
-3. `docs/CANONICAL_STYLE_GUIDE.md`
-4. `specs/repo.yaml`
-5. `specs/task-routing.yaml`
-6. `specs/extension-taxonomy.yaml`
-7. `specs/package-hotspots.yaml`
-8. `specs/dependency-rules.yaml`
-9. `<module>/module.yaml`
-10. module code
+2. matching `specs/task-routing.yaml` entry
+3. selected entry's `start_with` files
+4. `<module>/module.yaml` before editing module behavior
+5. module code and focused tests
+
+Use `docs/AGENT_CONTEXT_BUDGET.md` when context package selection, task-card
+limits, validation output compression, or resume discipline is unclear. Use the
+full architecture/spec read set only for control-plane, boundary, or release
+work.
 
 ## Machine-Readable Agent Workflow
 
@@ -180,7 +175,7 @@ guessing.
 
 Required metadata lives under `specs/`:
 
-- `specs/task-routing.yaml`: task-to-entrypoint map and disallowed first reads
+- `specs/task-routing.yaml`: task-to-entrypoint map, context package, and disallowed first reads
 - `specs/extension-taxonomy.yaml`: canonical extension families and subordinate roots
 - `specs/package-hotspots.yaml`: ambiguity hotspot packages and first-read paths
 - `specs/change-recipes/*.yaml`: standard task recipes for common change shapes
@@ -216,7 +211,7 @@ without inferring from package names alone.
 The default agent loop is:
 
 1. classify the owning layer and module
-2. read the control plane in canonical order
+2. select the smallest matching context package from `docs/AGENT_CONTEXT_BUDGET.md`
 3. declare intended scope and touched files
 4. implement the smallest coherent change
 5. run module validation first, then boundary and repo checks
