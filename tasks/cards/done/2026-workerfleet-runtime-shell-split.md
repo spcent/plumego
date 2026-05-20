@@ -76,6 +76,6 @@ Split the current workerfleet `Runtime` into a lifecycle shell plus explicit ing
 
 Validation Run:
 
-- `cd reference/workerfleet && env GOCACHE=/Users/bingrong.yan/projects/go/plumego/.tmp-gocache go test ./internal/app/...`
-- `cd reference/workerfleet && env GOCACHE=/Users/bingrong.yan/projects/go/plumego/.tmp-gocache go vet ./internal/app/...`
-- `cd reference/workerfleet && env GOCACHE=/Users/bingrong.yan/projects/go/plumego/.tmp-gocache go test ./...`
+- `cd reference/workerfleet && env GOCACHE=.tmp-gocache go test ./internal/app/...`
+- `cd reference/workerfleet && env GOCACHE=.tmp-gocache go vet ./internal/app/...`
+- `cd reference/workerfleet && env GOCACHE=.tmp-gocache go test ./...`

@@ -78,6 +78,6 @@ Add loop-level timeout, non-reentry, and retry-backoff guardrails so kube sync, 
 
 Validation Run:
 
-- `cd reference/workerfleet && env GOCACHE=/Users/bingrong.yan/projects/go/plumego/.tmp-gocache go test ./internal/app/...`
-- `cd reference/workerfleet && env GOCACHE=/Users/bingrong.yan/projects/go/plumego/.tmp-gocache go test ./...`
+- `cd reference/workerfleet && env GOCACHE=.tmp-gocache go test ./internal/app/...`
+- `cd reference/workerfleet && env GOCACHE=.tmp-gocache go test ./...`
 - `gofmt -l reference/workerfleet/internal/app`

@@ -76,6 +76,6 @@ Turn worker status and alert thresholds into explicit domain policy objects inst
 
 Validation Run:
 
-- `cd reference/workerfleet && env GOCACHE=/Users/bingrong.yan/projects/go/plumego/.tmp-gocache go test ./internal/domain/...`
-- `cd reference/workerfleet && env GOCACHE=/Users/bingrong.yan/projects/go/plumego/.tmp-gocache go vet ./internal/domain/...`
+- `cd reference/workerfleet && env GOCACHE=.tmp-gocache go test ./internal/domain/...`
+- `cd reference/workerfleet && env GOCACHE=.tmp-gocache go vet ./internal/domain/...`
 - `gofmt -l reference/workerfleet/internal/domain`

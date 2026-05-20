@@ -28,7 +28,7 @@ Run locally:
 - `cd reference/workerfleet && go run .`
 - `cd reference/workerfleet && go build .`
 - `cd reference/workerfleet && WORKERFLEET_HTTP_ADDR=:9090 go run .`
-- the shared repository [env.example](/Users/bingrong.yan/projects/go/plumego/env.example) now includes the current workerfleet env surface for local bootstrapping
+- the shared repository [env.example](env.example) now includes the current workerfleet env surface for local bootstrapping
 
 HTTP entrypoint configuration:
 

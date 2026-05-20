@@ -76,6 +76,6 @@ Move workerfleet counters and histograms toward explicit domain-event instrument
 
 Validation Run:
 
-- `cd reference/workerfleet && env GOCACHE=/Users/bingrong.yan/projects/go/plumego/.tmp-gocache go test ./internal/platform/metrics/...`
-- `cd reference/workerfleet && env GOCACHE=/Users/bingrong.yan/projects/go/plumego/.tmp-gocache go test ./internal/domain/...`
+- `cd reference/workerfleet && env GOCACHE=.tmp-gocache go test ./internal/platform/metrics/...`
+- `cd reference/workerfleet && env GOCACHE=.tmp-gocache go test ./internal/domain/...`
 - `gofmt -l reference/workerfleet/internal/platform/metrics reference/workerfleet/internal/domain`

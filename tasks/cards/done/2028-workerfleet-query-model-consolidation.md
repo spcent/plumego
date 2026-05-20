@@ -75,6 +75,6 @@ Define one stable read-model surface for worker detail, task detail, case timeli
 
 Validation Run:
 
-- `cd reference/workerfleet && env GOCACHE=/Users/bingrong.yan/projects/go/plumego/.tmp-gocache go test ./internal/handler/...`
-- `cd reference/workerfleet && env GOCACHE=/Users/bingrong.yan/projects/go/plumego/.tmp-gocache go test ./internal/app/...`
-- `cd reference/workerfleet && env GOCACHE=/Users/bingrong.yan/projects/go/plumego/.tmp-gocache go test ./...`
+- `cd reference/workerfleet && env GOCACHE=.tmp-gocache go test ./internal/handler/...`
+- `cd reference/workerfleet && env GOCACHE=.tmp-gocache go test ./internal/app/...`
+- `cd reference/workerfleet && env GOCACHE=
