@@ -168,7 +168,7 @@ func (l *jsonLogger) buildEntry(level Level, msg string, fields Fields) map[stri
 	l.mu.Unlock()
 
 	combined := mergeFields(baseFields, fields)
-	entry := make(map[string]any, len(combined)+4)
+	entry := make(map[string]any, safeMapCapacity(len(combined), 4))
 	for k, v := range combined {
 		entry[k] = normalizeJSONFieldValue(v)
 	}

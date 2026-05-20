@@ -1,5 +1,53 @@
 package log
 
+import "math/bits"
+
+const maxMapCapacity = int(^uint(0) >> 1)
+
+func safeMapCapacity(lengths ...int) int {
+	total := 0
+	for _, length := range lengths {
+		next, ok := addMapCapacity(total, length)
+		if !ok {
+			return 0
+		}
+		total = next
+	}
+	return total
+}
+
+func addMapCapacity(base, extra int) (int, bool) {
+	if base < 0 || extra < 0 {
+		return 0, false
+	}
+	sum, carry := bits.Add(uint(base), uint(extra), 0)
+	if carry != 0 || sum > uint(maxMapCapacity) {
+		return 0, false
+	}
+	return int(sum), true
+}
+
+func fieldSetCapacity(fieldSets []Fields) int {
+	total := 0
+	for _, fields := range fieldSets {
+		next, ok := addMapCapacity(total, len(fields))
+		if !ok {
+			return 0
+		}
+		total = next
+	}
+	return total
+}
+
+func fieldSetsEmpty(fieldSets []Fields) bool {
+	for _, fields := range fieldSets {
+		if len(fields) > 0 {
+			return false
+		}
+	}
+	return true
+}
+
 // cloneFields returns a shallow copy of fields.
 func cloneFields(fields Fields) Fields {
 	if len(fields) == 0 {
@@ -18,12 +66,7 @@ func mergeFields(base, override Fields) Fields {
 		return Fields{}
 	}
 
-	const maxInt = int(^uint(0) >> 1)
-	merged := make(Fields)
-	if len(base) <= maxInt-len(override) {
-		merged = make(Fields, len(base)+len(override))
-	}
-
+	merged := make(Fields, safeMapCapacity(len(base), len(override)))
 	for k, v := range base {
 		merged[k] = v
 	}
@@ -35,24 +78,12 @@ func mergeFields(base, override Fields) Fields {
 
 // mergeFieldSets returns a merged copy where later field sets take precedence.
 func mergeFieldSets(fieldSets ...Fields) Fields {
-	total := 0
-	overflowed := false
-	const maxInt = int(^uint(0) >> 1)
-	for _, fields := range fieldSets {
-		if total > maxInt-len(fields) {
-			overflowed = true
-			break
-		}
-		total += len(fields)
-	}
-	if total == 0 {
+	capacity := fieldSetCapacity(fieldSets)
+	if capacity == 0 && fieldSetsEmpty(fieldSets) {
 		return Fields{}
 	}
 
-	merged := make(Fields)
-	if !overflowed {
-		merged = make(Fields, total)
-	}
+	merged := make(Fields, capacity)
 	for _, fields := range fieldSets {
 		for k, v := range fields {
 			merged[k] = v

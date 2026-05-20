@@ -2,6 +2,7 @@ package testlog
 
 import (
 	"context"
+	"math/bits"
 	"os"
 	"strings"
 	"sync"
@@ -10,6 +11,8 @@ import (
 	"github.com/spcent/plumego/contract"
 	plog "github.com/spcent/plumego/log"
 )
+
+const maxMapCapacity = int(^uint(0) >> 1)
 
 const (
 	DEBUG   = plog.DEBUG
@@ -192,11 +195,34 @@ func firstFields(extra []Fields) Fields {
 	return nil
 }
 
+func safeMapCapacity(lengths ...int) int {
+	total := 0
+	for _, length := range lengths {
+		next, ok := addMapCapacity(total, length)
+		if !ok {
+			return 0
+		}
+		total = next
+	}
+	return total
+}
+
+func addMapCapacity(base, extra int) (int, bool) {
+	if base < 0 || extra < 0 {
+		return 0, false
+	}
+	sum, carry := bits.Add(uint(base), uint(extra), 0)
+	if carry != 0 || sum > uint(maxMapCapacity) {
+		return 0, false
+	}
+	return int(sum), true
+}
+
 func mergeFields(base, extra Fields) Fields {
 	if len(base) == 0 && len(extra) == 0 {
 		return Fields{}
 	}
-	merged := make(Fields, len(base)+len(extra))
+	merged := make(Fields, safeMapCapacity(len(base), len(extra)))
 	for key, value := range base {
 		merged[key] = value
 	}

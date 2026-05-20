@@ -88,3 +88,60 @@ func TestLoggerFatalHook(t *testing.T) {
 		t.Fatal("HasEntry(FATAL, boom) = false, want true")
 	}
 }
+
+func TestSafeMapCapacity(t *testing.T) {
+	tests := []struct {
+		name    string
+		lengths []int
+		want    int
+	}{
+		{
+			name:    "sums lengths",
+			lengths: []int{2, 3},
+			want:    5,
+		},
+		{
+			name:    "rejects negative length",
+			lengths: []int{1, -1},
+			want:    0,
+		},
+		{
+			name:    "falls back on overflow",
+			lengths: []int{maxMapCapacity, 1},
+			want:    0,
+		},
+		{
+			name:    "allows max capacity",
+			lengths: []int{maxMapCapacity - 1, 1},
+			want:    maxMapCapacity,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := safeMapCapacity(tt.lengths...); got != tt.want {
+				t.Fatalf("safeMapCapacity(%v) = %d, want %d", tt.lengths, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestMergeFieldsKeepsExtraPrecedence(t *testing.T) {
+	got := mergeFields(Fields{
+		"base":     "yes",
+		"override": "base",
+	}, Fields{
+		"extra":    "yes",
+		"override": "extra",
+	})
+
+	for key, want := range (Fields{
+		"base":     "yes",
+		"extra":    "yes",
+		"override": "extra",
+	}) {
+		if got[key] != want {
+			t.Fatalf("mergeFields()[%s] = %v, want %v in %#v", key, got[key], want, got)
+		}
+	}
+}
