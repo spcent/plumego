@@ -58,17 +58,24 @@ const t = copy[locale];
     app := core.<span class="hc-fn">New</span>(core.<span class="hc-fn">DefaultConfig</span>(),
         core.AppDependencies&#123;Logger: plog.<span class="hc-fn">NewLogger</span>()&#125;)
 
-    _ = app.<span class="hc-fn">Get</span>(<span class="hc-str">"/ping"</span>, http.<span class="hc-fn">HandlerFunc</span>(
+    <span class="hc-kw">if</span> err := app.<span class="hc-fn">Get</span>(<span class="hc-str">"/ping"</span>, http.<span class="hc-fn">HandlerFunc</span>(
         <span class="hc-kw">func</span>(w http.ResponseWriter, r *http.Request) &#123;
-            _ = contract.<span class="hc-fn">WriteResponse</span>(w, r,
+            <span class="hc-kw">if</span> err := contract.<span class="hc-fn">WriteResponse</span>(w, r,
                 http.StatusOK,
-                map[string]string&#123;<span class="hc-str">"status"</span>: <span class="hc-str">"ok"</span>&#125;, <span class="hc-kw">nil</span>)
-        &#125;))
+                map[string]string&#123;<span class="hc-str">"status"</span>: <span class="hc-str">"ok"</span>&#125;, <span class="hc-kw">nil</span>); err != <span class="hc-kw">nil</span> &#123;
+                log.<span class="hc-fn">Printf</span>(<span class="hc-str">"write: %v"</span>, err)
+            &#125;
+        &#125;)); err != <span class="hc-kw">nil</span> &#123;
+        log.<span class="hc-fn">Fatal</span>(err)
+    &#125;
 
     <span class="hc-kw">if</span> err := app.<span class="hc-fn">Prepare</span>(); err != <span class="hc-kw">nil</span> &#123;
         log.<span class="hc-fn">Fatal</span>(err)
     &#125;
-    srv, _ := app.<span class="hc-fn">Server</span>()
+    srv, err := app.<span class="hc-fn">Server</span>()
+    <span class="hc-kw">if</span> err != <span class="hc-kw">nil</span> &#123;
+        log.<span class="hc-fn">Fatal</span>(err)
+    &#125;
     log.<span class="hc-fn">Println</span>(<span class="hc-str">"listening on :8080"</span>)
     srv.<span class="hc-fn">ListenAndServe</span>()
 &#125;</code></pre>

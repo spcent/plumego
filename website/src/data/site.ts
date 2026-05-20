@@ -13,24 +13,24 @@ export const SITE = {
 
 export const SITE_COPY: Record<Locale, { footerTagline: string }> = {
   en: {
-    footerTagline: 'stdlib-only Go HTTP toolkit — explicit by design, agent-ready by structure.',
+    footerTagline: 'stdlib-only Go HTTP toolkit — explicit by design, machine-readable specs by structure.',
   },
   zh: {
-    footerTagline: 'stdlib only 的 Go HTTP 工具包——显式设计，结构化 Agent 就绪。',
+    footerTagline: 'stdlib only 的 Go HTTP 工具包——显式设计，机器可读规范内置于结构。',
   },
 };
 
 export const NAV_LINKS: Record<Locale, Array<{ label: string; href: string }>> = {
   en: [
-    { label: 'Docs', href: '/docs' },
     { label: 'Why Plumego', href: '/why-plumego' },
+    { label: 'Docs', href: '/docs' },
     { label: 'Examples', href: '/examples' },
     { label: 'Architecture', href: '/architecture' },
     { label: 'Releases', href: '/releases' },
   ],
   zh: [
-    { label: '文档', href: '/zh/docs' },
     { label: '为什么选择', href: '/zh/why-plumego' },
+    { label: '文档', href: '/zh/docs' },
     { label: '示例', href: '/zh/examples' },
     { label: '架构', href: '/zh/architecture' },
     { label: '发布', href: '/zh/releases' },
@@ -116,10 +116,10 @@ export const FOOTER_GROUPS: Record<Locale, Array<{ title: string; links: Array<{
 
 export const HOME_COPY = {
   en: {
-    eyebrow: 'stdlib-only · explicit routing · agent-ready · v1.0.0',
+    eyebrow: 'stdlib-only · explicit routing · machine-readable specs · v1.0.0',
     headline: 'Explicit Go HTTP. Built for humans and agents.',
     summary:
-      'Explicit routing that survives code review. Machine-readable specs and per-module manifests give AI coding agents a clear operating model. Zero external dependencies. 9 stable modules with the v1 stable-root compatibility promise.',
+      'Explicit routing that survives code review. Machine-readable route specs and per-module manifests let AI coding agents and human reviewers share the same code model — no LLM integration needed. Zero external dependencies. 9 stable modules with the v1 stable-root compatibility promise.',
     primaryCta: { label: 'Get Started', href: '/docs/getting-started' },
     secondaryCta: { label: 'See the difference', href: '#contrast' },
     scenarioCards: [
@@ -165,7 +165,7 @@ api.Get("/data", tenant.Guard(data.List))
     ],
     stabilityBandTitle: 'Know exactly what you can rely on.',
     stabilityBandItems: [
-      { label: '9 stable modules', detail: 'v1 compatibility promise', status: 'stable', href: '/stability' },
+      { label: '9 stable modules', detail: 'core · router · contract · middleware · security · store · health · log · metrics', status: 'stable', href: '/stability' },
       { label: '4 beta extensions', detail: 'API frozen between refs', status: 'beta', href: '/stability' },
       { label: '16 experimental', detail: 'Evaluate before adopting', status: 'experimental', href: '/stability' },
     ],
@@ -226,10 +226,10 @@ api.Get("/data", tenant.Guard(data.List))
     contrastAfterLabel: 'plumego: one file, one contract',
   },
   zh: {
-    eyebrow: 'stdlib only · 显式路由 · agent-ready · v1.0.0',
+    eyebrow: 'stdlib only · 显式路由 · 机器可读规范 · v1.0.0',
     headline: '显式 Go HTTP。为人类和 Agent 而生。',
     summary:
-      '在代码评审中清晰可见的显式路由。机器可读的规范与模块清单，让 AI 编程代理精准定位变更边界。零外部依赖。9 个稳定模块承载 v1 稳定根兼容性承诺。',
+      '在代码评审中清晰可见的显式路由。机器可读的路由规范与模块清单，让 AI 编程代理和人工评审者共享同一份代码模型——无需 LLM 集成。零外部依赖。9 个稳定模块承载 v1 稳定根兼容性承诺。',
     primaryCta: { label: '开始使用', href: '/zh/docs/getting-started' },
     secondaryCta: { label: '看看有什么不同', href: '#contrast' },
     scenarioCards: [
@@ -275,7 +275,7 @@ api.Get("/data", tenant.Guard(data.List))
     ],
     stabilityBandTitle: '清楚知道哪些可以依赖。',
     stabilityBandItems: [
-      { label: '9 个稳定模块', detail: 'v1 兼容性承诺', status: 'stable', href: '/zh/stability' },
+      { label: '9 个稳定模块', detail: 'core · router · contract · middleware · security · store · health · log · metrics', status: 'stable', href: '/zh/stability' },
       { label: '4 个 beta 扩展', detail: 'ref 间 API 冻结', status: 'beta', href: '/zh/stability' },
       { label: '16 个实验性', detail: '采用前请先评估', status: 'experimental', href: '/zh/stability' },
     ],
