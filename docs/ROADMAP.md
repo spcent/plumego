@@ -168,12 +168,11 @@ Next work:
 
 ## Phase 13: Docs and Onboarding Sync
 
-Status: in progress
+Status: substantially complete (2026-05-20)
 
-Current state:
+Work completed:
 
 - the repository now has four distinct control surfaces: `docs/`, `specs/`, `tasks/`, and `reference/`
-- onboarding docs must stay aligned with the current `Makefile`, manifests, and reference app
 - `README.md` and `README_CN.md` are structurally aligned
 - `docs/getting-started.md` matches the actual API surface
 - `env.example` now includes `AUTH_TOKEN` (used by `x/observability/ops` but previously missing)
@@ -181,8 +180,13 @@ Current state:
 - user-facing scenario entrypoint maps now identify the first reads for REST API,
   multi-tenant API, edge gateway, realtime, AI, and observability work without
   treating `x/*` packages as application bootstrap paths
+- `docs/AGENT_FIRST.md` added as external-facing agent-first design overview
+- `docs/README.md` updated to distinguish `agent-first.md` (internal operating reference)
+  from `AGENT_FIRST.md` (external design overview)
+- website module primers added for `x/rpc`, `x/openapi`, and `x/validate`
+- `x/tenant` and `x/frontend` stability labels corrected to Beta across website and sidebar
 
-Next work:
+Ongoing (continuous):
 
 - keep `README.md` and `README_CN.md` aligned in scope and meaning as features land
 - keep `docs/getting-started.md` and module primers aligned with `reference/standard-service`

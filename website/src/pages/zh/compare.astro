@@ -215,7 +215,7 @@ const matrixRows = [
   },
   {
     feature: 'AI / Agent 就绪控制面',
-    note: '机器可读规范、任务路由、边界检查',
+    note: 'specs/task-routing.yaml 在代码打开前就对工作分类；specs/change-recipes/ 为 15 种修改类型定义有序步骤；module.yaml 约束每个包的范围；internal/checks/ 在 CI 中机械执行边界检查',
     values: { gin: false, echo: false, fiber: false, chi: false, plumego: true },
   },
 ] as const;

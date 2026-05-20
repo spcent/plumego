@@ -168,7 +168,7 @@ const frameworks: Framework[] = [
     whenToChoose: [
       'Route registration, middleware order, and dependency wiring must be visible in code review',
       'Multiple services should start from one canonical shape rather than each team\'s custom bootstrap',
-      'You use AI coding assistants and want explicit machine-readable rules about where changes belong',
+      'You use AI coding assistants and want machine-readable ownership rules: task-routing.yaml, change-recipes/, and module.yaml give agents a deterministic operating model',
       'You need clear separation between stable modules and experimental capability work',
     ],
     whenNotToChoose: [
@@ -219,7 +219,7 @@ const matrixRows = [
   },
   {
     feature: 'AI / agent-ready control plane',
-    note: 'Machine-readable specs, task routing, boundary enforcement',
+    note: 'specs/task-routing.yaml classifies work before code is opened; specs/change-recipes/ defines ordered steps for 15 change types; module.yaml scopes each package; internal/checks/ enforces boundaries in CI',
     values: { gin: false, echo: false, fiber: false, chi: false, plumego: true },
   },
 ] as const;

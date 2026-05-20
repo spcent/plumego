@@ -48,6 +48,9 @@ The current repository already exposes several clear family-level entry rules.
 | `x/rest` | reusable CRUD transport behavior, query parsing, pagination rules, and repository-backed resource wiring | service bootstrap, gateway topology, business repository ownership, or domain validation |
 | `x/messaging` | app-facing queue, pubsub, scheduler, or webhook orchestration at the family level | the smallest runnable service path, stable abstractions, or a task already known to be only `x/messaging/mq` or `x/messaging/pubsub` |
 | `x/observability` | exporter wiring, telemetry adapters, buffered metrics inspection, rolling metrics helpers, and broader diagnostics integration | transport-only request middleware primitives such as request IDs, tracing hooks, or access logging |
+| `x/rpc` | RPC server lifecycle helpers, outbound connection pooling, and HTTP-over-RPC transcoding alongside standard routes | service discovery for backends (use `x/gateway/discovery`), or importing a concrete gRPC runtime into `x/rpc` |
+| `x/openapi` | generating OpenAPI 3.1 document structures from `router.RouteInfo` values and operation hints, without external dependencies | handler reflection-based schema inference, runtime Swagger UI, or YAML parsing |
+| `x/validate` | explicit `BindJSON`/`Bind` call sites in handlers that decode JSON and return structured `contract.APIError` responses | middleware-level pre-validation, tag-based struct validation frameworks, or global validator instances |
 
 These examples matter because they show that `x/*` is not just a place to move code away from stable roots. Each family is supposed to become a discoverable entrypoint with a clear ownership story.
 
@@ -59,6 +62,9 @@ Once you know the work belongs to an extension family, continue with the most ho
 | --- | --- | --- |
 | reusable CRUD controller behavior, shared pagination rules, and resource-route standardization | [x/rest Primer](/docs/modules/x-rest) | it turns the family rule into a concrete split across app-local wiring, repository code, and domain validation |
 | app-facing queue, pubsub, scheduler, and webhook orchestration | [x/messaging Primer](/docs/modules/x-messaging) | it shows when to start at the family entrypoint and when it is safe to dive into narrower siblings |
+| RPC server lifecycle, outbound connection pooling, or HTTP-over-RPC gateway | [x/rpc Primer](/docs/modules/x-rpc) | it covers which surfaces are caller-owned and which lifecycle helpers `x/rpc` provides |
+| OpenAPI 3.1 document generation from registered routes | [x/openapi Primer](/docs/modules/x-openapi) | it explains the route-driven generation model and where the CLI integration boundary sits |
+| explicit JSON binding and caller-owned validation in handlers | [x/validate Primer](/docs/modules/x-validate) | it clarifies when to use `BindJSON` vs `Bind`, how errors map to `contract.APIError`, and why validation stays in handlers |
 | stable-surface decisions that might still belong in root packages | [Stable Roots](/docs/stable-roots) | it is the right backtrack when the change is still really about default-path ownership |
 
 ## Concrete routing examples
@@ -94,6 +100,9 @@ That is the real boundary between default-path ownership and extension-family ow
 
 - [x/rest Primer](/docs/modules/x-rest)
 - [x/messaging Primer](/docs/modules/x-messaging)
+- [x/rpc Primer](/docs/modules/x-rpc)
+- [x/openapi Primer](/docs/modules/x-openapi)
+- [x/validate Primer](/docs/modules/x-validate)
 - [Stable Roots](/docs/stable-roots)
 - [Modules Overview](/docs/modules/overview)
 - [API Quick Reference](/docs/reference) — stable-root signatures to distinguish from extension APIs

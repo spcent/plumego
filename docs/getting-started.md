@@ -185,6 +185,9 @@ After the smallest example works, keep the app layout from
 | Reusable circuit breaker or rate-limit primitives | `x/resilience` |
 | AI providers, sessions, streaming, and tools | `x/ai/provider`, `x/ai/session`, `x/ai/streaming`, `x/ai/tool` |
 | Observability export, protected diagnostics, or local debug endpoints | `x/observability`, `x/observability/ops`, or `x/observability/devtools` depending on the surface |
+| gRPC + HTTP service hosting or outbound RPC client pooling | `x/rpc` |
+| OpenAPI 3.1 document generation from registered routes | `x/openapi` |
+| Explicit JSON binding and caller-owned request validation | `x/validate` |
 
 Do not start a new application layout from an `x/*` package. Treat extensions as
 explicit additions to the canonical app wiring.
