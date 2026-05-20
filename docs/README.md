@@ -15,7 +15,8 @@ Read by intent instead of scanning everything.
 - `benchmarks/README.md` — performance results and methodology vs. Chi, Gin, Echo
 - `../reference/standard-service/README.md` — canonical reference app layout and route wiring
 - `CANONICAL_STYLE_GUIDE.md` — the default handler, route, middleware, and response style
-- `agent-first.md` — agent-first design rationale, mechanisms, and operating reference
+- `agent-first.md` — agent-first design rationale, mechanisms, zones, and operating reference (detailed internal guide)
+- `AGENT_FIRST.md` — external-facing overview of the four control planes (docs, specs, tasks, reference); read this to understand the design philosophy or adopt the model in another project
 - `architecture/AGENT_FIRST_REPO_BLUEPRINT.md` — repository shape, boundaries, and canonical implementation path
 - `architecture/core-boundary.md` — stable root package responsibilities and wiring patterns
 - `architecture/extension-boundary.md` — x/* taxonomy, maturity ladder, and promotion criteria

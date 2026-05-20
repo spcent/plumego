@@ -1,0 +1,95 @@
+---
+title: x/validate Primer
+description: Read this when the change is about explicit JSON binding and caller-owned validation in Plumego handlers without middleware or struct tags.
+translationKey: modules-x-validate
+sidebar:
+  order: 27
+---
+
+# x/validate Primer
+
+> **Experimental** — API compatibility is not frozen. Evaluate before adopting in production. Check [Release Posture](/docs/release-posture) for current maturity status.
+
+Open this page after [x/* Family](/docs/x-family) when the change involves decoding a JSON request body and returning structured validation errors through `contract.WriteError` — without adding validation middleware or tag-based parsing.
+
+`x/validate` provides two functions: `BindJSON[T]` for decode-only and `Bind[T]` for decode plus caller-owned validation. Validation rules belong in your application code; `x/validate` only wires decode errors and validation errors into the `contract.APIError` response shape.
+
+## Start here when
+
+- a handler needs to decode a JSON body and return a structured `400` or `422` response on failure
+- you have a `Validator` implementation and want to compose it with `contract.WriteError` without boilerplate
+- you are adapting a third-party validator (e.g. `go-playground/validator`) to the `validate.Validator` interface in your own package
+
+## Do not start here when
+
+- middleware-level validation before the handler runs is the goal — validate in the handler, not upstream
+- tag-based struct validation is required — keep your adapter in application code or an external module
+- the validation is unrelated to HTTP body decoding (e.g. config or environment validation) — use your own logic
+- you are adding a default global validator to `x/validate` — no such global exists or should be added
+
+## First files to read
+
+1. `x/validate/` — `BindJSON`, `Bind`, `Validator` interface, `ValidationError`
+2. `reference/with-rest/` — complete example of `Bind` with a third-party adapter
+3. `contract/errors.go` — `TypeValidation` and `TypeBadRequest` constants used in error responses
+
+## Concrete ownership examples
+
+| Keep it in `x/validate` when the work is about | Move out when the work becomes |
+| --- | --- |
+| `BindJSON[T]`: decoding the request body into a typed value | type-specific decoding or content-type negotiation — handle in the handler |
+| `Bind[T]`: composing decode with a caller-supplied `Validator` | a concrete validator implementation (go-playground, custom rules) — keep in application code |
+| `ValidationError`: shaping decode and validation failures into `contract.APIError` | domain-level validation (business rules, database uniqueness) — handle in the service layer |
+| `Validator` interface: the minimal contract between `Bind` and caller logic | global validator instances or tag-based registration — not in `x/validate` |
+
+## Error shape
+
+`BindJSON` and `Bind` return `*validate.ValidationError` on failure. `contract.WriteError` handles this type natively:
+
+| Failure kind | HTTP status | `type` field |
+| --- | --- | --- |
+| Malformed JSON, unexpected EOF | `400` | `bad_request` |
+| `Validator.Validate` returns non-nil | `422` | `validation_error` |
+
+## Third-party validator adapter
+
+Keep the adapter in your application code — not in `x/validate`:
+
+```go
+// internal/validation/adapter.go
+type PlaygroundAdapter struct{ v *validator.Validate }
+
+func New() validate.Validator { return &PlaygroundAdapter{v: validator.New()} }
+
+func (a *PlaygroundAdapter) Validate(val any) error { return a.v.Struct(val) }
+```
+
+```go
+// handler.go
+type CreateUserRequest struct {
+    Name  string `json:"name"  validate:"required"`
+    Email string `json:"email" validate:"required,email"`
+}
+
+var v = validation.New()
+
+func createUserHandler(w http.ResponseWriter, r *http.Request) {
+    req, err := validate.Bind[CreateUserRequest](r, v)
+    if err != nil {
+        _ = contract.WriteError(w, r, err)
+        return
+    }
+    _ = contract.WriteResponse(w, r, http.StatusCreated, req, nil)
+}
+```
+
+## Why this primer exists
+
+Request validation in Go web services drifts in two directions: either it disappears into middleware (making handler behavior implicit) or it scatters custom decode-and-check blocks across every handler. `x/validate` provides a single, explicit call site per handler with a consistent error output shape. The `Validator` interface keeps third-party libraries in application code where they belong, without coupling `x/validate` to any specific validation strategy.
+
+## Read next
+
+- [x/* Family](/docs/x-family)
+- [Contract Primer](/docs/modules/contract)
+- [Handle Errors Guide](/docs/guides/handle-errors)
+- [Build a REST Resource](/docs/guides/build-rest-resource)

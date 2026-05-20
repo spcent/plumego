@@ -87,11 +87,13 @@ const fitProfiles = [
   {
     kicker: 'best fit',
     title: 'Repositories maintained by both human engineers and AI coding agents',
-    body: 'Plumego is designed for codebases where AI agents share execution and review responsibilities. Machine-readable specs, per-module manifests, standardized check commands, and explicit task cards give agents a clear operating model — the same structure that makes human review easier also makes agent contributions safe to verify.',
+    body: 'Plumego is built for codebases where AI agents share execution and review responsibilities. Four machine-readable control planes — <code>docs/</code>, <code>specs/</code>, <code>tasks/</code>, and <code>reference/</code> — give agents a deterministic operating model: where to classify a task, which files to read first, what a correct change looks like, and which checks must pass before a contribution lands. The same structure that makes human review tractable also makes agent contributions safe to verify.',
     points: [
-      'specs/ provides task routing, dependency rules, and change scope in YAML',
-      'module.yaml scopes changes and checks to the owning module before editing starts',
-      'make gates provides a consistent, agent-executable validation loop',
+      'specs/task-routing.yaml maps task intent to owning module before any code is opened',
+      'specs/change-recipes/ defines ordered steps and stop conditions for 15 common change types',
+      'each module/module.yaml declares scope, risk, test commands, and review checklist for that package',
+      'internal/checks/ enforces boundary rules mechanically — the same checks run locally and in CI',
+      'make gates provides an agent-executable, CI-equivalent validation loop before every push',
     ],
   },
 ] as const;

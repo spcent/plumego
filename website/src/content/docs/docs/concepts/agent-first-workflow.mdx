@@ -140,16 +140,85 @@ This check runs as part of `make gates` and is required before any change lands.
 
 ## Change recipes
 
-`specs/change-recipes/` contains YAML files that define the correct execution sequence for common modification types:
+`specs/change-recipes/` contains YAML files that define the correct execution sequence for known change types. Each recipe specifies: the scope, ordered steps, and stop conditions (things the recipe must not do).
+
+### Full recipe index
 
 | Recipe | Use when |
 | --- | --- |
-| `fix-bug.yaml` | Fixing a defect in an existing module |
+| `add-http-endpoint.yaml` | Adding a new route and handler in app-local code |
+| `add-middleware.yaml` | Adding transport-only middleware to the middleware package |
+| `fix-bug.yaml` | Localizing and fixing a defect with regression tests |
+| `http-endpoint-bugfix.yaml` | Fixing a defect in HTTP handlers, route wiring, or transport contracts |
+| `symbol-change.yaml` | Renaming, removing, or changing the behavior of an exported symbol |
+| `new-extension-module.yaml` | Creating a new `x/*` capability family |
 | `new-stable-module.yaml` | Adding a new package to the stable roots |
-| `new-extension-module.yaml` | Adding a new `x/*` capability family |
-| `deprecation.yaml` | Marking a symbol or module as deprecated |
+| `add-websocket-room.yaml` | Adding a new room type or connection policy to `x/websocket` |
+| `add-grpc-method.yaml` | Adding a gRPC method alongside an existing HTTP surface via `x/rpc` |
+| `add-ai-tool.yaml` | Registering a new tool in `x/ai/tool` or wiring it into a session |
+| `add-acceptance-tests.yaml` | Writing pre-failing acceptance tests that define a task card's done condition |
+| `tenant-policy-change.yaml` | Changing tenant resolution, policy evaluation, quota, or rate-limit behavior |
+| `stable-root-boundary-review.yaml` | Review-only safety check for stable-root boundary changes |
+| `analysis-only.yaml` | Research and planning tasks — no file edits allowed |
+| `review-only.yaml` | Code review tasks — findings only, no patch |
 
-An agent following a recipe reads the defined steps, completes each one, then runs the checkers specified in the recipe before considering the change done. This narrows the space for hallucination on known change types.
+### Worked example: adding a new HTTP endpoint
+
+**Task:** "Add a `GET /users/:id` handler that returns user details."
+
+Step 1 — classify using `specs/task-routing.yaml`. The task is app-local HTTP feature work → routing entry is `app_wiring`, recipe is `add-http-endpoint`.
+
+Step 2 — read the recipe:
+
+```yaml
+# specs/change-recipes/add-http-endpoint.yaml (excerpt)
+name: add-http-endpoint
+scope: app-local HTTP feature work
+steps:
+  - Read docs/CANONICAL_STYLE_GUIDE.md.
+  - Read specs/repo.yaml and the target module manifest.
+  - Open reference/standard-service/internal/app/routes.go.
+  - Add one explicit route registration line.
+  - Add or update a handler with net/http shape.
+  - Use contract.WriteError for structured error responses.
+  - Add or update focused tests near the changed handler or module.
+  - Run module tests, then repository quality gates if the change is cross-cutting.
+stop_conditions:
+  - Do not add bootstrap behavior in x/*.
+  - Do not hide dependencies in request context.
+```
+
+Step 3 — follow the steps in order:
+
+```go
+// reference/standard-service/internal/app/routes.go
+mux.Get("/users/:id", handlers.GetUser)
+
+// reference/standard-service/internal/handlers/users.go
+func GetUser(w http.ResponseWriter, r *http.Request) {
+    id := router.Param(r, "id")
+    user, err := svc.FindUser(r.Context(), id)
+    if err != nil {
+        _ = contract.WriteError(w, r, contract.NewErrorBuilder().
+            WithType(contract.TypeNotFound).
+            WithMessage("user not found").
+            Build())
+        return
+    }
+    _ = contract.WriteResponse(w, r, http.StatusOK, user, nil)
+}
+```
+
+Step 4 — run validation per the recipe:
+
+```bash
+go test -race ./internal/...
+go run ./internal/checks/dependency-rules
+```
+
+**Result:** the recipe removes ambiguity about where the handler lives, what response helpers to use, and which tests to run — without requiring reviewer memory for any of it.
+
+An agent following a recipe reads the defined steps, completes each one, then runs the checkers specified in the recipe before considering the change done.
 
 ## Running gates after agent-generated changes
 

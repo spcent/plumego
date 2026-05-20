@@ -1,0 +1,63 @@
+---
+title: x/validate Primer
+description: 当改动涉及在 Plumego 处理器中进行显式 JSON 绑定和调用方自有验证，而无需中间件或结构体标签时，先读这里。
+translationKey: modules-x-validate
+sidebar:
+  order: 27
+---
+
+# x/validate Primer
+
+> **实验性** — API 兼容性未冻结。采用前请先评估。查看[发布策略](/zh/docs/release-posture)了解当前成熟度。
+
+当你已经通过 [x/* 家族](/zh/docs/x-family) 确认问题属于解码 JSON 请求体并通过 `contract.WriteError` 返回结构化验证错误时，打开这一页——无需添加验证中间件或基于标签的解析。
+
+`x/validate` 提供两个函数：`BindJSON[T]` 用于仅解码，`Bind[T]` 用于解码加调用方自有验证。验证规则属于你的应用程序代码；`x/validate` 只负责将解码错误和验证错误接入 `contract.APIError` 响应格式。
+
+## 什么时候从这里开始
+
+- 处理器需要解码 JSON 请求体，并在失败时返回结构化的 `400` 或 `422` 响应
+- 你有一个 `Validator` 实现，想要在无样板代码的情况下与 `contract.WriteError` 组合
+- 你正在将第三方验证器（如 `go-playground/validator`）在自己的包中适配为 `validate.Validator` 接口
+
+## 什么时候不该从这里开始
+
+- 目标是在处理器运行前在中间件层进行验证 — 在处理器中验证，不要在上游进行
+- 需要基于标签的结构体验证 — 将你的适配器保留在应用程序代码或外部模块
+- 验证与 HTTP 请求体解码无关（如配置或环境变量验证）— 使用你自己的逻辑
+- 你正在向 `x/validate` 添加默认全局验证器 — 不存在此类全局变量，也不应添加
+
+## 当前仓库里先读哪些文件
+
+1. `x/validate/` — `BindJSON`、`Bind`、`Validator` 接口、`ValidationError`
+2. `reference/with-rest/` — 使用第三方适配器的 `Bind` 完整示例
+3. `contract/errors.go` — 错误响应中使用的 `TypeValidation` 和 `TypeBadRequest` 常量
+
+## 更具体的归属例子
+
+| 这些工作适合留在 `x/validate` | 一旦变成这些问题就应移出 |
+| --- | --- |
+| `BindJSON[T]`：将请求体解码为类型化的值 | 类型专属解码或内容类型协商 — 在处理器中处理 |
+| `Bind[T]`：将解码与调用方提供的 `Validator` 组合 | 具体的验证器实现（go-playground、自定义规则）— 保留在应用程序代码 |
+| `ValidationError`：将解码和验证失败塑造为 `contract.APIError` | 域层验证（业务规则、数据库唯一性）— 在服务层处理 |
+| `Validator` 接口：`Bind` 与调用方逻辑之间的最小契约 | 全局验证器实例或基于标签的注册 — 不属于 `x/validate` |
+
+## 错误格式
+
+`BindJSON` 和 `Bind` 在失败时返回 `*validate.ValidationError`。`contract.WriteError` 原生处理此类型：
+
+| 失败类型 | HTTP 状态码 | `type` 字段 |
+| --- | --- | --- |
+| JSON 格式错误、意外 EOF | `400` | `bad_request` |
+| `Validator.Validate` 返回非 nil | `422` | `validation_error` |
+
+## 为什么单独写这一页
+
+Go Web 服务中的请求验证倾向于向两个方向漂移：要么消失到中间件中（使处理器行为变得隐式），要么在每个处理器中散布自定义的解码和检查块。`x/validate` 在每个处理器中提供单一的显式调用点，并输出一致的错误格式。`Validator` 接口将第三方库保留在应用程序代码中，不将 `x/validate` 与任何特定的验证策略耦合。
+
+## 下一步阅读
+
+- [x/* 家族](/zh/docs/x-family)
+- [Contract Primer](/zh/docs/modules/contract)
+- [错误处理指南](/zh/docs/guides/handle-errors)
+- [构建 REST 资源](/zh/docs/guides/build-rest-resource)
