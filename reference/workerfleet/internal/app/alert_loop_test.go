@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -25,7 +26,7 @@ func TestEvaluateAndNotifyAlertsPersistsAndDispatches(t *testing.T) {
 	t.Cleanup(func() {
 		_ = runtime.Close(context.Background())
 	})
-	if err := runtime.store.UpsertWorkerSnapshot(context.Background(), domain.WorkerSnapshot{
+	if err := runtime.shell.alerts.store.UpsertWorkerSnapshot(context.Background(), domain.WorkerSnapshot{
 		Identity: domain.WorkerIdentity{WorkerID: "worker-1"},
 		Status:   domain.WorkerStatusOffline,
 	}); err != nil {
@@ -46,7 +47,7 @@ func TestEvaluateAndNotifyAlertsPersistsAndDispatches(t *testing.T) {
 	if calls != 1 {
 		t.Fatalf("webhook calls = %d, want 1", calls)
 	}
-	records, err := runtime.store.ListAlertRecords(context.Background())
+	records, err := runtime.shell.alerts.store.ListAlertRecords(context.Background())
 	if err != nil {
 		t.Fatalf("list alerts: %v", err)
 	}
@@ -69,8 +70,8 @@ func TestEvaluateAndNotifyAlertsIgnoresDeliveryFailure(t *testing.T) {
 		_ = runtime.Close(context.Background())
 	})
 	observer := &recordingRuntimeErrorObserver{}
-	runtime.errors = observer
-	if err := runtime.store.UpsertWorkerSnapshot(context.Background(), domain.WorkerSnapshot{
+	runtime.shell.alerts.errors = observer
+	if err := runtime.shell.alerts.store.UpsertWorkerSnapshot(context.Background(), domain.WorkerSnapshot{
 		Identity: domain.WorkerIdentity{WorkerID: "worker-1"},
 		Status:   domain.WorkerStatusOffline,
 	}); err != nil {
@@ -104,4 +105,62 @@ func TestStartAlertLoopDisabledIsSafe(t *testing.T) {
 		t.Fatalf("start alert loop: %v", err)
 	}
 	stop()
+}
+
+func TestAlertRunnerUsesInjectedDependencies(t *testing.T) {
+	runtime, err := Bootstrap(context.Background(), DefaultConfig())
+	if err != nil {
+		t.Fatalf("bootstrap: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = runtime.Close(context.Background())
+	})
+	observer := &recordingRuntimeErrorObserver{}
+	runtime.shell.alerts.errors = observer
+	runtime.shell.alerts.engineFactory = func() domainAlertEngine {
+		return domainAlertEngineFunc(func(context.Context) ([]domain.AlertRecord, error) {
+			return []domain.AlertRecord{{
+				AlertID:   "alert-1",
+				WorkerID:  "worker-1",
+				AlertType: domain.AlertWorkerOffline,
+			}}, nil
+		})
+	}
+	dispatched := 0
+	runtime.shell.alerts.dispatcherFn = func(Config) alertDispatcher {
+		return alertDispatcherFunc(func(context.Context, domain.AlertRecord) error {
+			dispatched++
+			return errors.New("notify failed")
+		})
+	}
+
+	cfg := DefaultConfig()
+	cfg.Runtime.NotificationEnabled = true
+	cfg.Runtime.NotifierDeliveryTimeout = time.Second
+
+	if _, err := runtime.EvaluateAndNotifyAlerts(context.Background(), cfg); err != nil {
+		t.Fatalf("evaluate and notify alerts: %v", err)
+	}
+	if dispatched != 1 {
+		t.Fatalf("dispatched = %d, want 1", dispatched)
+	}
+	operations, errs := observer.snapshot()
+	if len(operations) != 1 || operations[0] != "alert_notify" {
+		t.Fatalf("reported operations = %#v, want alert_notify", operations)
+	}
+	if errs[0] == nil || errs[0].Error() != "notify failed" {
+		t.Fatalf("error = %v, want notify failed", errs[0])
+	}
+}
+
+type alertDispatcherFunc func(context.Context, domain.AlertRecord) error
+
+func (fn alertDispatcherFunc) Notify(ctx context.Context, alert domain.AlertRecord) error {
+	return fn(ctx, alert)
+}
+
+type domainAlertEngineFunc func(context.Context) ([]domain.AlertRecord, error)
+
+func (fn domainAlertEngineFunc) Evaluate(ctx context.Context) ([]domain.AlertRecord, error) {
+	return fn(ctx)
 }

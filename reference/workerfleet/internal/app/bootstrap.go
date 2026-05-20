@@ -6,25 +6,9 @@ import (
 
 	"workerfleet/internal/domain"
 	workerfleetmetrics "workerfleet/internal/platform/metrics"
-	platformstore "workerfleet/internal/platform/store"
 	"workerfleet/internal/platform/store/memory"
 	mongostore "workerfleet/internal/platform/store/mongo"
 )
-
-type Runtime struct {
-	Service *Service
-	Metrics *workerfleetmetrics.Collector
-	Close   func(context.Context) error
-	Ready   func(context.Context) error
-	store   runtimeStore
-	policy  domain.StatusPolicy
-	metrics *workerfleetmetrics.Observer
-	errors  RuntimeErrorObserver
-}
-
-type RuntimeErrorObserver interface {
-	ObserveRuntimeError(operation string, err error)
-}
 
 func Bootstrap(ctx context.Context, cfg Config) (*Runtime, error) {
 	if cfg.StoreBackend == "" {
@@ -73,14 +57,18 @@ func newRuntime(store runtimeStore, close func(context.Context) error) *Runtime 
 		domain.WithIngestMetrics(metricsObserver),
 	)
 	service := NewService(ingest, store)
+	loops := NewLoopRunner(store, policy, metricsObserver, metricsObserver)
+	alerts := NewAlertRunner(store, policy, metricsObserver, metricsObserver)
 	return &Runtime{
 		Service: service,
 		Metrics: metrics,
 		Close:   close,
-		store:   store,
-		policy:  policy,
-		metrics: metricsObserver,
-		errors:  metricsObserver,
+		shell: runtimeShell{
+			ingest: ingest,
+			query:  service,
+			loops:  loops,
+			alerts: alerts,
+		},
 		Ready: func(ctx context.Context) error {
 			if store == nil {
 				return fmt.Errorf("workerfleet store is not configured")
@@ -95,16 +83,8 @@ func newRuntime(store runtimeStore, close func(context.Context) error) *Runtime 
 }
 
 func (r *Runtime) reportRuntimeError(operation string, err error) {
-	if r == nil || r.errors == nil || err == nil {
+	if r == nil || r.shell.loops == nil {
 		return
 	}
-	r.errors.ObserveRuntimeError(operation, err)
-}
-
-type runtimeStore interface {
-	platformstore.QueryStore
-	platformstore.WorkerEventStore
-	domain.SnapshotStore
-	domain.TaskHistoryStore
-	domain.WorkerEventStore
+	r.shell.loops.reportRuntimeError(operation, err)
 }

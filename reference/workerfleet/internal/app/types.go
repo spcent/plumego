@@ -1,10 +1,13 @@
 package app
 
 import (
+	"context"
 	"errors"
 	"time"
 
 	"workerfleet/internal/domain"
+	workerfleetmetrics "workerfleet/internal/platform/metrics"
+	platformstore "workerfleet/internal/platform/store"
 )
 
 var (
@@ -12,6 +15,62 @@ var (
 	ErrNotImplemented = errors.New("workerfleet operation not implemented")
 	ErrConflict       = errors.New("workerfleet conflict")
 )
+
+type Runtime struct {
+	Service *Service
+	Metrics *workerfleetmetrics.Collector
+	Close   func(context.Context) error
+	Ready   func(context.Context) error
+	shell   runtimeShell
+}
+
+type runtimeShell struct {
+	ingest *domain.IngestService
+	query  *Service
+	loops  *LoopRunner
+	alerts *AlertRunner
+}
+
+type RuntimeErrorObserver interface {
+	ObserveRuntimeError(operation string, err error)
+}
+
+type runtimeStore interface {
+	platformstore.QueryStore
+	platformstore.WorkerEventStore
+	domain.SnapshotStore
+	domain.TaskHistoryStore
+	domain.WorkerEventStore
+}
+
+type LoopRunner struct {
+	store             runtimeStore
+	policy            domain.StatusPolicy
+	metrics           *workerfleetmetrics.Observer
+	errors            RuntimeErrorObserver
+	inventorySyncerFn func(Config) (inventorySyncer, error)
+}
+
+type AlertRunner struct {
+	store         runtimeStore
+	policy        domain.StatusPolicy
+	metrics       *workerfleetmetrics.Observer
+	errors        RuntimeErrorObserver
+	dispatcherFn  func(Config) alertDispatcher
+	engineFactory func() domainAlertEngine
+}
+
+type inventorySyncer interface {
+	SyncOnce(ctx context.Context) (resourceVersion string, err error)
+}
+
+type alertDispatcher interface {
+	Notify(ctx context.Context, alert domain.AlertRecord) error
+}
+
+type domainAlertEngine interface {
+	Evaluate(ctx context.Context) ([]domain.AlertRecord, error)
+}
 
 type RegisterWorkerInput struct {
 	Identity   domain.WorkerIdentity

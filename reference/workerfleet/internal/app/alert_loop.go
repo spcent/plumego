@@ -7,19 +7,43 @@ import (
 	"sync"
 
 	"workerfleet/internal/domain"
+	workerfleetmetrics "workerfleet/internal/platform/metrics"
 	"workerfleet/internal/platform/notifier"
 )
 
+func NewAlertRunner(store runtimeStore, policy domain.StatusPolicy, metrics *workerfleetmetrics.Observer, errors RuntimeErrorObserver) *AlertRunner {
+	runner := &AlertRunner{
+		store:   store,
+		policy:  policy,
+		metrics: metrics,
+		errors:  errors,
+	}
+	runner.dispatcherFn = func(cfg Config) alertDispatcher {
+		return newAlertDispatcher(cfg)
+	}
+	runner.engineFactory = func() domainAlertEngine {
+		return domain.NewAlertEngine(runner.store, runner.store, runner.policy, nil, domain.WithAlertMetrics(runner.metrics))
+	}
+	return runner
+}
+
 func (r *Runtime) StartAlertLoop(ctx context.Context, cfg Config) (func(), error) {
-	if r == nil || !cfg.Runtime.AlertEvaluationEnabled {
+	if r == nil || r.shell.alerts == nil {
+		return func() {}, nil
+	}
+	return r.shell.alerts.Start(ctx, cfg)
+}
+
+func (a *AlertRunner) Start(ctx context.Context, cfg Config) (func(), error) {
+	if a == nil || !cfg.Runtime.AlertEvaluationEnabled {
 		return func() {}, nil
 	}
 	loopCtx, cancel := context.WithCancel(ctx)
 	var wg sync.WaitGroup
 	startLoop(loopCtx, &wg, cfg.Runtime.AlertEvaluationInterval, func(ctx context.Context) {
-		_, err := r.EvaluateAndNotifyAlerts(ctx, cfg)
+		_, err := a.EvaluateAndNotifyAlerts(ctx, cfg)
 		if err != nil {
-			r.reportRuntimeError("alert_evaluate", err)
+			a.reportRuntimeError("alert_evaluate", err)
 		}
 	})
 	return func() {
@@ -29,10 +53,17 @@ func (r *Runtime) StartAlertLoop(ctx context.Context, cfg Config) (func(), error
 }
 
 func (r *Runtime) EvaluateAndNotifyAlerts(ctx context.Context, cfg Config) ([]domain.AlertRecord, error) {
-	if r == nil || r.store == nil {
+	if r == nil || r.shell.alerts == nil {
 		return nil, errWorkerfleetStoreNotConfigured
 	}
-	engine := domain.NewAlertEngine(r.store, r.store, r.policy, nil, domain.WithAlertMetrics(r.metrics))
+	return r.shell.alerts.EvaluateAndNotifyAlerts(ctx, cfg)
+}
+
+func (a *AlertRunner) EvaluateAndNotifyAlerts(ctx context.Context, cfg Config) ([]domain.AlertRecord, error) {
+	if a == nil || a.store == nil {
+		return nil, errWorkerfleetStoreNotConfigured
+	}
+	engine := a.engineFactory()
 	emitted, err := engine.Evaluate(ctx)
 	if err != nil {
 		return nil, err
@@ -40,15 +71,22 @@ func (r *Runtime) EvaluateAndNotifyAlerts(ctx context.Context, cfg Config) ([]do
 	if !cfg.Runtime.NotificationEnabled || len(emitted) == 0 {
 		return emitted, nil
 	}
-	dispatcher := newAlertDispatcher(cfg)
+	dispatcher := a.dispatcherFn(cfg)
 	for _, alert := range emitted {
 		deliveryCtx, cancel := context.WithTimeout(ctx, cfg.Runtime.NotifierDeliveryTimeout)
 		if err := dispatcher.Notify(deliveryCtx, alert); err != nil {
-			r.reportRuntimeError("alert_notify", err)
+			a.reportRuntimeError("alert_notify", err)
 		}
 		cancel()
 	}
 	return emitted, nil
+}
+
+func (a *AlertRunner) reportRuntimeError(operation string, err error) {
+	if a == nil || a.errors == nil || err == nil {
+		return
+	}
+	a.errors.ObserveRuntimeError(operation, err)
 }
 
 func newAlertDispatcher(cfg Config) *notifier.Dispatcher {

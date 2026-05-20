@@ -51,7 +51,7 @@ func TestSweepWorkerStatusesMarksExpiredHeartbeatOffline(t *testing.T) {
 		StatusReason:        "ready",
 		LastStatusChangedAt: now.Add(-3 * time.Minute),
 	}
-	if err := runtime.store.UpsertWorkerSnapshot(context.Background(), previous); err != nil {
+	if err := runtime.shell.loops.store.UpsertWorkerSnapshot(context.Background(), previous); err != nil {
 		t.Fatalf("upsert snapshot: %v", err)
 	}
 
@@ -59,7 +59,7 @@ func TestSweepWorkerStatusesMarksExpiredHeartbeatOffline(t *testing.T) {
 		t.Fatalf("sweep: %v", err)
 	}
 
-	current, ok, err := runtime.store.GetWorkerSnapshot(context.Background(), "worker-1")
+	current, ok, err := runtime.shell.loops.store.GetWorkerSnapshot(context.Background(), "worker-1")
 	if err != nil {
 		t.Fatalf("get snapshot: %v", err)
 	}
@@ -72,7 +72,7 @@ func TestSweepWorkerStatusesMarksExpiredHeartbeatOffline(t *testing.T) {
 	if current.StatusReason != "heartbeat_expired" {
 		t.Fatalf("status reason = %q, want heartbeat_expired", current.StatusReason)
 	}
-	events, err := runtime.store.ListWorkerEvents("worker-1")
+	events, err := runtime.shell.loops.store.ListWorkerEvents("worker-1")
 	if err != nil {
 		t.Fatalf("list events: %v", err)
 	}
@@ -119,7 +119,11 @@ func TestStartLoopsStopsStatusSweeper(t *testing.T) {
 
 func TestStartLoopsReportsStatusSweepErrors(t *testing.T) {
 	observer := &recordingRuntimeErrorObserver{}
-	runtime := &Runtime{errors: observer}
+	runtime := &Runtime{
+		shell: runtimeShell{
+			loops: &LoopRunner{errors: observer},
+		},
+	}
 	cfg := DefaultConfig()
 	cfg.Runtime.StatusSweepEnabled = true
 	cfg.Runtime.StatusSweepInterval = time.Millisecond
@@ -141,4 +145,52 @@ func TestStartLoopsReportsStatusSweepErrors(t *testing.T) {
 	if !errors.Is(errs[0], errWorkerfleetStoreNotConfigured) {
 		t.Fatalf("error = %v, want store not configured", errs[0])
 	}
+}
+
+func TestLoopRunnerUsesInjectedRuntimeDependencies(t *testing.T) {
+	observer := &recordingRuntimeErrorObserver{}
+	runtime, err := Bootstrap(context.Background(), DefaultConfig())
+	if err != nil {
+		t.Fatalf("bootstrap: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = runtime.Close(context.Background())
+	})
+
+	called := 0
+	runtime.shell.loops.errors = observer
+	runtime.shell.loops.inventorySyncerFn = func(Config) (inventorySyncer, error) {
+		called++
+		return inventorySyncerFunc(func(context.Context) (string, error) {
+			return "", errors.New("sync failed")
+		}), nil
+	}
+
+	cfg := DefaultConfig()
+	cfg.Runtime.KubeSyncEnabled = true
+	cfg.Runtime.KubeSyncInterval = time.Millisecond
+
+	stop, err := runtime.StartLoops(context.Background(), cfg)
+	if err != nil {
+		t.Fatalf("start loops: %v", err)
+	}
+	time.Sleep(5 * time.Millisecond)
+	stop()
+
+	if called == 0 {
+		t.Fatalf("expected injected inventory syncer to be used")
+	}
+	operations, errs := observer.snapshot()
+	if len(operations) == 0 || operations[0] != "kube_sync" {
+		t.Fatalf("reported operations = %#v, want kube_sync", operations)
+	}
+	if errs[0] == nil || errs[0].Error() != "sync failed" {
+		t.Fatalf("error = %v, want sync failed", errs[0])
+	}
+}
+
+type inventorySyncerFunc func(context.Context) (string, error)
+
+func (fn inventorySyncerFunc) SyncOnce(ctx context.Context) (string, error) {
+	return fn(ctx)
 }

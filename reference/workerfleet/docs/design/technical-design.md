@@ -62,7 +62,7 @@ flowchart LR
 Layer responsibilities:
 
 - `main.go`: thin process entrypoint that loads config, constructs the app, and runs it.
-- `internal/app`: application bootstrap, explicit dependency wiring, service methods, runtime loops, HTTP server lifecycle, route registrar invocation, and graceful shutdown orchestration.
+- `internal/app`: application bootstrap, explicit dependency wiring, the HTTP-facing service facade, runtime lifecycle shell, loop runners, alert runners, route registrar invocation, and graceful shutdown orchestration.
 - `internal/handler`: HTTP request and response layer.
 - `internal/domain`: worker status rules, task reconciliation, pod reconciliation, alerts, domain events.
 - `internal/platform/store`: app-local storage interfaces and shared query/filter types.
@@ -88,6 +88,13 @@ Boundary rules:
 - Metrics are injected as explicit optional observers, not hidden globals.
 - Storage dependencies are behind app-local interfaces.
 - No workerfleet-specific labels, stores, or alert rules are added to Plumego stable packages.
+
+Runtime wiring notes:
+
+- `Runtime` is intentionally kept as a lifecycle shell rather than the default owner of every business dependency.
+- Bootstrap wires explicit components for ingest, query, loop execution, and alert evaluation, then exposes only the lifecycle hooks needed by `App`.
+- Periodic Kubernetes sync and status sweep logic live behind `LoopRunner`.
+- Periodic alert evaluation and notification delivery live behind `AlertRunner`.
 
 ## 5. Domain Model
 

@@ -9,43 +9,55 @@ import (
 
 	"workerfleet/internal/domain"
 	"workerfleet/internal/platform/kube"
+	workerfleetmetrics "workerfleet/internal/platform/metrics"
 )
 
 var errWorkerfleetStoreNotConfigured = errors.New("workerfleet store is not configured")
 
+func NewLoopRunner(store runtimeStore, policy domain.StatusPolicy, metrics *workerfleetmetrics.Observer, errors RuntimeErrorObserver) *LoopRunner {
+	runner := &LoopRunner{
+		store:   store,
+		policy:  policy,
+		metrics: metrics,
+		errors:  errors,
+	}
+	runner.inventorySyncerFn = runner.newInventorySyncer
+	return runner
+}
+
 func (r *Runtime) StartLoops(ctx context.Context, cfg Config) (func(), error) {
-	if r == nil {
+	if r == nil || r.shell.loops == nil {
+		return func() {}, nil
+	}
+	return r.shell.loops.Start(ctx, cfg)
+}
+
+func (l *LoopRunner) Start(ctx context.Context, cfg Config) (func(), error) {
+	if l == nil {
 		return func() {}, nil
 	}
 	loopCtx, cancel := context.WithCancel(ctx)
 	var wg sync.WaitGroup
 
 	if cfg.Runtime.KubeSyncEnabled {
-		client, err := kube.NewClient(kube.Config{
-			APIHost:         cfg.Kube.APIHost,
-			BearerToken:     cfg.Kube.BearerToken,
-			Namespace:       cfg.Kube.Namespace,
-			LabelSelector:   cfg.Kube.LabelSelector,
-			WorkerContainer: cfg.Kube.WorkerContainer,
-		})
+		syncer, err := l.inventorySyncerFn(cfg)
 		if err != nil {
 			cancel()
 			return nil, fmt.Errorf("create kubernetes client: %w", err)
 		}
-		syncer := kube.NewInventorySync(client, r.store, cfg.Kube.WorkerContainer, r.policy, kube.WithMetricsObserver(r.metrics))
 		startLoop(loopCtx, &wg, cfg.Runtime.KubeSyncInterval, func(ctx context.Context) {
 			_, err := syncer.SyncOnce(ctx)
 			if err != nil {
-				r.reportRuntimeError("kube_sync", err)
+				l.reportRuntimeError("kube_sync", err)
 			}
 		})
 	}
 
 	if cfg.Runtime.StatusSweepEnabled {
 		startLoop(loopCtx, &wg, cfg.Runtime.StatusSweepInterval, func(context.Context) {
-			err := r.SweepWorkerStatuses(ctx, time.Now().UTC())
+			err := l.SweepWorkerStatuses(ctx, time.Now().UTC())
 			if err != nil {
-				r.reportRuntimeError("status_sweep", err)
+				l.reportRuntimeError("status_sweep", err)
 			}
 		})
 	}
@@ -57,20 +69,27 @@ func (r *Runtime) StartLoops(ctx context.Context, cfg Config) (func(), error) {
 }
 
 func (r *Runtime) SweepWorkerStatuses(ctx context.Context, now time.Time) error {
-	if r == nil || r.store == nil {
+	if r == nil || r.shell.loops == nil {
+		return errWorkerfleetStoreNotConfigured
+	}
+	return r.shell.loops.SweepWorkerStatuses(ctx, now)
+}
+
+func (l *LoopRunner) SweepWorkerStatuses(ctx context.Context, now time.Time) error {
+	if l == nil || l.store == nil {
 		return errWorkerfleetStoreNotConfigured
 	}
 	started := time.Now()
-	snapshots, err := r.store.ListCurrentWorkerSnapshots(ctx)
+	snapshots, err := l.store.ListCurrentWorkerSnapshots(ctx)
 	if err != nil {
 		return err
 	}
 	for _, previous := range snapshots {
 		current := previous
-		status, reason := domain.EvaluateWorkerStatus(current, now, r.policy)
+		status, reason := domain.EvaluateWorkerStatus(current, now, l.policy)
 		if current.Status == status && current.StatusReason == reason {
-			if r.metrics != nil {
-				r.metrics.ObserveWorkerSnapshot(previous, current)
+			if l.metrics != nil {
+				l.metrics.ObserveWorkerSnapshot(previous, current)
 			}
 			continue
 		}
@@ -79,30 +98,30 @@ func (r *Runtime) SweepWorkerStatuses(ctx context.Context, now time.Time) error 
 		if previous.Status != status {
 			current.LastStatusChangedAt = now
 		}
-		if err := r.store.UpsertWorkerSnapshot(ctx, current); err != nil {
+		if err := l.store.UpsertWorkerSnapshot(ctx, current); err != nil {
 			return err
 		}
 		if previous.Status != status {
-			if err := r.appendStatusEvent(ctx, previous, current, now); err != nil {
+			if err := l.appendStatusEvent(ctx, previous, current, now); err != nil {
 				return err
 			}
 		}
-		if r.metrics != nil {
-			r.metrics.ObserveWorkerSnapshot(previous, current)
+		if l.metrics != nil {
+			l.metrics.ObserveWorkerSnapshot(previous, current)
 		}
 	}
-	if r.metrics != nil {
-		r.metrics.ObserveWorkerReportApplied("status_sweep", time.Since(started))
+	if l.metrics != nil {
+		l.metrics.ObserveWorkerReportApplied("status_sweep", time.Since(started))
 	}
 	return nil
 }
 
-func (r *Runtime) appendStatusEvent(ctx context.Context, previous domain.WorkerSnapshot, current domain.WorkerSnapshot, now time.Time) error {
+func (l *LoopRunner) appendStatusEvent(ctx context.Context, previous domain.WorkerSnapshot, current domain.WorkerSnapshot, now time.Time) error {
 	eventType, ok := statusEventType(current.Status)
 	if !ok {
 		return nil
 	}
-	return r.store.AppendWorkerEvent(ctx, domain.DomainEvent{
+	return l.store.AppendWorkerEvent(ctx, domain.DomainEvent{
 		Type:       eventType,
 		OccurredAt: now,
 		WorkerID:   current.Identity.WorkerID,
@@ -112,6 +131,27 @@ func (r *Runtime) appendStatusEvent(ctx context.Context, previous domain.WorkerS
 			"to_status":   string(current.Status),
 		},
 	})
+}
+
+func (l *LoopRunner) reportRuntimeError(operation string, err error) {
+	if l == nil || l.errors == nil || err == nil {
+		return
+	}
+	l.errors.ObserveRuntimeError(operation, err)
+}
+
+func (l *LoopRunner) newInventorySyncer(cfg Config) (inventorySyncer, error) {
+	client, err := kube.NewClient(kube.Config{
+		APIHost:         cfg.Kube.APIHost,
+		BearerToken:     cfg.Kube.BearerToken,
+		Namespace:       cfg.Kube.Namespace,
+		LabelSelector:   cfg.Kube.LabelSelector,
+		WorkerContainer: cfg.Kube.WorkerContainer,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return kube.NewInventorySync(client, l.store, cfg.Kube.WorkerContainer, l.policy, kube.WithMetricsObserver(l.metrics)), nil
 }
 
 func statusEventType(status domain.WorkerStatus) (domain.EventType, bool) {

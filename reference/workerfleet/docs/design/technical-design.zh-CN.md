@@ -62,7 +62,7 @@ flowchart LR
 分层职责：
 
 - `main.go`：薄进程入口，只负责加载配置、构造应用并运行。
-- `internal/app`：应用启动、显式依赖注入、service 方法、运行时循环、HTTP 服务生命周期、路由注册器调用和优雅关闭编排。
+- `internal/app`：应用启动、显式依赖注入、HTTP 对外 service facade、runtime 生命周期壳、loop runner、alert runner、路由注册器调用和优雅关闭编排。
 - `internal/handler`：HTTP 请求解析和响应层。
 - `internal/domain`：worker 状态规则、任务对账、Pod 对账、告警、领域事件。
 - `internal/platform/store`：应用本地存储接口和查询过滤类型。
@@ -88,6 +88,13 @@ Workerfleet 是独立 Go 子模块：
 - Metrics 通过显式可选 observer 注入，不能使用隐藏全局 collector。
 - 存储依赖必须通过应用本地接口隔离。
 - 不能把 workerfleet 专属 label、store 或 alert rule 放到 Plumego 稳定包中。
+
+运行时装配说明：
+
+- `Runtime` 只保留生命周期壳职责，不再默认持有所有业务依赖。
+- Bootstrap 会显式装配 ingest、query、loop 执行和 alert 执行组件，再只把 `App` 需要的生命周期钩子暴露出来。
+- 周期性 Kubernetes sync 和 status sweep 逻辑收敛在 `LoopRunner`。
+- 周期性 alert evaluation 和 notification delivery 逻辑收敛在 `AlertRunner`。
 
 ## 5. 领域模型
 

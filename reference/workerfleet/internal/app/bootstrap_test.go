@@ -21,8 +21,50 @@ func TestBootstrapMemoryBackend(t *testing.T) {
 	if runtime.Metrics == nil {
 		t.Fatalf("metrics collector is nil")
 	}
+	if runtime.shell.ingest == nil {
+		t.Fatalf("ingest runtime component is nil")
+	}
+	if runtime.shell.query == nil {
+		t.Fatalf("query runtime component is nil")
+	}
+	if runtime.shell.loops == nil {
+		t.Fatalf("loop runner is nil")
+	}
+	if runtime.shell.alerts == nil {
+		t.Fatalf("alert runner is nil")
+	}
 	if err := runtime.Close(context.Background()); err != nil {
 		t.Fatalf("close memory runtime: %v", err)
+	}
+}
+
+func TestBootstrapBuildsSplitRuntimeShell(t *testing.T) {
+	runtime, err := Bootstrap(context.Background(), DefaultConfig())
+	if err != nil {
+		t.Fatalf("bootstrap memory: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = runtime.Close(context.Background())
+	})
+
+	if runtime.Service != runtime.shell.query {
+		t.Fatalf("runtime service should reuse the query service component")
+	}
+	if runtime.shell.ingest == nil || runtime.shell.query == nil || runtime.shell.loops == nil || runtime.shell.alerts == nil {
+		t.Fatalf("runtime shell components not fully wired: %#v", runtime.shell)
+	}
+}
+
+func TestRuntimeReadyChecksConfiguredStore(t *testing.T) {
+	runtime, err := Bootstrap(context.Background(), DefaultConfig())
+	if err != nil {
+		t.Fatalf("bootstrap memory: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = runtime.Close(context.Background())
+	})
+	if err := runtime.Ready(context.Background()); err != nil {
+		t.Fatalf("ready check failed: %v", err)
 	}
 }
 
