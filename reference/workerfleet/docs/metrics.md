@@ -77,7 +77,9 @@ Scrape endpoint:
 
 Instrumentation points:
 
-- worker register and heartbeat paths accept an optional observer and record worker status gauges, heartbeat-age gauges, accepting-task gauges, active-case gauges, task lifecycle counters, phase transition counters, pod-level case completion/failure counters, phase duration histograms, total task duration histograms, case duration histograms, case step completion counters, case step duration histograms, stuck-case gauges, oldest active step age gauges, and worker report apply duration.
+- worker register and heartbeat paths accept an optional observer and split instrumentation into two sources:
+- worker snapshots drive state gauges such as worker status, heartbeat age, accepting-task state, active-case gauges, stuck-case gauges, and oldest active step age.
+- worker domain events drive counters and histograms such as task starts, finishes, phase transitions, case completion/failure totals, total case duration, and case step completion/duration.
 - Kubernetes inventory sync accepts an optional observer and records pod phase gauges plus sync duration histograms with `operation` and `result`.
 - alert evaluation accepts an optional observer and records emitted alert counters plus firing alert gauges.
 - runtime loops report Kubernetes sync, status sweep, alert evaluation, and notification delivery errors through `workerfleet_runtime_errors_total{operation,error_class}`.

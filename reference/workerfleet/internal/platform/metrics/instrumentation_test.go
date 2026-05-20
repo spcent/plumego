@@ -38,6 +38,15 @@ func TestObserverRecordsWorkerTaskMetrics(t *testing.T) {
 	}}
 
 	observer.ObserveWorkerSnapshot(previous, current)
+	observer.ObserveWorkerEvents(previous, current, []domain.DomainEvent{{
+		Type:       domain.EventTaskPhaseChanged,
+		OccurredAt: now,
+		TaskID:     "task-1",
+		Attributes: map[string]string{
+			"from_phase": string(domain.TaskPhaseRunning),
+			"to_phase":   string(domain.TaskPhaseFinalizing),
+		},
+	}})
 	text := collector.PrometheusText()
 	assertMetricsTextContains(t, text,
 		`workerfleet_active_cases{namespace="sim",node="node-a",phase="finalizing",task_type="simulation"} 1.000000000`,
@@ -71,6 +80,11 @@ func TestObserverRecordsFinishedTaskMetrics(t *testing.T) {
 	}
 
 	observer.ObserveWorkerSnapshot(previous, current)
+	observer.ObserveWorkerEvents(previous, current, []domain.DomainEvent{{
+		Type:       domain.EventTaskFinished,
+		OccurredAt: now,
+		TaskID:     "task-1",
+	}})
 	text := collector.PrometheusText()
 	assertMetricsTextContains(t, text,
 		`workerfleet_case_finished_total{namespace="sim",node="node-a",status="succeeded",task_type="simulation"} 1.000000000`,
@@ -110,6 +124,11 @@ func TestObserverRecordsPodCaseThroughputAndDurationMetrics(t *testing.T) {
 	}
 
 	observer.ObserveWorkerSnapshot(previous, current)
+	observer.ObserveWorkerEvents(previous, current, []domain.DomainEvent{{
+		Type:       domain.EventTaskFinished,
+		OccurredAt: now,
+		TaskID:     "case-1",
+	}})
 	text := collector.PrometheusText()
 	assertMetricsTextContains(t, text,
 		`workerfleet_case_completed_total{exec_plan_id="plan-1",namespace="sim",node="node-a",pod="pod-a",result="failed",task_type="simulation"} 1.000000000`,
@@ -161,6 +180,14 @@ func TestObserverRecordsStepCompletionAndDurationMetrics(t *testing.T) {
 	}}
 
 	observer.ObserveWorkerSnapshot(previous, current)
+	observer.ObserveWorkerEvents(previous, current, []domain.DomainEvent{{
+		Type:       domain.EventTaskStepChanged,
+		OccurredAt: now,
+		TaskID:     "case-1",
+		Attributes: map[string]string{
+			"to_step_started_at": now.Format(time.RFC3339Nano),
+		},
+	}})
 	text := collector.PrometheusText()
 	assertMetricsTextContains(t, text,
 		`workerfleet_case_step_completed_total{exec_plan_id="plan-1",namespace="sim",node="node-a",pod="pod-a",result="transitioned",step="download_bundle",task_type="simulation"} 1.000000000`,
@@ -244,6 +271,42 @@ func TestObserverRecordsAlertMetrics(t *testing.T) {
 		`workerfleet_alerts_total{alert_type="worker_offline",severity="critical",status="firing"} 1.000000000`,
 		`workerfleet_alerts_total{alert_type="worker_offline",severity="critical",status="resolved"} 1.000000000`,
 		`workerfleet_alerts_firing{alert_type="worker_offline",severity="critical"} 0.000000000`,
+	)
+}
+
+func TestObserverUnchangedSnapshotsDoNotDoubleCountEventMetrics(t *testing.T) {
+	now := time.Date(2026, 4, 20, 11, 40, 0, 0, time.UTC)
+	collector := NewCollector()
+	observer := NewObserver(collector)
+	previous := domain.WorkerSnapshot{
+		Identity: domain.WorkerIdentity{WorkerID: "worker-1", Namespace: "sim", NodeName: "node-a"},
+		Status:   domain.WorkerStatusOnline,
+		ActiveTasks: []domain.ActiveTask{{
+			TaskID:    "task-1",
+			TaskType:  "simulation",
+			Phase:     domain.TaskPhaseSucceeded,
+			PhaseName: "succeeded",
+			StartedAt: now.Add(-2 * time.Minute),
+			UpdatedAt: now.Add(-1 * time.Minute),
+		}},
+	}
+	current := domain.WorkerSnapshot{
+		Identity: domain.WorkerIdentity{WorkerID: "worker-1", Namespace: "sim", NodeName: "node-a"},
+		Status:   domain.WorkerStatusOnline,
+	}
+
+	observer.ObserveWorkerSnapshot(previous, current)
+	observer.ObserveWorkerEvents(previous, current, []domain.DomainEvent{{
+		Type:       domain.EventTaskFinished,
+		OccurredAt: now,
+		TaskID:     "task-1",
+	}})
+	observer.ObserveWorkerSnapshot(current, current)
+	observer.ObserveWorkerEvents(current, current, nil)
+
+	text := collector.PrometheusText()
+	assertMetricsTextContains(t, text,
+		`workerfleet_case_finished_total{namespace="sim",node="node-a",status="succeeded",task_type="simulation"} 1.000000000`,
 	)
 }
 

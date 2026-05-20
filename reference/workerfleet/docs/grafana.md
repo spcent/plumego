@@ -4,6 +4,11 @@ This dashboard assumes Prometheus scrapes `GET /metrics` from the workerfleet se
 
 The pod/worker/exec-plan/case/step metric phase is implemented in the workerfleet exporter. See [Case And Step Metrics Design](./case-step-metrics.md) for the full rationale; the implementation intentionally allows `pod` on selected metrics for pod-level throughput and duration panels while keeping `case_id` and `task_id` out of Prometheus.
 
+Metric semantics:
+
+- snapshot-derived gauges represent current state such as worker status, active cases, heartbeat age, and stuck-step signals.
+- event-derived counters and histograms represent throughput and duration, so Grafana rate and histogram panels should be read as domain-event streams rather than snapshot diffs.
+
 Recommended template variables:
 
 - `$namespace`: `label_values(workerfleet_workers, namespace)`

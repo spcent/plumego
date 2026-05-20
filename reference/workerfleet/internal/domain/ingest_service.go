@@ -24,6 +24,7 @@ type WorkerEventStore interface {
 
 type IngestMetricsObserver interface {
 	ObserveWorkerSnapshot(previous WorkerSnapshot, current WorkerSnapshot)
+	ObserveWorkerEvents(previous WorkerSnapshot, current WorkerSnapshot, events []DomainEvent)
 	ObserveWorkerReportApplied(operation string, duration time.Duration)
 }
 
@@ -143,6 +144,7 @@ func (s *IngestService) Heartbeat(ctx context.Context, report WorkerReport) (Wor
 	}
 	if s.metrics != nil {
 		s.metrics.ObserveWorkerSnapshot(previous, merged)
+		s.metrics.ObserveWorkerEvents(previous, merged, events)
 		s.metrics.ObserveWorkerReportApplied("heartbeat", time.Since(started))
 	}
 
