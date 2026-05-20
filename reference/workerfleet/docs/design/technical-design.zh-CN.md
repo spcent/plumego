@@ -219,7 +219,9 @@ Pod 映射：
 
 - `internal/platform/kube` 中的 sync 基础能力已经接入应用运行时。
 - `WORKERFLEET_KUBE_SYNC_ENABLED=true` 时，`internal/app` 会启动周期性 Kubernetes sync loop。
+- 运行时 loop scheduler 会防止同进程重入，默认单次执行超时为 `25s`，失败后按 `5s` 起步、`1m` 封顶做退避。
 - sync 错误会通过 runtime error observer 上报，并以低基数指标导出，不再静默丢弃。
+- loop 调度已经预留 no-op lease seam，后续接多副本 owner 协调时不需要重写 loop body。
 - 优雅关闭时会先停止该循环，再关闭 runtime store。
 
 ## 8. 存储设计
@@ -367,6 +369,7 @@ Grafana 看板应以聚合视图为主。单 case 或单 task 的细节排查应
 - 告警评估和 notifier 基础能力已经接入应用运行时。
 - `WORKERFLEET_ALERT_EVALUATION_ENABLED=true` 时，`internal/app` 会启动周期性告警评估循环。
 - `WORKERFLEET_NOTIFICATION_ENABLED=true` 时，已产生的告警记录会通过配置的 notifier 投递，并使用 `WORKERFLEET_NOTIFIER_DELIVERY_TIMEOUT` 控制超时。
+- 告警评估复用同一套 guarded loop scheduler，同样具备防重入、单次执行超时和有界失败退避。
 - 评估和通知错误会通过 runtime error observer 上报，并以低基数指标导出，不再静默丢弃。
 - 优雅关闭时会先停止告警循环，再关闭 runtime store。
 
@@ -396,6 +399,7 @@ HTTP：
 - `WORKERFLEET_KUBE_SYNC_INTERVAL`，默认 `30s`。
 - `WORKERFLEET_STATUS_SWEEP_INTERVAL`，默认 `30s`。
 - `WORKERFLEET_ALERT_EVALUATION_INTERVAL`，默认 `30s`。
+- Loop guardrail 默认值：单次执行超时 `25s`，失败退避起点 `5s`，最大退避 `1m`。
 - `WORKERFLEET_NOTIFIER_DELIVERY_TIMEOUT`，默认 `5s`。
 - `WORKERFLEET_KUBE_API_HOST`。
 - `WORKERFLEET_KUBE_BEARER_TOKEN`。

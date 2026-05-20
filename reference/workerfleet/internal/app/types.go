@@ -48,6 +48,7 @@ type LoopRunner struct {
 	policy            domain.StatusPolicy
 	metrics           *workerfleetmetrics.Observer
 	errors            RuntimeErrorObserver
+	lease             LoopLeaseCoordinator
 	inventorySyncerFn func(Config) (inventorySyncer, error)
 }
 
@@ -56,8 +57,33 @@ type AlertRunner struct {
 	policy        domain.StatusPolicy
 	metrics       *workerfleetmetrics.Observer
 	errors        RuntimeErrorObserver
+	lease         LoopLeaseCoordinator
 	dispatcherFn  func(Config) alertDispatcher
 	engineFactory func() domainAlertEngine
+}
+
+type loopExecutionSettings struct {
+	Name              string
+	Interval          time.Duration
+	Timeout           time.Duration
+	FailureBackoff    time.Duration
+	MaxFailureBackoff time.Duration
+	Lease             LoopLeaseCoordinator
+}
+
+type loopExecutionResult struct {
+	err      error
+	timedOut bool
+}
+
+type LoopLeaseCoordinator interface {
+	TryAcquire(ctx context.Context, loopName string) (release func(), acquired bool, err error)
+}
+
+type nopLoopLease struct{}
+
+func (nopLoopLease) TryAcquire(context.Context, string) (func(), bool, error) {
+	return nil, true, nil
 }
 
 type inventorySyncer interface {

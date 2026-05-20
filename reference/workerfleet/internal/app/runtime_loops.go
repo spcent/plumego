@@ -20,6 +20,7 @@ func NewLoopRunner(store runtimeStore, policy domain.StatusPolicy, metrics *work
 		policy:  policy,
 		metrics: metrics,
 		errors:  errors,
+		lease:   nopLoopLease{},
 	}
 	runner.inventorySyncerFn = runner.newInventorySyncer
 	return runner
@@ -45,20 +46,19 @@ func (l *LoopRunner) Start(ctx context.Context, cfg Config) (func(), error) {
 			cancel()
 			return nil, fmt.Errorf("create kubernetes client: %w", err)
 		}
-		startLoop(loopCtx, &wg, cfg.Runtime.KubeSyncInterval, func(ctx context.Context) {
+		settings := cfg.Runtime.kubeSyncLoopSettings()
+		settings.Lease = l.lease
+		startManagedLoop(loopCtx, &wg, settings, l.reportRuntimeError, func(ctx context.Context) error {
 			_, err := syncer.SyncOnce(ctx)
-			if err != nil {
-				l.reportRuntimeError("kube_sync", err)
-			}
+			return err
 		})
 	}
 
 	if cfg.Runtime.StatusSweepEnabled {
-		startLoop(loopCtx, &wg, cfg.Runtime.StatusSweepInterval, func(context.Context) {
-			err := l.SweepWorkerStatuses(ctx, time.Now().UTC())
-			if err != nil {
-				l.reportRuntimeError("status_sweep", err)
-			}
+		settings := cfg.Runtime.statusSweepLoopSettings()
+		settings.Lease = l.lease
+		startManagedLoop(loopCtx, &wg, settings, l.reportRuntimeError, func(loopRunCtx context.Context) error {
+			return l.SweepWorkerStatuses(loopRunCtx, time.Now().UTC())
 		})
 	}
 
@@ -154,6 +154,142 @@ func (l *LoopRunner) newInventorySyncer(cfg Config) (inventorySyncer, error) {
 	return kube.NewInventorySync(client, l.store, cfg.Kube.WorkerContainer, l.policy, kube.WithMetricsObserver(l.metrics)), nil
 }
 
+func startManagedLoop(ctx context.Context, wg *sync.WaitGroup, settings loopExecutionSettings, report func(string, error), fn func(context.Context) error) {
+	normalized := normalizeLoopExecutionSettings(settings)
+	resultCh := make(chan loopExecutionResult, 1)
+	timer := time.NewTimer(0)
+	if !timer.Stop() {
+		select {
+		case <-timer.C:
+		default:
+		}
+	}
+	resetLoopTimer(timer, 0)
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		defer timer.Stop()
+
+		running := false
+		backoff := normalized.FailureBackoff
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case result := <-resultCh:
+				running = false
+				if result.timedOut {
+					report(normalized.Name, context.DeadlineExceeded)
+					resetLoopTimer(timer, backoff)
+					backoff = nextLoopBackoff(backoff, normalized)
+					continue
+				}
+				if result.err != nil {
+					report(normalized.Name, result.err)
+					resetLoopTimer(timer, backoff)
+					backoff = nextLoopBackoff(backoff, normalized)
+					continue
+				}
+				backoff = normalized.FailureBackoff
+				resetLoopTimer(timer, normalized.Interval)
+			case <-timer.C:
+				if running {
+					resetLoopTimer(timer, normalized.Interval)
+					continue
+				}
+				release, acquired, err := normalized.Lease.TryAcquire(ctx, normalized.Name)
+				if err != nil {
+					report(normalized.Name, err)
+					resetLoopTimer(timer, backoff)
+					backoff = nextLoopBackoff(backoff, normalized)
+					continue
+				}
+				if !acquired {
+					resetLoopTimer(timer, normalized.Interval)
+					continue
+				}
+				running = true
+				go runLoopIteration(ctx, normalized, fn, release, resultCh)
+			}
+		}
+	}()
+}
+
+func runLoopIteration(parent context.Context, settings loopExecutionSettings, fn func(context.Context) error, release func(), resultCh chan<- loopExecutionResult) {
+	runCtx := parent
+	cancel := func() {}
+	if settings.Timeout > 0 {
+		runCtx, cancel = context.WithTimeout(parent, settings.Timeout)
+	}
+	defer cancel()
+	if release != nil {
+		defer release()
+	}
+	err := fn(runCtx)
+	result := loopExecutionResult{err: err}
+	if errors.Is(runCtx.Err(), context.DeadlineExceeded) {
+		result.timedOut = true
+		if result.err == nil || errors.Is(result.err, context.Canceled) {
+			result.err = context.DeadlineExceeded
+		}
+	}
+	select {
+	case resultCh <- result:
+	case <-parent.Done():
+	}
+}
+
+func normalizeLoopExecutionSettings(settings loopExecutionSettings) loopExecutionSettings {
+	normalized := settings
+	if normalized.Interval <= 0 {
+		normalized.Interval = 30 * time.Second
+	}
+	if normalized.Timeout <= 0 {
+		normalized.Timeout = defaultLoopTimeout
+	}
+	if normalized.FailureBackoff <= 0 {
+		normalized.FailureBackoff = defaultLoopFailureBackoff
+	}
+	if normalized.MaxFailureBackoff < normalized.FailureBackoff {
+		normalized.MaxFailureBackoff = maxDuration(defaultLoopMaxBackoff, normalized.FailureBackoff)
+	}
+	if normalized.Lease == nil {
+		normalized.Lease = nopLoopLease{}
+	}
+	return normalized
+}
+
+func nextLoopBackoff(current time.Duration, settings loopExecutionSettings) time.Duration {
+	if current <= 0 {
+		return settings.FailureBackoff
+	}
+	next := current * 2
+	if next > settings.MaxFailureBackoff {
+		next = settings.MaxFailureBackoff
+	}
+	if next < settings.FailureBackoff {
+		next = settings.FailureBackoff
+	}
+	return next
+}
+
+func resetLoopTimer(timer *time.Timer, delay time.Duration) {
+	if !timer.Stop() {
+		select {
+		case <-timer.C:
+		default:
+		}
+	}
+	timer.Reset(delay)
+}
+
+func maxDuration(left time.Duration, right time.Duration) time.Duration {
+	if left >= right {
+		return left
+	}
+	return right
+}
+
 func statusEventType(status domain.WorkerStatus) (domain.EventType, bool) {
 	switch status {
 	case domain.WorkerStatusOnline:
@@ -165,25 +301,4 @@ func statusEventType(status domain.WorkerStatus) (domain.EventType, bool) {
 	default:
 		return "", false
 	}
-}
-
-func startLoop(ctx context.Context, wg *sync.WaitGroup, interval time.Duration, fn func(context.Context)) {
-	if interval <= 0 {
-		interval = 30 * time.Second
-	}
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		fn(ctx)
-		ticker := time.NewTicker(interval)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-ticker.C:
-				fn(ctx)
-			}
-		}
-	}()
 }

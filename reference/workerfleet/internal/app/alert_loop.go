@@ -17,6 +17,7 @@ func NewAlertRunner(store runtimeStore, policy domain.StatusPolicy, metrics *wor
 		policy:  policy,
 		metrics: metrics,
 		errors:  errors,
+		lease:   nopLoopLease{},
 	}
 	runner.dispatcherFn = func(cfg Config) alertDispatcher {
 		return newAlertDispatcher(cfg)
@@ -40,11 +41,11 @@ func (a *AlertRunner) Start(ctx context.Context, cfg Config) (func(), error) {
 	}
 	loopCtx, cancel := context.WithCancel(ctx)
 	var wg sync.WaitGroup
-	startLoop(loopCtx, &wg, cfg.Runtime.AlertEvaluationInterval, func(ctx context.Context) {
+	settings := cfg.Runtime.alertEvaluationLoopSettings()
+	settings.Lease = a.lease
+	startManagedLoop(loopCtx, &wg, settings, a.reportRuntimeError, func(ctx context.Context) error {
 		_, err := a.EvaluateAndNotifyAlerts(ctx, cfg)
-		if err != nil {
-			a.reportRuntimeError("alert_evaluate", err)
-		}
+		return err
 	})
 	return func() {
 		cancel()

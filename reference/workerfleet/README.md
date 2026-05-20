@@ -58,6 +58,8 @@ Runtime loop configuration:
 - `WORKERFLEET_KUBE_LABEL_SELECTOR` limits watched worker pods
 - `WORKERFLEET_KUBE_WORKER_CONTAINER` selects the worker container, default `worker`
 - runtime loop errors are exported as `workerfleet_runtime_errors_total`
+- each runtime loop runs with built-in non-overlap, a default `25s` iteration timeout, a `5s` initial failure backoff, and a `1m` max failure backoff
+- a no-op lease seam is already present in the loop scheduler so future multi-replica ownership can be added without rewriting loop bodies
 
 Single-cluster Kubernetes assumptions:
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -193,4 +194,171 @@ type inventorySyncerFunc func(context.Context) (string, error)
 
 func (fn inventorySyncerFunc) SyncOnce(ctx context.Context) (string, error) {
 	return fn(ctx)
+}
+
+func TestLoopRunnerPreventsOverlappingExecutions(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	var wg sync.WaitGroup
+	var current int32
+	var maxConcurrent int32
+	started := make(chan struct{}, 1)
+	release := make(chan struct{})
+
+	startManagedLoop(ctx, &wg, loopExecutionSettings{
+		Name:              "status_sweep",
+		Interval:          2 * time.Millisecond,
+		Timeout:           200 * time.Millisecond,
+		FailureBackoff:    5 * time.Millisecond,
+		MaxFailureBackoff: 10 * time.Millisecond,
+	}, func(string, error) {}, func(ctx context.Context) error {
+		active := atomic.AddInt32(&current, 1)
+		updateMaxConcurrent(&maxConcurrent, active)
+		select {
+		case started <- struct{}{}:
+		default:
+		}
+		select {
+		case <-release:
+		case <-ctx.Done():
+		}
+		atomic.AddInt32(&current, -1)
+		return nil
+	})
+
+	select {
+	case <-started:
+	case <-time.After(100 * time.Millisecond):
+		t.Fatal("loop did not start")
+	}
+	time.Sleep(20 * time.Millisecond)
+	close(release)
+	cancel()
+	wg.Wait()
+
+	if got := atomic.LoadInt32(&maxConcurrent); got != 1 {
+		t.Fatalf("max concurrent = %d, want 1", got)
+	}
+}
+
+func TestLoopRunnerCancelsSlowIterationOnTimeout(t *testing.T) {
+	observer := &recordingRuntimeErrorObserver{}
+	runner := &LoopRunner{errors: observer}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	var wg sync.WaitGroup
+	canceled := make(chan struct{}, 1)
+	startManagedLoop(ctx, &wg, loopExecutionSettings{
+		Name:              "status_sweep",
+		Interval:          time.Hour,
+		Timeout:           15 * time.Millisecond,
+		FailureBackoff:    5 * time.Millisecond,
+		MaxFailureBackoff: 10 * time.Millisecond,
+	}, runner.reportRuntimeError, func(ctx context.Context) error {
+		<-ctx.Done()
+		select {
+		case canceled <- struct{}{}:
+		default:
+		}
+		return ctx.Err()
+	})
+
+	select {
+	case <-canceled:
+	case <-time.After(200 * time.Millisecond):
+		t.Fatal("loop timeout did not cancel iteration")
+	}
+	cancel()
+	wg.Wait()
+
+	operations, errs := observer.snapshot()
+	if len(operations) == 0 || operations[0] != "status_sweep" {
+		t.Fatalf("reported operations = %#v, want status_sweep", operations)
+	}
+	if !errors.Is(errs[0], context.DeadlineExceeded) {
+		t.Fatalf("error = %v, want context deadline exceeded", errs[0])
+	}
+}
+
+func TestLoopRunnerBacksOffAfterFailure(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+	attempts := make([]time.Time, 0, 2)
+	done := make(chan struct{})
+
+	startManagedLoop(ctx, &wg, loopExecutionSettings{
+		Name:              "kube_sync",
+		Interval:          2 * time.Millisecond,
+		Timeout:           50 * time.Millisecond,
+		FailureBackoff:    25 * time.Millisecond,
+		MaxFailureBackoff: 25 * time.Millisecond,
+	}, func(string, error) {}, func(context.Context) error {
+		mu.Lock()
+		attempts = append(attempts, time.Now())
+		count := len(attempts)
+		mu.Unlock()
+		if count >= 2 {
+			select {
+			case done <- struct{}{}:
+			default:
+			}
+		}
+		return errors.New("boom")
+	})
+
+	select {
+	case <-done:
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("expected two loop attempts")
+	}
+	cancel()
+	wg.Wait()
+
+	mu.Lock()
+	defer mu.Unlock()
+	if len(attempts) < 2 {
+		t.Fatalf("attempt count = %d, want at least 2", len(attempts))
+	}
+	gap := attempts[1].Sub(attempts[0])
+	if gap < 20*time.Millisecond {
+		t.Fatalf("attempt gap = %v, want at least 20ms backoff", gap)
+	}
+}
+
+func TestRuntimeLoopSettingsRemainIndependent(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Runtime.KubeSyncInterval = 11 * time.Second
+	cfg.Runtime.StatusSweepInterval = 12 * time.Second
+	cfg.Runtime.AlertEvaluationInterval = 13 * time.Second
+
+	kubeSettings := cfg.Runtime.kubeSyncLoopSettings()
+	statusSettings := cfg.Runtime.statusSweepLoopSettings()
+	alertSettings := cfg.Runtime.alertEvaluationLoopSettings()
+
+	if kubeSettings.Name != "kube_sync" || kubeSettings.Interval != 11*time.Second {
+		t.Fatalf("kube settings = %#v", kubeSettings)
+	}
+	if statusSettings.Name != "status_sweep" || statusSettings.Interval != 12*time.Second {
+		t.Fatalf("status settings = %#v", statusSettings)
+	}
+	if alertSettings.Name != "alert_evaluate" || alertSettings.Interval != 13*time.Second {
+		t.Fatalf("alert settings = %#v", alertSettings)
+	}
+}
+
+func updateMaxConcurrent(target *int32, value int32) {
+	for {
+		current := atomic.LoadInt32(target)
+		if value <= current {
+			return
+		}
+		if atomic.CompareAndSwapInt32(target, current, value) {
+			return
+		}
+	}
 }

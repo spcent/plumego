@@ -17,6 +17,9 @@ const (
 
 	nanosecondsPerRetentionDay = uint64((24 * time.Hour) / time.Nanosecond)
 	maxRetentionDays           = uint64(1<<63-1) / nanosecondsPerRetentionDay
+	defaultLoopTimeout         = 25 * time.Second
+	defaultLoopFailureBackoff  = 5 * time.Second
+	defaultLoopMaxBackoff      = 1 * time.Minute
 )
 
 type Config struct {
@@ -251,6 +254,31 @@ func ValidateConfig(cfg Config) error {
 		return errors.New("WORKERFLEET_KUBE_WORKER_CONTAINER is required when WORKERFLEET_KUBE_SYNC_ENABLED=true")
 	}
 	return nil
+}
+
+func (cfg RuntimeConfig) kubeSyncLoopSettings() loopExecutionSettings {
+	return cfg.loopSettings("kube_sync", cfg.KubeSyncInterval)
+}
+
+func (cfg RuntimeConfig) statusSweepLoopSettings() loopExecutionSettings {
+	return cfg.loopSettings("status_sweep", cfg.StatusSweepInterval)
+}
+
+func (cfg RuntimeConfig) alertEvaluationLoopSettings() loopExecutionSettings {
+	return cfg.loopSettings("alert_evaluate", cfg.AlertEvaluationInterval)
+}
+
+func (cfg RuntimeConfig) loopSettings(name string, interval time.Duration) loopExecutionSettings {
+	if interval <= 0 {
+		interval = 30 * time.Second
+	}
+	return loopExecutionSettings{
+		Name:              name,
+		Interval:          interval,
+		Timeout:           defaultLoopTimeout,
+		FailureBackoff:    defaultLoopFailureBackoff,
+		MaxFailureBackoff: defaultLoopMaxBackoff,
+	}
 }
 
 func parseDurationEnv(name string, value string) (time.Duration, error) {

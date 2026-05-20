@@ -219,7 +219,9 @@ Implemented runtime behavior:
 
 - `internal/platform/kube` sync primitives are wired into the app runtime.
 - When `WORKERFLEET_KUBE_SYNC_ENABLED=true`, `internal/app` starts a periodic Kubernetes sync loop.
+- The runtime loop scheduler prevents same-process overlap, applies a default `25s` per-iteration timeout, and backs off from `5s` up to `1m` after failures.
 - Sync errors are reported through the runtime error observer and exported through low-cardinality metrics instead of being silently discarded.
+- Loop scheduling already routes through a no-op lease seam so future multi-replica ownership can be added without changing loop bodies.
 - The loop is stopped during graceful shutdown before the runtime store is closed.
 
 ## 8. Storage Design
@@ -367,6 +369,7 @@ Implemented runtime behavior:
 - Alert evaluation and notifier primitives are wired into the app runtime.
 - When `WORKERFLEET_ALERT_EVALUATION_ENABLED=true`, `internal/app` starts a periodic alert evaluation loop.
 - When `WORKERFLEET_NOTIFICATION_ENABLED=true`, emitted alert records are dispatched through configured notifiers with `WORKERFLEET_NOTIFIER_DELIVERY_TIMEOUT`.
+- Alert evaluation uses the same guarded loop scheduler, including non-overlap, per-iteration timeout, and bounded failure backoff.
 - Evaluation and notification errors are reported through the runtime error observer and exported through low-cardinality metrics instead of being silently discarded.
 - The alert loop is stopped during graceful shutdown before the runtime store is closed.
 
@@ -396,6 +399,7 @@ Runtime loop configuration:
 - `WORKERFLEET_KUBE_SYNC_INTERVAL`, default `30s`.
 - `WORKERFLEET_STATUS_SWEEP_INTERVAL`, default `30s`.
 - `WORKERFLEET_ALERT_EVALUATION_INTERVAL`, default `30s`.
+- Loop guardrail defaults: per-iteration timeout `25s`, initial failure backoff `5s`, max failure backoff `1m`.
 - `WORKERFLEET_NOTIFIER_DELIVERY_TIMEOUT`, default `5s`.
 - `WORKERFLEET_KUBE_API_HOST`.
 - `WORKERFLEET_KUBE_BEARER_TOKEN`.
