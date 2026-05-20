@@ -207,6 +207,11 @@ Example success payload:
 }
 ```
 
+Notes:
+
+- Query responses reuse the same read-model contract across worker detail, task detail, case timeline, and exec-plan drilldown payloads.
+- `current_step` is omitted from query responses when the worker does not currently report a step.
+
 ## `GET /v1/tasks/{task_id}/timeline`
 
 Returns case step transition and completion history for one case.
