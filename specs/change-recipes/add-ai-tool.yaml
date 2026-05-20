@@ -1,0 +1,13 @@
+name: add-ai-tool
+scope: registering a new tool in x/ai/tool or wiring an existing tool into a session
+steps:
+  - Read x/ai/module.yaml and docs/modules/x-ai/README.md.
+  - Confirm the tool contract: input schema, output type, and error paths.
+  - Define the tool using the x/ai/tool registration pattern; keep tool implementation pure (no HTTP calls from inside the tool function unless the tool is explicitly an HTTP-fetching tool).
+  - Wire the tool into the session via explicit constructor injection; do not register tools through a global registry or init().
+  - Add tests covering successful invocation, invalid-input rejection, and the error propagation path back to the session.
+  - Run x/ai tests; run boundary checks if session or provider interfaces changed.
+stop_conditions:
+  - Do not add tool logic that requires stable-root imports (core, router, contract, middleware).
+  - Do not use package-level mutable tool registries.
+  - Do not promote the tool to a stable-root export; tools belong in x/ai/tool.

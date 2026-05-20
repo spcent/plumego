@@ -218,6 +218,7 @@ Boundary and manifest checks:
 
 ```bash
 go run ./internal/checks/dependency-rules
+go run ./internal/checks/cross-extension-deps
 go run ./internal/checks/agent-workflow
 go run ./internal/checks/module-manifests
 go run ./internal/checks/reference-layout
@@ -271,6 +272,26 @@ Also update module primers under `docs/modules/`, `docs/EXTENSION_MATURITY.md`,
 that surface.
 
 Document implemented behavior only.
+
+### Website Generated Files
+
+`website/src/generated/` contains files generated from docs sources. These
+files are checked in and must stay in sync. `make gates` detects staleness by
+running the sync and comparing before/after diffs; it errors if the sync
+produces any change.
+
+**Required when editing any of these sources:**
+
+| Source file | Generated file | Rule |
+|---|---|---|
+| `docs/ROADMAP.md` | `website/src/generated/roadmap.ts` | run `make website-sync` |
+| `docs/modules/*/README.md` | `website/src/generated/modules.ts` | run `make website-sync` |
+| `specs/request-flows.yaml` | `website/src/generated/routing.ts` | run `make website-sync` |
+| `docs/release/*.md` | `website/src/generated/release-meta.ts` | run `make website-sync` |
+
+After any edit to a source listed above, run `make website-sync` and include
+the updated `website/src/generated/` files in the same commit. Never commit
+source changes without the corresponding generated file update.
 
 ## 10. Milestones
 

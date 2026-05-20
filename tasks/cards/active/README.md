@@ -62,6 +62,8 @@ chain in tasks/milestones/ROADMAP.md.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
+| 1500-m009-x-tenant-ga-evaluation.md | P1 | x/tenant | GA promotion evaluation: release evidence, snapshot comparison, owner sign-off |
+| 1501-m009-x-ai-stable-tier-beta-evaluation.md | P1 | x/ai | Beta evaluation for provider, session, streaming, tool subpackages individually |
 
 ### M-010 — Beta Promotions Round 2 (P1, depends on M-009)
 
@@ -82,6 +84,7 @@ chain in tasks/milestones/ROADMAP.md.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
+| 1502-m014-x-openapi-cli-integration.md | P1 | x/openapi | Add `plumego openapi generate` subcommand, JSON serialization, expand primer |
 
 ### M-015 — Database Adapters (P2, depends on M-009)
 

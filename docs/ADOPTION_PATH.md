@@ -61,6 +61,8 @@ Keep `reference/standard-service` as the app shape. Add one capability family:
 | Local debug routes, config snapshots, or pprof | `docs/modules/x-devtools/README.md` |
 | Reusable circuit breaker or rate-limit primitives | `docs/modules/x-resilience/README.md` |
 | AI provider/session/tool primitives | `docs/modules/x-ai/README.md` |
+| gRPC service hosting, client pooling, or HTTP-RPC gateway | `docs/modules/x-rpc/README.md` |
+| OpenAPI 3.1 spec generation from route metadata | `docs/modules/x-openapi/README.md` |
 
 Done when the app still has explicit route wiring and only the selected
 capability family is added.

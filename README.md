@@ -62,6 +62,25 @@ For the production-style application layout, read
 [`reference/standard-service`](./reference/standard-service) after this
 example.
 
+## Choose Your Starting Point
+
+Pick the scenario that matches your project:
+
+| I want to build... | Start here |
+| --- | --- |
+| A plain JSON API | `reference/standard-service` → stable roots only |
+| REST resources with CRUD conventions | `reference/with-rest` → `x/rest` |
+| A multi-tenant SaaS API | `reference/with-tenant` → `x/tenant` |
+| An API gateway or reverse proxy | `reference/with-gateway` → `x/gateway` |
+| Real-time WebSocket features | `reference/with-websocket` → `x/websocket` |
+| An AI-backed service | `reference/with-ai` → `x/ai/provider` |
+| A service with rich messaging/webhooks | `reference/with-messaging` → `x/messaging` |
+| A gRPC + HTTP service | `reference/with-rpc` → `x/rpc` |
+| Observability (Prometheus / OpenTelemetry) | `x/observability` |
+
+All paths keep `reference/standard-service` as the base layout. Extensions are
+explicit additions, not alternate bootstraps.
+
 ## Why plumego
 
 Plumego is for Go services that need more structure than raw `http.ServeMux`
@@ -127,3 +146,7 @@ full model and adoption path.
 - Browse [`docs/modules`](./docs/modules) for package-specific primers.
 - Check [`docs/ADOPTION_PATH.md`](./docs/ADOPTION_PATH.md) for the 5-minute,
   30-minute, and 1-day adoption path.
+- See [`docs/troubleshooting.md`](./docs/troubleshooting.md) for common
+  problems: route freeze, middleware order, JWT errors, and lifecycle issues.
+- See [`docs/benchmarks/README.md`](./docs/benchmarks/README.md) for
+  performance comparisons with Chi, Gin, and Echo.

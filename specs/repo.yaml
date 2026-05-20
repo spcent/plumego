@@ -57,6 +57,9 @@ canonical_authority:
     - specs/change-recipes/stable-root-boundary-review.yaml
     - specs/change-recipes/symbol-change.yaml
     - specs/change-recipes/tenant-policy-change.yaml
+    - specs/change-recipes/add-websocket-room.yaml
+    - specs/change-recipes/add-ai-tool.yaml
+    - specs/change-recipes/add-grpc-method.yaml
   task_queue:
     - tasks/cards
     - tasks/milestones
