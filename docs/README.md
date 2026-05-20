@@ -7,6 +7,7 @@ Read by intent instead of scanning everything.
 ## Start Here
 
 - `getting-started.md` — smallest runnable example and the canonical next reads
+- `getting-started_CN.md` — 中文入门指南（Chinese onboarding guide）
 - `ADOPTION_PATH.md` — narrow 5-minute, 30-minute, and 1-day adoption path
 - `why-plumego.md` — what Plumego is for, core principles, and fit summary
 - `when-not-to-use-plumego.md` — honest cases where a different tool fits better
