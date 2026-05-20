@@ -39,11 +39,13 @@ var StableRoots = []string{
 }
 
 var allowedTopLevelDirs = []string{
+	"agents",
 	"benchmark",
 	"cmd",
 	"contract",
 	"core",
 	"docs",
+	"examples",
 	"health",
 	"internal",
 	"log",
