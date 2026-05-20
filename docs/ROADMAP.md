@@ -231,9 +231,43 @@ Next work:
 
 - promote remaining candidates (`x/tenant`, `x/frontend`) only after release-history
   evidence proves two consecutive minor releases without exported API changes
+  (task cards 1500 and the existing x/frontend promotion card)
 - extend `docs/DEPRECATION.md` beta extension table as more modules are promoted
 - evaluate `x/ai` stable-tier subpackages individually after release-history
-  evidence is available
+  evidence is available (task card 1501)
+- update x/openapi/module.yaml to remove stale milestone-card language once
+  release-history evidence for beta evaluation is in place (task card 1502)
+
+## Phase 15: Community Onboarding Improvements
+
+Status: substantially complete (2026-05-20)
+
+Work completed:
+
+- `README.md` and `README_CN.md`: scenario routing decision table added
+- `docs/benchmarks/README.md`: benchmark methodology, medians vs. Chi/Gin/Echo,
+  net/http compatibility cost explanation
+- `docs/troubleshooting.md`: 14-category onboarding troubleshooting guide
+- `docs/getting-started_CN.md`: Chinese onboarding guide (complete)
+- `docs/modules/x-rpc/README.md`: expanded from 23 lines to full primer
+  (server lifecycle, client pool, interceptors, gateway, wiring diagram)
+- `docs/modules/x-openapi/README.md`: expanded from 7 lines to full primer
+  (CLI quick start, hint file format, Go API, serialisation, boundary rules)
+- `docs/modules/x-validate/README.md`: expanded from 18 lines to full primer
+  (BindJSON/Bind usage, Validator interface, adapter pattern, error shape)
+- `docs/modules/x-resilience/README.md`: usage examples added (circuit breaker,
+  keyed rate limiter, HTTP middleware integration)
+- `docs/ADOPTION_PATH.md`: gRPC/RPC and OpenAPI entries added
+- `specs/change-recipes/`: three new recipes (add-websocket-room, add-ai-tool,
+  add-grpc-method)
+- `internal/checks/cross-extension-deps`: new boundary checker validates
+  module.yaml forbidden_imports against actual Go imports in x/* packages
+- task cards 1500–1502 added to active queue for B1/B2/B3 evaluation
+
+Non-goals:
+
+- do not add Chinese versions of all module primers in this phase
+- do not promote extensions without release-history evidence
 
 ## Cross-Cutting Workstreams
 
@@ -268,15 +302,18 @@ Next work:
 - keep docs examples compatible with the current API surface
 - run `go run ./internal/checks/extension-maturity` when extension manifest
   status or risk changes so the dashboard stays aligned
+- run `go run ./internal/checks/cross-extension-deps` when x/* module.yaml
+  forbidden_imports or actual imports change to confirm boundary compliance
 
 ## Suggested Execution Order
 
-1. Keep Phase 13 docs and onboarding sync continuous.
+1. Keep Phase 13 and Phase 15 docs and onboarding sync continuous.
 2. Keep `docs/EXTENSION_MATURITY.md` aligned with module manifests and evidence records.
-3. Evaluate `x/ai` stable-tier subpackages individually after release-history evidence is available.
-4. Advance `x/tenant` production readiness.
-5. Clarify `x/data` and `x/fileapi` operational guidance.
-6. Expand `x/gateway/discovery` backends only when explicit adapters are ready.
+3. Execute task card 1500 (x/tenant GA evaluation) once v1.2.0 release evidence is available.
+4. Execute task card 1501 (x/ai stable-tier subpackages beta evaluation) per-subpackage after release evidence.
+5. Execute task card 1502 (x/openapi module.yaml cleanup and beta evaluation) once release evidence is available.
+6. Clarify `x/data` and `x/fileapi` operational guidance.
+7. Expand `x/gateway/discovery` backends only when explicit adapters are ready.
 
 ## What Not to Do
 
