@@ -141,28 +141,58 @@ export default defineConfig({
           translations: { 'zh-CN': '指南与参考' },
           items: [
             {
-              label: 'Practical Guides',
-              translations: { 'zh-CN': '实践指南' },
+              label: 'Build & Wire',
+              translations: { 'zh-CN': '构建与装配' },
               collapsed: false,
               items: [
-                { label: 'Dev Server', slug: 'docs/guides/dev-server', translations: { 'zh-CN': '开发服务器' } },
                 { label: 'Build a REST Resource', slug: 'docs/guides/build-rest-resource', translations: { 'zh-CN': '构建 REST 资源' } },
-                { label: 'Add JWT Auth', slug: 'docs/guides/add-jwt-auth', translations: { 'zh-CN': '添加 JWT 认证' } },
                 { label: 'Custom Middleware', slug: 'docs/guides/custom-middleware', translations: { 'zh-CN': '自定义中间件' } },
+                { label: 'Add JWT Auth', slug: 'docs/guides/add-jwt-auth', translations: { 'zh-CN': '添加 JWT 认证' } },
                 { label: 'Handle Errors', slug: 'docs/guides/handle-errors', translations: { 'zh-CN': '错误处理' } },
-                { label: 'Health & Readiness', slug: 'docs/guides/health-and-readiness', translations: { 'zh-CN': '健康检查' } },
-                { label: 'Structured Logging', slug: 'docs/guides/structured-logging', translations: { 'zh-CN': '结构化日志' } },
-                { label: 'Connect Database', slug: 'docs/guides/connect-database', translations: { 'zh-CN': '连接数据库' } },
                 { label: 'Testing Handlers', slug: 'docs/guides/testing-handlers', translations: { 'zh-CN': '测试 Handler' } },
+              ],
+            },
+            {
+              label: 'Data & Protocol',
+              translations: { 'zh-CN': '数据与协议' },
+              collapsed: true,
+              items: [
+                { label: 'Connect Database', slug: 'docs/guides/connect-database', translations: { 'zh-CN': '连接数据库' } },
                 { label: 'File Uploads', slug: 'docs/guides/file-uploads', translations: { 'zh-CN': '文件上传' } },
                 { label: 'WebSocket', slug: 'docs/guides/websocket', translations: { 'zh-CN': 'WebSocket' } },
-                { label: 'Graceful Shutdown', slug: 'docs/guides/graceful-shutdown', translations: { 'zh-CN': '优雅停机' } },
-                { label: 'Deploy with Docker', slug: 'docs/guides/deploy-with-docker', translations: { 'zh-CN': 'Docker 部署' } },
-                { label: 'Observability', slug: 'docs/guides/observability-integration', translations: { 'zh-CN': '可观测性集成' } },
                 { label: 'Integrate AI', slug: 'docs/guides/integrate-ai', translations: { 'zh-CN': '集成 AI' } },
                 { label: 'Multi-tenancy', slug: 'docs/guides/multi-tenancy', translations: { 'zh-CN': '多租户' } },
+              ],
+            },
+            {
+              label: 'Observe & Deploy',
+              translations: { 'zh-CN': '可观测与部署' },
+              collapsed: true,
+              items: [
+                { label: 'Health & Readiness', slug: 'docs/guides/health-and-readiness', translations: { 'zh-CN': '健康检查' } },
+                { label: 'Structured Logging', slug: 'docs/guides/structured-logging', translations: { 'zh-CN': '结构化日志' } },
+                { label: 'Observability', slug: 'docs/guides/observability-integration', translations: { 'zh-CN': '可观测性集成' } },
+                { label: 'Graceful Shutdown', slug: 'docs/guides/graceful-shutdown', translations: { 'zh-CN': '优雅停机' } },
+                { label: 'Deploy with Docker', slug: 'docs/guides/deploy-with-docker', translations: { 'zh-CN': 'Docker 部署' } },
+                { label: 'Dev Server', slug: 'docs/guides/dev-server', translations: { 'zh-CN': '开发服务器' } },
+              ],
+            },
+            {
+              label: 'Migrate',
+              translations: { 'zh-CN': '迁移' },
+              collapsed: true,
+              items: [
+                { label: 'Adoption Path', slug: 'docs/guides/adoption-path', translations: { 'zh-CN': '采用路径' } },
                 { label: 'Migration & Upgrades', slug: 'docs/guides/migration-and-upgrades', translations: { 'zh-CN': '迁移与升级' } },
                 { label: 'Migrate from Gin/Echo', slug: 'docs/guides/migrate-from-gin-echo', translations: { 'zh-CN': '从 Gin/Echo 迁移' } },
+              ],
+            },
+            {
+              label: 'Style Guide',
+              translations: { 'zh-CN': '编码规范' },
+              collapsed: true,
+              items: [
+                { label: 'Style Guide', slug: 'docs/guides/style-guide', translations: { 'zh-CN': '编码规范' } },
               ],
             },
             {
