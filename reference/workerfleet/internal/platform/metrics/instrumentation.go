@@ -14,13 +14,36 @@ const unknownLabel = "unknown"
 const activeStepStuckAfter = 30 * time.Minute
 
 type Observer struct {
-	collector *Collector
-	mu        sync.Mutex
-	seen      map[domain.WorkerID]struct{}
+	collector                 *Collector
+	experimentalSeriesEnabled bool
+	mu                        sync.Mutex
+	seen                      map[domain.WorkerID]struct{}
 }
 
-func NewObserver(collector *Collector) *Observer {
-	return &Observer{collector: collector, seen: make(map[domain.WorkerID]struct{})}
+type ObserverOption func(*Observer)
+
+func WithExperimentalMetrics(enabled bool) ObserverOption {
+	return func(o *Observer) {
+		o.experimentalSeriesEnabled = enabled
+	}
+}
+
+func NewObserver(collector *Collector, opts ...ObserverOption) *Observer {
+	observer := &Observer{
+		collector:                 collector,
+		experimentalSeriesEnabled: true,
+		seen:                      make(map[domain.WorkerID]struct{}),
+	}
+	for _, opt := range opts {
+		if opt != nil {
+			opt(observer)
+		}
+	}
+	return observer
+}
+
+func (o *Observer) ExperimentalMetricsEnabled() bool {
+	return o != nil && o.experimentalSeriesEnabled
 }
 
 func (o *Observer) ObserveWorkerSnapshot(previous domain.WorkerSnapshot, current domain.WorkerSnapshot) {
@@ -32,7 +55,9 @@ func (o *Observer) ObserveWorkerSnapshot(previous domain.WorkerSnapshot, current
 	o.observeHeartbeatAge(previous, current)
 	o.observeAcceptingTasks(previous, current)
 	o.observeActiveTaskGauges(previous, current)
-	o.observeActiveStepGauges(previous, current)
+	if o.experimentalSeriesEnabled {
+		o.observeActiveStepGauges(previous, current)
+	}
 	if firstObservation {
 		o.observeUnchangedBaseline(previous, current)
 	}
@@ -58,12 +83,18 @@ func (o *Observer) ObserveWorkerEvents(previous domain.WorkerSnapshot, current d
 				o.observeTaskPhaseTransition(current.Identity, previousTask, currentTask)
 			}
 		case domain.EventTaskStepChanged:
+			if !o.experimentalSeriesEnabled {
+				continue
+			}
 			previousTask, previousOK := previousTasks[event.TaskID]
 			currentTask, currentOK := currentTasks[event.TaskID]
 			if previousOK && currentOK {
 				o.observeTaskStepChanged(current.Identity, previousTask, currentTask, event)
 			}
 		case domain.EventTaskStepFinished:
+			if !o.experimentalSeriesEnabled {
+				continue
+			}
 			task, ok := currentTasks[event.TaskID]
 			if !ok {
 				task, ok = previousTasks[event.TaskID]
@@ -322,10 +353,6 @@ func (o *Observer) observeTaskFinishedAt(identity domain.WorkerIdentity, task do
 		LabelTaskType:  taskTypeLabel(task.TaskType),
 		LabelStatus:    status,
 	}, 1)
-	o.addCounter(MetricCaseCompletedTotal, caseCompletionLabels(identity, task, status), 1)
-	if status == string(domain.TaskPhaseFailed) {
-		o.addCounter(MetricCaseFailedTotal, caseFailureLabels(identity, task), 1)
-	}
 	if !task.UpdatedAt.IsZero() {
 		duration := finishedAt.Sub(task.UpdatedAt)
 		if duration > 0 {
@@ -346,6 +373,18 @@ func (o *Observer) observeTaskFinishedAt(identity domain.WorkerIdentity, task do
 				LabelTaskType:  taskTypeLabel(task.TaskType),
 				LabelStatus:    status,
 			}, duration.Seconds())
+		}
+	}
+	if !o.experimentalSeriesEnabled {
+		return
+	}
+	o.addCounter(MetricCaseCompletedTotal, caseCompletionLabels(identity, task, status), 1)
+	if status == string(domain.TaskPhaseFailed) {
+		o.addCounter(MetricCaseFailedTotal, caseFailureLabels(identity, task), 1)
+	}
+	if !task.StartedAt.IsZero() {
+		duration := finishedAt.Sub(task.StartedAt)
+		if duration > 0 {
 			o.observeHistogram(MetricCaseDurationSeconds, caseCompletionLabels(identity, task, status), duration.Seconds())
 		}
 	}

@@ -54,6 +54,7 @@ Runtime loop configuration:
 - `WORKERFLEET_STATUS_SWEEP_INTERVAL`, default `30s`
 - `WORKERFLEET_ALERT_EVALUATION_INTERVAL`, default `30s`
 - `WORKERFLEET_NOTIFIER_DELIVERY_TIMEOUT`, default `5s`
+- `WORKERFLEET_EXPERIMENTAL_METRICS_ENABLED`, default `true` in `dev` and `false` in `prod`
 - `WORKERFLEET_KUBE_API_HOST` optionally overrides in-cluster Kubernetes API discovery
 - `WORKERFLEET_KUBE_BEARER_TOKEN` optionally overrides service account token discovery
 - `WORKERFLEET_KUBE_NAMESPACE` controls the namespace watched by Kubernetes sync
@@ -74,6 +75,7 @@ Status and alert policy configuration:
 - `WORKERFLEET_ALERT_STAGE_STUCK_AFTER` overrides alert-side stage-stuck firing
 - `WORKERFLEET_ALERT_RESTART_BURST_THRESHOLD` overrides alert-side restart-burst firing
 - policy values are validated at startup; unsafe low thresholds fail closed before the HTTP server is exposed
+- `WORKERFLEET_EXPERIMENTAL_METRICS_ENABLED` overrides the profile default for pod, exec-plan, and case-step experimental metric families
 
 Single-cluster Kubernetes assumptions:
 

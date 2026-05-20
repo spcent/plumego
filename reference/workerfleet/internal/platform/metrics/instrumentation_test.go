@@ -229,6 +229,60 @@ func TestObserverRecordsActiveStepStuckAndOldestAgeMetrics(t *testing.T) {
 	)
 }
 
+func TestObserverSkipsExperimentalSeriesWhenDisabled(t *testing.T) {
+	now := time.Date(2026, 4, 20, 11, 35, 0, 0, time.UTC)
+	collector := NewCollector()
+	observer := NewObserver(collector, WithExperimentalMetrics(false))
+	previous := domain.WorkerSnapshot{
+		Identity: domain.WorkerIdentity{WorkerID: "worker-1", Namespace: "sim", NodeName: "node-a", PodName: "pod-a"},
+		Runtime:  domain.WorkerRuntime{LastHeartbeatAt: now.Add(-1 * time.Minute)},
+		Status:   domain.WorkerStatusOnline,
+		ActiveTasks: []domain.ActiveTask{{
+			TaskID:     "case-1",
+			ExecPlanID: "plan-1",
+			TaskType:   "simulation",
+			Phase:      domain.TaskPhaseFailed,
+			PhaseName:  "failed",
+			CurrentStep: domain.CaseStepRuntime{
+				Step:       "simulate",
+				Status:     domain.CaseStepStatusFailed,
+				StartedAt:  now.Add(-3 * time.Minute),
+				FinishedAt: now.Add(-1 * time.Minute),
+				ErrorClass: "simulation_timeout",
+			},
+			StartedAt: now.Add(-10 * time.Minute),
+			UpdatedAt: now.Add(-1 * time.Minute),
+		}},
+	}
+	current := domain.WorkerSnapshot{
+		Identity: domain.WorkerIdentity{WorkerID: "worker-1", Namespace: "sim", NodeName: "node-a", PodName: "pod-a"},
+		Runtime:  domain.WorkerRuntime{LastHeartbeatAt: now},
+		Status:   domain.WorkerStatusOnline,
+	}
+
+	observer.ObserveWorkerSnapshot(previous, current)
+	observer.ObserveWorkerEvents(previous, current, []domain.DomainEvent{{
+		Type:       domain.EventTaskFinished,
+		OccurredAt: now,
+		TaskID:     "case-1",
+	}})
+
+	text := collector.PrometheusText()
+	assertMetricsTextContains(t, text,
+		`workerfleet_case_finished_total{namespace="sim",node="node-a",status="failed",task_type="simulation"} 1.000000000`,
+		`workerfleet_case_total_duration_seconds_count{namespace="sim",node="node-a",status="failed",task_type="simulation"} 1`,
+	)
+	assertMetricsTextOmits(t, text,
+		"workerfleet_case_completed_total",
+		"workerfleet_case_failed_total",
+		"workerfleet_case_duration_seconds_count",
+		"workerfleet_case_step_completed_total",
+		"workerfleet_case_step_duration_seconds_count",
+		"workerfleet_case_step_stuck_cases",
+		"workerfleet_case_step_oldest_active_age_seconds",
+	)
+}
+
 func TestObserverBaselinesUnchangedExistingSnapshot(t *testing.T) {
 	now := time.Date(2026, 4, 20, 11, 30, 0, 0, time.UTC)
 	collector := NewCollector()

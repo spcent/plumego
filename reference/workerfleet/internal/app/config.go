@@ -32,6 +32,7 @@ type Config struct {
 	StoreBackend string
 	Profile      string
 	Policy       PolicyConfig
+	Metrics      MetricsConfig
 	Mongo        MongoConfig
 	Retention    time.Duration
 	Runtime      RuntimeConfig
@@ -43,6 +44,10 @@ type Config struct {
 type PolicyConfig struct {
 	Status domain.StatusPolicy
 	Alert  domain.AlertPolicy
+}
+
+type MetricsConfig struct {
+	ExperimentalSeriesEnabled bool
 }
 
 type MongoConfig struct {
@@ -95,6 +100,9 @@ func DefaultConfigForProfile(profile string) Config {
 		Policy: PolicyConfig{
 			Status: statusPolicy,
 			Alert:  statusPolicy.AlertPolicy(),
+		},
+		Metrics: MetricsConfig{
+			ExperimentalSeriesEnabled: normalized == ProfileDevelopment,
 		},
 		Mongo: MongoConfig{
 			ConnectTimeout:   10 * time.Second,
@@ -271,6 +279,13 @@ func LoadConfig(lookup func(string) (string, bool)) (Config, error) {
 			return Config{}, err
 		}
 		cfg.Policy.Alert.RestartBurstThreshold = threshold
+	}
+	if value, ok := lookup("WORKERFLEET_EXPERIMENTAL_METRICS_ENABLED"); ok {
+		enabled, err := parseBoolEnv("WORKERFLEET_EXPERIMENTAL_METRICS_ENABLED", value)
+		if err != nil {
+			return Config{}, err
+		}
+		cfg.Metrics.ExperimentalSeriesEnabled = enabled
 	}
 	if value, ok := lookup("WORKERFLEET_KUBE_API_HOST"); ok {
 		cfg.Kube.APIHost = strings.TrimSpace(value)

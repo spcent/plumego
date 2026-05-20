@@ -20,6 +20,9 @@ func TestLoadConfigDefaultsToMemory(t *testing.T) {
 	if cfg.Retention != 7*24*time.Hour {
 		t.Fatalf("retention = %v, want 7d", cfg.Retention)
 	}
+	if !cfg.Metrics.ExperimentalSeriesEnabled {
+		t.Fatalf("experimental metrics should default enabled in dev profile")
+	}
 }
 
 func TestLoadConfigParsesMongoSettings(t *testing.T) {
@@ -134,6 +137,29 @@ func TestLoadConfigParsesStatusAndAlertPolicies(t *testing.T) {
 	}
 	if cfg.Policy.Alert.RestartBurstThreshold != 8 {
 		t.Fatalf("alert restart threshold = %d, want 8", cfg.Policy.Alert.RestartBurstThreshold)
+	}
+}
+
+func TestLoadConfigParsesExperimentalMetricFlags(t *testing.T) {
+	cfg, err := LoadConfig(testLookup(map[string]string{
+		"WORKERFLEET_PROFILE":                      "prod",
+		"WORKERFLEET_EXPERIMENTAL_METRICS_ENABLED": "true",
+	}))
+	if err != nil {
+		t.Fatalf("load config: %v", err)
+	}
+	if !cfg.Metrics.ExperimentalSeriesEnabled {
+		t.Fatalf("experimental metrics should be enabled by explicit flag")
+	}
+
+	cfg, err = LoadConfig(testLookup(map[string]string{
+		"WORKERFLEET_PROFILE": "prod",
+	}))
+	if err != nil {
+		t.Fatalf("load config: %v", err)
+	}
+	if cfg.Metrics.ExperimentalSeriesEnabled {
+		t.Fatalf("experimental metrics should default disabled in prod profile")
 	}
 }
 

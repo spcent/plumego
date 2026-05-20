@@ -67,6 +67,13 @@ Experimental metric catalog:
 - `workerfleet_case_step_stuck_cases`
 - `workerfleet_case_step_oldest_active_age_seconds`
 
+Experimental metric gating:
+
+- `WORKERFLEET_EXPERIMENTAL_METRICS_ENABLED` controls whether experimental case and step series are emitted at all.
+- `dev` profile enables experimental metrics by default for local analysis.
+- `prod` profile disables experimental metrics by default so `exec_plan_id` and step-heavy series do not become part of the default fleet scrape surface.
+- stable metric families remain enabled regardless of the experimental flag.
+
 State and inventory coverage:
 
 - pod status is represented by `workerfleet_pods{phase,namespace,node}`.

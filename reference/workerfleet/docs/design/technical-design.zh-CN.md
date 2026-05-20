@@ -132,6 +132,7 @@ Worker 状态：
 - `StatusPolicy` 负责心跳 stale/offline 阈值，以及状态判断使用的 stage-stuck 和 restart 阈值。
 - `AlertPolicy` 负责告警侧使用的 stage-stuck 和 restart 阈值；默认从状态策略派生，也可以由运行时配置显式覆盖。
 - `internal/app/config.go` 通过环境变量暴露两类策略，并提供 `dev` / `prod` profile 默认值和逐字段校验。
+- 同一层应用配置还负责控制是否输出 experimental 的 pod、exec plan 和 case-step 指标。
 
 在线定义为进程存活且可以接新任务。当 worker 有活跃任务但暂时不接更多任务时，它可以仍然被认为在线且忙碌。当信号过期、worker 上报错误、空闲但不接任务、或任务阶段卡住时，状态会变为降级。当进程不存活、Pod 失败、Pod 消失、或心跳超过离线阈值时，状态会变为离线。
 
@@ -439,6 +440,7 @@ HTTP：
 - `WORKERFLEET_STATUS_RESTART_BURST_THRESHOLD` 覆盖 worker restart-burst 状态判断阈值。
 - `WORKERFLEET_ALERT_STAGE_STUCK_AFTER` 覆盖告警侧 stage-stuck 触发阈值。
 - `WORKERFLEET_ALERT_RESTART_BURST_THRESHOLD` 覆盖告警侧 restart-burst 触发阈值。
+- `WORKERFLEET_EXPERIMENTAL_METRICS_ENABLED` 用于显式启用或禁用 experimental case/step 指标；`dev` 默认开启，`prod` 默认关闭。
 - 策略值启动时会 fail closed 校验；例如过低阈值和互相矛盾的 stale/offline 组合都会直接拒绝启动。
 
 Worker 接入认证：

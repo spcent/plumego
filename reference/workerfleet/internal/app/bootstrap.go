@@ -31,7 +31,10 @@ func Bootstrap(ctx context.Context, cfg Config) (*Runtime, error) {
 	}
 	statusPolicy, alertPolicy := configuredPolicies(cfg)
 	metrics := workerfleetmetrics.NewCollector()
-	metricsObserver := workerfleetmetrics.NewObserver(metrics)
+	metricsObserver := workerfleetmetrics.NewObserver(
+		metrics,
+		workerfleetmetrics.WithExperimentalMetrics(cfg.Metrics.ExperimentalSeriesEnabled),
+	)
 
 	switch cfg.StoreBackend {
 	case StoreBackendMemory:

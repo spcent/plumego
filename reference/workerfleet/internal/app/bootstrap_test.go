@@ -104,6 +104,26 @@ func TestBootstrapUsesConfiguredPolicies(t *testing.T) {
 	}
 }
 
+func TestBootstrapUsesConfiguredMetricOptions(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Metrics.ExperimentalSeriesEnabled = false
+
+	runtime, err := Bootstrap(context.Background(), cfg)
+	if err != nil {
+		t.Fatalf("bootstrap memory: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = runtime.Close(context.Background())
+	})
+
+	if runtime.shell.loops.metrics == nil {
+		t.Fatalf("loop metrics observer is nil")
+	}
+	if runtime.shell.loops.metrics.ExperimentalMetricsEnabled() {
+		t.Fatalf("experimental metrics should be disabled")
+	}
+}
+
 func TestNewAppWiresCoreMiddlewareAndRoutes(t *testing.T) {
 	cfg := DefaultConfig()
 	serverCfg := DefaultServerConfig()
