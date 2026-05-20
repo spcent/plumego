@@ -19,6 +19,7 @@ Current documents:
 - [Metrics](./docs/metrics.md)
 - [Case And Step Metrics Design](./docs/case-step-metrics.md)
 - [Grafana Dashboard Plan](./docs/grafana.md)
+- [Kubernetes Deployment Assets](./deploy/README.md)
 - [Technical Design](./docs/design/technical-design.md)
 - [技术方案设计](./docs/design/technical-design.zh-CN.md)
 

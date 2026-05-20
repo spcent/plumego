@@ -1,0 +1,42 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: workerfleet
+  labels:
+    app.kubernetes.io/name: workerfleet
+spec:
+  groups:
+    - name: workerfleet.rules
+      rules:
+        - alert: WorkerfleetOfflineWorkers
+          expr: sum(workerfleet_workers{status="offline"}) > 0
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: workerfleet has offline workers
+            description: One or more workers have remained offline for more than five minutes.
+        - alert: WorkerfleetNoAcceptingWorkers
+          expr: sum(workerfleet_worker_accepting_tasks) == 0
+          for: 2m
+          labels:
+            severity: warning
+          annotations:
+            summary: no workers are currently accepting tasks
+            description: The fleet reports zero accepting workers for more than two minutes.
+        - alert: WorkerfleetRuntimeErrors
+          expr: sum(rate(workerfleet_runtime_errors_total[5m])) > 0
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: workerfleet runtime loops are erroring
+            description: Runtime loop or notification errors are occurring continuously.
+        - alert: WorkerfleetInventorySyncSlow
+          expr: histogram_quantile(0.95, sum by (le) (rate(workerfleet_kube_inventory_sync_duration_seconds_bucket[10m]))) > 15
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: workerfleet inventory sync is slow
+            description: The p95 Kubernetes inventory sync duration has exceeded 15 seconds.
