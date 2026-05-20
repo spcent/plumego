@@ -2,75 +2,59 @@
 
 Milestone: M-014
 Recipe: specs/change-recipes/new-extension-module.yaml
-Priority: P1
+Priority: P2
 State: active
 Primary Module: x/openapi
 Owned Files:
-- `x/openapi/`
 - `docs/modules/x-openapi/README.md`
-- `cmd/plumego/internal/scaffold/`
+- `x/openapi/module.yaml`
 
 Goal:
-- Complete the x/openapi CLI integration so that `plumego openapi generate`
-  reads route metadata from a running or introspectable app and writes an
-  OpenAPI 3.1 document to a file or stdout.
-- Expand the x/openapi module primer to document the complete API surface.
+- Update x/openapi/module.yaml to remove the stale "handled by later cards" note
+  and reflect the implemented state.
+- Evaluate x/openapi for beta promotion based on release-history evidence.
 
-Problem:
-x/openapi/module.yaml notes "Serialization and CLI wiring are handled by later
-OpenAPI milestone cards." The document model, RouteInfo conversion, and operation
-hint merging are substantially implemented, but:
-1. No `plumego openapi generate` subcommand exists in `cmd/plumego/`.
-2. No serialization (JSON/YAML) path is wired.
-3. The module primer is 7 lines.
+Problem (updated 2026-05-20):
+The CLI integration (`plumego generate spec`) and serialization (JSON + YAML via
+stdlib) were already fully implemented in `cmd/plumego/commands/spec.go` and
+`x/openapi/marshal.go`. The module primer has been expanded in this session.
+The remaining work is:
+1. Remove the stale placeholder note from x/openapi/module.yaml summary.
+2. Collect release-history evidence once a second qualifying release exists.
+3. Evaluate for beta promotion using the standard promotion checklist.
 
 Scope:
-- Add a `generate` subcommand to `cmd/plumego/` that:
-  - accepts `--output` (file path, defaults to stdout) and `--format` (json|yaml, default json)
-  - calls x/openapi document builder with route metadata
-  - writes the resulting OpenAPI 3.1 document
-- Add JSON serialization in x/openapi (stdlib `encoding/json` only — no external YAML library
-  in the main module; YAML output uses `encoding/json` + a thin converter, or is deferred).
-- Expand `docs/modules/x-openapi/README.md` to cover: document model, hint merging,
-  RouteInfo integration, CLI usage, and boundary rules.
-- Add or update x/openapi tests for the serialization path.
+- Update x/openapi/module.yaml: remove "Serialization and CLI wiring are handled
+  by later OpenAPI milestone cards" from the summary field; update to reflect
+  current implemented state.
+- Run `go run ./internal/checks/module-manifests` after manifest update.
+- Once v1.2.0 exists: run extension-release-evidence, record snapshot, get
+  owner sign-off, update extension-beta-evidence.yaml.
 
 Non-goals:
-- Do not add an external OpenAPI validation library dependency.
-- Do not add reflection over handler functions — generation is driven by RouteInfo only.
-- Do not move generation logic into router, core, or contract.
-- Do not support OpenAPI 2.0.
-- YAML output may be deferred to a follow-up card if it requires a third-party dependency.
+- Do not change x/openapi runtime behavior.
+- Do not add external OpenAPI validation library dependency.
+- Do not promote to beta without two qualifying release refs.
 
 Files:
-- `x/openapi/` (serialization and builder changes)
-- `cmd/plumego/internal/scaffold/` or `cmd/plumego/` (new subcommand)
-- `docs/modules/x-openapi/README.md`
-- `x/openapi/module.yaml` (update test commands if changed)
+- `x/openapi/module.yaml`
+- `specs/extension-beta-evidence.yaml` (when promotion evidence is recorded)
+- `docs/EXTENSION_MATURITY.md` (when promotion status changes)
 
 Tests:
 - `go test -race -timeout 60s ./x/openapi/...`
-- `go test -timeout 20s ./cmd/plumego/...`
-- `go run ./internal/checks/dependency-rules` (confirm no new forbidden imports)
 - `go run ./internal/checks/module-manifests`
+- `go run ./internal/checks/extension-maturity`
 
 Docs Sync:
-- Required: expand `docs/modules/x-openapi/README.md` with full API surface,
-  CLI usage example (`plumego openapi generate --output openapi.json`),
-  and boundary rules section.
-- Update `docs/ROADMAP.md` Phase 13/14 to reflect CLI completion.
+- Update `docs/ROADMAP.md` Phase 14 to note CLI completion and current status.
 
 Done Definition:
-- `plumego openapi generate` command exists and produces valid OpenAPI 3.1 JSON
-  from a minimal test route set.
-- x/openapi has serialization tests.
-- Module primer covers the complete API surface and CLI usage.
-- All boundary checks and x/openapi tests pass.
+- x/openapi/module.yaml summary no longer contains stale milestone-card language.
+- x/openapi either has beta status in the evidence ledger, OR has explicit
+  blockers with the missing release ref identified.
 
 Notes:
-- x/openapi is experimental; the CLI subcommand may be marked experimental in
-  the help text until x/openapi is promoted to beta.
-- Check `cmd/plumego/internal/scaffold/` for the existing subcommand registration
-  pattern before adding the new subcommand.
-- The RouteInfo → OpenAPI operation conversion is the primary integration point;
-  confirm its current coverage in x/openapi tests before adding CLI wiring.
+- `plumego generate spec --format json|yaml --output path` is the canonical CLI.
+- The hints file is `plumego.spec.yaml` in the project root (optional).
+- See `docs/modules/x-openapi/README.md` for the full API surface documentation.

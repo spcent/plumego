@@ -350,6 +350,7 @@ new-card: ## Scaffold a task card: make new-card ID=0001 SLUG=slice-router-work 
 
 gates: ## Run all required quality gates (mirrors CI)
 	go run ./internal/checks/dependency-rules
+	go run ./internal/checks/cross-extension-deps
 	go run ./internal/checks/agent-workflow
 	go run ./internal/checks/module-manifests
 	go run ./internal/checks/reference-layout
