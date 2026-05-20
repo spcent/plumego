@@ -186,3 +186,59 @@ func TestEvaluateWorkerStatus(t *testing.T) {
 		})
 	}
 }
+
+func TestStatusPolicyValidateRejectsInvalidThresholds(t *testing.T) {
+	tests := []struct {
+		name   string
+		policy StatusPolicy
+	}{
+		{
+			name: "zero stale threshold",
+			policy: StatusPolicy{
+				StaleAfter:            0,
+				OfflineAfter:          time.Minute,
+				StageStuckAfter:       time.Minute,
+				RestartBurstThreshold: 1,
+			},
+		},
+		{
+			name: "offline not greater than stale",
+			policy: StatusPolicy{
+				StaleAfter:            time.Minute,
+				OfflineAfter:          time.Minute,
+				StageStuckAfter:       time.Minute,
+				RestartBurstThreshold: 1,
+			},
+		},
+		{
+			name: "zero restart threshold",
+			policy: StatusPolicy{
+				StaleAfter:            time.Second,
+				OfflineAfter:          2 * time.Second,
+				StageStuckAfter:       time.Minute,
+				RestartBurstThreshold: 0,
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if err := test.policy.Validate(); err == nil {
+				t.Fatalf("expected validation failure for %#v", test.policy)
+			}
+		})
+	}
+}
+
+func TestAlertPolicyValidateRejectsInvalidThresholds(t *testing.T) {
+	tests := []AlertPolicy{
+		{StageStuckAfter: 0, RestartBurstThreshold: 1},
+		{StageStuckAfter: time.Minute, RestartBurstThreshold: 0},
+	}
+
+	for _, policy := range tests {
+		if err := policy.Validate(); err == nil {
+			t.Fatalf("expected alert policy validation failure for %#v", policy)
+		}
+	}
+}

@@ -2,7 +2,7 @@ package domain
 
 import "time"
 
-func EvaluateSnapshotAlerts(snapshot WorkerSnapshot, now time.Time, policy StatusPolicy) []AlertRecord {
+func EvaluateSnapshotAlerts(snapshot WorkerSnapshot, now time.Time, policy AlertPolicy) []AlertRecord {
 	candidates := make([]AlertRecord, 0, 4)
 
 	switch snapshot.Status {

@@ -126,6 +126,11 @@ Worker status:
 - `offline`
 - `unknown`
 
+Policy surface:
+
+- `StatusPolicy` owns heartbeat stale/offline thresholds plus stage-stuck and restart thresholds used by status evaluation.
+- `AlertPolicy` owns alert-side stage-stuck and restart thresholds and is derived from defaults unless runtime wiring overrides it explicitly.
+
 Online means the process is alive and ready to accept tasks. A worker can still be online while busy when it has active tasks but is not accepting additional work. A worker becomes degraded when signals are stale, it reports errors, it is not accepting tasks while idle, or task phases are stuck. A worker becomes offline when the process is not alive, the pod has failed, the pod has disappeared, or heartbeat expiry crosses policy thresholds.
 
 Task phases:
