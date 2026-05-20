@@ -2,6 +2,7 @@
 
 Milestone:
 Recipe: specs/change-recipes/<recipe>.yaml
+Context Package:
 Priority:
 State: active
 Primary Module:
@@ -14,7 +15,7 @@ Depends On:
 
 ## Scope
 
-<!-- Exact files or packages in scope. Max 5 files. -->
+<!-- Exact files or packages in scope. One primary module; max 5 files. -->
 
 ## Non-goals
 
@@ -44,7 +45,8 @@ Depends On:
 ## Validation
 
 <!-- Exact commands that must exit 0.
-     Minimum: go test -race -timeout 60s ./<module>/... -->
+     Max 3 commands. Minimum for behavior changes:
+     go test -race -timeout 60s ./<module>/... -->
 
 ## Done Definition
 

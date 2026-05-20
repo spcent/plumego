@@ -18,10 +18,11 @@ export const ROADMAP_FACTS = {
   ],
   "planned": [],
   "suggestedExecutionOrder": [
-    "Keep Phase 13 docs and onboarding sync continuous.",
+    "Keep Phase 13 and Phase 15 docs and onboarding sync continuous.",
     "Keep `docs/EXTENSION_MATURITY.md` aligned with module manifests and evidence records.",
-    "Evaluate `x/ai` stable-tier subpackages individually after release-history evidence is available.",
-    "Advance `x/tenant` production readiness.",
+    "Execute task card 1500 (x/tenant GA evaluation) once v1.2.0 release evidence is available.",
+    "Execute task card 1501 (x/ai stable-tier subpackages beta evaluation) per-subpackage after release evidence.",
+    "Execute task card 1502 (x/openapi module.yaml cleanup and beta evaluation) once release evidence is available.",
     "Clarify `x/data` and `x/fileapi` operational guidance.",
     "Expand `x/gateway/discovery` backends only when explicit adapters are ready."
   ]

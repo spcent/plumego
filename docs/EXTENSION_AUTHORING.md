@@ -33,11 +33,12 @@ promise beyond the extension author's published policy.
 
 ## community-extension.yaml Example
 
-This example models the current `x/rpc` family shape: a separate module,
-experimental status, explicit handler compatibility, and local validation
-commands. The in-repository `x/rpc` package is first-party code; a community
-module using this shape should keep direct stable-root integration out of the
-published module if it lists those imports as forbidden.
+This example models a community RPC-style extension published outside this
+repository: experimental status, explicit handler compatibility, and local
+validation commands. The in-repository `x/rpc` package is first-party code in
+the main module; external community modules using this shape should keep direct
+stable-root integration out of the published module if they list those imports
+as forbidden.
 
 ```yaml
 name: rpc

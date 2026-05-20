@@ -78,7 +78,7 @@ func TestValidateReferenceModules(t *testing.T) {
 	repo := t.TempDir()
 	writeFile(t, filepath.Join(repo, "reference", "standard-service", "go.mod"), `module standard-service
 
-go 1.24.0
+go 1.26.0
 
 require github.com/spcent/plumego v0.0.0
 
@@ -107,7 +107,7 @@ func main() {}
 `)
 	writeFile(t, filepath.Join(repo, "reference", "bad-module", "go.mod"), `module github.com/spcent/plumego/reference/bad-module
 
-go 1.24.0
+go 1.26.0
 `)
 	writeFile(t, filepath.Join(repo, "reference", "bad-module", "main.go"), `package main
 
@@ -134,6 +134,21 @@ import (
 		if !hasString(violations, expected) {
 			t.Fatalf("expected violation %q in %v", expected, violations)
 		}
+	}
+}
+
+func TestFindXGoModFiles(t *testing.T) {
+	repo := t.TempDir()
+	writeFile(t, filepath.Join(repo, "x", "validate", "module.yaml"), "name: x/validate\n")
+	writeFile(t, filepath.Join(repo, "x", "validate", "playground", "go.mod"), "module example.com/bad\n")
+	writeFile(t, filepath.Join(repo, "reference", "with-rest", "go.mod"), "module with-rest\n")
+
+	violations, err := FindXGoModFiles(repo)
+	if err != nil {
+		t.Fatalf("FindXGoModFiles: %v", err)
+	}
+	if len(violations) != 1 || violations[0] != "x/validate/playground/go.mod" {
+		t.Fatalf("unexpected violations: %#v", violations)
 	}
 }
 

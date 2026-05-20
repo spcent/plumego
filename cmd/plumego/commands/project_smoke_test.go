@@ -91,6 +91,16 @@ func TestCLI_NewParsesFlagsAfterProjectName(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(projectDir, "internal", "resource", "users.go")); err != nil {
 		t.Fatalf("expected api template resource file: %v", err)
 	}
+	for _, file := range []string{
+		"Makefile",
+		".github/workflows/ci.yml",
+		"AGENTS.md",
+		"CLAUDE.md",
+	} {
+		if _, err := os.Stat(filepath.Join(projectDir, file)); err != nil {
+			t.Fatalf("expected generated project control file %s: %v", file, err)
+		}
+	}
 }
 
 func TestCLI_NewRejectsUnexpectedArguments(t *testing.T) {

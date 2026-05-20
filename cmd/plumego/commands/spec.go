@@ -182,7 +182,7 @@ func specHelperGoMod(appDir string, target specTarget, modules []goModuleInfo) s
 
 	var b strings.Builder
 	fmt.Fprintf(&b, "module %s/plumego_spec_helper\n\n", target.ModulePath)
-	b.WriteString("go 1.24.0\n\n")
+	b.WriteString("go 1.26.0\n\n")
 	b.WriteString("require (\n")
 	fmt.Fprintf(&b, "\t%s v0.0.0\n", target.ModulePath)
 	b.WriteString("\tgithub.com/spcent/plumego v0.0.0\n")

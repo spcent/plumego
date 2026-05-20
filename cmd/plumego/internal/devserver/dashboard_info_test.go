@@ -233,7 +233,7 @@ func TestDashboardStopCleansServerAndSubscriptions(t *testing.T) {
 
 func TestDashboardRestartUsesRequestContext(t *testing.T) {
 	tmp := t.TempDir()
-	if err := os.WriteFile(filepath.Join(tmp, "go.mod"), []byte("module example.com/dashboard-restart\n\ngo 1.24\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(tmp, "go.mod"), []byte("module example.com/dashboard-restart\n\ngo 1.26.0\n"), 0o644); err != nil {
 		t.Fatalf("write go.mod: %v", err)
 	}
 

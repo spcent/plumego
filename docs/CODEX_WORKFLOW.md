@@ -7,7 +7,9 @@ It is a companion to:
 - `AGENTS.md` for hard rules and validation order
 - `docs/CANONICAL_STYLE_GUIDE.md` for code shape
 - `docs/AGENT_CODE_QUALITY_RULES.md` for agent preflight, review, and gate selection
+- `docs/AGENT_CONTEXT_BUDGET.md` for token-bounded context packages and resume discipline
 - `docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md` for repository layout
+- `specs/agent-quality-rules.yaml` for the machine-readable quality contract
 - `specs/*` and `<module>/module.yaml` for machine-readable ownership and boundaries
 
 Use this document when you want a repeatable prompting and execution pattern,
@@ -82,7 +84,29 @@ When humans omit these details, the agent should assume:
 - focused tests are required for behavior changes
 - docs sync is required only for implemented behavior changes
 
-## 3. Stop Conditions
+## 3. Context Budget
+
+Use the smallest context package that can safely complete the task. The default
+startup package is `AGENTS.md` plus the matching `specs/task-routing.yaml` task
+entry. Then load the selected entry's `start_with` files, the owning
+`module.yaml` when module behavior changes, and only the extra docs or specs
+identified by preflight.
+
+Do not use the full control-plane read set for routine implementation. Reserve
+it for architecture, boundary, release, and workflow-rule changes.
+
+Context packages are defined in `docs/AGENT_CONTEXT_BUDGET.md`:
+
+- `startup` for task orientation
+- `implementation` for normal code or doc changes
+- `review` for findings-first review
+- `control-plane` for workflow/spec/architecture rule changes
+
+Split work into a task card before implementation when the expected scope spans
+more than one primary module, more than five files, more than three validation
+commands, or unclear API, dependency, security, or boundary impact.
+
+## 4. Stop Conditions
 
 The agent should stop and surface the issue before coding when:
 
@@ -93,37 +117,26 @@ The agent should stop and surface the issue before coding when:
 - the task is broad but lacks acceptance criteria or validation commands
 - a repo spec, module manifest, and local pattern conflict in a behavior-changing way
 
-## 4. Daily Workflow
+## 5. Daily Workflow
 
 Use this loop for normal feature work, bug fixes, and refactors:
 
-1. Read the control plane in canonical order.
-2. Identify the owning module or family.
-3. State in-scope and out-of-scope paths.
-4. State public API and dependency assumptions.
-5. State behavior, security, docs, and validation impact from the quality preflight.
-6. Implement the smallest coherent change.
-7. Add or update focused tests.
-8. Run module validation first.
-9. Run boundary and repo-wide checks second.
-10. Report residual risks and doc-sync impacts.
+1. Read `AGENTS.md`.
+2. Select the matching `specs/task-routing.yaml` task entry.
+3. Read the selected entry's `start_with` files.
+4. Identify the owning module or family.
+5. Read the target `<module>/module.yaml` before editing module behavior.
+6. State the context package, in-scope paths, out-of-scope paths, and impact assumptions.
+7. Implement the smallest coherent change.
+8. Add or update focused tests.
+9. Run module validation first.
+10. Run boundary and repo-wide checks only when selected by the gate profile.
+11. Report validation as a compact command/status summary with residual risks.
 
-Default read order:
+Use targeted `rg` searches when a symbol, package, or rule needs confirmation.
+Avoid broad file dumps after ownership and validation are already clear.
 
-1. `AGENTS.md`
-2. `docs/CANONICAL_STYLE_GUIDE.md`
-3. `docs/AGENT_CODE_QUALITY_RULES.md`
-4. `docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md`
-5. `specs/repo.yaml`
-6. `specs/task-routing.yaml`
-7. `specs/extension-taxonomy.yaml`
-8. `specs/package-hotspots.yaml`
-9. `specs/dependency-rules.yaml`
-10. `specs/agent-quality-rules.yaml`
-11. target `<module>/module.yaml`
-12. `reference/standard-service`
-
-## 5. Prompt Templates
+## 6. Prompt Templates
 
 Before writing a bespoke prompt, check whether one of these repo-native recipes
 already matches the task:
@@ -149,6 +162,7 @@ Read the relevant control-plane files and determine the best landing zone for:
 [task]
 
 Return:
+- context package
 - owning module or x/* family
 - in-scope paths
 - out-of-scope paths
@@ -174,6 +188,7 @@ Constraints:
 
 Requirements:
 - complete the quality preflight before editing
+- use the smallest matching context package from docs/AGENT_CONTEXT_BUDGET.md
 - state which files you will touch before broad edits
 - make the smallest coherent change
 - add or update focused tests
@@ -228,7 +243,7 @@ Follow AGENTS.md milestone rules exactly:
 - run the full validation sequence before push
 ```
 
-## 6. Symbol Change Protocol
+## 7. Symbol Change Protocol
 
 When removing, renaming, or changing the behavior of an exported symbol:
 
@@ -242,7 +257,7 @@ When removing, renaming, or changing the behavior of an exported symbol:
 Do not leave dead wrappers, deprecated compatibility layers, or silent discard
 sites behind.
 
-## 7. Validation
+## 8. Validation
 
 Default validation order:
 
@@ -261,7 +276,7 @@ make gates
 ./...`, and `go test -timeout 20s ./...`. Run `gofmt -w <paths>` before the
 gate when formatting is required.
 
-## 8. Milestone Workflow
+## 9. Milestone Workflow
 
 Use the milestone path for multi-step, single-PR scopes with explicit human
 authorship and autonomous agent execution.
@@ -292,7 +307,7 @@ Use milestones when:
 Do not use milestones for every small fix. Daily implementation prompts are the
 default.
 
-## 9. Worked Examples
+## 10. Worked Examples
 
 These examples show how real Plumego work maps onto the control plane.
 
@@ -370,7 +385,7 @@ Representative cards:
 - `tasks/cards/done/0245-security-jwt-session-lifecycle-pruning.md`
 - `tasks/cards/done/0247-security-resilience-boundary-pruning.md`
 
-## 10. Review Checklist for Humans
+## 11. Review Checklist for Humans
 
 When reviewing agent output, check:
 
@@ -382,7 +397,7 @@ When reviewing agent output, check:
 6. docs changed only where implemented behavior changed
 7. `go.mod` did not change unless explicitly approved
 
-## 11. Anti-Patterns
+## 12. Anti-Patterns
 
 Do not ask the agent to:
 
@@ -399,7 +414,7 @@ Do not let the agent:
 - add one-off response helpers or route-registration idioms
 - treat subordinate `x/*` packages as competing family entrypoints
 
-## 12. Recommended Usage
+## 13. Recommended Usage
 
 For best stability, use this sequence:
 

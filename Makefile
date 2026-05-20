@@ -1,7 +1,7 @@
 # plumego — root Makefile
 # Minimal targets. Most work happens via codex --yolo or go toolchain directly.
 
-.PHONY: help bundle validate-diff validate-diff-dry milestone check-spec check-plan check-card check-verify new-milestone new-plan new-card new-verify run-card milestone-status gates fmt vet test test-race setup-hooks
+.PHONY: help bundle validate-diff validate-diff-dry milestone check-spec check-plan check-card check-verify new-milestone new-plan new-card new-verify run-card milestone-status gates fmt vet test test-race setup-hooks website-sync
 
 # Default: show help
 help:
@@ -350,6 +350,7 @@ new-card: ## Scaffold a task card: make new-card ID=0001 SLUG=slice-router-work 
 
 gates: ## Run all required quality gates (mirrors CI)
 	go run ./internal/checks/dependency-rules
+	go run ./internal/checks/cross-extension-deps
 	go run ./internal/checks/agent-workflow
 	go run ./internal/checks/module-manifests
 	go run ./internal/checks/reference-layout
@@ -425,6 +426,11 @@ reference-test: ## Run tests for every standalone reference module
 	done
 
 # ── Git Hooks ─────────────────────────────────────────────────────────────────
+
+website-sync: ## Regenerate website/src/generated/ from docs sources and stage the result
+	cd website && pnpm sync
+	git add website/src/generated/
+	@echo "Generated files staged. Review with 'git diff --cached website/src/generated/' then commit."
 
 setup-hooks: ## Install local git hooks (pre-push quality gates)
 	@cp .githooks/pre-push .git/hooks/pre-push

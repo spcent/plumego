@@ -6,6 +6,7 @@ authority:
   companions:
     - AGENTS.md
     - docs/CODEX_WORKFLOW.md
+    - docs/AGENT_CONTEXT_BUDGET.md
     - docs/CANONICAL_STYLE_GUIDE.md
     - specs/repo.yaml
     - specs/dependency-rules.yaml
@@ -29,6 +30,8 @@ rule_levels:
     - route_handler_middleware_wiring_is_grep_friendly
     - document_implemented_behavior_only
     - run_module_checks_then_boundary_checks_then_repo_gates
+    - load_smallest_safe_context_package
+    - summarize_validation_output_compactly
   may:
     - extract_small_helper_for_clear_local_repetition
     - skip_go_gates_for_docs_only_changes
@@ -37,6 +40,7 @@ rule_levels:
 
 preflight:
   required_fields:
+    - context_package
     - owning_module
     - target_module_manifest_read
     - in_scope_paths
@@ -52,6 +56,46 @@ preflight:
     - unclear_dependency_impact
     - unclear_stable_public_api_impact
     - unclear_cross_module_boundary
+    - context_package_exceeds_task_scope
+
+context_budget:
+  authority: docs/AGENT_CONTEXT_BUDGET.md
+  packages:
+    startup:
+      purpose: Initial task orientation.
+      default_reads:
+        - AGENTS.md
+        - matching specs/task-routing.yaml entry
+    implementation:
+      purpose: Normal code or docs changes.
+      default_reads:
+        - startup package
+        - target module.yaml when module behavior changes
+        - matching change recipe when applicable
+        - directly relevant module primer or style section
+    review:
+      purpose: Findings-first review.
+      default_reads:
+        - startup package
+        - docs/AGENT_CODE_QUALITY_RULES.md review output contract
+        - relevant module manifests or specs for the diff area
+    control_plane:
+      purpose: Workflow, architecture, quality, boundary, or spec rule changes.
+      default_reads:
+        - startup package
+        - docs/CODEX_WORKFLOW.md
+        - docs/AGENT_CODE_QUALITY_RULES.md
+        - directly changed specs
+  split_before_implementation_when:
+    - more_than_one_primary_module
+    - more_than_five_files
+    - more_than_three_validation_commands
+    - unclear_public_api_dependency_security_or_boundary_impact
+  validation_summary_fields:
+    - command
+    - status
+    - key_failure
+    - next_step
 
 module_quality_focus:
   core:
@@ -204,6 +248,7 @@ gate_matrix:
 
 handoff:
   required_sections:
+    - context_package
     - owning_module
     - files_changed
     - boundary_impact

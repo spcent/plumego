@@ -1,5 +1,32 @@
 version: 1
 
+context_policy:
+  initial_package: startup
+  task_default_package: implementation
+  startup:
+    - AGENTS.md
+    - specs/task-routing.yaml
+  package_docs:
+    - docs/AGENT_CONTEXT_BUDGET.md
+  selection_order:
+    - Read AGENTS.md.
+    - Match the request to one tasks entry.
+    - Read only that entry's start_with files.
+    - Read the target module.yaml before editing module behavior.
+    - Add extra docs or specs only when preflight identifies a concrete reason.
+  split_before_implementation_when:
+    - more_than_one_primary_module
+    - more_than_five_files
+    - more_than_three_validation_commands
+    - unclear_public_api_dependency_security_or_boundary_impact
+  validation_output:
+    format: compact_command_status_summary
+    include:
+      - command
+      - status
+      - first_meaningful_failure
+      - next_step
+
 routing_rules:
   stable_root_work:
     intent: Change kernel, lifecycle, route structure, transport contracts, transport middleware, auth primitives, or storage primitives.
@@ -57,8 +84,10 @@ routing_rules:
 tasks:
   control_plane:
     intent: Change AGENTS, canonical style, architecture blueprint, repo specs, dependency rules, or control-plane guidance.
+    context_package: control-plane
     start_with:
       - AGENTS.md
+      - docs/AGENT_CONTEXT_BUDGET.md
       - docs/CANONICAL_STYLE_GUIDE.md
       - docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md
       - specs/repo.yaml
@@ -69,6 +98,23 @@ tasks:
     avoid:
       - reference/with-messaging
       - reference/with-gateway
+
+  agent_context_budget:
+    intent: Change agent token budget, context loading, task-card limits, validation-output compression, or resume discipline.
+    context_package: control-plane
+    start_with:
+      - AGENTS.md
+      - docs/AGENT_CONTEXT_BUDGET.md
+      - docs/CODEX_WORKFLOW.md
+      - docs/AGENT_CODE_QUALITY_RULES.md
+      - specs/task-routing.yaml
+      - specs/agent-quality-rules.yaml
+      - specs/checks.yaml
+      - specs/repo.yaml
+    avoid:
+      - reference/with-messaging
+      - reference/with-gateway
+      - docs/stable-api/snapshots
 
   module_manifest:
     intent: Change module ownership, scope, test commands, or review guidance in module manifests.
@@ -83,10 +129,11 @@ tasks:
 
   symbol_change:
     intent: Remove, rename, or change the behavior of an exported symbol.
+    context_package: implementation
     start_with:
       - AGENTS.md
-      - docs/CODEX_WORKFLOW.md
       - docs/CANONICAL_STYLE_GUIDE.md
+      - docs/AGENT_CODE_QUALITY_RULES.md
       - specs/change-recipes/symbol-change.yaml
       - specs/package-hotspots.yaml
     avoid:
@@ -95,10 +142,9 @@ tasks:
 
   bugfix_triage:
     intent: Localize an implementation bug and identify the owning module before coding.
+    context_package: startup
     start_with:
       - AGENTS.md
-      - docs/CODEX_WORKFLOW.md
-      - specs/repo.yaml
       - specs/task-routing.yaml
       - specs/change-recipes/fix-bug.yaml
       - specs/package-hotspots.yaml
@@ -108,9 +154,9 @@ tasks:
 
   http_endpoint_bugfix:
     intent: Fix a defect in HTTP route wiring, handler transport logic, or contract-backed endpoint behavior.
+    context_package: implementation
     start_with:
       - AGENTS.md
-      - docs/CODEX_WORKFLOW.md
       - docs/CANONICAL_STYLE_GUIDE.md
       - specs/change-recipes/http-endpoint-bugfix.yaml
       - reference/standard-service/internal/app/routes.go
@@ -122,9 +168,9 @@ tasks:
 
   tenant_policy_change:
     intent: Change tenant resolution, tenant policy, quota, rate limiting, or tenant-session behavior.
+    context_package: implementation
     start_with:
       - AGENTS.md
-      - docs/CODEX_WORKFLOW.md
       - specs/change-recipes/tenant-policy-change.yaml
       - x/tenant/module.yaml
       - docs/architecture/X_TENANT_BLUEPRINT.md
@@ -136,9 +182,9 @@ tasks:
 
   stable_root_boundary_review:
     intent: Review stable-root changes for boundary drift, hidden coupling, and compatibility risk without coding.
+    context_package: review
     start_with:
       - AGENTS.md
-      - docs/CODEX_WORKFLOW.md
       - specs/change-recipes/stable-root-boundary-review.yaml
       - specs/repo.yaml
       - specs/dependency-rules.yaml

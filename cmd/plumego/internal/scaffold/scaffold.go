@@ -40,7 +40,7 @@ func GetTemplateFiles(template string) []string {
 	case "minimal", "fullstack", "microservice":
 		return canonicalTemplateFiles()
 	case "api":
-		return []string{
+		files := []string{
 			"cmd/app/main.go",
 			"internal/app/app.go",
 			"internal/app/routes.go",
@@ -53,8 +53,9 @@ func GetTemplateFiles(template string) []string {
 			".gitignore",
 			"README.md",
 		}
+		return appendTemplateControlFiles(files)
 	case "rest-api":
-		return []string{
+		files := []string{
 			"cmd/app/main.go",
 			"internal/app/app.go",
 			"internal/app/routes.go",
@@ -68,8 +69,9 @@ func GetTemplateFiles(template string) []string {
 			".gitignore",
 			"README.md",
 		}
+		return appendTemplateControlFiles(files)
 	case "tenant-api", "gateway", "realtime", "ai-service", "ops-service":
-		return []string{
+		files := []string{
 			"cmd/app/main.go",
 			"internal/app/app.go",
 			"internal/app/routes.go",
@@ -82,13 +84,14 @@ func GetTemplateFiles(template string) []string {
 			".gitignore",
 			"README.md",
 		}
+		return appendTemplateControlFiles(files)
 	default:
 		return nil
 	}
 }
 
 func canonicalTemplateFiles() []string {
-	return []string{
+	files := []string{
 		"cmd/app/main.go",
 		"internal/app/app.go",
 		"internal/app/routes.go",
@@ -100,6 +103,18 @@ func canonicalTemplateFiles() []string {
 		".gitignore",
 		"README.md",
 	}
+	return appendTemplateControlFiles(files)
+}
+
+func appendTemplateControlFiles(files []string) []string {
+	out := append([]string{}, files...)
+	out = append(out,
+		"Makefile",
+		".github/workflows/ci.yml",
+		"AGENTS.md",
+		"CLAUDE.md",
+	)
+	return out
 }
 
 // CreateProject creates a new project from a template.
@@ -275,7 +290,7 @@ func resolveProjectOptions(options []ProjectOptions) ProjectOptions {
 
 func getGoModContent(module string, opts ProjectOptions) string {
 	opts = resolveProjectOptions([]ProjectOptions{opts})
-	content := fmt.Sprintf("module %s\n\ngo 1.24\n\nrequire github.com/spcent/plumego %s\n", module, opts.PlumegoVersion)
+	content := fmt.Sprintf("module %s\n\ngo 1.26.0\n\nrequire github.com/spcent/plumego %s\n", module, opts.PlumegoVersion)
 	if opts.PlumegoReplace != "" {
 		content += fmt.Sprintf("\nreplace github.com/spcent/plumego => %s\n", filepath.ToSlash(opts.PlumegoReplace))
 	}
@@ -326,6 +341,14 @@ func getTemplateContent(file, name, module, template string) string {
 		return getGitignoreContent()
 	case "README.md":
 		return getReadmeContent(name, template)
+	case "Makefile":
+		return getMakefileContent()
+	case ".github/workflows/ci.yml":
+		return getCIWorkflowContent()
+	case "AGENTS.md":
+		return getAgentsContent(name)
+	case "CLAUDE.md":
+		return getClaudeContent(name)
 	default:
 		return ""
 	}
@@ -1546,4 +1569,117 @@ go build -o bin/app ./cmd/app
 
 See [Plumego documentation](https://github.com/spcent/plumego) for more information.
 `, name, template)
+}
+
+func getMakefileContent() string {
+	return `.PHONY: gates test vet fmt-check build run tidy
+
+gates: fmt-check vet test build
+
+test:
+	go test -timeout 20s ./...
+
+vet:
+	go vet ./...
+
+fmt-check:
+	@test -z "$$(gofmt -l .)" || (gofmt -l . && exit 1)
+
+build:
+	go build -o bin/app ./cmd/app
+
+run:
+	go run ./cmd/app
+
+tidy:
+	go mod tidy
+`
+}
+
+func getCIWorkflowContent() string {
+	return `name: ci
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  gates:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Run gates
+        run: make gates
+`
+}
+
+func getAgentsContent(name string) string {
+	return fmt.Sprintf(`# AGENTS.md - %s
+
+Operational guide for AI coding agents working in this Plumego application.
+
+## Rules
+
+- Preserve `+"`net/http`"+` handler compatibility.
+- Keep route wiring explicit: one method, one path, one handler per line.
+- Decode JSON in handlers with `+"`json.NewDecoder(r.Body).Decode(&dst)`"+`.
+- Write success responses through `+"`contract.WriteResponse`"+`.
+- Write API errors through `+"`contract.WriteError`"+`.
+- Add dependencies only when the application code needs them directly.
+- Do not introduce hidden globals, `+"`init()`"+` registration, or context-based service lookup.
+- Keep middleware in the standard `+"`func(http.Handler) http.Handler`"+` shape.
+- Run `+"`make gates`"+` before handing off code changes.
+
+## Project Layout
+
+- `+"`cmd/app`"+`: process entrypoint.
+- `+"`internal/app`"+`: dependency assembly and route registration.
+- `+"`internal/config`"+`: configuration loading and validation.
+- `+"`internal/handler`"+`: HTTP handlers.
+
+Prefer constructor injection and small local interfaces over package globals.
+`, name)
+}
+
+func getClaudeContent(name string) string {
+	return fmt.Sprintf(`# CLAUDE.md - %s
+
+This project follows the same operational contract as `+"`AGENTS.md`"+`.
+
+Use this file for assistant-specific notes only. Keep durable engineering rules
+in `+"`AGENTS.md`"+` so every agent sees the same source of truth.
+
+## Common Commands
+
+`+"```bash"+`
+make gates
+make test
+make build
+go run ./cmd/app
+`+"```"+`
+
+## Implementation Notes
+
+- Keep application wiring in `+"`internal/app`"+`.
+- Keep business or resource-specific behavior outside middleware.
+- Prefer typed response structs for public JSON APIs.
+- Keep validation explicit at handler or service boundaries.
+`, name)
 }

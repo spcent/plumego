@@ -2,7 +2,8 @@
 
 This document turns Plumego's code quality expectations into an agent-facing
 checklist. Use it with `AGENTS.md`, `docs/CODEX_WORKFLOW.md`,
-`docs/CANONICAL_STYLE_GUIDE.md`, and `specs/agent-quality-rules.yaml`.
+`docs/AGENT_CONTEXT_BUDGET.md`, `docs/CANONICAL_STYLE_GUIDE.md`, and
+`specs/agent-quality-rules.yaml`.
 
 ## 1. Rule Levels
 
@@ -35,6 +36,8 @@ broader path.
 - Keep route, handler, and middleware wiring grep-friendly.
 - Document implemented behavior only.
 - Run module checks first, boundary checks second, and repo-wide gates last.
+- Load the smallest context package that can safely establish ownership,
+  boundaries, touched files, and validation.
 
 ### MAY
 
@@ -50,6 +53,7 @@ Use these sparingly and explain the reason when they affect review scope.
 Before editing, answer these fields:
 
 ```text
+Context package:
 Owning module:
 Target module.yaml read:
 In-scope paths:
@@ -64,6 +68,10 @@ Validation plan:
 
 Stop in analysis-only mode when ownership, dependency impact, stable public API
 impact, or cross-module boundaries are unclear.
+
+Use `docs/AGENT_CONTEXT_BUDGET.md` to choose `startup`, `implementation`,
+`review`, or `control-plane` before reading beyond the selected
+`specs/task-routing.yaml` `start_with` files.
 
 ## 3. Module Quality Focus
 
@@ -176,6 +184,7 @@ Review priorities:
 
 Check accuracy, links, terminology, and authority order. Go gates are not
 required unless code, config, generated data, or examples changed.
+Use compact validation summaries instead of pasting full link or grep output.
 
 ### single module behavior
 
@@ -234,6 +243,7 @@ gofmt -w .
 Every implementation handoff should include:
 
 ```text
+Context package:
 Owning module:
 Files changed:
 Boundary impact:

@@ -61,6 +61,8 @@ Keep `reference/standard-service` as the app shape. Add one capability family:
 | Local debug routes, config snapshots, or pprof | `docs/modules/x-devtools/README.md` |
 | Reusable circuit breaker or rate-limit primitives | `docs/modules/x-resilience/README.md` |
 | AI provider/session/tool primitives | `docs/modules/x-ai/README.md` |
+| gRPC service hosting, client pooling, or HTTP-RPC gateway | `docs/modules/x-rpc/README.md` |
+| OpenAPI 3.1 spec generation from route metadata | `docs/modules/x-openapi/README.md` |
 
 Done when the app still has explicit route wiring and only the selected
 capability family is added.
@@ -70,12 +72,14 @@ capability family is added.
 Read:
 
 1. `AGENTS.md`
-2. `docs/CODEX_WORKFLOW.md`
-3. `docs/CANONICAL_STYLE_GUIDE.md`
-4. `docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md`
-5. `specs/repo.yaml`
-6. `specs/dependency-rules.yaml`
-7. the target module's `module.yaml`
+2. `docs/AGENT_CONTEXT_BUDGET.md`
+3. `docs/CODEX_WORKFLOW.md`
+4. `docs/CANONICAL_STYLE_GUIDE.md`
+5. `docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md`
+6. `specs/task-routing.yaml`
+7. `specs/repo.yaml`
+8. `specs/dependency-rules.yaml`
+9. the target module's `module.yaml`
 
 Done when a developer or agent can answer:
 

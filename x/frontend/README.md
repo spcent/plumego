@@ -607,7 +607,7 @@ See `frontend_test.go` for test examples covering:
 
 ## Compatibility
 
-- **Go**: 1.24+ (as per plumego requirements)
+- **Go**: 1.26+ (as per plumego requirements)
 - **Build Tools**: Any (Vite, Next.js, Create React App, etc.)
 - **Browsers**: All modern browsers (gzip/brotli support)
 

@@ -13,6 +13,7 @@ canonical_authority:
   operations:
     - AGENTS.md
     - docs/CODEX_WORKFLOW.md
+    - docs/AGENT_CONTEXT_BUDGET.md
   style:
     - docs/CANONICAL_STYLE_GUIDE.md
   quality:
@@ -57,6 +58,9 @@ canonical_authority:
     - specs/change-recipes/stable-root-boundary-review.yaml
     - specs/change-recipes/symbol-change.yaml
     - specs/change-recipes/tenant-policy-change.yaml
+    - specs/change-recipes/add-websocket-room.yaml
+    - specs/change-recipes/add-ai-tool.yaml
+    - specs/change-recipes/add-grpc-method.yaml
   task_queue:
     - tasks/cards
     - tasks/milestones
@@ -131,6 +135,7 @@ top_level_rules:
     - frontend
   rules:
     - New library packages must live under a stable root or x/*
+    - x/* extension packages are part of the main module; go.mod files under x/** are forbidden
     - Every top-level x/* extension root must be declared in layers.extension.paths
     - Root package facade is forbidden in the target layout
     - Reference apps define the canonical app structure
@@ -155,13 +160,15 @@ agent_workflow:
     - Identify target layer and module
     - Establish goal, in-scope paths, and out-of-scope paths before editing
     - Read canonical style and reference app when shaping app structure
-    - Read specs/task-routing.yaml for discovery defaults
+    - Read docs/AGENT_CONTEXT_BUDGET.md when context package selection is unclear
+    - Read specs/task-routing.yaml for discovery defaults and start_with context packages
     - Read specs/package-hotspots.yaml when package choice is ambiguous
     - Read specs/agent-quality-rules.yaml for quality preflight and gate selection
     - Read the target module manifest
     - State public API and dependency assumptions before broad changes
     - State behavior, security, docs, and validation impact before broad changes
     - Split broad or ambiguous work into analysis and implementation passes
+    - Split work before implementation when it exceeds context budget limits
     - Keep changes within one primary module when possible
     - Run module tests first
     - Run boundary checks second
@@ -170,6 +177,7 @@ agent_workflow:
   defaults:
     max_primary_modules_per_change: 1
     max_files_per_card: 5
+    max_validation_commands_per_card: 3
     require_manifest_for_new_module: true
     prefer_extension_family_entrypoint: true
     require_explicit_scope: true
@@ -194,3 +202,4 @@ agent_workflow:
       - no new dependencies
       - focused tests required for behavior changes
       - docs sync only for implemented behavior changes
+      - smallest safe context package selected before broad reading

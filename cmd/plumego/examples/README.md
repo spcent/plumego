@@ -188,7 +188,7 @@ All scripts follow standard exit code conventions:
 
 - `plumego` CLI installed and in PATH
 - `jq` for JSON processing
-- Go 1.24+ installed
+- Go 1.26+ installed
 
 ## Tips
 

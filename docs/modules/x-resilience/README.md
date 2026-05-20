@@ -31,9 +31,117 @@
 ## Public entrypoints
 
 - `circuitbreaker.New`
-- `circuitbreaker.NewMiddleware`
+- `circuitbreaker.Middleware` / `circuitbreaker.MiddlewareWithErrorHandler`
 - `ratelimit.New`
 - `ratelimit.NewKeyed`
+
+---
+
+## Circuit Breaker
+
+`circuitbreaker.New` creates a three-state breaker (Closed → Open → Half-Open):
+
+```go
+import "github.com/spcent/plumego/x/resilience/circuitbreaker"
+
+breaker := circuitbreaker.New(circuitbreaker.Config{
+    FailureThreshold:  5,               // open after 5 consecutive failures
+    SuccessThreshold:  2,               // close again after 2 successes in half-open
+    Timeout:           10 * time.Second, // stay open for this long before half-open
+    OnStateChange: func(from, to circuitbreaker.State) {
+        log.Printf("circuit breaker: %s → %s", from, to)
+    },
+})
+
+// Wrap any operation.
+err := breaker.Call(func() error {
+    return callDownstreamService()
+})
+if err != nil {
+    // err may be circuitbreaker.ErrOpen if the breaker is open.
+}
+
+// Context-aware variant.
+err = breaker.CallWithContext(ctx, func() error {
+    return callDownstreamService()
+})
+
+// Inspect state and counts.
+state := breaker.State()   // circuitbreaker.StateClosed, StateOpen, StateHalfOpen
+counts := breaker.Counts() // requests, failures, successes
+```
+
+### HTTP Middleware
+
+Wraps a handler; 5xx responses count as failures:
+
+```go
+import (
+    "github.com/spcent/plumego/x/resilience/circuitbreaker"
+)
+
+breaker := circuitbreaker.New(circuitbreaker.Config{FailureThreshold: 3})
+
+// Mount on a route or route group.
+app.Get("/downstream", circuitbreaker.Middleware(circuitbreaker.MiddlewareConfig{
+    Breaker: breaker,
+})(downstreamHandler))
+```
+
+When the breaker is open, the middleware returns HTTP 503 with a structured
+`contract.APIError`. When the concurrent request limit is exceeded in half-open
+state, it returns HTTP 429.
+
+---
+
+## Rate Limiter
+
+`ratelimit.New` creates a single token-bucket limiter. `ratelimit.NewKeyed`
+manages per-key buckets (e.g., per IP or per tenant ID):
+
+```go
+import "github.com/spcent/plumego/x/resilience/ratelimit"
+
+// Single bucket: 100 tokens/second, burst of 20.
+limiter := ratelimit.New(100, 20)
+
+// Non-blocking check.
+if !limiter.Allow() {
+    // rate limit exceeded
+}
+
+// Blocking wait until a token is available (or context cancelled).
+if err := limiter.Wait(ctx); err != nil {
+    // context cancelled or deadline exceeded
+}
+
+// Dynamic reconfiguration.
+limiter.UpdateRate(200, 40)
+```
+
+### Per-Key Buckets
+
+```go
+// Per-client rate limiting keyed by IP address.
+keyedLimiter := ratelimit.NewKeyed(50, 10) // 50 req/s per key, burst 10
+
+func rateLimitMiddleware(next http.Handler) http.Handler {
+    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        clientIP := r.RemoteAddr
+        if !keyedLimiter.Allow(clientIP) {
+            w.Header().Set("Retry-After", "1")
+            http.Error(w, "rate limit exceeded", http.StatusTooManyRequests)
+            return
+        }
+        next.ServeHTTP(w, r)
+    })
+}
+
+// Clean up buckets for inactive clients.
+keyedLimiter.Delete("192.168.1.1")
+```
+
+---
 
 ## Main risks when changing this module
 

@@ -423,7 +423,7 @@ Fallback to disk-based serving for development.
 
 ## Requirements
 
-- Go 1.24+
+- Go 1.26+
 - Plumego application with debug endpoints explicitly mounted, typically through `x/observability/devtools`; the dev server sets `APP_DEBUG=true` for generated apps that choose to honor it
 - Available ports for app and dashboard
 

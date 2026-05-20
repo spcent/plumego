@@ -474,6 +474,42 @@ func FindReferenceXImports(repoRoot, refDir string) ([]string, error) {
 	return violations, nil
 }
 
+// FindXGoModFiles returns all go.mod files nested under x/. Extension packages
+// are part of the main module; optional third-party adapters must live in
+// reference applications or external modules instead of adding x/* submodules.
+func FindXGoModFiles(repoRoot string) ([]string, error) {
+	xDir := filepath.Join(repoRoot, "x")
+	var violations []string
+	err := filepath.WalkDir(xDir, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			if strings.HasPrefix(d.Name(), ".") {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if d.Name() != "go.mod" {
+			return nil
+		}
+		rel, err := filepath.Rel(repoRoot, path)
+		if err != nil {
+			return err
+		}
+		violations = append(violations, filepath.ToSlash(rel))
+		return nil
+	})
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	sort.Strings(violations)
+	return violations, nil
+}
+
 // ValidateReferenceModules verifies that every top-level reference example is a
 // standalone module with local module naming and no imports back through the
 // repository's reference or internal paths.

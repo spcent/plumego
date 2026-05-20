@@ -8,7 +8,7 @@ For the broader adoption sequence, read `docs/ADOPTION_PATH.md`.
 
 ## Requirements
 
-- Go 1.24 or later
+- Go 1.26 or later
 - no external runtime dependencies in the main module
 
 Install:
@@ -230,3 +230,10 @@ Read these next, in order:
 - Prefer explicit route wiring and explicit middleware registration.
 - Prefer `contract.WriteError` and `contract.WriteResponse` for JSON APIs.
 - When the example stops being enough, copy structure from `reference/standard-service` instead of inventing a new bootstrap shape.
+
+## Troubleshooting
+
+If something is not working as expected, see
+[`docs/troubleshooting.md`](./troubleshooting.md). Common issues include:
+routes not matching after `Prepare`, middleware order, empty
+`router.Param` values, and JWT verification failures.

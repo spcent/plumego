@@ -48,7 +48,7 @@
 
 - <!-- e.g. "ResourceHandler must embed http.Handler, not wrap it." -->
 - <!-- e.g. "Error shape must use contract.WriteError, not a new type." -->
-- <!-- e.g. "Use Go 1.24-compatible standard-library APIs only." -->
+- <!-- e.g. "Use Go 1.26-compatible standard-library APIs only." -->
 
 ---
 

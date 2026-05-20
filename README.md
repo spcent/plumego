@@ -1,6 +1,6 @@
 # Plumego — Standard Library Web Toolkit
 
-[![Go Version](https://img.shields.io/badge/Go-1.24%2B-00ADD8?style=flat&logo=go)](https://go.dev/)
+[![Go Version](https://img.shields.io/badge/Go-1.26%2B-00ADD8?style=flat&logo=go)](https://go.dev/)
 [![Status](https://img.shields.io/badge/status-v1.0.0-blue)](https://github.com/spcent/plumego/releases/tag/v1.0.0)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
@@ -62,6 +62,25 @@ For the production-style application layout, read
 [`reference/standard-service`](./reference/standard-service) after this
 example.
 
+## Choose Your Starting Point
+
+Pick the scenario that matches your project:
+
+| I want to build... | Start here |
+| --- | --- |
+| A plain JSON API | `reference/standard-service` → stable roots only |
+| REST resources with CRUD conventions | `reference/with-rest` → `x/rest` |
+| A multi-tenant SaaS API | `reference/with-tenant` → `x/tenant` |
+| An API gateway or reverse proxy | `reference/with-gateway` → `x/gateway` |
+| Real-time WebSocket features | `reference/with-websocket` → `x/websocket` |
+| An AI-backed service | `reference/with-ai` → `x/ai/provider` |
+| A service with rich messaging/webhooks | `reference/with-messaging` → `x/messaging` |
+| A gRPC + HTTP service | `reference/with-rpc` → `x/rpc` |
+| Observability (Prometheus / OpenTelemetry) | `x/observability` |
+
+All paths keep `reference/standard-service` as the base layout. Extensions are
+explicit additions, not alternate bootstraps.
+
 ## Why plumego
 
 Plumego is for Go services that need more structure than raw `http.ServeMux`
@@ -106,6 +125,16 @@ without taking on a large framework model.
 Optional capability families live under `x/*`. Treat them as additions to the
 stable root path, not as alternate application layouts.
 
+## Agent-First Design
+
+Plumego is maintained with an agent-first control plane: `docs/` explains the
+architecture, `specs/` records machine-checkable boundaries, `tasks/` defines
+reviewable execution units, and `reference/` shows canonical wiring. The checks
+under `internal/checks/` enforce the most important boundaries locally and in
+CI, so automated changes produce reviewable evidence instead of relying on
+implicit convention. See [`docs/AGENT_FIRST.md`](./docs/AGENT_FIRST.md) for the
+full model and adoption path.
+
 ## Getting Help
 
 - Start with [`docs/getting-started.md`](./docs/getting-started.md) for the
@@ -117,3 +146,7 @@ stable root path, not as alternate application layouts.
 - Browse [`docs/modules`](./docs/modules) for package-specific primers.
 - Check [`docs/ADOPTION_PATH.md`](./docs/ADOPTION_PATH.md) for the 5-minute,
   30-minute, and 1-day adoption path.
+- See [`docs/troubleshooting.md`](./docs/troubleshooting.md) for common
+  problems: route freeze, middleware order, JWT errors, and lifecycle issues.
+- See [`docs/benchmarks/README.md`](./docs/benchmarks/README.md) for
+  performance comparisons with Chi, Gin, and Echo.
