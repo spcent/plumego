@@ -1,7 +1,7 @@
 # plumego — root Makefile
 # Minimal targets. Most work happens via codex --yolo or go toolchain directly.
 
-.PHONY: help bundle validate-diff validate-diff-dry milestone check-spec check-plan check-card check-verify new-milestone new-plan new-card new-verify run-card milestone-status gates fmt vet test test-race setup-hooks
+.PHONY: help bundle validate-diff validate-diff-dry milestone check-spec check-plan check-card check-verify new-milestone new-plan new-card new-verify run-card milestone-status gates gates-go gates-website fmt vet test test-race test-stable test-contract bench check-boundaries check-public-api setup-hooks
 
 # Default: show help
 help:
@@ -346,22 +346,38 @@ new-card: ## Scaffold a task card: make new-card ID=0001 SLUG=slice-router-work 
 	  echo "Hint: set Recipe: to one of specs/change-recipes/*.yaml or scaffold with R=<recipe-name> next time."; \
 	fi
 
-# ── Quality Gates (run locally, mirrors CI) ───────────────────────────────────
+# ── Composable Go Gates (no website required) ────────────────────────────────
 
-gates: ## Run all required quality gates (mirrors CI)
+check-boundaries: ## Run boundary and manifest checks (no website)
 	go run ./internal/checks/dependency-rules
 	go run ./internal/checks/agent-workflow
 	go run ./internal/checks/module-manifests
 	go run ./internal/checks/reference-layout
-	go run ./internal/checks/extension-maturity
-	go run ./internal/checks/extension-beta-evidence
-	go run ./internal/checks/deprecation-inventory -strict
+	go run ./internal/checks/public-entrypoints-sync
+
+check-public-api: ## Check stable public API surface hasn't drifted
 	go run ./internal/checks/public-entrypoints-sync
 	@set -e; \
 	TMP=$$(mktemp -d "$${TMPDIR:-/tmp}/plumego-stable-api.XXXXXX"); \
 	trap 'rm -rf "$$TMP"' EXIT; \
 	go run ./internal/checks/extension-api-snapshot -module ./core -out "$$TMP/core-head.snapshot"; \
 	go run ./internal/checks/extension-api-snapshot -compare docs/stable-api/snapshots/core-head.snapshot "$$TMP/core-head.snapshot"
+
+test-stable: ## Run tests for stable roots only (core, router, contract, middleware, security, store, health, log, metrics)
+	go test -race -timeout 60s ./core/... ./router/... ./contract/... ./middleware/... ./security/... ./store/... ./health/... ./log/... ./metrics/...
+
+test-contract: ## Run freeze/conformance/contract tests only
+	go test -run 'TestFreeze|TestConformance|TestContract|TestJSON' -timeout 20s ./...
+
+bench: ## Run all benchmarks (short mode, no unit tests)
+	go test -bench=. -benchtime=1s -run=^$$ ./...
+
+gates-go: ## Run all Go quality gates without website (for pure Go changes)
+	$(MAKE) check-boundaries
+	$(MAKE) check-public-api
+	go run ./internal/checks/extension-maturity
+	go run ./internal/checks/extension-beta-evidence
+	go run ./internal/checks/deprecation-inventory -strict
 	go run ./internal/tools/doc-snippets
 	go vet ./...
 	$(MAKE) reference-vet
@@ -383,6 +399,9 @@ gates: ## Run all required quality gates (mirrors CI)
 	cd cmd/plumego && go vet ./...
 	cd cmd/plumego && go test -race -timeout 60s ./...
 	cd cmd/plumego && go test -timeout 60s ./...
+	@echo "Go gates passed."
+
+gates-website: ## Run website quality gates only (requires pnpm)
 	@TMPDIR=$$(mktemp -d); \
 	git diff -- website/src/generated > "$$TMPDIR/before"; \
 	cd website && pnpm sync; \
@@ -394,6 +413,13 @@ gates: ## Run all required quality gates (mirrors CI)
 	fi
 	cd website && pnpm check
 	cd website && pnpm build
+	@echo "Website gates passed."
+
+# ── Quality Gates (run locally, mirrors CI) ───────────────────────────────────
+
+gates: ## Run all required quality gates (mirrors CI)
+	$(MAKE) gates-go
+	$(MAKE) gates-website
 	@echo "All gates passed."
 
 fmt: ## Format all Go source files in-place

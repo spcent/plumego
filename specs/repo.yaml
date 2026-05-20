@@ -108,6 +108,16 @@ layers:
     paths:
       - reference
 
+  agent_control_plane:
+    description: Agent working rules, verification guides, and prompt recipes.
+    paths:
+      - agents
+
+  examples:
+    description: Minimal runnable snippets demonstrating core patterns.
+    paths:
+      - examples
+
 top_level_rules:
   allowed_library_roots:
     - core

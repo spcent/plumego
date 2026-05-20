@@ -469,6 +469,82 @@ modules:
       - reference/**
       - cmd/**
 
+# ── Internal packages ─────────────────────────────────────────────────────────
+# These packages are part of the main module and may only be imported by the
+# declared_callers listed below. No reference apps or cmd/ packages may import
+# them. The dependency checker validates their deny rules; declared_callers is
+# informational for agents reviewing the dependency graph.
+
+  internal/semver:
+    path: internal/semver
+    layer: internal
+    declared_callers:
+      - x/ai/marketplace
+    allow:
+      - stdlib
+    deny:
+      - reference/**
+      - cmd/**
+
+  internal/httputil:
+    path: internal/httputil
+    layer: internal
+    declared_callers:
+      - middleware/internal/transport
+      - x/gateway/cache
+      - x/gateway/transform
+    allow:
+      - stdlib
+    deny:
+      - reference/**
+      - cmd/**
+
+  internal/httpx:
+    path: internal/httpx
+    layer: internal
+    declared_callers:
+      - x/gateway
+      - x/messaging/webhook
+    allow:
+      - stdlib
+    deny:
+      - reference/**
+      - cmd/**
+
+  internal/nethttp:
+    path: internal/nethttp
+    layer: internal
+    declared_callers:
+      - x/messaging
+    allow:
+      - stdlib
+    deny:
+      - reference/**
+      - cmd/**
+
+  internal/stringsx:
+    path: internal/stringsx
+    layer: internal
+    declared_callers:
+      - x/messaging/webhook
+    allow:
+      - stdlib
+    deny:
+      - reference/**
+      - cmd/**
+
+  internal/config:
+    path: internal/config
+    layer: internal
+    declared_callers:
+      - x/observability/devtools
+    allow:
+      - stdlib
+      - log
+    deny:
+      - reference/**
+      - cmd/**
+
 special_rules:
   forbidden_paths:
     - plumego.go
