@@ -147,7 +147,7 @@ func TestSourcesRespectCanceledContext(t *testing.T) {
 
 func TestGetHelpers(t *testing.T) {
 	// Create custom config instance
-	cfg := NewManager(log.NewLogger())
+	cfg := mustNewManager(t, log.NewLogger())
 
 	// Add environment variable source
 	envSource := NewEnvSource("")

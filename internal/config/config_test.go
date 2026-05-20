@@ -15,6 +15,15 @@ import (
 	"github.com/spcent/plumego/log"
 )
 
+func mustNewManager(t *testing.T, logger log.StructuredLogger) *Manager {
+	t.Helper()
+	m, err := NewManager(logger)
+	if err != nil {
+		t.Fatalf("NewManager: %v", err)
+	}
+	return m
+}
+
 type stubSource struct {
 	name string
 	data map[string]any
@@ -60,7 +69,7 @@ func unsetEnvForTest(t *testing.T, keys ...string) {
 
 // TestConfigBasic tests basic Config functionality
 func TestConfigBasic(t *testing.T) {
-	cfg := NewManager(log.NewLogger())
+	cfg := mustNewManager(t, log.NewLogger())
 
 	// Test empty config
 	if cfg.Get("missing") != "" {
@@ -81,7 +90,7 @@ func TestConfigBasic(t *testing.T) {
 }
 
 func TestGetBoolNumericValues(t *testing.T) {
-	cfg := NewManager(log.NewLogger())
+	cfg := mustNewManager(t, log.NewLogger())
 	cfg.data = map[string]any{
 		"int_zero":   int8(0),
 		"int_one":    int16(1),
@@ -143,7 +152,7 @@ func TestToIntPreservesInRangeConversions(t *testing.T) {
 
 // TestConfigWithData tests Config with actual data
 func TestConfigWithData(t *testing.T) {
-	cfg := NewManager(log.NewLogger())
+	cfg := mustNewManager(t, log.NewLogger())
 	ctx := t.Context()
 
 	// Create a simple JSON config file
@@ -200,7 +209,7 @@ func TestConfigWithData(t *testing.T) {
 }
 
 func TestConfigKeyNormalization(t *testing.T) {
-	cfg := NewManager(log.NewLogger())
+	cfg := mustNewManager(t, log.NewLogger())
 	ctx := t.Context()
 
 	src := &stubSource{
@@ -233,7 +242,7 @@ func TestConfigKeyNormalization(t *testing.T) {
 }
 
 func TestConfigUnmarshalNestedStruct(t *testing.T) {
-	cfg := NewManager(log.NewLogger())
+	cfg := mustNewManager(t, log.NewLogger())
 	cfg.data = map[string]any{
 		"app_name":      "demo",
 		"db_host":       "localhost",
@@ -273,7 +282,7 @@ func TestConfigUnmarshalNestedStruct(t *testing.T) {
 }
 
 func TestLoadBestEffort(t *testing.T) {
-	cfg := NewManager(log.NewLogger())
+	cfg := mustNewManager(t, log.NewLogger())
 	cfg.AddSource(&stubSource{name: "bad", err: errors.New("boom")})
 	cfg.AddSource(&stubSource{name: "ok", data: map[string]any{"app_name": "demo"}})
 
@@ -287,7 +296,7 @@ func TestLoadBestEffort(t *testing.T) {
 }
 
 func TestLoadBestEffortAllFail(t *testing.T) {
-	cfg := NewManager(log.NewLogger())
+	cfg := mustNewManager(t, log.NewLogger())
 	cfg.AddSource(&stubSource{name: "bad1", err: errors.New("boom1")})
 	cfg.AddSource(&stubSource{name: "bad2", err: errors.New("boom2")})
 
@@ -298,7 +307,7 @@ func TestLoadBestEffortAllFail(t *testing.T) {
 
 func TestReloadWithValidation(t *testing.T) {
 	source := &stubSource{name: "test", data: map[string]any{"value": "ok"}}
-	cfg := NewManager(log.NewLogger())
+	cfg := mustNewManager(t, log.NewLogger())
 	cfg.AddSource(source)
 
 	if err := cfg.Load(t.Context()); err != nil {
@@ -332,7 +341,7 @@ func TestReloadWithValidation(t *testing.T) {
 
 // TestConfigUnmarshal tests struct unmarshalling
 func TestConfigUnmarshal(t *testing.T) {
-	cfg := NewManager(log.NewLogger())
+	cfg := mustNewManager(t, log.NewLogger())
 	ctx := t.Context()
 
 	// Set up test data
@@ -381,7 +390,7 @@ func TestConfigUnmarshal(t *testing.T) {
 
 func TestReloadNotifiesWatchers(t *testing.T) {
 	source := &stubSource{name: "test", data: map[string]any{"value": "v1"}}
-	cfg := NewManager(log.NewLogger())
+	cfg := mustNewManager(t, log.NewLogger())
 	cfg.AddSource(source)
 	cfg.Load(t.Context())
 
@@ -407,7 +416,7 @@ func TestReloadNotifiesWatchers(t *testing.T) {
 
 func TestReloadWithValidationWatcherOnlyOnSuccess(t *testing.T) {
 	source := &stubSource{name: "test", data: map[string]any{"value": "ok"}}
-	cfg := NewManager(log.NewLogger())
+	cfg := mustNewManager(t, log.NewLogger())
 	cfg.AddSource(source)
 	cfg.Load(t.Context())
 
@@ -439,7 +448,7 @@ func TestReloadWithValidationWatcherOnlyOnSuccess(t *testing.T) {
 }
 
 func TestUnmarshalDurationAndSlice(t *testing.T) {
-	cfg := NewManager(log.NewLogger())
+	cfg := mustNewManager(t, log.NewLogger())
 	cfg.data = map[string]any{
 		"timeout":  "5s",
 		"tags":     "alpha,beta, gamma",
@@ -468,7 +477,7 @@ func TestUnmarshalDurationAndSlice(t *testing.T) {
 }
 
 func TestUnmarshalDurationMillisecondsOverflowReturnsError(t *testing.T) {
-	cfg := NewManager(log.NewLogger())
+	cfg := mustNewManager(t, log.NewLogger())
 	cfg.data = map[string]any{
 		"timeout": strconv.FormatInt(maxDurationMilliseconds+1, 10),
 	}
@@ -524,7 +533,7 @@ func TestUnmarshalNumericOverflowReturnsError(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cfg := NewManager(log.NewLogger())
+			cfg := mustNewManager(t, log.NewLogger())
 			cfg.data = tt.data
 
 			defer func() {
@@ -545,7 +554,7 @@ func TestUnmarshalNumericOverflowReturnsError(t *testing.T) {
 }
 
 func TestGetStringSliceAndHas(t *testing.T) {
-	cfg := NewManager(log.NewLogger())
+	cfg := mustNewManager(t, log.NewLogger())
 	cfg.data = map[string]any{
 		"hosts": "a.com,b.com, c.com",
 	}
@@ -567,7 +576,7 @@ func TestGetStringSliceAndHas(t *testing.T) {
 }
 
 func TestGetDuration(t *testing.T) {
-	cfg := NewManager(log.NewLogger())
+	cfg := mustNewManager(t, log.NewLogger())
 	cfg.data = map[string]any{
 		"go_dur":  "10s",
 		"bad_dur": "3000",
@@ -583,13 +592,11 @@ func TestGetDuration(t *testing.T) {
 	}
 }
 
-func TestNewManagerPanicsForCompatibility(t *testing.T) {
-	defer func() {
-		if recovered := recover(); recovered == nil {
-			t.Fatal("expected panic for nil logger")
-		}
-	}()
-	_ = NewManager(nil)
+func TestNewManagerRejectsNilLogger(t *testing.T) {
+	_, err := NewManager(nil)
+	if err == nil {
+		t.Fatal("expected error for nil logger, got nil")
+	}
 }
 
 // TestFileSource tests FileSource functionality

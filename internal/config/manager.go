@@ -33,10 +33,10 @@ type Manager struct {
 	logger     log.StructuredLogger
 }
 
-// NewManager creates a new Manager instance.
-func NewManager(logger log.StructuredLogger) *Manager {
+// NewManager creates a new Manager instance. It returns an error if logger is nil.
+func NewManager(logger log.StructuredLogger) (*Manager, error) {
 	if logger == nil {
-		panic("config: logger is required")
+		return nil, errors.New("config: logger is required")
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	return &Manager{
@@ -47,7 +47,7 @@ func NewManager(logger log.StructuredLogger) *Manager {
 		ctx:        ctx,
 		cancel:     cancel,
 		logger:     logger,
-	}
+	}, nil
 }
 
 // AddSource adds a configuration source.
