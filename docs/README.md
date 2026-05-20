@@ -10,6 +10,8 @@ Read by intent instead of scanning everything.
 - `ADOPTION_PATH.md` — narrow 5-minute, 30-minute, and 1-day adoption path
 - `why-plumego.md` — what Plumego is for, core principles, and fit summary
 - `when-not-to-use-plumego.md` — honest cases where a different tool fits better
+- `troubleshooting.md` — common problems and fixes (routes, middleware, JWT, lifecycle)
+- `benchmarks/README.md` — performance results and methodology vs. Chi, Gin, Echo
 - `../reference/standard-service/README.md` — canonical reference app layout and route wiring
 - `CANONICAL_STYLE_GUIDE.md` — the default handler, route, middleware, and response style
 - `agent-first.md` — agent-first design rationale, mechanisms, and operating reference
