@@ -57,8 +57,8 @@ func check(repoRoot string) ([]violation, error) {
 
 	// Collect all x/* packages that have a module.yaml with forbidden_imports.
 	type moduleEntry struct {
-		dir             string
-		forbidden       []string
+		dir       string
+		forbidden []string
 	}
 	var modules []moduleEntry
 
