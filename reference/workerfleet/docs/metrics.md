@@ -36,6 +36,8 @@ Forbidden default labels:
 
 Implemented metric catalog:
 
+Stable metric catalog:
+
 - `workerfleet_workers`
 - `workerfleet_pods`
 - `workerfleet_active_cases`
@@ -45,22 +47,25 @@ Implemented metric catalog:
 - `workerfleet_node_active_cases`
 - `workerfleet_case_started_total`
 - `workerfleet_case_finished_total`
-- `workerfleet_case_completed_total`
-- `workerfleet_case_failed_total`
 - `workerfleet_case_phase_transitions_total`
 - `workerfleet_worker_status_transitions_total`
 - `workerfleet_alerts_total`
 - `workerfleet_alerts_firing`
 - `workerfleet_case_phase_duration_seconds`
 - `workerfleet_case_total_duration_seconds`
+- `workerfleet_worker_report_apply_duration_seconds`
+- `workerfleet_kube_inventory_sync_duration_seconds`
+- `workerfleet_runtime_errors_total`
+
+Experimental metric catalog:
+
+- `workerfleet_case_completed_total`
+- `workerfleet_case_failed_total`
 - `workerfleet_case_duration_seconds`
 - `workerfleet_case_step_completed_total`
 - `workerfleet_case_step_duration_seconds`
 - `workerfleet_case_step_stuck_cases`
 - `workerfleet_case_step_oldest_active_age_seconds`
-- `workerfleet_worker_report_apply_duration_seconds`
-- `workerfleet_kube_inventory_sync_duration_seconds`
-- `workerfleet_runtime_errors_total`
 
 State and inventory coverage:
 
@@ -92,3 +97,4 @@ Case and step metrics:
 - `exec_plan_id` is a controlled optional label and should be disabled if active plan cardinality is high.
 - `case_id` and `task_id` stay out of Prometheus and belong in MongoDB/API drilldown.
 - step duration distribution should use histogram metrics rather than per-case gauges.
+- metrics carrying `exec_plan_id` or `step` remain experimental until the label cardinality and panel usage are proven stable in production.
