@@ -95,6 +95,7 @@ Workerfleet 是独立 Go 子模块：
 - Bootstrap 会显式装配 ingest、query、loop 执行和 alert 执行组件，再只把 `App` 需要的生命周期钩子暴露出来。
 - 周期性 Kubernetes sync 和 status sweep 逻辑收敛在 `LoopRunner`。
 - 周期性 alert evaluation 和 notification delivery 逻辑收敛在 `AlertRunner`。
+- 应用配置层持有按 profile 选出的 `StatusPolicy` 和 `AlertPolicy`，启动时会先校验，再把生效策略显式注入 ingest、loop 和 alert 组件。
 
 ## 5. 领域模型
 
@@ -125,6 +126,12 @@ Worker 状态：
 - `degraded`
 - `offline`
 - `unknown`
+
+策略面：
+
+- `StatusPolicy` 负责心跳 stale/offline 阈值，以及状态判断使用的 stage-stuck 和 restart 阈值。
+- `AlertPolicy` 负责告警侧使用的 stage-stuck 和 restart 阈值；默认从状态策略派生，也可以由运行时配置显式覆盖。
+- `internal/app/config.go` 通过环境变量暴露两类策略，并提供 `dev` / `prod` profile 默认值和逐字段校验。
 
 在线定义为进程存活且可以接新任务。当 worker 有活跃任务但暂时不接更多任务时，它可以仍然被认为在线且忙碌。当信号过期、worker 上报错误、空闲但不接任务、或任务阶段卡住时，状态会变为降级。当进程不存活、Pod 失败、Pod 消失、或心跳超过离线阈值时，状态会变为离线。
 
@@ -323,6 +330,10 @@ Base path：`/v1`
 - `to_status`
 - `operation`
 - `result`
+- `pod`
+- `exec_plan_id`
+- `step`
+- `error_class`
 
 禁止作为默认 label：
 
@@ -331,8 +342,15 @@ Base path：`/v1`
 - `worker_id`
 - `pod_name`
 - `pod_uid`
+- `raw_error`
+- `error_message`
 
-下一阶段 case/step 指标会在部分指标中允许 `pod` label，因为 pod 维度吞吐和耗时分布是明确业务诉求。`exec_plan_id` 是可选 label，只有在活跃 plan 数量受控时才应默认开启。
+当前指标契约已经区分 stable 和 experimental：
+
+- stable 指标用于常规 Grafana 聚合面板和告警规则，label contract 视为冻结。
+- experimental 指标主要覆盖 pod、exec plan、case step 维度的吞吐和耗时明细，用于诊断和演进，不默认视为长期兼容接口。
+
+case/step 指标允许在部分指标中使用 `pod` label，因为 pod 维度吞吐和耗时分布是明确业务诉求。`exec_plan_id` 是受控可选 label，只有在活跃 plan 数量受控时才应默认开启。
 
 Grafana 看板应以聚合视图为主。单 case 或单 task 的细节排查应该通过 workerfleet 查询 API 和 MongoDB 历史记录完成，而不是把高基数字段放进 Prometheus label。完整 case/step 指标方案见 [Case And Step Metrics Design](../case-step-metrics.md)。
 
@@ -392,6 +410,7 @@ HTTP：
 
 运行时循环配置：
 
+- `WORKERFLEET_PROFILE`，默认 `dev`。
 - `WORKERFLEET_KUBE_SYNC_ENABLED`，默认 `false`。
 - `WORKERFLEET_STATUS_SWEEP_ENABLED`，默认 `false`。
 - `WORKERFLEET_ALERT_EVALUATION_ENABLED`，默认 `false`。
@@ -409,6 +428,18 @@ HTTP：
 - `WORKERFLEET_FEISHU_WEBHOOK_URL`。
 - `WORKERFLEET_WEBHOOK_URL`。
 - `WORKERFLEET_WEBHOOK_HEADERS`，格式为逗号分隔的 `Header=Value`。
+
+状态和告警策略配置：
+
+- `WORKERFLEET_PROFILE=dev` 使用应用本地开发默认阈值。
+- `WORKERFLEET_PROFILE=prod` 切换为更保守的生产默认阈值。
+- `WORKERFLEET_STATUS_STALE_AFTER` 覆盖 worker 心跳 stale 阈值。
+- `WORKERFLEET_STATUS_OFFLINE_AFTER` 覆盖 worker 离线阈值。
+- `WORKERFLEET_STATUS_STAGE_STUCK_AFTER` 覆盖 worker stage-stuck 状态判断阈值。
+- `WORKERFLEET_STATUS_RESTART_BURST_THRESHOLD` 覆盖 worker restart-burst 状态判断阈值。
+- `WORKERFLEET_ALERT_STAGE_STUCK_AFTER` 覆盖告警侧 stage-stuck 触发阈值。
+- `WORKERFLEET_ALERT_RESTART_BURST_THRESHOLD` 覆盖告警侧 restart-burst 触发阈值。
+- 策略值启动时会 fail closed 校验；例如过低阈值和互相矛盾的 stale/offline 组合都会直接拒绝启动。
 
 Worker 接入认证：
 
@@ -477,9 +508,6 @@ Worker 接入认证：
 - HTTP 服务入口和优雅关闭。
 - 周期性 Kubernetes 库存同步、状态 sweep、告警评估和告警通知循环。
 - Kubernetes 和 notifier 的运行时环境变量配置。
+- profile 驱动的状态和告警策略配置，以及启动期 fail-closed 校验。
+- stable / experimental metrics catalog 契约和 label 集冻结测试。
 - Grafana 看板规划文档。
-
-建议下一批卡片：
-
-- 增加 worker 注册和心跳认证。
-- 增加 Kubernetes 部署配置示例。
