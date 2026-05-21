@@ -7,9 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"os"
-	"os/signal"
-	"syscall"
 
 	"github.com/spcent/plumego/core"
 	plumelog "github.com/spcent/plumego/log"
@@ -51,10 +48,11 @@ func New(cfg config.Config) (*App, error) {
 }
 
 // Start prepares the runtime and blocks while the HTTP server runs.
-// It listens for SIGTERM and SIGINT and triggers a graceful shutdown.
-func (a *App) Start() error {
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
+// When ctx is canceled, it triggers a graceful shutdown.
+func (a *App) Start(ctx context.Context) (err error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 
 	if err := a.Core.Prepare(); err != nil {
 		return fmt.Errorf("prepare server: %w", err)
@@ -63,9 +61,11 @@ func (a *App) Start() error {
 	if err != nil {
 		return fmt.Errorf("get server: %w", err)
 	}
+
+	shutdownErr := make(chan error, 1)
 	go func() {
 		<-ctx.Done()
-		_ = a.Core.Shutdown(context.Background())
+		shutdownErr <- a.Core.Shutdown(context.Background())
 	}()
 
 	var serveErr error
@@ -76,6 +76,13 @@ func (a *App) Start() error {
 	}
 	if serveErr != nil && !errors.Is(serveErr, http.ErrServerClosed) {
 		return fmt.Errorf("server stopped: %w", serveErr)
+	}
+	select {
+	case err := <-shutdownErr:
+		if err != nil {
+			return fmt.Errorf("shutdown server: %w", err)
+		}
+	default:
 	}
 	return nil
 }

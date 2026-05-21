@@ -15,7 +15,8 @@ Read `ARCHITECTURE.md` (this directory) for layout rationale.
 |---|---|
 | `internal/handler/api.go` | Add, change, or remove handler methods |
 | `internal/handler/health.go` | Update health check logic |
-| `internal/handler/items.go` | Extend item endpoints or add new handler files with DI |
+| `internal/handler/items.go` | Extend item HTTP endpoints or add new handler files with DI |
+| `internal/domain/item/item.go` | Change sample item model or in-memory repository behavior |
 | `internal/handler/handler_test.go` | Add or update handler tests |
 | `internal/config/config.go` | Add config fields, change defaults |
 | `main.go` | Only the four wiring calls; do not add logic |
@@ -54,7 +55,7 @@ func (h APIHandler) MyEndpoint(w http.ResponseWriter, r *http.Request) {
 ```
 
 **Handler with injected dependencies** (declare the interface in the handler,
-wire the concrete implementation in `routes.go`):
+	wire the concrete implementation from the owning domain package in `routes.go`):
 ```go
 // handler/widgets.go
 type WidgetRepository interface {
@@ -73,8 +74,11 @@ func (h WidgetHandler) GetByID(w http.ResponseWriter, r *http.Request) {
     _ = contract.WriteResponse(w, r, http.StatusOK, widget, nil)
 }
 
+// internal/domain/widget/store.go
+func NewMemoryStore() *MemoryStore { /* ... */ }
+
 // app/routes.go
-widgets := handler.WidgetHandler{Repo: handler.NewMemoryWidgetStore()}
+widgets := handler.WidgetHandler{Repo: widget.NewMemoryStore()}
 if err := a.Core.Get("/api/v1/widgets/:id", http.HandlerFunc(widgets.GetByID)); err != nil {
     return err
 }
@@ -97,8 +101,9 @@ func (h WidgetHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 1. Add the field to `AppConfig` in `internal/config/config.go`.
 2. Set a safe default in `Defaults()`.
-3. Read from environment in `applyEnv()`.
-4. Optionally expose as a flag in `applyFlags()`.
+3. Read from `.env` in `applyEnvMap()` when local file support is needed.
+4. Read from environment in `applyEnv()`.
+5. Optionally expose as a flag in `applyFlags()`.
 
 ### Add middleware
 

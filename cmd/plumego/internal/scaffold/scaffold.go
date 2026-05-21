@@ -95,8 +95,10 @@ func canonicalTemplateFiles() []string {
 		"cmd/app/main.go",
 		"internal/app/app.go",
 		"internal/app/routes.go",
+		"internal/domain/item/item.go",
 		"internal/handler/api.go",
 		"internal/handler/health.go",
+		"internal/handler/items.go",
 		"internal/config/config.go",
 		"go.mod",
 		"env.example",
@@ -323,10 +325,14 @@ func getTemplateContent(file, name, module, template string) string {
 			return getAPIRoutesGoContent(module, name)
 		}
 		return getCanonicalRoutesGoContent(module, name)
+	case "internal/domain/item/item.go":
+		return getCanonicalItemDomainContent()
 	case "internal/handler/api.go":
 		return getCanonicalAPIHandlerContent(name)
 	case "internal/handler/health.go":
 		return getCanonicalHealthHandlerContent()
+	case "internal/handler/items.go":
+		return getCanonicalItemHandlerContent(module)
 	case "internal/config/config.go":
 		return getCanonicalConfigGoContent(module)
 	case "internal/resource/users.go":
@@ -358,8 +364,11 @@ func getCanonicalMainGoContent(module, name string) string {
 	return fmt.Sprintf(`package main
 
 import (
+	"context"
 	"log"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"%s/internal/app"
 	"%s/internal/config"
@@ -373,6 +382,9 @@ func main() {
 }
 
 func run() error {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
 	cfg, err := config.Load()
 	if err != nil {
 		return err
@@ -388,7 +400,7 @@ func run() error {
 	}
 
 	log.Printf("Starting %s on %%s", cfg.Core.Addr)
-	return a.Start()
+	return a.Start(ctx)
 }
 `, module, module, name)
 }
@@ -441,8 +453,11 @@ func New(cfg config.Config) (*App, error) {
 }
 
 // Start prepares the runtime and blocks while the HTTP server runs.
-func (a *App) Start() (err error) {
-	ctx := context.Background()
+// When ctx is canceled, it triggers a graceful shutdown.
+func (a *App) Start(ctx context.Context) (err error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 
 	if err := a.Core.Prepare(); err != nil {
 		return fmt.Errorf("prepare server: %%w", err)
@@ -451,10 +466,11 @@ func (a *App) Start() (err error) {
 	if err != nil {
 		return fmt.Errorf("get server: %%w", err)
 	}
-	defer func() {
-		if shutdownErr := a.Core.Shutdown(ctx); shutdownErr != nil && err == nil {
-			err = fmt.Errorf("shutdown server: %%w", shutdownErr)
-		}
+
+	shutdownErr := make(chan error, 1)
+	go func() {
+		<-ctx.Done()
+		shutdownErr <- a.Core.Shutdown(context.Background())
 	}()
 
 	if a.Cfg.Core.TLS.Enabled {
@@ -465,6 +481,13 @@ func (a *App) Start() (err error) {
 	}
 	if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		return fmt.Errorf("server stopped: %%w", err)
+	}
+	select {
+	case err := <-shutdownErr:
+		if err != nil {
+			return fmt.Errorf("shutdown server: %%w", err)
+		}
+	default:
 	}
 	return nil
 }
@@ -477,6 +500,7 @@ func getCanonicalRoutesGoContent(module, name string) string {
 import (
 	"net/http"
 
+	"%s/internal/domain/item"
 	"%s/internal/handler"
 )
 
@@ -484,6 +508,7 @@ import (
 func (a *App) RegisterRoutes() error {
 	api := handler.APIHandler{}
 	health := handler.HealthHandler{ServiceName: "%s"}
+	items := handler.ItemHandler{Repo: item.NewMemoryStore()}
 
 	if err := a.Core.Get("/", http.HandlerFunc(api.Hello)); err != nil {
 		return err
@@ -503,9 +528,15 @@ func (a *App) RegisterRoutes() error {
 	if err := a.Core.Get("/api/v1/greet", http.HandlerFunc(api.Greet)); err != nil {
 		return err
 	}
+	if err := a.Core.Post("/api/v1/items", http.HandlerFunc(items.Create)); err != nil {
+		return err
+	}
+	if err := a.Core.Get("/api/v1/items/:id", http.HandlerFunc(items.GetByID)); err != nil {
+		return err
+	}
 	return nil
 }
-`, module, name)
+`, module, module, name)
 }
 
 func getAPIRoutesGoContent(module, name string) string {
@@ -996,11 +1027,14 @@ func (h APIHandler) Hello(w http.ResponseWriter, r *http.Request) {
 			"minimal_bootstrap",
 		},
 		Endpoints: map[string]string{
-			"root":       "/",
-			"healthz":    "/healthz",
-			"readyz":     "/readyz",
-			"api_hello":  "/api/hello",
-			"api_status": "/api/status",
+			"root":         "/",
+			"healthz":      "/healthz",
+			"readyz":       "/readyz",
+			"api_hello":    "/api/hello",
+			"api_status":   "/api/status",
+			"api_greet":    "/api/v1/greet",
+			"items_create": "/api/v1/items",
+			"items_get":    "/api/v1/items/:id",
 		},
 	}
 	_ = contract.WriteResponse(w, r, http.StatusOK, resp, nil)
@@ -1043,6 +1077,127 @@ func (h APIHandler) Status(w http.ResponseWriter, r *http.Request) {
 	_ = contract.WriteResponse(w, r, http.StatusOK, resp, nil)
 }
 `, name, name, name)
+}
+
+func getCanonicalItemDomainContent() string {
+	return `// Package item contains the application item domain model and store.
+package item
+
+import (
+	"fmt"
+	"sync"
+	"time"
+)
+
+// Item is the sample item resource in this application.
+type Item struct {
+	ID        string ` + "`json:\"id\"`" + `
+	Name      string ` + "`json:\"name\"`" + `
+	CreatedAt string ` + "`json:\"created_at\"`" + `
+}
+
+// MemoryStore is a thread-safe in-memory item repository.
+type MemoryStore struct {
+	mu    sync.RWMutex
+	items map[string]Item
+	next  int
+}
+
+// NewMemoryStore returns a ready-to-use in-memory store.
+func NewMemoryStore() *MemoryStore {
+	return &MemoryStore{items: make(map[string]Item)}
+}
+
+// Create stores an item with the provided name.
+func (s *MemoryStore) Create(name string) Item {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.next++
+	item := Item{
+		ID:        fmt.Sprintf("item-%d", s.next),
+		Name:      name,
+		CreatedAt: time.Now().UTC().Format(time.RFC3339),
+	}
+	s.items[item.ID] = item
+	return item
+}
+
+// Get returns an item by id.
+func (s *MemoryStore) Get(id string) (Item, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	item, ok := s.items[id]
+	return item, ok
+}
+`
+}
+
+func getCanonicalItemHandlerContent(module string) string {
+	return fmt.Sprintf(`package handler
+
+import (
+	"encoding/json"
+	"net/http"
+
+	"github.com/spcent/plumego/contract"
+	"github.com/spcent/plumego/router"
+	"%s/internal/domain/item"
+)
+
+// ItemRepository is the minimal persistence contract that ItemHandler depends on.
+type ItemRepository interface {
+	Create(name string) item.Item
+	Get(id string) (item.Item, bool)
+}
+
+// ItemHandler demonstrates constructor injection for a domain repository.
+type ItemHandler struct {
+	Repo ItemRepository
+}
+
+type createItemReq struct {
+	Name string `+"`json:\"name\"`"+`
+}
+
+// Create handles POST /api/v1/items.
+func (h ItemHandler) Create(w http.ResponseWriter, r *http.Request) {
+	var req createItemReq
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+			Type(contract.TypeBadRequest).
+			Message("request body must be valid JSON").
+			Build())
+		return
+	}
+	if req.Name == "" {
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+			Type(contract.TypeRequired).
+			Detail("field", "name").
+			Message("name is required").
+			Build())
+		return
+	}
+	item := h.Repo.Create(req.Name)
+	_ = contract.WriteResponse(w, r, http.StatusCreated, item, nil)
+}
+
+// GetByID handles GET /api/v1/items/:id.
+func (h ItemHandler) GetByID(w http.ResponseWriter, r *http.Request) {
+	id := router.Param(r, "id")
+	item, ok := h.Repo.Get(id)
+	if !ok {
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+			Type(contract.TypeNotFound).
+			Detail("id", id).
+			Message("item not found").
+			Build())
+		return
+	}
+	_ = contract.WriteResponse(w, r, http.StatusOK, item, nil)
+}
+`, module)
 }
 
 func getAPIUsersResourceContent() string {
@@ -1259,17 +1414,26 @@ func Defaults() Config {
 
 // Load reads configuration from environment variables and flags.
 func Load() (Config, error) {
+	return load(os.Args, os.LookupEnv)
+}
+
+func load(args []string, lookupEnv func(string) (string, bool)) (Config, error) {
 	cfg := Defaults()
+	if lookupEnv == nil {
+		lookupEnv = os.LookupEnv
+	}
 
-	cfg.App.EnvFile = resolveEnvFile(os.Args, cfg.App.EnvFile)
-	if err := loadEnvFile(cfg.App.EnvFile); err != nil {
+	cfg.App.EnvFile = resolveEnvFile(args, lookupEnv, cfg.App.EnvFile)
+	fileEnv, err := readEnvFile(cfg.App.EnvFile)
+	if err != nil {
 		return cfg, err
 	}
 
-	if err := applyEnv(&cfg); err != nil {
+	applyEnvMap(&cfg, fileEnv)
+	applyEnv(&cfg, lookupEnv)
+	if err := applyFlags(&cfg, args); err != nil {
 		return cfg, err
 	}
-	applyFlags(&cfg)
 
 	return cfg, Validate(cfg)
 }
@@ -1282,28 +1446,83 @@ func Validate(cfg Config) error {
 	return nil
 }
 
-func applyEnv(cfg *Config) error {
-	if value := strings.TrimSpace(os.Getenv("APP_ADDR")); value != "" {
+func applyEnv(cfg *Config, lookupEnv func(string) (string, bool)) {
+	if value, ok := lookupEnv("APP_ADDR"); ok && strings.TrimSpace(value) != "" {
 		cfg.Core.Addr = value
 	}
-	if value := strings.TrimSpace(os.Getenv("APP_ENV_FILE")); value != "" {
+	if value, ok := lookupEnv("APP_ENV_FILE"); ok && strings.TrimSpace(value) != "" {
 		cfg.App.EnvFile = value
 	}
-	if value := strings.TrimSpace(os.Getenv("APP_DEBUG")); value != "" {
+	if value, ok := lookupEnv("APP_DEBUG"); ok && strings.TrimSpace(value) != "" {
 		cfg.App.Debug = value == "true" || value == "1"
 	}
-	return nil
 }
 
-func applyFlags(cfg *Config) {
-	flag.StringVar(&cfg.Core.Addr, "addr", cfg.Core.Addr, "listen address")
-	flag.StringVar(&cfg.App.EnvFile, "env-file", cfg.App.EnvFile, "path to .env file")
-	flag.BoolVar(&cfg.App.Debug, "debug", cfg.App.Debug, "enable debug mode")
-	flag.Parse()
+func applyEnvMap(cfg *Config, values map[string]string) {
+	if values == nil {
+		return
+	}
+	if value := strings.TrimSpace(values["APP_ADDR"]); value != "" {
+		cfg.Core.Addr = value
+	}
+	if value := strings.TrimSpace(values["APP_ENV_FILE"]); value != "" {
+		cfg.App.EnvFile = value
+	}
+	if value := strings.TrimSpace(values["APP_DEBUG"]); value != "" {
+		cfg.App.Debug = value == "true" || value == "1"
+	}
 }
 
-func resolveEnvFile(args []string, defaultPath string) string {
-	if envPath := strings.TrimSpace(os.Getenv("APP_ENV_FILE")); envPath != "" {
+func applyFlags(cfg *Config, args []string) error {
+	fs := flag.NewFlagSet("app", flag.ContinueOnError)
+	fs.StringVar(&cfg.Core.Addr, "addr", cfg.Core.Addr, "listen address")
+	fs.StringVar(&cfg.App.EnvFile, "env-file", cfg.App.EnvFile, "path to .env file")
+	fs.BoolVar(&cfg.App.Debug, "debug", cfg.App.Debug, "enable debug mode")
+	if len(args) == 0 {
+		return fs.Parse(nil)
+	}
+	return fs.Parse(configFlagArgs(args[1:]))
+}
+
+func configFlagArgs(args []string) []string {
+	out := make([]string, 0, len(args))
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		name, hasValue := flagName(arg)
+		switch name {
+		case "addr", "env-file":
+			out = append(out, arg)
+			if !hasValue && i+1 < len(args) {
+				i++
+				out = append(out, args[i])
+			}
+		case "debug":
+			out = append(out, arg)
+			if !hasValue && i+1 < len(args) && !strings.HasPrefix(args[i+1], "-") {
+				i++
+				out = append(out, args[i])
+			}
+		}
+	}
+	return out
+}
+
+func flagName(arg string) (name string, hasValue bool) {
+	if strings.HasPrefix(arg, "--") {
+		arg = strings.TrimPrefix(arg, "--")
+	} else if strings.HasPrefix(arg, "-") {
+		arg = strings.TrimPrefix(arg, "-")
+	} else {
+		return "", false
+	}
+	if idx := strings.IndexByte(arg, '='); idx >= 0 {
+		return arg[:idx], true
+	}
+	return arg, false
+}
+
+func resolveEnvFile(args []string, lookupEnv func(string) (string, bool), defaultPath string) string {
+	if envPath, ok := lookupEnv("APP_ENV_FILE"); ok && strings.TrimSpace(envPath) != "" {
 		defaultPath = envPath
 	}
 	for i := 0; i < len(args); i++ {
@@ -1323,43 +1542,60 @@ func resolveEnvFile(args []string, defaultPath string) string {
 	return defaultPath
 }
 
-func loadEnvFile(path string) error {
+func readEnvFile(path string) (map[string]string, error) {
 	if path == "" {
-		return nil
+		return nil, nil
 	}
 	file, err := os.Open(path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil
+			return nil, nil
 		}
-		return err
+		return nil, err
 	}
 	defer file.Close()
 
+	values := make(map[string]string)
 	scanner := bufio.NewScanner(file)
+	scanner.Buffer(make([]byte, 64*1024), 1024*1024)
 	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-		if line == "" || strings.HasPrefix(line, "#") {
+		key, value, ok := parseEnvLine(scanner.Text())
+		if !ok {
 			continue
 		}
-		key, value, ok := strings.Cut(line, "=")
-		if !ok {
-			return fmt.Errorf("invalid env line: %s", line)
-		}
-		key = strings.TrimSpace(key)
-		value = strings.Trim(strings.TrimSpace(value), ` + "`\"'`" + `)
-		if key == "" {
-			return fmt.Errorf("invalid empty env key")
-		}
-		if os.Getenv(key) == "" {
-			if err := os.Setenv(key, value); err != nil {
-				return err
-			}
+		values[key] = value
+	}
+	return values, scanner.Err()
+}
+
+func parseEnvLine(line string) (key, value string, ok bool) {
+	line = strings.TrimSpace(line)
+	if line == "" || strings.HasPrefix(line, "#") {
+		return "", "", false
+	}
+
+	idx := strings.IndexByte(line, '=')
+	if idx < 0 {
+		return "", "", false
+	}
+
+	key = strings.TrimSpace(line[:idx])
+	if key == "" {
+		return "", "", false
+	}
+
+	value = strings.TrimSpace(line[idx+1:])
+	if len(value) >= 2 {
+		q := value[0]
+		if (q == '"' || q == '\'') && value[len(value)-1] == q {
+			value = value[1 : len(value)-1]
+			value = strings.ReplaceAll(value, string([]byte{'\\', q}), string(q))
 		}
 	}
-	return scanner.Err()
+
+	return key, value, true
 }
-`
+	`
 }
 
 func getScenarioProfileContent(template string) string {

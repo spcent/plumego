@@ -81,58 +81,74 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/core"
 	plog "github.com/spcent/plumego/log"
+	"github.com/spcent/plumego/middleware/accesslog"
 	"github.com/spcent/plumego/middleware/recovery"
 	"github.com/spcent/plumego/middleware/requestid"
 )
 
 func main() {
-	ctx := context.Background()
+	if err := run(); err != nil {
+		log.Printf("server stopped: %v", err)
+		os.Exit(1)
+	}
+}
+
+func run() error {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
 	cfg := core.DefaultConfig()
 	cfg.Addr = ":8080"
 	app := core.New(cfg, core.AppDependencies{Logger: plog.NewLogger()})
 
 	recoveryMw, err := recovery.Middleware(recovery.Config{Logger: app.Logger()})
 	if err != nil {
-		log.Fatalf("configure recovery middleware: %v", err)
+		return err
+	}
+	accesslogMw, err := accesslog.Middleware(accesslog.Config{Logger: app.Logger()})
+	if err != nil {
+		return err
 	}
 	if err := app.Use(
 		requestid.Middleware(),
 		recoveryMw,
+		accesslogMw,
 	); err != nil {
-		log.Fatalf("register middleware: %v", err)
+		return err
 	}
 
 	if err := app.Get("/ping", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if err := contract.WriteResponse(w, r, http.StatusOK, map[string]string{
+		_ = contract.WriteResponse(w, r, http.StatusOK, map[string]string{
 			"message": "pong",
-		}, nil); err != nil {
-			http.Error(w, "write response", http.StatusInternalServerError)
-		}
+		}, nil)
 	})); err != nil {
-		log.Fatalf("register route: %v", err)
+		return err
 	}
 
 	if err := app.Prepare(); err != nil {
-		log.Fatalf("prepare server: %v", err)
+		return err
 	}
 	srv, err := app.Server()
 	if err != nil {
-		log.Fatalf("get server: %v", err)
+		return err
 	}
-	defer func() {
-		if err := app.Shutdown(ctx); err != nil {
-			log.Printf("shutdown server: %v", err)
-		}
+	go func() {
+		<-ctx.Done()
+		_ = app.Shutdown(context.Background())
 	}()
 
 	log.Println("server started at :8080")
 	if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-		log.Fatalf("server stopped: %v", err)
+		return err
 	}
+	return nil
 }
 ```
 

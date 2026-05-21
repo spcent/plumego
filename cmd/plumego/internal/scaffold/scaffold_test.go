@@ -222,9 +222,10 @@ func TestCanonicalAppTemplate_HandlesStartupErrorsExplicitly(t *testing.T) {
 		`"net/http"`,
 		`if err := a.Use(`,
 		`return nil, fmt.Errorf("register middleware: %w", err)`,
-		`func (a *App) Start() (err error)`,
+		`func (a *App) Start(ctx context.Context) (err error)`,
+		`shutdownErr := make(chan error, 1)`,
 		`errors.Is(err, http.ErrServerClosed)`,
-		`err = fmt.Errorf("shutdown server: %w", shutdownErr)`,
+		`return fmt.Errorf("shutdown server: %w", err)`,
 	})
 }
 
@@ -432,12 +433,15 @@ func TestCanonicalTemplate_MatchesReferenceRouteShape(t *testing.T) {
 
 	assertContainsAll(t, content, []string{
 		`"net/http"`,
+		`"example.com/myapp/internal/domain/item"`,
 		`a.Core.Get("/", http.HandlerFunc(api.Hello))`,
 		`a.Core.Get("/healthz", http.HandlerFunc(health.Live))`,
 		`a.Core.Get("/readyz", http.HandlerFunc(health.Ready))`,
 		`a.Core.Get("/api/hello", http.HandlerFunc(api.Hello))`,
 		`a.Core.Get("/api/status", http.HandlerFunc(api.Status))`,
 		`a.Core.Get("/api/v1/greet", http.HandlerFunc(api.Greet))`,
+		`a.Core.Post("/api/v1/items", http.HandlerFunc(items.Create))`,
+		`a.Core.Get("/api/v1/items/:id", http.HandlerFunc(items.GetByID))`,
 	})
 }
 
@@ -447,8 +451,10 @@ func TestCanonicalTemplate_FileSetMatchesReferenceContract(t *testing.T) {
 		"cmd/app/main.go",
 		"internal/app/app.go",
 		"internal/app/routes.go",
+		"internal/domain/item/item.go",
 		"internal/handler/api.go",
 		"internal/handler/health.go",
+		"internal/handler/items.go",
 		"internal/config/config.go",
 		"go.mod",
 		"env.example",

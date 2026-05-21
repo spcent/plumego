@@ -12,6 +12,8 @@ main.go
 internal/
   config/   config.go
   app/      app.go, routes.go
+  domain/
+    item/   item.go
   handler/  api.go, health.go, items.go, handler_test.go
 ```
 
@@ -28,7 +30,7 @@ reason creates drift that reviewers and agents have to recover from.
 1. Load configuration (`config.Load`)
 2. Construct the application (`app.New`)
 3. Register routes (`app.RegisterRoutes`)
-4. Start the server (`app.Start`)
+4. Start the server with a signal-aware context (`app.Start(ctx)`)
 
 It contains no business logic, no handler code, and no wiring decisions. If
 `main.go` grows beyond those four calls, the growth belongs somewhere else.
@@ -99,6 +101,10 @@ do not own persistence concerns (database queries, cache lookups).
 
 Tests live next to the handlers they test (`handler_test.go`).
 
+`internal/domain/item` owns the sample item model and in-memory repository. This
+keeps the transport package focused on HTTP adaptation while still showing where
+real business and persistence code belongs in an application.
+
 ### Constructor injection
 
 Handlers that require external dependencies declare them as interface fields and
@@ -117,7 +123,7 @@ type ItemHandler struct {
 }
 
 // routes.go wires the concrete implementation
-items := handler.ItemHandler{Repo: handler.NewMemoryItemStore()}
+items := handler.ItemHandler{Repo: item.NewMemoryStore()}
 ```
 
 Handlers with no external dependencies use a zero-field struct (`APIHandler{}`).
@@ -131,7 +137,8 @@ Both shapes are valid; choose based on whether the handler needs injected state.
 main.go
   → internal/config
   → internal/app          (imports internal/config, internal/handler)
-      → internal/handler  (imports contract, router)
+      → internal/domain/item
+      → internal/handler  (imports contract, router, internal/domain/item)
 ```
 
 `internal/handler` has no upward imports. It does not import `internal/app`

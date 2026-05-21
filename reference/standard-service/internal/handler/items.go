@@ -2,27 +2,18 @@ package handler
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
-	"sync"
-	"time"
 
 	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/router"
+	"standard-service/internal/domain/item"
 )
-
-// Item is the canonical item resource in this reference application.
-type Item struct {
-	ID        string `json:"id"`
-	Name      string `json:"name"`
-	CreatedAt string `json:"created_at"`
-}
 
 // ItemRepository is the minimal persistence contract that ItemHandler depends on.
 // Pass a concrete implementation from routes.go; pass a stub in tests.
 type ItemRepository interface {
-	Create(name string) Item
-	Get(id string) (Item, bool)
+	Create(name string) item.Item
+	Get(id string) (item.Item, bool)
 }
 
 // ItemHandler demonstrates constructor injection: declare the dependency as an
@@ -79,38 +70,4 @@ func (h ItemHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	_ = contract.WriteResponse(w, r, http.StatusOK, item, nil)
-}
-
-// MemoryItemStore is a thread-safe in-memory ItemRepository.
-// It satisfies the ItemRepository interface. Replace with a real
-// persistence layer when moving to production.
-type MemoryItemStore struct {
-	mu    sync.RWMutex
-	items map[string]Item
-	next  int
-}
-
-// NewMemoryItemStore returns a ready-to-use in-memory store.
-func NewMemoryItemStore() *MemoryItemStore {
-	return &MemoryItemStore{items: make(map[string]Item)}
-}
-
-func (s *MemoryItemStore) Create(name string) Item {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.next++
-	item := Item{
-		ID:        fmt.Sprintf("item-%d", s.next),
-		Name:      name,
-		CreatedAt: time.Now().UTC().Format(time.RFC3339),
-	}
-	s.items[item.ID] = item
-	return item
-}
-
-func (s *MemoryItemStore) Get(id string) (Item, bool) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	item, ok := s.items[id]
-	return item, ok
 }

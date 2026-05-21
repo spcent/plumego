@@ -3,6 +3,7 @@ package app
 import (
 	"net/http"
 
+	"standard-service/internal/domain/item"
 	"standard-service/internal/handler"
 )
 
@@ -11,9 +12,9 @@ import (
 func (a *App) RegisterRoutes() error {
 	api := handler.APIHandler{}
 	health := handler.HealthHandler{ServiceName: "plumego-reference"}
-	// ItemHandler demonstrates constructor injection: the concrete store is
-	// created here and passed through the interface the handler declared.
-	items := handler.ItemHandler{Repo: handler.NewMemoryItemStore()}
+	// ItemHandler demonstrates constructor injection: the concrete domain store
+	// is created here and passed through the interface the handler declared.
+	items := handler.ItemHandler{Repo: item.NewMemoryStore()}
 
 	if err := a.Core.Get("/", http.HandlerFunc(api.Hello)); err != nil {
 		return err

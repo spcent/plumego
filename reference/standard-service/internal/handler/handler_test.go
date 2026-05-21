@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/spcent/plumego/contract"
+	"standard-service/internal/domain/item"
 )
 
 func TestHealthHandlerResponses(t *testing.T) {
@@ -73,7 +74,7 @@ func TestAPIHandlerResponses(t *testing.T) {
 }
 
 func TestItemHandlerCreate(t *testing.T) {
-	h := ItemHandler{Repo: NewMemoryItemStore()}
+	h := ItemHandler{Repo: item.NewMemoryStore()}
 
 	t.Run("valid body returns 201 with item", func(t *testing.T) {
 		body := bytes.NewBufferString(`{"name":"widget"}`)
@@ -82,7 +83,7 @@ func TestItemHandlerCreate(t *testing.T) {
 		if rec.Code != http.StatusCreated {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusCreated)
 		}
-		item := decodeReferenceData[Item](t, rec)
+		item := decodeReferenceData[item.Item](t, rec)
 		if item.ID == "" || item.Name != "widget" || item.CreatedAt == "" {
 			t.Fatalf("unexpected item: %+v", item)
 		}
@@ -108,7 +109,7 @@ func TestItemHandlerCreate(t *testing.T) {
 }
 
 func TestItemHandlerGetByID(t *testing.T) {
-	store := NewMemoryItemStore()
+	store := item.NewMemoryStore()
 	created := store.Create("gadget")
 	h := ItemHandler{Repo: store}
 
@@ -123,7 +124,7 @@ func TestItemHandlerGetByID(t *testing.T) {
 		if rec.Code != http.StatusOK {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
 		}
-		item := decodeReferenceData[Item](t, rec)
+		item := decodeReferenceData[item.Item](t, rec)
 		if item.ID != created.ID || item.Name != "gadget" {
 			t.Fatalf("unexpected item: %+v", item)
 		}
