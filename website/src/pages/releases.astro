@@ -28,7 +28,7 @@ const adoptionGuidance = [
   {
     kicker: 'evaluate with evidence',
     title: 'Beta extensions have frozen APIs between minor release refs',
-    body: 'x/rest, x/websocket, x/gateway, and x/observability are promoted to beta — meaning their exported API surface did not change across two tagged release refs. Adopt them knowing the API is frozen between refs, not unconditionally.',
+    body: 'Seven extension families are promoted to beta — x/rest, x/websocket, x/gateway, x/observability (promoted at v1.0.0) and x/tenant, x/frontend, x/messaging (promoted at v1.1.0). Their exported API surfaces did not change across two consecutive tagged refs. Adopt them knowing the API is frozen between refs, not unconditionally.',
   },
   {
     kicker: 'evaluate deliberately',
@@ -58,7 +58,7 @@ const releaseChannels = [
   {
     kicker: 'beta',
     title: 'Beta extension families',
-    body: 'x/rest, x/websocket, x/gateway, and x/observability completed the promotion checklist: two consecutive release refs, no exported API changes, release-backed snapshots, and owner sign-off.',
+    body: 'Seven families completed the promotion checklist: x/rest, x/websocket, x/gateway, x/observability (v1.0.0), and x/tenant, x/frontend, x/messaging (v1.1.0). Two consecutive release refs, no exported API changes, release-backed snapshots, and owner sign-off.',
     details: ['API frozen between minor release refs', 'promotion requires two tagged refs and snapshot comparison', 'behavior is tested; compatibility is not unconditional'],
   },
   {
@@ -413,13 +413,13 @@ function badgeClass(status: string): string {
       <h2>How beta extensions are promoted.</h2>
       <p>
         A module does not become beta by declaration. It must complete a governed checklist: two consecutive tagged release refs with no exported API changes,
-        release-backed API snapshots on record, and owner sign-off. The four modules below completed this checklist at v0.1.0–v0.2.0.
+        release-backed API snapshots on record, and owner sign-off. The first four completed at v0.1.0–v0.2.0; the remaining three completed at v1.0.0–v1.1.0.
       </p>
     </div>
     <div class="control-grid control-grid--tight">
       <article class="control-grid__item">
         <p class="signal-list__kicker">two release refs</p>
-        <h3>API frozen across v0.1.0 and v0.2.0</h3>
+        <h3>API frozen across two consecutive refs</h3>
         <p>Each promoted module was snapshotted at both refs using <code>go run ./internal/checks/extension-release-evidence</code>. No exported symbol changed.</p>
       </article>
       <article class="control-grid__item">
@@ -458,6 +458,21 @@ function badgeClass(status: string): string {
         <p class="signal-list__kicker" style="color: #4f46e5">x/observability</p>
         <h3>Exporter, tracer, collector, and adapter wiring</h3>
         <p>Owner: <code>observability</code>. Evidence: exporter and tracer wiring, collector adapter surface, observability pipeline integration.</p>
+      </article>
+      <article class="control-grid__item">
+        <p class="signal-list__kicker" style="color: #4f46e5">x/tenant</p>
+        <h3>Per-tenant routing, quota enforcement, and JWT-backed policy</h3>
+        <p>Owner: <code>tenant</code>. Promoted at v1.1.0. Evidence: JWT tenant identity, per-tenant quota evaluation, policy enforcement at transport layer, tenant lifecycle, isolation tests.</p>
+      </article>
+      <article class="control-grid__item">
+        <p class="signal-list__kicker" style="color: #4f46e5">x/frontend</p>
+        <h3>Static asset serving and SPA embedding</h3>
+        <p>Owner: <code>assets</code>. Promoted at v1.1.0. Evidence: embedded and directory-based asset serving, cache-busting, pre-compressed delivery, directory safety, transport-layer attachment.</p>
+      </article>
+      <article class="control-grid__item">
+        <p class="signal-list__kicker" style="color: #4f46e5">x/messaging</p>
+        <h3>Async messaging, queues, and inbound webhook delivery</h3>
+        <p>Owner: <code>messaging</code>. Promoted at v1.1.0 (app-facing family entrypoint). Evidence: queue and pubsub flow wiring, inbound webhook transport, scheduled job surface. Subordinate primitives remain experimental.</p>
       </article>
     </div>
   </section>
