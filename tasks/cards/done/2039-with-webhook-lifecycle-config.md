@@ -4,7 +4,7 @@ Milestone:
 Recipe: specs/change-recipes/http-endpoint-bugfix.yaml
 Context Package: implementation
 Priority: P1
-State: active
+State: done
 Primary Module: reference/with-webhook
 Owned Files:
 - reference/with-webhook/main.go
@@ -56,10 +56,17 @@ Move signal ownership to `main.run`, change `App.Start(ctx)` to accept caller-ow
 
 ## Done Definition
 
-- [ ] Acceptance Tests pass.
-- [ ] All Validation commands exit 0.
-- [ ] gofmt -l . produces no output.
-- [ ] Docs Sync targets updated (if applicable).
+- [x] Acceptance Tests pass.
+- [x] All Validation commands exit 0.
+- [x] gofmt -l . produces no output.
+- [x] Docs Sync targets updated (if applicable).
 
 ## Outcome
 
+- Moved signal ownership to `main.run` and changed `App.Start(ctx)` to use caller-owned cancellation.
+- Replaced `.env` `os.Setenv` loading with an overlay-based config loader using `Defaults < .env < process env < flags`.
+- Added config precedence and unrelated flag tests.
+- Validation:
+  - `cd reference/with-webhook && go test -timeout 20s ./...`
+  - `cd reference/with-webhook && go vet ./...`
+  - `gofmt -l reference/with-webhook`
