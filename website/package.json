@@ -17,7 +17,8 @@
     "build": "ASTRO_TELEMETRY_DISABLED=1 astro build",
     "preview": "ASTRO_TELEMETRY_DISABLED=1 astro preview",
     "precheck": "pnpm sync",
-    "check": "pnpm check:docs-api && ASTRO_TELEMETRY_DISABLED=1 astro check",
+    "check": "pnpm check:content && pnpm check:docs-api && ASTRO_TELEMETRY_DISABLED=1 astro check",
+    "check:content": "node ./scripts/check-content-contracts.mjs",
     "check:docs-api": "node ./scripts/check-doc-api-symbols.mjs",
     "check:css": "node ./scripts/check-css-selectors.mjs"
   },

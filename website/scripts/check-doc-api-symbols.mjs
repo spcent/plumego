@@ -3,6 +3,8 @@ import path from 'node:path';
 import { REPO_ROOT, WEBSITE_ROOT } from './_shared.mjs';
 
 const DOCS_ROOT = path.join(WEBSITE_ROOT, 'src', 'content', 'docs');
+const PAGES_ROOT = path.join(WEBSITE_ROOT, 'src', 'pages');
+const SITE_DATA_FILE = path.join(WEBSITE_ROOT, 'src', 'data', 'site.ts');
 const MODULE_IMPORT_PREFIX = 'github.com/spcent/plumego/';
 const repoPathPrefixes = [
   'AGENTS.md',
@@ -35,12 +37,15 @@ const packageDirs = {
   jwt: path.join(REPO_ROOT, 'security', 'jwt'),
   log: path.join(REPO_ROOT, 'log'),
   metrics: path.join(REPO_ROOT, 'metrics'),
+  middleware: path.join(REPO_ROOT, 'middleware'),
   observability: path.join(REPO_ROOT, 'x', 'observability'),
   rest: path.join(REPO_ROOT, 'x', 'rest'),
+  resolve: path.join(REPO_ROOT, 'x', 'tenant', 'resolve'),
   router: path.join(REPO_ROOT, 'router'),
+  websocket: path.join(REPO_ROOT, 'x', 'websocket'),
 };
 
-const broadPackageChecks = new Set(['contract', 'metrics', 'rest']);
+const broadPackageChecks = new Set(['contract', 'metrics', 'resolve', 'rest', 'websocket']);
 
 const bannedPatterns = [
   {
@@ -102,6 +107,21 @@ const bannedPatterns = [
     packageName: 'websocket',
     pattern: /\bhub\.Broadcast\b/,
     message: 'use hub.BroadcastRoom(...) or hub.BroadcastAll(...)',
+  },
+  {
+    packageName: 'websocket',
+    pattern: /\bwebsocket\.NewHub\s*\(/,
+    message: 'use websocket.NewHubWithConfigE(...) or websocket.New(...)',
+  },
+  {
+    packageName: 'middleware',
+    pattern: /\bmiddleware\.Auth\s*\(/,
+    message: 'use middleware/auth.Authenticate(...) or a documented subpackage middleware',
+  },
+  {
+    packageName: 'tenant',
+    pattern: /\btenant\.(?:FromJWT|Guard)\s*\(/,
+    message: 'use x/tenant/resolve, policy, quota, and ratelimit middleware entrypoints',
   },
 ];
 
@@ -259,16 +279,18 @@ async function repoPathExists(value) {
   }
 }
 
-const [docsFiles, symbolMaps] = await Promise.all([
+const [docsFiles, pageFiles, symbolMaps] = await Promise.all([
   listFiles(DOCS_ROOT, (file) => file.endsWith('.mdx')),
+  listFiles(PAGES_ROOT, (file) => file.endsWith('.astro')),
   Promise.all(
     Object.entries(packageDirs).map(async ([name, dir]) => [name, await packageSymbols(dir)]),
   ).then((entries) => Object.fromEntries(entries)),
 ]);
 
+const checkedFiles = [...docsFiles, ...pageFiles, SITE_DATA_FILE];
 const failures = [];
 
-for (const file of docsFiles) {
+for (const file of checkedFiles) {
   const text = await fs.readFile(file, 'utf8');
   const rel = path.relative(REPO_ROOT, file);
 
@@ -327,4 +349,4 @@ if (failures.length > 0) {
   process.exit(1);
 }
 
-console.log(`Docs API symbol check passed (${docsFiles.length} MDX files).`);
+console.log(`Docs API symbol check passed (${checkedFiles.length} website content files).`);

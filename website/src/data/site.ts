@@ -129,8 +129,7 @@ export const HOME_COPY = {
         kicker: 'REST API',
         title: 'Build a REST API in minutes',
         code: `r := router.New()
-api := r.Group("/api/v1",
-    middleware.Auth(cfg.JWTSecret))
+api := r.Group("/api/v1")
 api.Get("/users/:id", users.Get)
 api.Post("/users",    users.Create)`,
         body: 'Trie-based routing with path params, middleware groups, and typed responses — all using standard net/http handlers. No custom context types.',
@@ -141,11 +140,16 @@ api.Post("/users",    users.Create)`,
       {
         kicker: 'WebSocket',
         title: 'Add real-time without touching core',
-        code: `hub := websocket.NewHub()
-r.Get("/ws", hub.Handler(onMessage))
+        code: `ws, err := websocket.New(websocket.DefaultWebSocketConfig())
+if err != nil {
+    return err
+}
+if err := ws.RegisterRoutes(r); err != nil {
+    return err
+}
 
 // broadcast to all connected clients
-hub.Broadcast([]byte("update"))`,
+ws.Hub().BroadcastAll(websocket.OpcodeText, []byte("update"))`,
         body: 'x/websocket adds a managed hub on top of the stable HTTP kernel. Routes stay explicit; transport concerns stay separate.',
         href: '/docs/modules/x-websocket',
         label: 'WebSocket module',
@@ -154,8 +158,10 @@ hub.Broadcast([]byte("update"))`,
       {
         kicker: 'Multi-tenant SaaS',
         title: 'Isolate tenants without changing core',
-        code: `api.Use(tenant.FromJWT(cfg.Secret))
-api.Get("/data", tenant.Guard(data.List))
+        code: `api.Use(resolve.Middleware(resolve.Options{
+    HeaderName: "X-Tenant-ID",
+}))
+api.Get("/data", data.List)
 
 // tenant identity resolved at transport
 // stable roots never see tenant logic`,
@@ -239,8 +245,7 @@ api.Get("/data", tenant.Guard(data.List))
         kicker: 'REST API',
         title: '几分钟搭一个 REST API',
         code: `r := router.New()
-api := r.Group("/api/v1",
-    middleware.Auth(cfg.JWTSecret))
+api := r.Group("/api/v1")
 api.Get("/users/:id", users.Get)
 api.Post("/users",    users.Create)`,
         body: '基于 trie 树的路由，支持路径参数、中间件组和类型化响应，全部使用标准 net/http handler，无自定义 context 类型。',
@@ -251,11 +256,16 @@ api.Post("/users",    users.Create)`,
       {
         kicker: 'WebSocket',
         title: '不动内核，加入实时能力',
-        code: `hub := websocket.NewHub()
-r.Get("/ws", hub.Handler(onMessage))
+        code: `ws, err := websocket.New(websocket.DefaultWebSocketConfig())
+if err != nil {
+    return err
+}
+if err := ws.RegisterRoutes(r); err != nil {
+    return err
+}
 
 // 向所有连接的客户端广播
-hub.Broadcast([]byte("update"))`,
+ws.Hub().BroadcastAll(websocket.OpcodeText, []byte("update"))`,
         body: 'x/websocket 在稳定 HTTP 内核上加了一个托管 hub，路由保持显式，传输层关注点保持独立。',
         href: '/zh/docs/modules/x-websocket',
         label: 'WebSocket 模块',
@@ -264,8 +274,10 @@ hub.Broadcast([]byte("update"))`,
       {
         kicker: '多租户 SaaS',
         title: '不改内核，隔离多租户',
-        code: `api.Use(tenant.FromJWT(cfg.Secret))
-api.Get("/data", tenant.Guard(data.List))
+        code: `api.Use(resolve.Middleware(resolve.Options{
+    HeaderName: "X-Tenant-ID",
+}))
+api.Get("/data", data.List)
 
 // 租户身份在传输层解析
 // 稳定根永远感知不到租户逻辑`,
@@ -976,8 +988,8 @@ export const EXAMPLES_COPY = {
       { name: 'reference/with-messaging', kicker: 'x/messaging', description: 'Async message publishing and subscription wiring', href: '/docs/modules/x-messaging', maturity: 'Beta' },
       { name: 'reference/with-events', kicker: 'x/messaging', description: 'In-process pubsub, idempotent consumption, delayed retry, and webhook delivery', href: '/docs/modules/x-messaging', maturity: 'Experimental' },
       { name: 'reference/with-rpc', kicker: 'x/rpc', description: 'gRPC server with HTTP gateway mount via x/rpc/server and x/rpc/gateway', href: '/docs/modules/x-rpc', maturity: 'Experimental' },
-      { name: 'reference/with-webhook', kicker: 'x/webhook', description: 'Webhook receiver with signature verification', href: '/docs/modules/x-webhook', maturity: 'Experimental' },
-      { name: 'reference/with-ops', kicker: 'x/ops', description: 'Protected admin and operations surfaces', href: '/docs/modules/x-ops', maturity: 'Experimental' },
+      { name: 'reference/with-webhook', kicker: 'x/messaging/webhook', description: 'Webhook receiver with signature verification', href: '/docs/modules/x-webhook', maturity: 'Experimental' },
+      { name: 'reference/with-ops', kicker: 'x/observability/ops', description: 'Protected admin and operations surfaces', href: '/docs/modules/x-ops', maturity: 'Experimental' },
       { name: 'reference/production-service', kicker: 'stable roots', description: 'Production-hardened variant with full lifecycle, TLS, and tests', href: '/docs/reference-app', maturity: 'Supported reference' },
     ],
     workerfleetTitle: 'Production-scale reference: reference/workerfleet',
@@ -1108,8 +1120,8 @@ export const EXAMPLES_COPY = {
       { name: 'reference/with-messaging', kicker: 'x/messaging', description: '异步消息发布与订阅接线', href: '/zh/docs/modules/x-messaging', maturity: 'Beta' },
       { name: 'reference/with-events', kicker: 'x/messaging', description: '进程内 pubsub、幂等消费、延迟重试与 webhook 投递', href: '/zh/docs/modules/x-messaging', maturity: '实验性' },
       { name: 'reference/with-rpc', kicker: 'x/rpc', description: '通过 x/rpc/server 托管 gRPC 服务并经 x/rpc/gateway 挂载 HTTP 端点', href: '/zh/docs/modules/x-rpc', maturity: '实验性' },
-      { name: 'reference/with-webhook', kicker: 'x/webhook', description: '带签名校验的 Webhook 接收器', href: '/zh/docs/modules/x-webhook', maturity: '实验性' },
-      { name: 'reference/with-ops', kicker: 'x/ops', description: '受保护的管理与运维表面', href: '/zh/docs/modules/x-ops', maturity: '实验性' },
+      { name: 'reference/with-webhook', kicker: 'x/messaging/webhook', description: '带签名校验的 Webhook 接收器', href: '/zh/docs/modules/x-webhook', maturity: '实验性' },
+      { name: 'reference/with-ops', kicker: 'x/observability/ops', description: '受保护的管理与运维表面', href: '/zh/docs/modules/x-ops', maturity: '实验性' },
       { name: 'reference/production-service', kicker: 'stable roots', description: '带完整生命周期、TLS 和测试的生产级加固变体', href: '/zh/docs/reference-app', maturity: '受支持参考' },
     ],
     workerfleetTitle: '生产规模参考：reference/workerfleet',

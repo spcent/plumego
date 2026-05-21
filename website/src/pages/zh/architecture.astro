@@ -20,25 +20,25 @@ const MODULE_PRIMER: Record<string, string> = {
   log: '/zh/docs/modules/log',
   metrics: '/zh/docs/modules/metrics',
   'x/ai': '/zh/docs/modules/x-ai',
-  'x/cache': '/zh/docs/modules/x-cache',
+  'x/data/cache': '/zh/docs/modules/x-cache',
   'x/data': '/zh/docs/modules/x-data',
-  'x/devtools': '/zh/docs/modules/x-devtools',
-  'x/discovery': '/zh/docs/modules/x-discovery',
+  'x/observability/devtools': '/zh/docs/modules/x-devtools',
+  'x/gateway/discovery': '/zh/docs/modules/x-discovery',
   'x/fileapi': '/zh/docs/modules/x-fileapi',
   'x/frontend': '/zh/docs/modules/x-frontend',
   'x/gateway': '/zh/docs/modules/x-gateway',
   'x/messaging': '/zh/docs/modules/x-messaging',
-  'x/mq': '/zh/docs/modules/x-messaging-subordinates',
-  'x/pubsub': '/zh/docs/modules/x-messaging-subordinates',
+  'x/messaging/mq': '/zh/docs/modules/x-messaging-subordinates',
+  'x/messaging/pubsub': '/zh/docs/modules/x-messaging-subordinates',
   'x/observability': '/zh/docs/modules/x-observability',
-  'x/ops': '/zh/docs/modules/x-ops',
+  'x/observability/ops': '/zh/docs/modules/x-ops',
   'x/resilience': '/zh/docs/modules/x-resilience',
   'x/rest': '/zh/docs/modules/x-rest',
-  'x/scheduler': '/zh/docs/modules/x-scheduler',
+  'x/messaging/scheduler': '/zh/docs/modules/x-scheduler',
   'x/tenant': '/zh/docs/modules/x-tenant',
-  'x/webhook': '/zh/docs/modules/x-webhook',
+  'x/messaging/webhook': '/zh/docs/modules/x-webhook',
   'x/websocket': '/zh/docs/modules/x-websocket',
-  // x/ipc 暂无独立 primer，渲染为纯文本
+  'x/gateway/ipc': '/zh/docs/modules/x-ipc',
 };
 
 const xScenarios = [
@@ -105,7 +105,7 @@ const copy = ARCHITECTURE_COPY.zh;
 const journeySteps = [
   { label: '为什么选择', href: '/zh/why-plumego' },
   { label: '示例', href: '/zh/examples' },
-  { label: '状态', href: '/zh/status' },
+  { label: '发布', href: '/zh/releases' },
 ];
 
 const requestFlowNodes = [

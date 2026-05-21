@@ -179,9 +179,10 @@ or reference-app doc page.
 **Applies to:** `src/pages/examples.astro`, `src/pages/zh/examples.astro`, `src/data/site.ts`
 (EXAMPLES_COPY referenceMatrix).
 
-**Verification:** Run `ls reference/` and compare against the `referenceMatrix` array in
-`src/data/site.ts`. Every subdirectory (except `workerfleet`, which has its own dedicated section)
-must appear in `referenceMatrix`.
+**Verification:** Run `node scripts/check-content-contracts.mjs`. Every subdirectory except
+`standard-service` (covered by the canonical reference-app page), `workerfleet` (covered by its
+dedicated examples section), and `benchmark` (not a service reference app) must appear in
+`referenceMatrix`.
 
 ---
 
@@ -207,3 +208,19 @@ all public API patterns. Website pages are downstream — when in doubt, match t
 > `app.Run()` is the combined path. The code above uses `app.Prepare()` + `app.Server()` to
 > show the two lifecycle steps explicitly. See [core module primer](/docs/modules/core) for
 > the full API.
+
+---
+
+## Rule 15 — Content contract checks are mandatory
+
+Run `node scripts/check-content-contracts.mjs` before merging website content changes. The checker
+owns three executable contracts:
+
+- every `<JourneyBar>` uses the fixed Why Plumego → Examples → Releases sequence
+- every `reference/` service app is either listed in the examples reference matrix or explicitly
+  declared as an exception
+- subordinate extension primitives are displayed with their full owning path, such as
+  `x/messaging/webhook`, not shortened as if they were top-level `x/*` families
+
+Run `node scripts/check-doc-api-symbols.mjs` as the companion API-pattern check. It scans docs,
+marketing pages, and `src/data/site.ts` for stale Plumego API examples.

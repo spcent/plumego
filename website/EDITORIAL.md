@@ -45,6 +45,9 @@ appear on every marketing page. Architecture is a reference page — it is not a
 step in the adoption journey and is therefore not a JourneyBar step (see
 CONTENT_RULES Rule 9).
 
+This is enforced by `node scripts/check-content-contracts.mjs`; do not maintain
+alternate per-page JourneyBar sequences by hand.
+
 End-of-page navigation must not repeat the full four-card AdoptionNav block
 on every page. Instead, link only to the **single most appropriate next step**
 from the current page's primary question. Repeating all four choices at the
