@@ -112,6 +112,8 @@ export default defineConfig({
                 { label: 'x/observability', slug: 'docs/modules/x-observability' },
                 { label: 'x/tenant', slug: 'docs/modules/x-tenant' },
                 { label: 'x/frontend', slug: 'docs/modules/x-frontend' },
+                { label: 'x/messaging', slug: 'docs/modules/x-messaging' },
+                { label: 'x/messaging (primitives)', slug: 'docs/modules/x-messaging-subordinates' },
               ],
             },
             {
@@ -120,8 +122,6 @@ export default defineConfig({
               collapsed: true,
               items: [
                 { label: 'x/ai', slug: 'docs/modules/x-ai' },
-                { label: 'x/messaging', slug: 'docs/modules/x-messaging' },
-                { label: 'x/messaging (primitives)', slug: 'docs/modules/x-messaging-subordinates' },
                 { label: 'x/data', slug: 'docs/modules/x-data' },
                 { label: 'x/fileapi', slug: 'docs/modules/x-fileapi' },
                 { label: 'x/cache', slug: 'docs/modules/x-cache' },
@@ -188,6 +188,7 @@ export default defineConfig({
                 { label: 'Adoption Path', slug: 'docs/guides/adoption-path', translations: { 'zh-CN': '采用路径' } },
                 { label: 'Migration & Upgrades', slug: 'docs/guides/migration-and-upgrades', translations: { 'zh-CN': '迁移与升级' } },
                 { label: 'Migrate from Gin/Echo', slug: 'docs/guides/migrate-from-gin-echo', translations: { 'zh-CN': '从 Gin/Echo 迁移' } },
+                { label: 'Migrate from Chi', slug: 'docs/guides/migrate-from-chi', translations: { 'zh-CN': '从 Chi 迁移' } },
               ],
             },
             {

@@ -77,6 +77,27 @@ const xScenarios = [
     href: '/zh/docs/modules/x-observability',
     label: '打开 x/observability 模块手册',
   },
+  {
+    kicker: 'rest api',
+    title: '带一致响应规范的 CRUD 资源控制器',
+    body: 'x/rest 为所有 CRUD 端点提供类型化资源接口、统一响应封装和验证钩子，让每个新资源都遵循同一套结构契约。',
+    href: '/zh/docs/modules/x-rest',
+    label: '打开 x/rest 模块手册',
+  },
+  {
+    kicker: 'messaging',
+    title: '异步消息、队列与入站 Webhook 投递',
+    body: 'x/messaging 在一个家族入口点下连接消息队列、pubsub 流、定时任务和入站/出站 Webhook 传输，将异步关注点保留在 HTTP 内核之外。',
+    href: '/zh/docs/modules/x-messaging',
+    label: '打开 x/messaging 模块手册',
+  },
+  {
+    kicker: 'frontend',
+    title: '静态资产服务与 SPA 嵌入',
+    body: 'x/frontend 将嵌入式或目录式资产服务作为传输层关注点处理。缓存清除、预压缩投递和目录安全均留在扩展层。',
+    href: '/zh/docs/modules/x-frontend',
+    label: '打开 x/frontend 模块手册',
+  },
 ] as const;
 
 const copy = ARCHITECTURE_COPY.zh;
