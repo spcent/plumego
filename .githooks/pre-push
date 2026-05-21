@@ -48,6 +48,40 @@ run_fmt() {
   fi
 }
 
+# ── website generated files check ────────────────────────────────────────────
+# Mirrors the check inside `make gates`. Runs pnpm sync and fails if it would
+# change any file under website/src/generated/ — which means a source file was
+# committed without the corresponding `make website-sync` step.
+#
+# translation-lag.ts is the most common offender: it is derived from git commit
+# timestamps, so it must be regenerated after every commit that touches any en
+# or zh .mdx doc file.
+#
+# When this check fails the generated files are already updated in the working
+# tree. Run `make website-sync && git add website/src/generated/ && git commit`
+# to fix, then push again.
+run_website_sync_check() {
+  if ! command -v pnpm >/dev/null 2>&1; then
+    info "pnpm not found — skipping website-sync check"
+    return 0
+  fi
+  local TMP
+  TMP=$(mktemp -d)
+  git diff -- website/src/generated > "$TMP/before" 2>/dev/null
+  (cd "$ROOT/website" && pnpm sync 2>/dev/null)
+  git diff -- website/src/generated > "$TMP/after" 2>/dev/null
+  local ok=0
+  cmp -s "$TMP/before" "$TMP/after" || ok=1
+  rm -rf "$TMP"
+  if [ $ok -ne 0 ]; then
+    echo "    website/src/generated/ is stale." \
+         "Run: make website-sync && git add website/src/generated/ && git commit --amend --no-edit" \
+      | fold -s -w 80 | sed 's/^/    /'
+    return 1
+  fi
+  return 0
+}
+
 # ── milestone branch: full gate suite ────────────────────────────────────────
 if [[ "$BRANCH" == milestone/* ]]; then
   echo -e "\n${BOLD}plumego — milestone quality gates (${BRANCH})${RESET}\n"
@@ -61,6 +95,7 @@ if [[ "$BRANCH" == milestone/* ]]; then
   run_fmt
   run_gate "tests"             go test -timeout 20s ./...
   run_gate "tests (race)"      go test -race -timeout 60s ./...
+  run_gate "website-sync"      run_website_sync_check
 
   echo ""
   if [ $FAILED -ne 0 ]; then
@@ -81,6 +116,7 @@ if [[ "$BRANCH" == main ]] || [[ "$BRANCH" == claude/* ]] || [[ "$BRANCH" == cod
   run_gate "doc snippets" go run ./internal/tools/doc-snippets
   run_fmt
   run_gate "tests"   go test -timeout 20s ./...
+  run_gate "website-sync" run_website_sync_check
 
   echo ""
   if [ $FAILED -ne 0 ]; then
