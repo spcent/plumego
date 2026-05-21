@@ -1,15 +1,25 @@
 package handler
 
 import (
+	"context"
 	"net/http"
 	"time"
 
 	"github.com/spcent/plumego/contract"
 )
 
+// ReadinessChecker reports whether a dependency is ready to serve traffic.
+// Register one per dependency (database, cache, downstream service) in routes.go.
+type ReadinessChecker interface {
+	Ready(ctx context.Context) error
+}
+
 // HealthHandler serves the canonical liveness and readiness endpoints.
 type HealthHandler struct {
 	ServiceName string
+	// Checkers is an optional list of dependency readiness probes.
+	// When nil or empty the readiness endpoint reports ready immediately.
+	Checkers []ReadinessChecker
 }
 
 type healthResponse struct {
@@ -29,8 +39,19 @@ func (h HealthHandler) Live(w http.ResponseWriter, r *http.Request) {
 	}, nil)
 }
 
-// Ready reports that the reference service is ready to accept requests.
+// Ready probes each registered ReadinessChecker in order.
+// The first failure returns 503 TypeUnavailable; all passing returns 200.
 func (h HealthHandler) Ready(w http.ResponseWriter, r *http.Request) {
+	for _, checker := range h.Checkers {
+		if err := checker.Ready(r.Context()); err != nil {
+			_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+				Type(contract.TypeUnavailable).
+				Detail("reason", err.Error()).
+				Message("service not ready").
+				Build())
+			return
+		}
+	}
 	_ = contract.WriteResponse(w, r, http.StatusOK, healthResponse{
 		Status:    "ready",
 		Service:   h.ServiceName,

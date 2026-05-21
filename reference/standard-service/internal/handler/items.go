@@ -14,6 +14,8 @@ import (
 type ItemRepository interface {
 	Create(name string) item.Item
 	Get(id string) (item.Item, bool)
+	List() []item.Item
+	Delete(id string) bool
 }
 
 // ItemHandler demonstrates constructor injection: declare the dependency as an
@@ -53,6 +55,14 @@ func (h ItemHandler) Create(w http.ResponseWriter, r *http.Request) {
 	_ = contract.WriteResponse(w, r, http.StatusCreated, item, nil)
 }
 
+// List handles GET /api/v1/items.
+// It returns all items as a JSON array; an empty store returns an empty array.
+//
+//	GET /api/v1/items → 200 [items…]
+func (h ItemHandler) List(w http.ResponseWriter, r *http.Request) {
+	_ = contract.WriteResponse(w, r, http.StatusOK, h.Repo.List(), nil)
+}
+
 // GetByID handles GET /api/v1/items/:id.
 // It demonstrates path parameter extraction and the canonical 404 error path.
 //
@@ -70,4 +80,22 @@ func (h ItemHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	_ = contract.WriteResponse(w, r, http.StatusOK, item, nil)
+}
+
+// Delete handles DELETE /api/v1/items/:id.
+// A successful delete returns 204 No Content with no body.
+//
+//	DELETE /api/v1/items/item-1  → 204
+//	DELETE /api/v1/items/missing → 404 TypeNotFound
+func (h ItemHandler) Delete(w http.ResponseWriter, r *http.Request) {
+	id := router.Param(r, "id")
+	if !h.Repo.Delete(id) {
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+			Type(contract.TypeNotFound).
+			Detail("id", id).
+			Message("item not found").
+			Build())
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }

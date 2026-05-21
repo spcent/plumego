@@ -2,7 +2,9 @@ package handler
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -10,6 +12,11 @@ import (
 	"github.com/spcent/plumego/contract"
 	"standard-service/internal/domain/item"
 )
+
+// readinessCheckerFunc is a test helper that adapts a plain function to ReadinessChecker.
+type readinessCheckerFunc func(context.Context) error
+
+func (f readinessCheckerFunc) Ready(ctx context.Context) error { return f(ctx) }
 
 func TestHealthHandlerResponses(t *testing.T) {
 	h := HealthHandler{ServiceName: "svc"}
@@ -21,7 +28,7 @@ func TestHealthHandlerResponses(t *testing.T) {
 		check   string
 	}{
 		{name: "live", handler: h.Live, status: "ok", check: "liveness"},
-		{name: "ready", handler: h.Ready, status: "ready", check: "readiness"},
+		{name: "ready_no_checkers", handler: h.Ready, status: "ready", check: "readiness"},
 	}
 
 	for _, tt := range tests {
@@ -39,37 +46,132 @@ func TestHealthHandlerResponses(t *testing.T) {
 	}
 }
 
+func TestHealthHandlerReadyWithCheckers(t *testing.T) {
+	t.Run("passing checker returns 200", func(t *testing.T) {
+		h := HealthHandler{
+			ServiceName: "svc",
+			Checkers: []ReadinessChecker{
+				readinessCheckerFunc(func(_ context.Context) error { return nil }),
+			},
+		}
+		rec := httptest.NewRecorder()
+		h.Ready(rec, httptest.NewRequest(http.MethodGet, "/readyz", nil))
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+		}
+		resp := decodeReferenceData[healthResponse](t, rec)
+		if resp.Status != "ready" {
+			t.Fatalf("status = %q, want %q", resp.Status, "ready")
+		}
+	})
+
+	t.Run("failing checker returns 503", func(t *testing.T) {
+		h := HealthHandler{
+			ServiceName: "svc",
+			Checkers: []ReadinessChecker{
+				readinessCheckerFunc(func(_ context.Context) error {
+					return errors.New("db not connected")
+				}),
+			},
+		}
+		rec := httptest.NewRecorder()
+		h.Ready(rec, httptest.NewRequest(http.MethodGet, "/readyz", nil))
+		if rec.Code != http.StatusServiceUnavailable {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusServiceUnavailable)
+		}
+	})
+
+	t.Run("second checker failing returns 503", func(t *testing.T) {
+		h := HealthHandler{
+			ServiceName: "svc",
+			Checkers: []ReadinessChecker{
+				readinessCheckerFunc(func(_ context.Context) error { return nil }),
+				readinessCheckerFunc(func(_ context.Context) error {
+					return errors.New("cache not connected")
+				}),
+			},
+		}
+		rec := httptest.NewRecorder()
+		h.Ready(rec, httptest.NewRequest(http.MethodGet, "/readyz", nil))
+		if rec.Code != http.StatusServiceUnavailable {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusServiceUnavailable)
+		}
+	})
+}
+
 func TestAPIHandlerResponses(t *testing.T) {
 	h := APIHandler{}
 
-	helloRec := httptest.NewRecorder()
-	h.Hello(helloRec, httptest.NewRequest(http.MethodGet, "/", nil))
-	if helloRec.Code != http.StatusOK {
-		t.Fatalf("hello status = %d, want %d", helloRec.Code, http.StatusOK)
-	}
-	hello := decodeReferenceData[helloResponse](t, helloRec)
-	if hello.Service != "plumego-reference" || hello.Mode != "canonical" || hello.Endpoints["api_hello"] == "" {
-		t.Fatalf("unexpected hello response: %+v", hello)
+	tests := []struct {
+		name   string
+		path   string
+		fn     func(http.ResponseWriter, *http.Request)
+		assert func(t *testing.T, rec *httptest.ResponseRecorder)
+	}{
+		{
+			name: "root",
+			path: "/",
+			fn:   h.Root,
+			assert: func(t *testing.T, rec *httptest.ResponseRecorder) {
+				if rec.Code != http.StatusOK {
+					t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+				}
+				got := decodeReferenceData[rootResponse](t, rec)
+				if got.Service != "plumego-reference" || got.Docs == "" {
+					t.Fatalf("unexpected root response: %+v", got)
+				}
+			},
+		},
+		{
+			name: "hello",
+			path: "/api/hello",
+			fn:   h.Hello,
+			assert: func(t *testing.T, rec *httptest.ResponseRecorder) {
+				if rec.Code != http.StatusOK {
+					t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+				}
+				got := decodeReferenceData[helloResponse](t, rec)
+				if got.Service != "plumego-reference" || got.Mode != "canonical" || got.Endpoints["api_hello"] == "" {
+					t.Fatalf("unexpected hello response: %+v", got)
+				}
+			},
+		},
+		{
+			name: "greet",
+			path: "/api/v1/greet?name=Alice",
+			fn:   h.Greet,
+			assert: func(t *testing.T, rec *httptest.ResponseRecorder) {
+				if rec.Code != http.StatusOK {
+					t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+				}
+				got := decodeReferenceData[greetResponse](t, rec)
+				if got.Message != "hello, Alice" {
+					t.Fatalf("unexpected greet response: %+v", got)
+				}
+			},
+		},
+		{
+			name: "status",
+			path: "/api/status",
+			fn:   h.Status,
+			assert: func(t *testing.T, rec *httptest.ResponseRecorder) {
+				if rec.Code != http.StatusOK {
+					t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+				}
+				got := decodeReferenceData[statusResponse](t, rec)
+				if got.Status != "healthy" || got.Structure.Routes != "one_method_one_path_one_handler" || len(got.Modules) == 0 {
+					t.Fatalf("unexpected status response: %+v", got)
+				}
+			},
+		},
 	}
 
-	greetRec := httptest.NewRecorder()
-	h.Greet(greetRec, httptest.NewRequest(http.MethodGet, "/api/v1/greet?name=Alice", nil))
-	if greetRec.Code != http.StatusOK {
-		t.Fatalf("greet status = %d, want %d", greetRec.Code, http.StatusOK)
-	}
-	greet := decodeReferenceData[greetResponse](t, greetRec)
-	if greet.Message != "hello, Alice" {
-		t.Fatalf("unexpected greet response: %+v", greet)
-	}
-
-	statusRec := httptest.NewRecorder()
-	h.Status(statusRec, httptest.NewRequest(http.MethodGet, "/api/status", nil))
-	if statusRec.Code != http.StatusOK {
-		t.Fatalf("status status = %d, want %d", statusRec.Code, http.StatusOK)
-	}
-	status := decodeReferenceData[statusResponse](t, statusRec)
-	if status.Status != "healthy" || status.Structure.Routes != "one_method_one_path_one_handler" || len(status.Modules) == 0 {
-		t.Fatalf("unexpected status response: %+v", status)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rec := httptest.NewRecorder()
+			tt.fn(rec, httptest.NewRequest(http.MethodGet, tt.path, nil))
+			tt.assert(t, rec)
+		})
 	}
 }
 
@@ -108,6 +210,38 @@ func TestItemHandlerCreate(t *testing.T) {
 	})
 }
 
+func TestItemHandlerList(t *testing.T) {
+	t.Run("empty store returns empty array", func(t *testing.T) {
+		h := ItemHandler{Repo: item.NewMemoryStore()}
+		rec := httptest.NewRecorder()
+		h.List(rec, httptest.NewRequest(http.MethodGet, "/api/v1/items", nil))
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+		}
+		items := decodeReferenceData[[]item.Item](t, rec)
+		if len(items) != 0 {
+			t.Fatalf("items = %v, want empty", items)
+		}
+	})
+
+	t.Run("populated store returns all items", func(t *testing.T) {
+		store := item.NewMemoryStore()
+		store.Create("alpha")
+		store.Create("beta")
+		h := ItemHandler{Repo: store}
+
+		rec := httptest.NewRecorder()
+		h.List(rec, httptest.NewRequest(http.MethodGet, "/api/v1/items", nil))
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+		}
+		items := decodeReferenceData[[]item.Item](t, rec)
+		if len(items) != 2 {
+			t.Fatalf("items count = %d, want 2", len(items))
+		}
+	})
+}
+
 func TestItemHandlerGetByID(t *testing.T) {
 	store := item.NewMemoryStore()
 	created := store.Create("gadget")
@@ -137,6 +271,51 @@ func TestItemHandlerGetByID(t *testing.T) {
 		})
 		rec := httptest.NewRecorder()
 		h.GetByID(rec, req.WithContext(ctx))
+		if rec.Code != http.StatusNotFound {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusNotFound)
+		}
+	})
+}
+
+func TestItemHandlerDelete(t *testing.T) {
+	store := item.NewMemoryStore()
+	created := store.Create("gadget")
+	h := ItemHandler{Repo: store}
+
+	t.Run("missing id returns 404 TypeNotFound", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodDelete, "/api/v1/items/no-such-item", nil)
+		ctx := contract.WithRequestContext(req.Context(), contract.RequestContext{
+			Params: map[string]string{"id": "no-such-item"},
+		})
+		rec := httptest.NewRecorder()
+		h.Delete(rec, req.WithContext(ctx))
+		if rec.Code != http.StatusNotFound {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusNotFound)
+		}
+	})
+
+	t.Run("existing id returns 204 no content", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodDelete, "/api/v1/items/"+created.ID, nil)
+		ctx := contract.WithRequestContext(req.Context(), contract.RequestContext{
+			Params: map[string]string{"id": created.ID},
+		})
+		rec := httptest.NewRecorder()
+		h.Delete(rec, req.WithContext(ctx))
+		if rec.Code != http.StatusNoContent {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusNoContent)
+		}
+		if rec.Body.Len() != 0 {
+			t.Fatalf("expected empty body, got %q", rec.Body.String())
+		}
+	})
+
+	t.Run("already deleted id returns 404", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodDelete, "/api/v1/items/"+created.ID, nil)
+		ctx := contract.WithRequestContext(req.Context(), contract.RequestContext{
+			Params: map[string]string{"id": created.ID},
+		})
+		rec := httptest.NewRecorder()
+		h.Delete(rec, req.WithContext(ctx))
 		if rec.Code != http.StatusNotFound {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusNotFound)
 		}
