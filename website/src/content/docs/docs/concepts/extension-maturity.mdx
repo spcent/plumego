@@ -31,10 +31,38 @@ Most extensions carry only `status: experimental` with no `stability_tiers` bloc
 
 | Status | Semver guarantee | API change policy | Production guidance |
 | --- | --- | --- | --- |
-| **stable** (subpackage tier) | Covered — breaking changes require a major version bump | Deprecation notice before removal | Safe for production; pin a minor version |
+| **beta** | API frozen between minor release refs | Breaking changes require a major version bump; deprecation notice before removal | Safe for production with minor-version pinning; review changelogs before upgrading |
+| **beta surface** | Covered for the named subpackage only | Same as beta; parent family may still be experimental | Adopt the specific subpackage; isolate behind app-local adapters and check `module.yaml` |
 | **experimental** | Not yet covered | API may change without a deprecation period | Evaluate per use case; pin an exact version and review changelogs on upgrade |
 
-All `x/*` extensions are currently `experimental` at the module level. Within `x/ai`, the `provider`, `session`, `streaming`, and `tool` subpackages are promoted to the stable tier; `orchestration`, `semanticcache`, `marketplace`, `distributed`, and `resilience` remain experimental.
+## Current beta families
+
+These extension families are at `beta` status. Their APIs are frozen between minor release refs and are backed by two consecutive release refs, exported API snapshots, and owner sign-off.
+
+| Family | Promoted | Evidence |
+| --- | --- | --- |
+| `x/gateway` | v0.2.0 | [beta evidence](/docs/modules/x-gateway) |
+| `x/observability` | v0.2.0 | [beta evidence](/docs/modules/x-observability) |
+| `x/rest` | v0.2.0 | [beta evidence](/docs/modules/x-rest) |
+| `x/websocket` | v0.2.0 | [beta evidence](/docs/modules/x-websocket) |
+| `x/tenant` | v1.1.0 | [beta evidence](/docs/modules/x-tenant) |
+| `x/frontend` | v1.1.0 | [beta evidence](/docs/modules/x-frontend) |
+| `x/messaging` | v1.1.0 (app-facing service) | [beta evidence](/docs/modules/x-messaging) |
+
+## Selected beta surfaces
+
+Some families are `experimental` at the root level but contain specific subpackages that have accumulated their own release evidence and beta sign-off. The parent family can still change shape, but the named subpackage surface is stable.
+
+| Surface | Parent family | Promoted | What is covered |
+| --- | --- | --- | --- |
+| `x/ai/provider` | `x/ai` (experimental) | v1.1.0 | `Provider` interface and concrete constructors |
+| `x/ai/session` | `x/ai` (experimental) | v1.1.0 | Session lifecycle and state management |
+| `x/ai/streaming` | `x/ai` (experimental) | v1.1.0 | Streaming response coordination |
+| `x/ai/tool` | `x/ai` (experimental) | v1.1.0 | Tool registration and invocation |
+| `x/data/file` | `x/data` (experimental) | v1.1.0 | File helper and metadata contracts |
+| `x/data/idempotency` | `x/data` (experimental) | v1.1.0 | Idempotency key store contracts |
+
+For these surfaces, check `module.yaml` `stability_tiers` before relying on a specific subpackage. Subpackages listed under `stable:` are covered; those listed under `experimental:` are not.
 
 ## How to check before depending on an extension
 

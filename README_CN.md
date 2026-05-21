@@ -1,7 +1,7 @@
 # Plumego — 标准库优先的 Go Web 工具包
 
 [![Go 版本](https://img.shields.io/badge/Go-1.26%2B-00ADD8?style=flat&logo=go)](https://go.dev/)
-[![状态](https://img.shields.io/badge/status-v1.0.0-blue)](https://github.com/spcent/plumego/releases/tag/v1.0.0)
+[![状态](https://img.shields.io/badge/status-v1.1.0-blue)](https://github.com/spcent/plumego/releases/tag/v1.1.0)
 [![许可证](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 Plumego 是一个基于 Go 标准库构建的小型 HTTP 工具包。它把 `net/http`

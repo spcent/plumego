@@ -50,6 +50,9 @@ routing_rules:
       - x/observability
       - x/rest
       - x/websocket
+      - x/tenant
+      - x/frontend
+      - x/messaging
     primary_families:
       - x/tenant
       - x/fileapi

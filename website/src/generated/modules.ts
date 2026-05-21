@@ -31,7 +31,10 @@ export const MODULE_FACTS = {
     "x/gateway",
     "x/observability",
     "x/rest",
-    "x/websocket"
+    "x/websocket",
+    "x/tenant",
+    "x/frontend",
+    "x/messaging"
   ],
   "primaryExtensionFamilies": [
     "x/tenant",

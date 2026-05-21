@@ -13,7 +13,9 @@ export const ROADMAP_FACTS = {
     "`x/rest`, `x/websocket`, `x/gateway`, and `x/observability` promoted to `beta`",
     "`v1.0.0` tagged on May 15, 2026; release notes and evidence in `docs/release/v1.0.0.md`"
   ],
-  "inProgress": [],
+  "inProgress": [
+    "Phase 16: Active Extension Evaluations"
+  ],
   "planned": [],
   "suggestedExecutionOrder": [
     "Keep Phase 13 and Phase 15 docs and onboarding sync continuous.",

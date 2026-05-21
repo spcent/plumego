@@ -1,7 +1,7 @@
 # Plumego — Standard Library Web Toolkit
 
 [![Go Version](https://img.shields.io/badge/Go-1.26%2B-00ADD8?style=flat&logo=go)](https://go.dev/)
-[![Status](https://img.shields.io/badge/status-v1.0.0-blue)](https://github.com/spcent/plumego/releases/tag/v1.0.0)
+[![Status](https://img.shields.io/badge/status-v1.1.0-blue)](https://github.com/spcent/plumego/releases/tag/v1.1.0)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 Plumego is a small Go HTTP toolkit built on the standard library. It keeps
