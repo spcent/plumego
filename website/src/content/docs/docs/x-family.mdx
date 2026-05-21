@@ -16,6 +16,22 @@ The `x/*` layer exists so optional or faster-moving capabilities can evolve with
 
 <GeneratedExtensionFacts />
 
+## Beta extension families
+
+The following families have reached `beta` status: API frozen between minor release refs, backed by two consecutive release refs, exported API snapshots, and owner sign-off.
+
+| Family | Status | Promoted | Recommended entry |
+| --- | --- | --- | --- |
+| `x/gateway` | beta | v0.2.0 | proxy, rewrite, balancing, edge transport |
+| `x/observability` | beta | v0.2.0 | exporter, tracer, collector, adapter wiring |
+| `x/rest` | beta | v0.2.0 | resource controller and CRUD route conventions |
+| `x/websocket` | beta | v0.2.0 | WebSocket hub and explicit route registration |
+| `x/tenant` | beta | v1.1.0 | resolution, policy, quota, rate limit, session |
+| `x/frontend` | beta | v1.1.0 | static and embedded asset serving |
+| `x/messaging` | beta | v1.1.0 | app-facing queue, pubsub, scheduler, webhook service |
+
+For the full maturity dashboard including selected beta surfaces within experimental families, see [Extension Maturity](/docs/concepts/extension-maturity).
+
 ## When to start here
 
 Start with an `x/*` family when the work is primarily about reusable capability behavior rather than the smallest canonical service shape.

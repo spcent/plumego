@@ -199,7 +199,7 @@ Non-goals:
 
 ## Phase 14: Extension Stability Evaluation
 
-Status: substantially complete
+Status: complete
 
 Current state:
 
@@ -230,17 +230,46 @@ Current state:
   `ErrHubStopped`), `RangeConns` iteration and early return, `BroadcastRoom`/
   `BroadcastAll` no-op after stop, `Leave`/`RemoveConn` non-member no-op; primer
   updated with boundary section and coverage section
+- `x/tenant`, `x/frontend`, and `x/messaging` (app-facing service) promoted to
+  `beta` with two consecutive release refs (`v1.0.0`, `v1.1.0`), API unchanged
+  across both refs, release-backed snapshots recorded, owner sign-off complete,
+  all blockers cleared in `specs/extension-beta-evidence.yaml`
+- selected surfaces under `x/ai` (`provider`, `session`, `streaming`, `tool`)
+  and `x/data` (`file`, `idempotency`) confirmed as beta surfaces with two
+  release refs, owner sign-off, and evidence recorded; parent families remain
+  experimental
+- `specs/task-routing.yaml` `beta_families` updated to include `x/tenant`,
+  `x/frontend`, and `x/messaging`
+- `docs/DEPRECATION.md` beta extension table updated to include all promoted families
+
+## Phase 16: Active Extension Evaluations
+
+Status: in progress
+
+Current state:
+
+- task card 1500 (x/tenant GA evaluation) is in the active queue pending
+  `v1.2.0` release evidence; `x/tenant` is beta — GA requires one additional
+  release ref with no API changes and a second owner sign-off cycle
+- task card 1501 (x/ai stable-tier subpackages beta evaluation) is in the active
+  queue; each subpackage (`provider`, `session`, `streaming`, `tool`) requires
+  its own per-subpackage evaluation after `v1.2.0` release evidence
+- task card 1502 (x/openapi beta evaluation) is in the active queue; `x/openapi`
+  requires cleanup of stale milestone-card language in `module.yaml` and two
+  consecutive release refs before promotion
 
 Next work:
 
-- promote remaining candidates (`x/tenant`, `x/frontend`) only after release-history
-  evidence proves two consecutive minor releases without exported API changes
-  (task cards 1500 and the existing x/frontend promotion card)
-- extend `docs/DEPRECATION.md` beta extension table as more modules are promoted
-- evaluate `x/ai` stable-tier subpackages individually after release-history
-  evidence is available (task card 1501)
-- update x/openapi/module.yaml to remove stale milestone-card language once
-  release-history evidence for beta evaluation is in place (task card 1502)
+- execute task card 1500 once `v1.2.0` release evidence is available
+- execute task card 1501 per stable-tier subpackage after `v1.2.0` release evidence
+- execute task card 1502 after `x/openapi` release-history evidence is complete
+- clarify `x/data` and `x/fileapi` operational guidance as topology surfaces mature
+- expand `x/gateway/discovery` backends only when explicit adapters are ready
+
+Non-goals:
+
+- do not promote extensions without two consecutive release refs and owner sign-off
+- do not bundle multiple subpackage evaluations into a single promotion card
 
 ## Phase 15: Community Onboarding Improvements
 

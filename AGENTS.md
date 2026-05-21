@@ -310,7 +310,7 @@ produces any change.
 | `docs/ROADMAP.md` | `website/src/generated/roadmap.ts` | run `make website-sync` |
 | `docs/modules/*/README.md` | `website/src/generated/modules.ts` | run `make website-sync` |
 | `specs/task-routing.yaml` | `website/src/generated/routing.ts` | run `make website-sync` |
-| `docs/release/*.md` | `website/src/generated/release-meta.ts` | run `make website-sync` |
+| `README.md` / `specs/task-routing.yaml` | `website/src/generated/releases.ts` | run `make website-sync` |
 
 After any edit to a source listed above, run `make website-sync` and include
 the updated `website/src/generated/` files in the same commit. Never commit

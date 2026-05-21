@@ -52,7 +52,7 @@ const scenarios = [
       'stable roots stay compatible when tenant logic evolves',
     ],
     modules: 'x/tenant',
-    moduleNote: 'experimental — evaluate before adopting',
+    moduleNote: 'beta — API stable between minor releases',
     startHref: '/docs/modules/x-tenant',
     startLabel: 'Open x/tenant Primer',
     secondaryHref: '/releases',
@@ -67,10 +67,58 @@ const scenarios = [
       'streaming responses work through standard net/http handlers',
       'stable roots remain compatible as AI API shapes evolve',
     ],
-    modules: 'x/ai',
-    moduleNote: 'experimental — evaluate before adopting',
+    modules: 'x/ai/provider, x/ai/session, x/ai/streaming, x/ai/tool',
+    moduleNote: 'beta surfaces — stable subpackages within experimental family',
     startHref: '/docs/modules/x-ai',
     startLabel: 'Open x/ai Primer',
+    secondaryHref: '/releases',
+    secondaryLabel: 'Check maturity posture',
+  },
+  {
+    kicker: 'api gateway',
+    title: 'Reverse proxy and API gateway services with load balancing and edge routing',
+    body: 'Use x/gateway when your service needs to proxy requests to upstream backends, apply rewrite rules, or balance load across multiple targets. The stable HTTP kernel handles all transport; x/gateway owns the proxy and edge behavior layer.',
+    fitPoints: [
+      'upstream proxy and rewrite rules stay outside the HTTP kernel',
+      'load balancing and backend discovery are explicit in config',
+      'stable middleware handles auth and rate limiting before forwarding',
+    ],
+    modules: 'x/gateway',
+    moduleNote: 'beta — API stable between minor releases',
+    startHref: '/docs/modules/x-gateway',
+    startLabel: 'Open x/gateway Primer',
+    secondaryHref: '/docs/reference-app',
+    secondaryLabel: 'Read the Reference App',
+  },
+  {
+    kicker: 'real-time service',
+    title: 'Real-time services with WebSocket hubs, rooms, and broadcast',
+    body: 'Use x/websocket when your service needs persistent connections, room management, and broadcast alongside standard HTTP routes. WebSocket handling is registered explicitly on routes; the stable kernel does not learn WebSocket semantics.',
+    fitPoints: [
+      'WebSocket routes register alongside standard HTTP routes',
+      'hub lifecycle and room management stay separate from HTTP handler logic',
+      'stable transport middleware applies before WebSocket upgrade',
+    ],
+    modules: 'x/websocket',
+    moduleNote: 'beta — API stable between minor releases',
+    startHref: '/docs/modules/x-websocket',
+    startLabel: 'Open x/websocket Primer',
+    secondaryHref: '/releases',
+    secondaryLabel: 'Check maturity posture',
+  },
+  {
+    kicker: 'messaging service',
+    title: 'Services with queues, webhooks, and scheduled tasks integrated into HTTP handlers',
+    body: 'Use x/messaging when your service dispatches or consumes jobs, outbound webhooks, pubsub events, or scheduled tasks alongside HTTP routes. The app-facing service layer is beta; subordinate primitives (mq, pubsub, scheduler) remain experimental.',
+    fitPoints: [
+      'message dispatch and consumption stay separate from HTTP handler logic',
+      'scheduled tasks and outbound webhooks are declared as service dependencies',
+      'stable transport layer handles request routing independently of messaging',
+    ],
+    modules: 'x/messaging',
+    moduleNote: 'beta — app-facing service layer; primitives are experimental',
+    startHref: '/docs/modules/x-messaging',
+    startLabel: 'Open x/messaging Primer',
     secondaryHref: '/releases',
     secondaryLabel: 'Check maturity posture',
   },
@@ -98,14 +146,14 @@ const fitGuide = [
 <MarketingLayout
   locale="en"
   title="Use Cases"
-  description="Four concrete service scenarios where Plumego is a strong fit: internal APIs, platform services, multi-tenant SaaS, and AI-capable services."
+  description="Seven concrete service scenarios where Plumego is a strong fit: internal APIs, platform services, multi-tenant SaaS, AI services, API gateway, real-time WebSocket, and messaging."
   currentPath="/use-cases"
   keywords={['plumego use cases', 'go http service scenarios', 'multi-tenant go', 'ai go service', 'platform service go']}
 >
   <PageHero
     eyebrow="Use Cases"
     title="Where Plumego fits best"
-    description="Four concrete service scenarios where the explicit wiring model becomes a clear advantage. Each scenario shows the best-fit modules, the fit signals to check, and where to start."
+    description="Seven concrete service scenarios where the explicit wiring model becomes a clear advantage. Each scenario shows the best-fit modules, the fit signals to check, and where to start."
     visual="fit"
     links={[
       { label: 'Why Plumego', href: '/why-plumego' },
@@ -118,7 +166,7 @@ const fitGuide = [
 
   <section class="section">
     <div class="section__intro">
-      <h2>Four scenarios where explicit wiring pays off.</h2>
+      <h2>Seven scenarios where explicit wiring pays off.</h2>
       <p>
         Plumego becomes a stronger fit when the service shape needs to stay readable as the codebase grows, when multiple teams must start from one baseline, or when capability work should stay outside the HTTP kernel.
       </p>

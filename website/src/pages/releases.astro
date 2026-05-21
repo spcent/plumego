@@ -130,8 +130,46 @@ function badgeClass(status: string): string {
   <!-- Inline changelog summary -->
   <section class="section changelog-section">
     <div class="section__intro">
-      <h2>What changed in v1.0.0.</h2>
+      <h2>What changed in v1.1.0.</h2>
       <p>Key highlights for this release. Full diff and tagged artifacts are on <a class="text-link" href={SITE.githubUrl + '/releases'} target="_blank" rel="noreferrer">GitHub Releases</a>.</p>
+    </div>
+    <div class="changelog-list">
+      <div class="changelog-entry">
+        <span class="changelog-entry__tag changelog-entry__tag--beta">beta</span>
+        <div>
+          <p class="changelog-entry__title">3 more extension families promoted to beta</p>
+          <p class="changelog-entry__body"><code>x/tenant</code>, <code>x/frontend</code>, and <code>x/messaging</code> (app-facing service layer) completed two consecutive tagged refs (<code>v1.0.0</code>, <code>v1.1.0</code>) with no exported API changes, release-backed snapshots, and owner sign-off. Subordinate messaging primitives remain experimental.</p>
+        </div>
+      </div>
+      <div class="changelog-entry">
+        <span class="changelog-entry__tag changelog-entry__tag--beta">beta surface</span>
+        <div>
+          <p class="changelog-entry__title">Selected x/ai and x/data subpackages confirmed as beta surfaces</p>
+          <p class="changelog-entry__body"><code>x/ai/provider</code>, <code>x/ai/session</code>, <code>x/ai/streaming</code>, <code>x/ai/tool</code>, <code>x/data/file</code>, and <code>x/data/idempotency</code> have two release refs, API snapshots, and owner sign-off. Parent families remain experimental.</p>
+        </div>
+      </div>
+      <div class="changelog-entry">
+        <span class="changelog-entry__tag changelog-entry__tag--new">agent</span>
+        <div>
+          <p class="changelog-entry__title">Agent workflow improvements</p>
+          <p class="changelog-entry__body">Route, diff-validation, task-bundle, recipe, and manifest guidance expanded so AI coding assistants find landing zones and validation paths more deterministically. <code>internal/checks/cross-extension-deps</code> validates forbidden imports against actual Go imports.</p>
+        </div>
+      </div>
+      <div class="changelog-entry">
+        <span class="changelog-entry__tag changelog-entry__tag--new">docs</span>
+        <div>
+          <p class="changelog-entry__title">Website and bilingual docs synchronized</p>
+          <p class="changelog-entry__body">Release posture, status, architecture, migration, benchmark, and bilingual docs pages were synchronized and rebuilt. All 77 docs pages available in both English and Chinese.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- v1.0.0 history -->
+  <section class="section changelog-section">
+    <div class="section__intro">
+      <h2>What changed in v1.0.0.</h2>
+      <p>The initial stable release on May 15, 2026. Full evidence in <a class="text-link" href={SITE.githubUrl + '/blob/main/docs/release/v1.0.0.md'} target="_blank" rel="noreferrer">docs/release/v1.0.0.md</a>.</p>
     </div>
     <div class="changelog-list">
       <div class="changelog-entry">
