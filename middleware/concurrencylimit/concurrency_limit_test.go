@@ -13,7 +13,7 @@ import (
 
 func TestMiddlewareAllowsConfiguredQueuedWaiter(t *testing.T) {
 	mw := Middleware(Config{MaxConcurrent: 1, QueueDepth: 1, QueueTimeout: 200 * time.Millisecond})
-	blocker := make(chan struct{})
+	blocker := make(chan struct{}, 1)
 	release := make(chan struct{})
 
 	handler := mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -52,7 +52,7 @@ func TestDefaultConfigUsesDefaultQueueTimeout(t *testing.T) {
 
 func TestMiddlewareFailFastWhenNoQueueDepth(t *testing.T) {
 	mw := Middleware(Config{MaxConcurrent: 1, QueueDepth: 0, QueueTimeout: 50 * time.Millisecond})
-	blocker := make(chan struct{})
+	blocker := make(chan struct{}, 1)
 	release := make(chan struct{})
 
 	handler := mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -81,7 +81,7 @@ func TestMiddlewareFailFastWhenNoQueueDepth(t *testing.T) {
 
 func TestMiddlewareQueuedRequestTimesOut(t *testing.T) {
 	mw := Middleware(Config{MaxConcurrent: 1, QueueDepth: 1, QueueTimeout: 10 * time.Millisecond})
-	blocker := make(chan struct{})
+	blocker := make(chan struct{}, 1)
 	release := make(chan struct{})
 
 	handler := mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
