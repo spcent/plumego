@@ -14,10 +14,12 @@ Read `ARCHITECTURE.md` (this directory) for layout rationale.
 | Path | What you can do |
 |---|---|
 | `internal/handler/api.go` | Add, change, or remove handler methods |
-| `internal/handler/health.go` | Update health check logic |
+| `internal/handler/health.go` | Update health check logic or readiness checker interface |
 | `internal/handler/items.go` | Extend item HTTP endpoints or add new handler files with DI |
 | `internal/domain/item/item.go` | Change sample item model or in-memory repository behavior |
+| `internal/domain/item/item_test.go` | Add or update domain model tests |
 | `internal/handler/handler_test.go` | Add or update handler tests |
+| `internal/app/app_test.go` | Update route shape assertions or middleware wiring tests |
 | `internal/config/config.go` | Add config fields, change defaults |
 | `main.go` | Only the four wiring calls; do not add logic |
 
@@ -97,6 +99,73 @@ func (h WidgetHandler) Create(w http.ResponseWriter, r *http.Request) {
 }
 ```
 
+### Add a readiness check
+
+A `ReadinessChecker` represents one dependency (database, cache, downstream service).
+Implement the interface and register it in `routes.go`.
+
+```go
+// Implement ReadinessChecker for your dependency.
+// This type lives in the domain or infrastructure layer, not in handler/.
+type dbChecker struct{ db *sql.DB }
+
+func (c *dbChecker) Ready(ctx context.Context) error {
+    return c.db.PingContext(ctx)
+}
+
+// Wire it in routes.go alongside the other handler dependencies.
+health := handler.HealthHandler{
+    ServiceName: a.Cfg.App.ServiceName,
+    Checkers: []handler.ReadinessChecker{
+        &dbChecker{db: myDB},
+    },
+}
+```
+
+`GET /readyz` probes each checker in order; the first error returns 503
+TypeUnavailable with `detail.reason` set to the error message.
+
+### Add a DELETE or LIST endpoint
+
+Extend the repository interface in the handler file and add a method to both the
+interface and the domain store, then register the route.
+
+```go
+// 1. Extend the interface in handler/widgets.go
+type WidgetRepository interface {
+    Get(id string) (Widget, bool)
+    List() []Widget
+    Delete(id string) bool
+}
+
+// 2. Implement in internal/domain/widget/store.go
+func (s *MemoryStore) List() []Widget { ... }
+func (s *MemoryStore) Delete(id string) bool { ... }
+
+// 3. Add handler methods in handler/widgets.go
+func (h WidgetHandler) List(w http.ResponseWriter, r *http.Request) {
+    _ = contract.WriteResponse(w, r, http.StatusOK, h.Repo.List(), nil)
+}
+
+func (h WidgetHandler) Delete(w http.ResponseWriter, r *http.Request) {
+    id := router.Param(r, "id")
+    if !h.Repo.Delete(id) {
+        _ = contract.WriteError(w, r, contract.NewErrorBuilder().
+            Type(contract.TypeNotFound).Detail("id", id).Message("not found").Build())
+        return
+    }
+    w.WriteHeader(http.StatusNoContent)
+}
+
+// 4. Register both verbs in app/routes.go
+if err := a.Core.Get("/api/v1/widgets", http.HandlerFunc(widgets.List)); err != nil {
+    return err
+}
+if err := a.Core.Delete("/api/v1/widgets/:id", http.HandlerFunc(widgets.Delete)); err != nil {
+    return err
+}
+```
+
 ### Add a config field
 
 1. Add the field to `AppConfig` in `internal/config/config.go`.
@@ -104,6 +173,7 @@ func (h WidgetHandler) Create(w http.ResponseWriter, r *http.Request) {
 3. Read from `.env` in `applyEnvMap()` when local file support is needed.
 4. Read from environment in `applyEnv()`.
 5. Optionally expose as a flag in `applyFlags()`.
+6. Use the field in `routes.go` or pass it to a handler constructor.
 
 ### Add middleware
 
@@ -121,13 +191,13 @@ to a specific route group wraps the handler in `routes.go`.
 After any change to this service, run in order:
 
 ```bash
-# 1. Module tests
-go test -race -timeout 30s ./reference/standard-service/...
+# 1. Module tests (standard-service is its own Go module; cd in first)
+cd reference/standard-service && go test -race -timeout 30s ./...
 
-# 2. Boundary check — must not import x/*
+# 2. Boundary check — must not import x/*   (run from repo root)
 go run ./internal/checks/dependency-rules
 
-# 3. Module manifests
+# 3. Module manifests                        (run from repo root)
 go run ./internal/checks/module-manifests
 
 # 4. Full gates (for cross-module or release-relevant changes)

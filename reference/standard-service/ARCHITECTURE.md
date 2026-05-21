@@ -114,8 +114,10 @@ independently testable: tests pass a stub; production passes the real store.
 ```go
 // handler declares the interface it needs
 type ItemRepository interface {
-    Create(name string) Item
-    Get(id string) (Item, bool)
+    Create(name string) item.Item
+    Get(id string) (item.Item, bool)
+    List() []item.Item
+    Delete(id string) bool
 }
 
 type ItemHandler struct {
@@ -128,6 +130,47 @@ items := handler.ItemHandler{Repo: item.NewMemoryStore()}
 
 Handlers with no external dependencies use a zero-field struct (`APIHandler{}`).
 Both shapes are valid; choose based on whether the handler needs injected state.
+
+### Readiness checking
+
+`HealthHandler` supports an optional list of `ReadinessChecker` implementations.
+Each checker represents one dependency (database, cache, downstream service).
+`GET /readyz` probes them in order; the first failure returns 503 TypeUnavailable.
+
+```go
+// handler declares the interface
+type ReadinessChecker interface {
+    Ready(ctx context.Context) error
+}
+
+// routes.go registers one checker per dependency
+health := handler.HealthHandler{
+    ServiceName: a.Cfg.App.ServiceName,
+    Checkers: []handler.ReadinessChecker{
+        mydb.NewReadinessChecker(db),
+    },
+}
+```
+
+The reference wires no checkers because it has no real dependencies. When no
+checkers are registered `GET /readyz` returns 200 immediately, which is correct
+for a stateless service.
+
+### Route layout — collection + member pairs
+
+REST resources follow a consistent two-path pattern:
+
+```
+GET    /api/v1/items       → list all items
+POST   /api/v1/items       → create an item
+
+GET    /api/v1/items/:id   → fetch one item
+DELETE /api/v1/items/:id   → remove one item
+```
+
+The same base path (`/api/v1/items`) and member path (`/api/v1/items/:id`) carry
+different verbs. Each registration is one line in `routes.go`; no grouping or
+prefix magic is needed for a service of this size.
 
 ---
 

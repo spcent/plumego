@@ -19,8 +19,10 @@ type Config struct {
 }
 
 // AppConfig holds app-local, non-kernel configuration.
+// Add application-specific fields here; keep framework/kernel config in Config.Core.
 type AppConfig struct {
-	EnvFile string
+	EnvFile     string
+	ServiceName string // Exposed as APP_SERVICE_NAME; used as the service identity in health responses.
 }
 
 // Defaults returns safe configuration values for local development.
@@ -30,7 +32,8 @@ func Defaults() Config {
 	return Config{
 		Core: coreCfg,
 		App: AppConfig{
-			EnvFile: ".env",
+			EnvFile:     ".env",
+			ServiceName: "plumego-reference",
 		},
 	}
 }
@@ -72,6 +75,7 @@ func Validate(cfg Config) error {
 func applyEnv(cfg *Config, lookupEnv func(string) (string, bool)) {
 	cfg.Core.Addr = envString(lookupEnv, "APP_ADDR", cfg.Core.Addr)
 	cfg.App.EnvFile = envString(lookupEnv, "APP_ENV_FILE", cfg.App.EnvFile)
+	cfg.App.ServiceName = envString(lookupEnv, "APP_SERVICE_NAME", cfg.App.ServiceName)
 }
 
 func applyEnvMap(cfg *Config, values map[string]string) {
@@ -83,6 +87,9 @@ func applyEnvMap(cfg *Config, values map[string]string) {
 	}
 	if value := strings.TrimSpace(values["APP_ENV_FILE"]); value != "" {
 		cfg.App.EnvFile = value
+	}
+	if value := strings.TrimSpace(values["APP_SERVICE_NAME"]); value != "" {
+		cfg.App.ServiceName = value
 	}
 }
 

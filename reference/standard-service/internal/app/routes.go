@@ -14,7 +14,7 @@ func (a *App) RegisterRoutes() error {
 	// HealthHandler receives no Checkers here because the reference has no real
 	// dependencies to probe. In a production service, pass one ReadinessChecker
 	// per dependency (database, cache, downstream) so /readyz reflects real state.
-	health := handler.HealthHandler{ServiceName: "plumego-reference"}
+	health := handler.HealthHandler{ServiceName: a.Cfg.App.ServiceName}
 	// ItemHandler demonstrates constructor injection: the concrete domain store
 	// is created here and passed through the interface the handler declared.
 	items := handler.ItemHandler{Repo: item.NewMemoryStore()}
