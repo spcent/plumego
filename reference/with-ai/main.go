@@ -12,6 +12,8 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/core"
@@ -162,6 +164,9 @@ func writeInternal(w http.ResponseWriter, r *http.Request) {
 }
 
 func serve(app *core.App, cfg core.AppConfig) error {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
 	if err := app.Prepare(); err != nil {
 		return fmt.Errorf("prepare server: %w", err)
 	}
@@ -169,10 +174,9 @@ func serve(app *core.App, cfg core.AppConfig) error {
 	if err != nil {
 		return fmt.Errorf("get server: %w", err)
 	}
-	defer func() {
-		if err := app.Shutdown(context.Background()); err != nil {
-			log.Printf("shutdown server: %v", err)
-		}
+	go func() {
+		<-ctx.Done()
+		_ = app.Shutdown(context.Background())
 	}()
 
 	log.Printf("Starting with-ai demo on %s", cfg.Addr)

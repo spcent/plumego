@@ -3,13 +3,12 @@ package app
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"os"
-	"path/filepath"
-	"sync"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/spcent/plumego/core"
@@ -91,8 +90,10 @@ func New(cfg config.Config) (*App, error) {
 }
 
 // Start prepares the runtime and blocks while the HTTP server runs.
+// It listens for SIGTERM and SIGINT and triggers a graceful shutdown.
 func (a *App) Start() error {
-	ctx := context.Background()
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
 	if a.RateLimit != nil {
 		defer a.RateLimit.Stop()
 	}
@@ -104,8 +105,9 @@ func (a *App) Start() error {
 	if err != nil {
 		return fmt.Errorf("get server: %w", err)
 	}
-	defer func() {
-		_ = a.Core.Shutdown(ctx)
+	go func() {
+		<-ctx.Done()
+		_ = a.Core.Shutdown(context.Background())
 	}()
 
 	var serveErr error
@@ -134,125 +136,4 @@ func (noopSpan) SpanID() string                          { return "" }
 
 func utcNow() string {
 	return time.Now().UTC().Format(time.RFC3339)
-}
-
-type tenantProfile struct {
-	TenantID string   `json:"tenant_id"`
-	Name     string   `json:"name"`
-	Plan     string   `json:"plan"`
-	Features []string `json:"features"`
-}
-
-type profileStoreFile struct {
-	Profiles []tenantProfile `json:"profiles"`
-}
-
-type profileStore struct {
-	mu       sync.RWMutex
-	path     string
-	profiles map[string]tenantProfile
-}
-
-func newProfileStore(path string) (*profileStore, error) {
-	profiles := defaultProfiles()
-	if path != "" {
-		loaded, err := loadProfileFile(path, profiles)
-		if err != nil {
-			return nil, err
-		}
-		profiles = loaded
-	}
-	return &profileStore{path: path, profiles: profiles}, nil
-}
-
-func defaultProfiles() map[string]tenantProfile {
-	profiles := make(map[string]tenantProfile)
-	profiles["tenant-a"] = tenantProfile{
-		TenantID: "tenant-a",
-		Name:     "Tenant A",
-		Plan:     "production",
-		Features: []string{"api", "ops", "tenant_context"},
-	}
-	profiles["tenant-b"] = tenantProfile{
-		TenantID: "tenant-b",
-		Name:     "Tenant B",
-		Plan:     "standard",
-		Features: []string{"api", "tenant_context"},
-	}
-	return profiles
-}
-
-func loadProfileFile(path string, fallback map[string]tenantProfile) (map[string]tenantProfile, error) {
-	content, err := os.ReadFile(path)
-	if errors.Is(err, os.ErrNotExist) {
-		if err := writeProfileFile(path, fallback); err != nil {
-			return nil, err
-		}
-		return fallback, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-
-	var file profileStoreFile
-	if err := json.Unmarshal(content, &file); err != nil {
-		return nil, fmt.Errorf("decode profile store %s: %w", path, err)
-	}
-	profiles := make(map[string]tenantProfile, len(file.Profiles))
-	for _, profile := range file.Profiles {
-		if profile.TenantID == "" {
-			return nil, fmt.Errorf("decode profile store %s: tenant_id is required", path)
-		}
-		profiles[profile.TenantID] = profile
-	}
-	return profiles, nil
-}
-
-func writeProfileFile(path string, profiles map[string]tenantProfile) error {
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return fmt.Errorf("create profile store directory: %w", err)
-	}
-	file := profileStoreFile{Profiles: make([]tenantProfile, 0, len(profiles))}
-	for _, profile := range profiles {
-		file.Profiles = append(file.Profiles, profile)
-	}
-	content, err := json.MarshalIndent(file, "", "  ")
-	if err != nil {
-		return fmt.Errorf("encode profile store: %w", err)
-	}
-	if err := os.WriteFile(path, append(content, '\n'), 0o600); err != nil {
-		return fmt.Errorf("write profile store %s: %w", path, err)
-	}
-	return nil
-}
-
-func (s *profileStore) Get(tenantID string) (tenantProfile, bool) {
-	if s == nil {
-		return tenantProfile{}, false
-	}
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	profile, ok := s.profiles[tenantID]
-	return profile, ok
-}
-
-func (s *profileStore) Kind() string {
-	if s == nil || s.path == "" {
-		return "app_local_in_memory_reference"
-	}
-	return "app_local_json_file_reference"
-}
-
-func (s *profileStore) Replacement() string {
-	if s == nil || s.path == "" {
-		return "set APP_PROFILE_STORE_PATH or replace profileStore behind App.Profiles in internal/app"
-	}
-	return "replace JSON loader behind App.Profiles with an application-owned repository"
-}
-
-func (s *profileStore) Path() string {
-	if s == nil {
-		return ""
-	}
-	return s.path
 }

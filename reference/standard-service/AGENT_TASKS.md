@@ -15,6 +15,7 @@ Read `ARCHITECTURE.md` (this directory) for layout rationale.
 |---|---|
 | `internal/handler/api.go` | Add, change, or remove handler methods |
 | `internal/handler/health.go` | Update health check logic |
+| `internal/handler/items.go` | Extend item endpoints or add new handler files with DI |
 | `internal/handler/handler_test.go` | Add or update handler tests |
 | `internal/config/config.go` | Add config fields, change defaults |
 | `main.go` | Only the four wiring calls; do not add logic |
@@ -40,23 +41,55 @@ Read `ARCHITECTURE.md` (this directory) for layout rationale.
 
 ### Add a new endpoint
 
-1. Add a handler method to `internal/handler/api.go` (or a new file in `internal/handler/`).
+1. Add a handler method to an existing file in `internal/handler/`, or create a new file there.
 2. Register the route in `internal/app/routes.go`.
 3. Write a test in `internal/handler/handler_test.go`.
 4. Run validation (see below).
 
-Handler shape:
+**Handler with no dependencies** (zero-field struct):
 ```go
 func (h APIHandler) MyEndpoint(w http.ResponseWriter, r *http.Request) {
-    // read → process → write
     _ = contract.WriteResponse(w, r, http.StatusOK, response, nil)
 }
 ```
 
-Route registration shape:
+**Handler with injected dependencies** (declare the interface in the handler,
+wire the concrete implementation in `routes.go`):
 ```go
-if err := a.Core.Get("/api/my-endpoint", http.HandlerFunc(api.MyEndpoint)); err != nil {
+// handler/widgets.go
+type WidgetRepository interface {
+    Get(id string) (Widget, bool)
+}
+type WidgetHandler struct{ Repo WidgetRepository }
+
+func (h WidgetHandler) GetByID(w http.ResponseWriter, r *http.Request) {
+    id := router.Param(r, "id")
+    widget, ok := h.Repo.Get(id)
+    if !ok {
+        _ = contract.WriteError(w, r, contract.NewErrorBuilder().
+            Type(contract.TypeNotFound).Detail("id", id).Message("not found").Build())
+        return
+    }
+    _ = contract.WriteResponse(w, r, http.StatusOK, widget, nil)
+}
+
+// app/routes.go
+widgets := handler.WidgetHandler{Repo: handler.NewMemoryWidgetStore()}
+if err := a.Core.Get("/api/v1/widgets/:id", http.HandlerFunc(widgets.GetByID)); err != nil {
     return err
+}
+```
+
+**POST with request body decode**:
+```go
+func (h WidgetHandler) Create(w http.ResponseWriter, r *http.Request) {
+    var req struct{ Name string `json:"name"` }
+    if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+        _ = contract.WriteError(w, r, contract.NewErrorBuilder().
+            Type(contract.TypeBadRequest).Message("body must be valid JSON").Build())
+        return
+    }
+    // validate, call repo, write 201
 }
 ```
 
