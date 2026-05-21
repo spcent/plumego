@@ -11,7 +11,7 @@ same bootstrap structure as `reference/standard-service`.
 
 - Wiring an `x/gateway` reverse proxy into the app constructor
 - Proxying all `/proxy/*` requests to a configurable backend
-- Keeping the bootstrap shape (config → app → routes → start) identical to the canonical path
+- Keeping the bootstrap shape (`main.run` → `app.Start(ctx)`) aligned with the canonical path
 
 ## Design constraints
 
@@ -19,6 +19,7 @@ same bootstrap structure as `reference/standard-service`.
 - also imports `x/gateway` for the proxy (intentional — this is a scenario reference)
 - keeps gateway wiring in `internal/app/app.go`, not in `main.go`
 - keeps route registration explicit in `internal/app/routes.go`
+- keeps process signal ownership in `main.go`; `internal/app` only reacts to the caller-owned context
 
 ## Configuration
 

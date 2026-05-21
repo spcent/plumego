@@ -13,7 +13,7 @@ exactly one extension capability: a reverse-proxy gateway (`x/gateway`). Everyth
 else remains identical to the standard service shape.
 
 ```
-main.go
+main.go      signal context and top-level wiring
 internal/
   config/   config.go
   app/      app.go, routes.go
@@ -67,12 +67,13 @@ rewriting the path prefix is a configuration concern, not a framework concern.
 ## Shutdown sequence
 
 ```
-SIGTERM / context cancel
+main.run signal context cancel
   → a.Core.Shutdown(ctx)   — drain in-flight HTTP and proxy requests
 ```
 
 `x/gateway` does not require a separate shutdown call. In-flight proxy requests
-are drained when the HTTP server stops accepting new connections.
+are drained when the HTTP server stops accepting new connections, and
+`internal/app` reacts to the caller-owned context.
 
 ---
 

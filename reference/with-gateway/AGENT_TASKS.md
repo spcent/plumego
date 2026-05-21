@@ -22,7 +22,7 @@ Read `docs/modules/x-gateway/README.md` for the `x/gateway` API.
 | Path | Constraint |
 |---|---|
 | `internal/app/app.go` | Proxy construction and backend config are load-bearing |
-| `main.go` | Four wiring calls only; do not add logic |
+| `main.go` | Owns process signal context and top-level wiring only |
 
 ### Frozen
 
