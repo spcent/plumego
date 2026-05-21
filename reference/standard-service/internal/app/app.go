@@ -7,10 +7,12 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/spcent/plumego/core"
 	plumelog "github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/middleware/accesslog"
+	"github.com/spcent/plumego/middleware/bodylimit"
 	"github.com/spcent/plumego/middleware/recovery"
 	"github.com/spcent/plumego/middleware/requestid"
 	"standard-service/internal/config"
@@ -33,10 +35,15 @@ func New(cfg config.Config) (*App, error) {
 	if err != nil {
 		return nil, fmt.Errorf("configure access log middleware: %w", err)
 	}
+	// bodylimit is placed after accesslog so the access log captures the 413 status.
 	if err := app.Use(
 		requestid.Middleware(),
 		recoveryMw,
 		accesslogMw,
+		bodylimit.Middleware(bodylimit.Config{
+			MaxBytes: cfg.App.MaxBodyBytes,
+			Logger:   app.Logger(),
+		}),
 	); err != nil {
 		return nil, fmt.Errorf("register middleware: %w", err)
 	}
@@ -65,7 +72,10 @@ func (a *App) Start(ctx context.Context) (err error) {
 	shutdownErr := make(chan error, 1)
 	go func() {
 		<-ctx.Done()
-		shutdownErr <- a.Core.Shutdown(context.Background())
+		// Allow up to 15 s for in-flight requests to complete before forcing close.
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		defer cancel()
+		shutdownErr <- a.Core.Shutdown(shutdownCtx)
 	}()
 
 	var serveErr error
@@ -77,12 +87,10 @@ func (a *App) Start(ctx context.Context) (err error) {
 	if serveErr != nil && !errors.Is(serveErr, http.ErrServerClosed) {
 		return fmt.Errorf("server stopped: %w", serveErr)
 	}
-	select {
-	case err := <-shutdownErr:
-		if err != nil {
-			return fmt.Errorf("shutdown server: %w", err)
-		}
-	default:
+	// Always drain the shutdown channel so the goroutine is not leaked and
+	// shutdown errors are not silently discarded.
+	if err := <-shutdownErr; err != nil {
+		return fmt.Errorf("shutdown server: %w", err)
 	}
 	return nil
 }

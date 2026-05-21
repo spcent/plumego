@@ -3,6 +3,7 @@ package handler
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 
 	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/router"
@@ -14,6 +15,8 @@ import (
 type ItemRepository interface {
 	Create(name string) item.Item
 	Get(id string) (item.Item, bool)
+	List() []item.Item
+	Delete(id string) bool
 }
 
 // ItemHandler demonstrates constructor injection: declare the dependency as an
@@ -24,6 +27,14 @@ type ItemHandler struct {
 
 type createItemReq struct {
 	Name string `json:"name"`
+}
+
+// listResponse is the paginated list envelope returned by GET /api/v1/items.
+type listResponse struct {
+	Items  []item.Item `json:"items"`
+	Total  int         `json:"total"`
+	Limit  int         `json:"limit"`
+	Offset int         `json:"offset"`
 }
 
 // Create handles POST /api/v1/items.
@@ -53,6 +64,51 @@ func (h ItemHandler) Create(w http.ResponseWriter, r *http.Request) {
 	_ = contract.WriteResponse(w, r, http.StatusCreated, item, nil)
 }
 
+// List handles GET /api/v1/items with basic limit/offset pagination.
+//
+//	GET /api/v1/items                    → 200 {items:[…], total:N, limit:20, offset:0}
+//	GET /api/v1/items?limit=5            → first 5 items; limit capped at 100
+//	GET /api/v1/items?limit=5&offset=10  → items 11-15
+func (h ItemHandler) List(w http.ResponseWriter, r *http.Request) {
+	const defaultLimit = 20
+	const maxLimit = 100
+
+	limit := listQueryInt(r, "limit", defaultLimit, 1, maxLimit)
+	offset := listQueryInt(r, "offset", 0, 0, 0) // 0 maxVal = uncapped
+
+	all := h.Repo.List()
+	total := len(all)
+	if offset > len(all) {
+		offset = len(all)
+	}
+	page := all[offset:]
+	if len(page) > limit {
+		page = page[:limit]
+	}
+
+	_ = contract.WriteResponse(w, r, http.StatusOK, listResponse{
+		Items: page, Total: total, Limit: limit, Offset: offset,
+	}, nil)
+}
+
+// listQueryInt parses a non-negative integer query parameter.
+// Falls back to defaultVal when absent, non-numeric, or below minVal.
+// Clamps to maxVal when maxVal > 0.
+func listQueryInt(r *http.Request, key string, defaultVal, minVal, maxVal int) int {
+	raw := r.URL.Query().Get(key)
+	if raw == "" {
+		return defaultVal
+	}
+	n, err := strconv.Atoi(raw)
+	if err != nil || n < minVal {
+		return defaultVal
+	}
+	if maxVal > 0 && n > maxVal {
+		return maxVal
+	}
+	return n
+}
+
 // GetByID handles GET /api/v1/items/:id.
 // It demonstrates path parameter extraction and the canonical 404 error path.
 //
@@ -70,4 +126,22 @@ func (h ItemHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	_ = contract.WriteResponse(w, r, http.StatusOK, item, nil)
+}
+
+// Delete handles DELETE /api/v1/items/:id.
+// A successful delete returns 204 No Content with no body.
+//
+//	DELETE /api/v1/items/item-1  → 204
+//	DELETE /api/v1/items/missing → 404 TypeNotFound
+func (h ItemHandler) Delete(w http.ResponseWriter, r *http.Request) {
+	id := router.Param(r, "id")
+	if !h.Repo.Delete(id) {
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+			Type(contract.TypeNotFound).
+			Detail("id", id).
+			Message("item not found").
+			Build())
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }

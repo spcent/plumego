@@ -49,3 +49,27 @@ func (s *MemoryStore) Get(id string) (Item, bool) {
 	item, ok := s.items[id]
 	return item, ok
 }
+
+// List returns all stored items in an unspecified order.
+func (s *MemoryStore) List() []Item {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	result := make([]Item, 0, len(s.items))
+	for _, item := range s.items {
+		result = append(result, item)
+	}
+	return result
+}
+
+// Delete removes an item by id and reports whether it existed.
+func (s *MemoryStore) Delete(id string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if _, ok := s.items[id]; !ok {
+		return false
+	}
+	delete(s.items, id)
+	return true
+}

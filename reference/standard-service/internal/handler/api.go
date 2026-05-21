@@ -11,6 +11,12 @@ import (
 // APIHandler handles the core JSON API endpoints.
 type APIHandler struct{}
 
+type rootResponse struct {
+	Service string `json:"service"`
+	Version string `json:"version"`
+	Docs    string `json:"docs"`
+}
+
 type helloResponse struct {
 	Message   string            `json:"message"`
 	Service   string            `json:"service"`
@@ -41,6 +47,15 @@ type statusStructure struct {
 	Routes     string `json:"routes"`
 }
 
+// Root responds with minimal service identity. For the full endpoint listing use GET /api/hello.
+func (h APIHandler) Root(w http.ResponseWriter, r *http.Request) {
+	_ = contract.WriteResponse(w, r, http.StatusOK, rootResponse{
+		Service: "plumego-reference",
+		Version: "1.0.0",
+		Docs:    "/api/hello",
+	}, nil)
+}
+
 // Hello responds with service metadata and available endpoints.
 func (h APIHandler) Hello(w http.ResponseWriter, r *http.Request) {
 	resp := helloResponse{
@@ -62,8 +77,10 @@ func (h APIHandler) Hello(w http.ResponseWriter, r *http.Request) {
 			"api_hello":    "/api/hello",
 			"api_status":   "/api/status",
 			"api_greet":    "/api/v1/greet",
+			"items_list":   "/api/v1/items",
 			"items_create": "/api/v1/items",
 			"items_get":    "/api/v1/items/:id",
+			"items_delete": "/api/v1/items/:id",
 		},
 	}
 	_ = contract.WriteResponse(w, r, http.StatusOK, resp, nil)

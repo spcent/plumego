@@ -114,8 +114,10 @@ independently testable: tests pass a stub; production passes the real store.
 ```go
 // handler declares the interface it needs
 type ItemRepository interface {
-    Create(name string) Item
-    Get(id string) (Item, bool)
+    Create(name string) item.Item
+    Get(id string) (item.Item, bool)
+    List() []item.Item
+    Delete(id string) bool
 }
 
 type ItemHandler struct {
@@ -128,6 +130,63 @@ items := handler.ItemHandler{Repo: item.NewMemoryStore()}
 
 Handlers with no external dependencies use a zero-field struct (`APIHandler{}`).
 Both shapes are valid; choose based on whether the handler needs injected state.
+
+### Readiness checking
+
+`HealthHandler` supports an optional list of `ReadinessChecker` implementations.
+Each checker represents one dependency (database, cache, downstream service).
+`GET /readyz` probes them in order; the first failure returns 503 TypeUnavailable.
+
+```go
+// handler declares the interface
+type ReadinessChecker interface {
+    Ready(ctx context.Context) error
+}
+
+// routes.go registers one checker per dependency
+health := handler.HealthHandler{
+    ServiceName: a.Cfg.App.ServiceName,
+    Checkers: []handler.ReadinessChecker{
+        mydb.NewReadinessChecker(db),
+    },
+}
+```
+
+The reference wires no checkers because it has no real dependencies. When no
+checkers are registered `GET /readyz` returns 200 immediately, which is correct
+for a stateless service.
+
+### Route layout — groups and collection + member pairs
+
+Routes that share a common path prefix are registered through a `RouteGroup` so
+the prefix is declared once and never repeated:
+
+```go
+v1 := a.Core.Group("/api/v1")
+v1.Get("/greet",     http.HandlerFunc(api.Greet))
+v1.Get("/items",     http.HandlerFunc(items.List))
+v1.Post("/items",    http.HandlerFunc(items.Create))
+v1.Get("/items/:id", http.HandlerFunc(items.GetByID))
+v1.Delete("/items/:id", http.HandlerFunc(items.Delete))
+```
+
+`RouteGroup` is a `core.App` concept: it enforces the same lifecycle and
+nil-handler rules as the top-level `Get/Post/Delete` methods. Groups can be
+nested (`api := app.Group("/api"); v1 := api.Group("/v1")`).
+
+REST resources follow a consistent two-path pattern:
+
+```
+GET    /api/v1/items       → list all items
+POST   /api/v1/items       → create an item
+
+GET    /api/v1/items/:id   → fetch one item
+DELETE /api/v1/items/:id   → remove one item
+```
+
+The same collection path and member path carry different verbs; the group
+prefix keeps the registration readable without any controller scanning or
+annotation-based magic.
 
 ---
 

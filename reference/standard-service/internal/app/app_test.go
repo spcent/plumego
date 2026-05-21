@@ -20,12 +20,17 @@ func TestRegisterRoutesCanonicalShape(t *testing.T) {
 		t.Fatalf("register routes: %v", err)
 	}
 
+	// router.Routes() returns entries sorted by Method then Path, so the want
+	// slice must follow the same order: DELETE before GET before POST,
+	// and paths alphabetically within each method.
 	got := a.Core.Routes()
 	want := []router.RouteInfo{
+		{Method: http.MethodDelete, Path: "/api/v1/items/:id"},
 		{Method: http.MethodGet, Path: "/"},
 		{Method: http.MethodGet, Path: "/api/hello"},
 		{Method: http.MethodGet, Path: "/api/status"},
 		{Method: http.MethodGet, Path: "/api/v1/greet"},
+		{Method: http.MethodGet, Path: "/api/v1/items"},
 		{Method: http.MethodGet, Path: "/api/v1/items/:id"},
 		{Method: http.MethodGet, Path: "/healthz"},
 		{Method: http.MethodGet, Path: "/readyz"},
