@@ -23,10 +23,10 @@ func (a *App) RegisterRoutes() error {
 
 	// Top-level routes registered directly on the app.
 	root := newRouteReg(a.Core)
-	root.get("/",           http.HandlerFunc(api.Root))
-	root.get("/healthz",    http.HandlerFunc(health.Live))
-	root.get("/readyz",     http.HandlerFunc(health.Ready))
-	root.get("/api/hello",  http.HandlerFunc(api.Hello))
+	root.get("/", http.HandlerFunc(api.Root))
+	root.get("/healthz", http.HandlerFunc(health.Live))
+	root.get("/readyz", http.HandlerFunc(health.Ready))
+	root.get("/api/hello", http.HandlerFunc(api.Hello))
 	root.get("/api/status", http.HandlerFunc(api.Status))
 	if root.err != nil {
 		return root.err
@@ -40,10 +40,10 @@ func (a *App) RegisterRoutes() error {
 	// Member:              GET    /api/v1/items/:id → 200 item or 404
 	//                      DELETE /api/v1/items/:id → 204      or 404
 	v1 := newRouteReg(a.Core.Group("/api/v1"))
-	v1.get("/greet",        http.HandlerFunc(api.Greet))
-	v1.get("/items",        http.HandlerFunc(items.List))
-	v1.post("/items",       http.HandlerFunc(items.Create))
-	v1.get("/items/:id",    http.HandlerFunc(items.GetByID))
+	v1.get("/greet", http.HandlerFunc(api.Greet))
+	v1.get("/items", http.HandlerFunc(items.List))
+	v1.post("/items", http.HandlerFunc(items.Create))
+	v1.get("/items/:id", http.HandlerFunc(items.GetByID))
 	v1.delete("/items/:id", http.HandlerFunc(items.Delete))
 	return v1.err
 }
@@ -69,4 +69,8 @@ func newRouteReg(adder routeAdder) *routeReg { return &routeReg{adder: adder} }
 func (r *routeReg) get(path string, h http.Handler)    { r.record(r.adder.Get(path, h)) }
 func (r *routeReg) post(path string, h http.Handler)   { r.record(r.adder.Post(path, h)) }
 func (r *routeReg) delete(path string, h http.Handler) { r.record(r.adder.Delete(path, h)) }
-func (r *routeReg) record(err error)                   { if r.err == nil { r.err = err } }
+func (r *routeReg) record(err error) {
+	if r.err == nil {
+		r.err = err
+	}
+}
