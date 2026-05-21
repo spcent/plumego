@@ -7,7 +7,7 @@ import { ROADMAP_FACTS } from '../generated/roadmap';
 
 const stableCount = MODULE_FACTS.stableRoots.length;
 const betaCount = MODULE_FACTS.betaExtensionFamilies.length;
-const experimentalCount = MODULE_FACTS.allExtensionPaths.length - betaCount;
+const experimentalCount = MODULE_FACTS.experimentalFamilies.length;
 
 const releaseChecklist = [
   { label: '9 stable roots with API snapshots', done: true, subitems: [] },
@@ -193,9 +193,7 @@ const v11Checklist = [
         <h3>Experimental extensions</h3>
         <p>Not API-frozen. Evaluate for clear reasons; expect faster iteration than stable roots.</p>
         <div class="tier-card__chips">
-          {MODULE_FACTS.allExtensionPaths
-            .filter((m) => !MODULE_FACTS.betaExtensionFamilies.includes(m as any))
-            .map((m) => <code>{m}</code>)}
+          {MODULE_FACTS.experimentalFamilies.map((m) => <code>{m}</code>)}
         </div>
         <a class="text-link" href="/releases">Full release matrix →</a>
       </article>

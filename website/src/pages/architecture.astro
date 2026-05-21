@@ -79,6 +79,27 @@ const xScenarios = [
     href: '/docs/modules/x-observability',
     label: 'Open x/observability primer',
   },
+  {
+    kicker: 'rest api',
+    title: 'CRUD resource controllers with consistent response conventions',
+    body: 'x/rest adds a typed resource interface, consistent response envelopes, and validation hooks across all CRUD endpoints — so each new resource follows the same structural contract.',
+    href: '/docs/modules/x-rest',
+    label: 'Open x/rest primer',
+  },
+  {
+    kicker: 'messaging',
+    title: 'Async messaging, queues, and inbound webhook delivery',
+    body: 'x/messaging connects message queues, pubsub flows, scheduled jobs, and inbound webhook transport under one family entrypoint — keeping async concerns outside the HTTP kernel.',
+    href: '/docs/modules/x-messaging',
+    label: 'Open x/messaging primer',
+  },
+  {
+    kicker: 'frontend',
+    title: 'Static asset serving and SPA embedding',
+    body: 'x/frontend serves embedded or directory-based assets as a transport-layer concern. Cache-busting, pre-compressed delivery, and directory safety stay in the extension layer.',
+    href: '/docs/modules/x-frontend',
+    label: 'Open x/frontend primer',
+  },
 ] as const;
 
 const copy = ARCHITECTURE_COPY.en;

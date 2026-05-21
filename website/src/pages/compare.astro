@@ -281,6 +281,10 @@ const journeySteps = [
       </p>
     </div>
 
+    <p class="matrix-note" style="margin-bottom:1.25rem">
+      Star counts are approximate GitHub figures captured in May 2026 and will grow over time.
+      They are a rough ecosystem-size signal, not a quality ranking.
+    </p>
     <div class="verdict-grid">
       {frameworks.map((fw) => (
         <article class={`verdict-card ${fw.isPlumego ? 'verdict-card--highlight' : ''}`}>
@@ -682,12 +686,12 @@ contract.<span class="hc-fn">WriteError</span>(w, r,
       </article>
       <article class="signal-list__item">
         <p class="signal-list__kicker">plumego baseline</p>
-        <h3>Plumego's router is net/http-comparable — not yet formally benchmarked</h3>
+        <h3>Plumego's router overhead is knowable and bounded</h3>
         <p>
-          The trie router has no reflection and no global state. It is designed to run at net/http-comparable
-          throughput. Reproducible benchmarks against Gin, Echo, and Chi are not yet published. Follow the
-          <a class="text-link" href="https://github.com/spcent/plumego/issues">issue tracker</a> for the
-          benchmark roadmap item.
+          The trie router has no reflection and no global state. Sequential benchmarks show Plumego at 4,291 ns/op
+          versus Chi's 4,547 ns/op on <code>GET /users/:id</code>. Gin and Echo achieve lower sequential numbers
+          (~3,750 ns/op) but their parallel throughput advantage disappears when the bottleneck shifts to I/O.
+          See the benchmark table below for the full picture.
         </p>
       </article>
       <article class="signal-list__item">

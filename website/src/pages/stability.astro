@@ -67,7 +67,7 @@ function badgeClass(status: string): string {
       </div>
       <div class="stat-hero__cell">
         <span class="stat-hero__num stat-hero__num--warn">
-          {MODULE_FACTS.allExtensionPaths.length - MODULE_FACTS.betaExtensionFamilies.length}
+          {MODULE_FACTS.experimentalFamilies.length}
         </span>
         <span class="stat-hero__label">experimental extensions</span>
       </div>
@@ -145,7 +145,7 @@ function badgeClass(status: string): string {
     <div class="section__intro">
       <h2>Beta extensions — API frozen between refs.</h2>
       <p>
-        These four modules completed the promotion checklist: two consecutive tagged release refs with no API
+        Seven families have completed the promotion checklist: two consecutive tagged release refs with no API
         changes, release-backed snapshots, and owner sign-off. Safe to adopt, but check release notes before upgrading.
       </p>
     </div>
@@ -155,6 +155,9 @@ function badgeClass(status: string): string {
         { name: 'x/gateway', owner: 'edge', desc: 'Proxy, rewrite, load balancing, and edge transport', href: '/docs/modules/x-gateway' },
         { name: 'x/websocket', owner: 'realtime', desc: 'WebSocket hub and explicit route registration', href: '/docs/modules/x-websocket' },
         { name: 'x/observability', owner: 'observability', desc: 'Exporter, tracer, collector, and adapter wiring', href: '/docs/modules/x-observability' },
+        { name: 'x/tenant', owner: 'tenant', desc: 'Per-tenant routing, quota enforcement, and JWT-backed policy', href: '/docs/modules/x-tenant' },
+        { name: 'x/frontend', owner: 'assets', desc: 'Static asset serving, SPA embedding, and pre-compressed delivery', href: '/docs/modules/x-frontend' },
+        { name: 'x/messaging', owner: 'messaging', desc: 'Async messaging, queues, pubsub flows, and inbound webhook delivery', href: '/docs/modules/x-messaging' },
       ].map((mod) => (
         <a class="page-panel page-panel--info beta-panel" href={mod.href}>
           <p class="signal-list__kicker">beta</p>

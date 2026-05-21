@@ -36,6 +36,15 @@ export const MODULE_FACTS = {
     "x/frontend",
     "x/messaging"
   ],
+  "experimentalFamilies": [
+    "x/fileapi",
+    "x/openapi",
+    "x/resilience",
+    "x/rpc",
+    "x/data",
+    "x/ai",
+    "x/validate"
+  ],
   "primaryExtensionFamilies": [
     "x/tenant",
     "x/fileapi",
