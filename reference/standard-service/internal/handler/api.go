@@ -102,9 +102,9 @@ func (h APIHandler) Status(w http.ResponseWriter, r *http.Request) {
 		},
 		Modules: []string{
 			"core",
-			"router",
 			"contract",
 			"middleware",
+			"log",
 		},
 	}
 	_ = contract.WriteResponse(w, r, http.StatusOK, resp, nil)

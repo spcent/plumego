@@ -21,14 +21,9 @@ type healthResponse struct {
 
 // Live reports that the process is serving HTTP traffic.
 func (h HealthHandler) Live(w http.ResponseWriter, r *http.Request) {
-	service := h.ServiceName
-	if service == "" {
-		service = "plumego-reference"
-	}
-
 	_ = contract.WriteResponse(w, r, http.StatusOK, healthResponse{
 		Status:    "ok",
-		Service:   service,
+		Service:   h.ServiceName,
 		Check:     "liveness",
 		Timestamp: time.Now().Format(time.RFC3339),
 	}, nil)
@@ -36,14 +31,9 @@ func (h HealthHandler) Live(w http.ResponseWriter, r *http.Request) {
 
 // Ready reports that the reference service is ready to accept requests.
 func (h HealthHandler) Ready(w http.ResponseWriter, r *http.Request) {
-	service := h.ServiceName
-	if service == "" {
-		service = "plumego-reference"
-	}
-
 	_ = contract.WriteResponse(w, r, http.StatusOK, healthResponse{
 		Status:    "ready",
-		Service:   service,
+		Service:   h.ServiceName,
 		Check:     "readiness",
 		Timestamp: time.Now().Format(time.RFC3339),
 	}, nil)

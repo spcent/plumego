@@ -7,7 +7,6 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"strconv"
 	"strings"
 
 	"github.com/spcent/plumego/core"
@@ -22,7 +21,6 @@ type Config struct {
 // AppConfig holds app-local, non-kernel configuration.
 type AppConfig struct {
 	EnvFile string
-	Debug   bool
 }
 
 // Defaults returns safe configuration values for local development.
@@ -65,14 +63,12 @@ func Validate(cfg Config) error {
 func applyEnv(cfg *Config) error {
 	cfg.Core.Addr = envString("APP_ADDR", cfg.Core.Addr)
 	cfg.App.EnvFile = envString("APP_ENV_FILE", cfg.App.EnvFile)
-	cfg.App.Debug = envBool("APP_DEBUG", cfg.App.Debug)
 	return nil
 }
 
 func applyFlags(cfg *Config) {
 	flag.StringVar(&cfg.Core.Addr, "addr", cfg.Core.Addr, "listen address")
 	flag.StringVar(&cfg.App.EnvFile, "env-file", cfg.App.EnvFile, "path to .env file")
-	flag.BoolVar(&cfg.App.Debug, "debug", cfg.App.Debug, "enable debug mode")
 	flag.Parse()
 }
 
@@ -129,14 +125,6 @@ func envString(key, fallback string) string {
 		return value
 	}
 	return fallback
-}
-
-func envBool(key string, fallback bool) bool {
-	value, err := strconv.ParseBool(os.Getenv(key))
-	if err != nil {
-		return fallback
-	}
-	return value
 }
 
 func parseEnvLine(line string) (key, value string, ok bool) {
