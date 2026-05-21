@@ -12,7 +12,7 @@ main.go
 internal/
   config/   config.go
   app/      app.go, routes.go
-  handler/  api.go, health.go, handler_test.go
+  handler/  api.go, health.go, items.go, handler_test.go
 ```
 
 This is the canonical Plumego application shape. Every scaffold and getting-
@@ -90,7 +90,7 @@ registrations, not logic.
 
 Handlers convert HTTP requests to domain responses. They:
 
-- Read request parameters (`r.URL.Query()`, `json.NewDecoder`)
+- Read request parameters (`r.URL.Query()`, `json.NewDecoder(r.Body).Decode`)
 - Call domain logic (passed in through the handler struct's fields)
 - Write responses using `contract.WriteResponse` or `contract.WriteError`
 
@@ -99,6 +99,30 @@ do not own persistence concerns (database queries, cache lookups).
 
 Tests live next to the handlers they test (`handler_test.go`).
 
+### Constructor injection
+
+Handlers that require external dependencies declare them as interface fields and
+receive concrete implementations from `routes.go`. This keeps handlers
+independently testable: tests pass a stub; production passes the real store.
+
+```go
+// handler declares the interface it needs
+type ItemRepository interface {
+    Create(name string) Item
+    Get(id string) (Item, bool)
+}
+
+type ItemHandler struct {
+    Repo ItemRepository
+}
+
+// routes.go wires the concrete implementation
+items := handler.ItemHandler{Repo: handler.NewMemoryItemStore()}
+```
+
+Handlers with no external dependencies use a zero-field struct (`APIHandler{}`).
+Both shapes are valid; choose based on whether the handler needs injected state.
+
 ---
 
 ## Dependency direction
@@ -106,8 +130,8 @@ Tests live next to the handlers they test (`handler_test.go`).
 ```
 main.go
   → internal/config
-  → internal/app        (imports internal/config, internal/handler)
-      → internal/handler (imports contract only)
+  → internal/app          (imports internal/config, internal/handler)
+      → internal/handler  (imports contract, router)
 ```
 
 `internal/handler` has no upward imports. It does not import `internal/app`

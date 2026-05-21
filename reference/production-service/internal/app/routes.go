@@ -2,7 +2,6 @@ package app
 
 import (
 	"net/http"
-	"os"
 
 	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/middleware"
@@ -227,7 +226,7 @@ func (a *App) protectedTenantAPIHandler(next http.Handler) http.Handler {
 
 func (a *App) protectedOpsHandler(next http.Handler) http.Handler {
 	authMw, err := auth.Authenticate(
-		authn.StaticToken(os.Getenv("OPS_TOKEN")),
+		authn.StaticToken(a.Cfg.App.OpsToken),
 		auth.WithAuthRealm("production-ops"),
 	)
 	if err != nil {
