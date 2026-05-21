@@ -12,6 +12,7 @@ import (
 	"github.com/spcent/plumego/core"
 	plumelog "github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/middleware/accesslog"
+	"github.com/spcent/plumego/middleware/bodylimit"
 	"github.com/spcent/plumego/middleware/recovery"
 	"github.com/spcent/plumego/middleware/requestid"
 	"standard-service/internal/config"
@@ -34,10 +35,15 @@ func New(cfg config.Config) (*App, error) {
 	if err != nil {
 		return nil, fmt.Errorf("configure access log middleware: %w", err)
 	}
+	// bodylimit is placed after accesslog so the access log captures the 413 status.
 	if err := app.Use(
 		requestid.Middleware(),
 		recoveryMw,
 		accesslogMw,
+		bodylimit.Middleware(bodylimit.Config{
+			MaxBytes: cfg.App.MaxBodyBytes,
+			Logger:   app.Logger(),
+		}),
 	); err != nil {
 		return nil, fmt.Errorf("register middleware: %w", err)
 	}

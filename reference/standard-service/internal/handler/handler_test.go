@@ -211,20 +211,20 @@ func TestItemHandlerCreate(t *testing.T) {
 }
 
 func TestItemHandlerList(t *testing.T) {
-	t.Run("empty store returns empty array", func(t *testing.T) {
+	t.Run("empty store returns empty items with zero total", func(t *testing.T) {
 		h := ItemHandler{Repo: item.NewMemoryStore()}
 		rec := httptest.NewRecorder()
 		h.List(rec, httptest.NewRequest(http.MethodGet, "/api/v1/items", nil))
 		if rec.Code != http.StatusOK {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
 		}
-		items := decodeReferenceData[[]item.Item](t, rec)
-		if len(items) != 0 {
-			t.Fatalf("items = %v, want empty", items)
+		resp := decodeReferenceData[listResponse](t, rec)
+		if len(resp.Items) != 0 || resp.Total != 0 || resp.Limit != 20 || resp.Offset != 0 {
+			t.Fatalf("unexpected list response: %+v", resp)
 		}
 	})
 
-	t.Run("populated store returns all items", func(t *testing.T) {
+	t.Run("populated store returns items with correct total", func(t *testing.T) {
 		store := item.NewMemoryStore()
 		store.Create("alpha")
 		store.Create("beta")
@@ -235,9 +235,45 @@ func TestItemHandlerList(t *testing.T) {
 		if rec.Code != http.StatusOK {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
 		}
-		items := decodeReferenceData[[]item.Item](t, rec)
-		if len(items) != 2 {
-			t.Fatalf("items count = %d, want 2", len(items))
+		resp := decodeReferenceData[listResponse](t, rec)
+		if resp.Total != 2 || len(resp.Items) != 2 {
+			t.Fatalf("total=%d items=%d, want 2/2", resp.Total, len(resp.Items))
+		}
+	})
+
+	t.Run("limit param restricts returned items", func(t *testing.T) {
+		store := item.NewMemoryStore()
+		for _, name := range []string{"a", "b", "c", "d", "e"} {
+			store.Create(name)
+		}
+		h := ItemHandler{Repo: store}
+
+		rec := httptest.NewRecorder()
+		h.List(rec, httptest.NewRequest(http.MethodGet, "/api/v1/items?limit=3", nil))
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+		}
+		resp := decodeReferenceData[listResponse](t, rec)
+		if resp.Total != 5 || len(resp.Items) != 3 || resp.Limit != 3 {
+			t.Fatalf("total=%d items=%d limit=%d, want 5/3/3", resp.Total, len(resp.Items), resp.Limit)
+		}
+	})
+
+	t.Run("offset param skips items", func(t *testing.T) {
+		store := item.NewMemoryStore()
+		for _, name := range []string{"a", "b", "c", "d", "e"} {
+			store.Create(name)
+		}
+		h := ItemHandler{Repo: store}
+
+		rec := httptest.NewRecorder()
+		h.List(rec, httptest.NewRequest(http.MethodGet, "/api/v1/items?offset=3", nil))
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+		}
+		resp := decodeReferenceData[listResponse](t, rec)
+		if resp.Total != 5 || len(resp.Items) != 2 || resp.Offset != 3 {
+			t.Fatalf("total=%d items=%d offset=%d, want 5/2/3", resp.Total, len(resp.Items), resp.Offset)
 		}
 	})
 }

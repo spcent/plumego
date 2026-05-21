@@ -3,6 +3,7 @@ package handler
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 
 	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/router"
@@ -26,6 +27,14 @@ type ItemHandler struct {
 
 type createItemReq struct {
 	Name string `json:"name"`
+}
+
+// listResponse is the paginated list envelope returned by GET /api/v1/items.
+type listResponse struct {
+	Items  []item.Item `json:"items"`
+	Total  int         `json:"total"`
+	Limit  int         `json:"limit"`
+	Offset int         `json:"offset"`
 }
 
 // Create handles POST /api/v1/items.
@@ -55,12 +64,49 @@ func (h ItemHandler) Create(w http.ResponseWriter, r *http.Request) {
 	_ = contract.WriteResponse(w, r, http.StatusCreated, item, nil)
 }
 
-// List handles GET /api/v1/items.
-// It returns all items as a JSON array; an empty store returns an empty array.
+// List handles GET /api/v1/items with basic limit/offset pagination.
 //
-//	GET /api/v1/items → 200 [items…]
+//	GET /api/v1/items                    → 200 {items:[…], total:N, limit:20, offset:0}
+//	GET /api/v1/items?limit=5            → first 5 items; limit capped at 100
+//	GET /api/v1/items?limit=5&offset=10  → items 11-15
 func (h ItemHandler) List(w http.ResponseWriter, r *http.Request) {
-	_ = contract.WriteResponse(w, r, http.StatusOK, h.Repo.List(), nil)
+	const defaultLimit = 20
+	const maxLimit = 100
+
+	limit := listQueryInt(r, "limit", defaultLimit, 1, maxLimit)
+	offset := listQueryInt(r, "offset", 0, 0, 0) // 0 maxVal = uncapped
+
+	all := h.Repo.List()
+	total := len(all)
+	if offset > len(all) {
+		offset = len(all)
+	}
+	page := all[offset:]
+	if len(page) > limit {
+		page = page[:limit]
+	}
+
+	_ = contract.WriteResponse(w, r, http.StatusOK, listResponse{
+		Items: page, Total: total, Limit: limit, Offset: offset,
+	}, nil)
+}
+
+// listQueryInt parses a non-negative integer query parameter.
+// Falls back to defaultVal when absent, non-numeric, or below minVal.
+// Clamps to maxVal when maxVal > 0.
+func listQueryInt(r *http.Request, key string, defaultVal, minVal, maxVal int) int {
+	raw := r.URL.Query().Get(key)
+	if raw == "" {
+		return defaultVal
+	}
+	n, err := strconv.Atoi(raw)
+	if err != nil || n < minVal {
+		return defaultVal
+	}
+	if maxVal > 0 && n > maxVal {
+		return maxVal
+	}
+	return n
 }
 
 // GetByID handles GET /api/v1/items/:id.

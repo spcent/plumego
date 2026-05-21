@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/spcent/plumego/core"
@@ -21,8 +22,9 @@ type Config struct {
 // AppConfig holds app-local, non-kernel configuration.
 // Add application-specific fields here; keep framework/kernel config in Config.Core.
 type AppConfig struct {
-	EnvFile     string
-	ServiceName string // Exposed as APP_SERVICE_NAME; used as the service identity in health responses.
+	EnvFile      string
+	ServiceName  string // APP_SERVICE_NAME; used as the service identity in health responses.
+	MaxBodyBytes int64  // APP_MAX_BODY_BYTES; maximum request body size. 0 disables the limit.
 }
 
 // Defaults returns safe configuration values for local development.
@@ -32,8 +34,9 @@ func Defaults() Config {
 	return Config{
 		Core: coreCfg,
 		App: AppConfig{
-			EnvFile:     ".env",
-			ServiceName: "plumego-reference",
+			EnvFile:      ".env",
+			ServiceName:  "plumego-reference",
+			MaxBodyBytes: 1 << 20, // 1 MiB
 		},
 	}
 }
@@ -76,6 +79,7 @@ func applyEnv(cfg *Config, lookupEnv func(string) (string, bool)) {
 	cfg.Core.Addr = envString(lookupEnv, "APP_ADDR", cfg.Core.Addr)
 	cfg.App.EnvFile = envString(lookupEnv, "APP_ENV_FILE", cfg.App.EnvFile)
 	cfg.App.ServiceName = envString(lookupEnv, "APP_SERVICE_NAME", cfg.App.ServiceName)
+	cfg.App.MaxBodyBytes = envInt64(lookupEnv, "APP_MAX_BODY_BYTES", cfg.App.MaxBodyBytes)
 }
 
 func applyEnvMap(cfg *Config, values map[string]string) {
@@ -90,6 +94,11 @@ func applyEnvMap(cfg *Config, values map[string]string) {
 	}
 	if value := strings.TrimSpace(values["APP_SERVICE_NAME"]); value != "" {
 		cfg.App.ServiceName = value
+	}
+	if value := strings.TrimSpace(values["APP_MAX_BODY_BYTES"]); value != "" {
+		if n, err := strconv.ParseInt(value, 10, 64); err == nil {
+			cfg.App.MaxBodyBytes = n
+		}
 	}
 }
 
@@ -184,6 +193,15 @@ func readEnvFile(path string) (map[string]string, error) {
 func envString(lookupEnv func(string) (string, bool), key, fallback string) string {
 	if value, ok := lookupEnv(key); ok && value != "" {
 		return value
+	}
+	return fallback
+}
+
+func envInt64(lookupEnv func(string) (string, bool), key string, fallback int64) int64 {
+	if value, ok := lookupEnv(key); ok && value != "" {
+		if n, err := strconv.ParseInt(value, 10, 64); err == nil {
+			return n
+		}
 	}
 	return fallback
 }
