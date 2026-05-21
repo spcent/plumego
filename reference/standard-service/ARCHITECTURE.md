@@ -156,7 +156,23 @@ The reference wires no checkers because it has no real dependencies. When no
 checkers are registered `GET /readyz` returns 200 immediately, which is correct
 for a stateless service.
 
-### Route layout — collection + member pairs
+### Route layout — groups and collection + member pairs
+
+Routes that share a common path prefix are registered through a `RouteGroup` so
+the prefix is declared once and never repeated:
+
+```go
+v1 := a.Core.Group("/api/v1")
+v1.Get("/greet",     http.HandlerFunc(api.Greet))
+v1.Get("/items",     http.HandlerFunc(items.List))
+v1.Post("/items",    http.HandlerFunc(items.Create))
+v1.Get("/items/:id", http.HandlerFunc(items.GetByID))
+v1.Delete("/items/:id", http.HandlerFunc(items.Delete))
+```
+
+`RouteGroup` is a `core.App` concept: it enforces the same lifecycle and
+nil-handler rules as the top-level `Get/Post/Delete` methods. Groups can be
+nested (`api := app.Group("/api"); v1 := api.Group("/v1")`).
 
 REST resources follow a consistent two-path pattern:
 
@@ -168,9 +184,9 @@ GET    /api/v1/items/:id   → fetch one item
 DELETE /api/v1/items/:id   → remove one item
 ```
 
-The same base path (`/api/v1/items`) and member path (`/api/v1/items/:id`) carry
-different verbs. Each registration is one line in `routes.go`; no grouping or
-prefix magic is needed for a service of this size.
+The same collection path and member path carry different verbs; the group
+prefix keeps the registration readable without any controller scanning or
+annotation-based magic.
 
 ---
 

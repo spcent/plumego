@@ -12,6 +12,122 @@ import (
 	"github.com/spcent/plumego/router"
 )
 
+func TestGroupRouteRegistration(t *testing.T) {
+	app := newTestApp()
+	g := app.Group("/api/v1")
+
+	type entry struct {
+		method string
+		path   string
+		status int
+		called bool
+	}
+	entries := []*entry{
+		{method: http.MethodGet, path: "/items", status: http.StatusOK},
+		{method: http.MethodPost, path: "/items", status: http.StatusCreated},
+		{method: http.MethodGet, path: "/items/:id", status: http.StatusOK},
+		{method: http.MethodDelete, path: "/items/:id", status: http.StatusNoContent},
+	}
+
+	for _, e := range entries {
+		e := e
+		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			e.called = true
+			w.WriteHeader(e.status)
+		})
+		switch e.method {
+		case http.MethodGet:
+			mustRegisterRoute(t, g.Get(e.path, handler))
+		case http.MethodPost:
+			mustRegisterRoute(t, g.Post(e.path, handler))
+		case http.MethodDelete:
+			mustRegisterRoute(t, g.Delete(e.path, handler))
+		}
+	}
+
+	probes := []struct {
+		method string
+		url    string
+		entry  *entry
+	}{
+		{http.MethodGet, "/api/v1/items", entries[0]},
+		{http.MethodPost, "/api/v1/items", entries[1]},
+		{http.MethodGet, "/api/v1/items/item-1", entries[2]},
+		{http.MethodDelete, "/api/v1/items/item-1", entries[3]},
+	}
+
+	for _, p := range probes {
+		p.entry.called = false
+		rec := httptest.NewRecorder()
+		app.ServeHTTP(rec, httptest.NewRequest(p.method, p.url, nil))
+		if !p.entry.called {
+			t.Errorf("%s %s: handler was not called", p.method, p.url)
+		}
+		if rec.Code != p.entry.status {
+			t.Errorf("%s %s: status = %d, want %d", p.method, p.url, rec.Code, p.entry.status)
+		}
+	}
+}
+
+func TestNestedGroup(t *testing.T) {
+	app := newTestApp()
+	api := app.Group("/api")
+	v1 := api.Group("/v1")
+
+	called := false
+	mustRegisterRoute(t, v1.Get("/hello", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		called = true
+		w.WriteHeader(http.StatusOK)
+	})))
+
+	rec := httptest.NewRecorder()
+	app.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/v1/hello", nil))
+	if !called {
+		t.Error("nested group handler was not called")
+	}
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+}
+
+func TestGroupNilHandlerReturnsError(t *testing.T) {
+	app := newTestApp()
+	g := app.Group("/api/v1")
+	if err := g.Get("/nil", nil); err == nil {
+		t.Fatal("expected nil handler to return error")
+	}
+}
+
+func TestGroupRegistrationFailsAfterPrepare(t *testing.T) {
+	app := newTestApp()
+	mustRegisterRoute(t, app.Get("/base", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	})))
+	if err := app.Prepare(); err != nil {
+		t.Fatalf("Prepare: %v", err)
+	}
+	g := app.Group("/api/v1")
+	err := g.Get("/items", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	if err == nil {
+		t.Fatal("expected group registration after Prepare to fail")
+	}
+	if !strings.Contains(err.Error(), "cannot register route after app has been prepared") {
+		t.Fatalf("error = %q", err.Error())
+	}
+}
+
+func TestGroupAddRouteWithNamedRoute(t *testing.T) {
+	app := newTestApp()
+	g := app.Group("/api/v1")
+	mustRegisterRoute(t, g.AddRoute(http.MethodGet, "/items/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}), router.WithRouteName("items.show")))
+
+	if got := app.URL("items.show", "id", "42"); got != "/api/v1/items/42" {
+		t.Fatalf("URL = %q, want %q", got, "/api/v1/items/42")
+	}
+}
+
 func TestGetPostPutDeletePatch(t *testing.T) {
 	tests := []struct {
 		method   string
