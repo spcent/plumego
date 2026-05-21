@@ -42,6 +42,8 @@ export async function syncModules() {
     .split('\n')
     .map((line) => line.replace(/^\s*-\s+/, '').trim())
     .filter(Boolean);
+  const betaSet = new Set(betaExtensionFamilies);
+  const experimentalFamilies = primaryExtensionFamilies.filter((f) => !betaSet.has(f));
 
   await writeGeneratedFile(
     'modules.ts',
@@ -49,6 +51,7 @@ export async function syncModules() {
       stableRoots,
       allExtensionPaths,
       betaExtensionFamilies,
+      experimentalFamilies,
       primaryExtensionFamilies,
       discouragedRoots,
       topLevelRules,

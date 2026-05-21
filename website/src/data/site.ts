@@ -949,7 +949,7 @@ export const EXAMPLES_COPY = {
         kicker: 'multi-tenant saas',
         title: 'reference/with-tenant',
         body: 'Per-tenant routing, quota enforcement, and JWT-backed policy evaluation. Adds x/tenant outside the HTTP kernel so stable roots stay compatible when tenant logic evolves.',
-        maturity: 'x/tenant — Experimental',
+        maturity: 'x/tenant — Beta',
         details: [
           'tenant identity from JWT or header, evaluated at the transport layer',
           'per-tenant quota and policy separate from route wiring',
@@ -966,7 +966,7 @@ export const EXAMPLES_COPY = {
       'Each app adds one x/* family to the standard-service baseline. Read the canonical reference app first, then open the one that matches your capability.',
     referenceMatrix: [
       { name: 'reference/with-gateway', kicker: 'x/gateway', description: 'Edge proxy, load balancing, and route rewriting', href: '/docs/modules/x-gateway', maturity: 'Beta' },
-      { name: 'reference/with-messaging', kicker: 'x/messaging', description: 'Async message publishing and subscription wiring', href: '/docs/modules/x-messaging', maturity: 'Experimental' },
+      { name: 'reference/with-messaging', kicker: 'x/messaging', description: 'Async message publishing and subscription wiring', href: '/docs/modules/x-messaging', maturity: 'Beta' },
       { name: 'reference/with-websocket', kicker: 'x/websocket', description: 'WebSocket real-time transport', href: '/docs/modules/x-websocket', maturity: 'Beta' },
       { name: 'reference/with-webhook', kicker: 'x/webhook', description: 'Webhook receiver with signature verification', href: '/docs/modules/x-webhook', maturity: 'Experimental' },
       { name: 'reference/with-rest', kicker: 'x/rest', description: 'CRUD resource controllers and REST conventions', href: '/docs/modules/x-rest', maturity: 'Beta' },
@@ -1076,7 +1076,7 @@ export const EXAMPLES_COPY = {
         kicker: 'multi-tenant saas',
         title: 'reference/with-tenant',
         body: '带 per-tenant 路由、配额执行和 JWT 策略评估的多租户服务。x/tenant 在 HTTP 内核之外承接租户层，稳定根不受租户逻辑演进影响。',
-        maturity: 'x/tenant — 实验性',
+        maturity: 'x/tenant — Beta',
         details: [
           '租户身份来自 JWT 或 header，在传输层评估',
           'per-tenant 配额与策略与 route wiring 分开',
@@ -1093,7 +1093,7 @@ export const EXAMPLES_COPY = {
       '每个参考应用都在 standard-service 的基础上加入一个 x/* 家族。先读 canonical 参考应用，再按你需要评估的能力选择进入。',
     referenceMatrix: [
       { name: 'reference/with-gateway', kicker: 'x/gateway', description: '边缘代理、负载均衡与路由重写', href: '/zh/docs/modules/x-gateway', maturity: 'Beta' },
-      { name: 'reference/with-messaging', kicker: 'x/messaging', description: '异步消息发布与订阅接线', href: '/zh/docs/modules/x-messaging', maturity: '实验性' },
+      { name: 'reference/with-messaging', kicker: 'x/messaging', description: '异步消息发布与订阅接线', href: '/zh/docs/modules/x-messaging', maturity: 'Beta' },
       { name: 'reference/with-websocket', kicker: 'x/websocket', description: 'WebSocket 实时传输', href: '/zh/docs/modules/x-websocket', maturity: 'Beta' },
       { name: 'reference/with-webhook', kicker: 'x/webhook', description: '带签名校验的 Webhook 接收器', href: '/zh/docs/modules/x-webhook', maturity: '实验性' },
       { name: 'reference/with-rest', kicker: 'x/rest', description: 'CRUD 资源控制器与 REST 规范', href: '/zh/docs/modules/x-rest', maturity: 'Beta' },
