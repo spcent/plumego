@@ -14,6 +14,7 @@ hidden production bundle.
 - optional app-local JSON profile store with `APP_PROFILE_STORE_PATH`
 - explicit middleware order in `internal/app/app.go`
 - visible route registration in `internal/app/routes.go`
+- canonical `main.run -> app.Start(ctx)` signal and shutdown shape
 - request IDs, recovery, body limits, timeout, security headers, abuse guard,
   tracing hook, HTTP metrics, and access logs
 - explicit abuse guard limiter lifecycle ownership with shutdown cleanup

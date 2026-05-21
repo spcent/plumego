@@ -21,6 +21,7 @@ func TestProductionServiceSmoke(t *testing.T) {
 
 	cfg := config.Defaults()
 	cfg.App.APIToken = "api-token"
+	cfg.App.OpsToken = "ops-token"
 	cfg.App.ProfileStorePath = filepath.Join(t.TempDir(), "profiles.json")
 	cfg.App.RateLimit = 1000
 	cfg.App.RateBurst = 1000

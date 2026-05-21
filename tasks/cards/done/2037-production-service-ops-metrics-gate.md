@@ -4,7 +4,7 @@ Milestone:
 Recipe: specs/change-recipes/http-endpoint-bugfix.yaml
 Context Package: implementation
 Priority: P0
-State: active
+State: done
 Primary Module: reference/production-service
 Owned Files:
 - reference/production-service/main.go
@@ -54,10 +54,14 @@ Fix the production reference's ops-token test/config mismatch and align its star
 
 ## Done Definition
 
-- [ ] Acceptance Tests pass.
-- [ ] All Validation commands exit 0.
-- [ ] gofmt -l . produces no output.
-- [ ] Docs Sync targets updated (if applicable).
+- [x] Acceptance Tests pass.
+- [x] All Validation commands exit 0.
+- [x] gofmt -l . produces no output.
+- [x] Docs Sync targets updated (if applicable).
 
 ## Outcome
 
+Completed production-service ops metrics smoke repair while preserving fail-closed
+auth. The test now configures the app-local ops token when bypassing
+`config.Load`, and the service lifecycle now matches the canonical
+`main.run -> app.Start(ctx)` shape.
