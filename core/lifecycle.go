@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -32,7 +33,11 @@ func (a *App) Run() error {
 	} else {
 		err = server.ListenAndServe()
 	}
-	if err == http.ErrServerClosed {
+	return normalizeRunError(err)
+}
+
+func normalizeRunError(err error) error {
+	if errors.Is(err, http.ErrServerClosed) {
 		return nil
 	}
 	return err
