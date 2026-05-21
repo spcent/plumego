@@ -56,14 +56,14 @@ func (h APIHandler) Hello(w http.ResponseWriter, r *http.Request) {
 			"minimal_bootstrap",
 		},
 		Endpoints: map[string]string{
-			"root":        "/",
-			"healthz":     "/healthz",
-			"readyz":      "/readyz",
-			"api_hello":   "/api/hello",
-			"api_status":  "/api/status",
-			"api_greet":   "/api/v1/greet",
+			"root":         "/",
+			"healthz":      "/healthz",
+			"readyz":       "/readyz",
+			"api_hello":    "/api/hello",
+			"api_status":   "/api/status",
+			"api_greet":    "/api/v1/greet",
 			"items_create": "/api/v1/items",
-			"items_get":   "/api/v1/items/:id",
+			"items_get":    "/api/v1/items/:id",
 		},
 	}
 	_ = contract.WriteResponse(w, r, http.StatusOK, resp, nil)
