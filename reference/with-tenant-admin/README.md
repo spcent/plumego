@@ -6,6 +6,9 @@ quota administration, usage recording, and fail-closed admin authentication
 using `net/http`, `core.App`, `contract.WriteResponse`, and `x/tenant`
 primitives.
 
+It keeps the canonical `main.run -> app.Start(ctx)` lifecycle shape: `main.go`
+owns process signals, and `internal/app` reacts to the caller-owned context.
+
 ## Run
 
 ```bash
