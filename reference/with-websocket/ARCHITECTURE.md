@@ -34,8 +34,9 @@ type App struct {
 }
 ```
 
-This keeps the WebSocket lifecycle visible. `Start()` defers both
-`a.WS.Shutdown(ctx)` and `a.Core.Shutdown(ctx)` — the caller controls both.
+This keeps the WebSocket lifecycle visible. `Start(ctx)` shuts down
+`a.WS.Shutdown(ctx)` before `a.Core.Shutdown(ctx)` when the caller-owned context
+is canceled.
 
 **What not to do:** Do not store the WebSocket server in a package-level
 variable. Do not call `websocket.Enable()` or any self-registering helper.
@@ -62,7 +63,7 @@ the same way any other route can be.
 ## Shutdown sequence
 
 ```
-SIGTERM / context cancel
+main.run signal context cancel
   → a.WS.Shutdown(ctx)    — drain active WebSocket connections
   → a.Core.Shutdown(ctx)  — drain in-flight HTTP requests
 ```
