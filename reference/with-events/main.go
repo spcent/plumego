@@ -7,6 +7,9 @@ package main
 import (
 	"context"
 	"log"
+	"os"
+	"os/signal"
+	"syscall"
 
 	"with-events/internal/app"
 	"with-events/internal/config"
@@ -27,8 +30,11 @@ func main() {
 		log.Fatalf("failed to register routes: %v", err)
 	}
 
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
 	log.Printf("Starting with-events demo on %s", cfg.Addr)
-	if err := a.Start(context.Background()); err != nil {
+	if err := a.Start(ctx); err != nil {
 		log.Fatalf("server stopped: %v", err)
 	}
 }

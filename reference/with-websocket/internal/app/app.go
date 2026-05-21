@@ -4,7 +4,12 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/spcent/plumego/core"
 	plumelog "github.com/spcent/plumego/log"
@@ -55,8 +60,10 @@ func New(cfg config.Config) (*App, error) {
 }
 
 // Start prepares the runtime and blocks while the HTTP server runs.
+// It listens for SIGTERM and SIGINT and triggers a graceful shutdown.
 func (a *App) Start() error {
-	ctx := context.Background()
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
 
 	if err := a.Core.Prepare(); err != nil {
 		return fmt.Errorf("prepare server: %w", err)
@@ -65,19 +72,20 @@ func (a *App) Start() error {
 	if err != nil {
 		return fmt.Errorf("get server: %w", err)
 	}
-	defer func() {
-		_ = a.WS.Shutdown(ctx)
-		_ = a.Core.Shutdown(ctx)
+	go func() {
+		<-ctx.Done()
+		_ = a.WS.Shutdown(context.Background())
+		_ = a.Core.Shutdown(context.Background())
 	}()
 
+	var serveErr error
 	if a.Cfg.Core.TLS.Enabled {
-		if err := srv.ListenAndServeTLS("", ""); err != nil {
-			return fmt.Errorf("server stopped: %w", err)
-		}
-		return nil
+		serveErr = srv.ListenAndServeTLS("", "")
+	} else {
+		serveErr = srv.ListenAndServe()
 	}
-	if err := srv.ListenAndServe(); err != nil {
-		return fmt.Errorf("server stopped: %w", err)
+	if serveErr != nil && !errors.Is(serveErr, http.ErrServerClosed) {
+		return fmt.Errorf("server stopped: %w", serveErr)
 	}
 	return nil
 }

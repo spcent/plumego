@@ -105,8 +105,9 @@ func (a *App) Start() error {
 	if err != nil {
 		return fmt.Errorf("get server: %w", err)
 	}
-	defer func() {
-		_ = a.Core.Shutdown(ctx)
+	go func() {
+		<-ctx.Done()
+		_ = a.Core.Shutdown(context.Background())
 	}()
 
 	var serveErr error
