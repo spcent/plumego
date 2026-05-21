@@ -115,11 +115,11 @@ app.Use(accesslog.Middleware(accesslog.Config{Logger: logger}))
 app.Get("/ping",  handlers.Ping)
 app.Post("/users", handlers.CreateUser)
 
-// Caller-owned shutdown — explicit
-ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
-defer cancel()
-if err := app.Shutdown(ctx); err != nil {
-    log.Printf("shutdown error: %v", err)
+// Caller-owned lifecycle — explicit
+ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+defer stop()
+if err := app.Start(ctx); err != nil {
+    log.Printf("server stopped: %v", err)
 }
 ```
 
@@ -158,7 +158,9 @@ and architecture decision points back to it.
 
 Additional reference applications (`reference/with-rest`, `reference/with-gateway`,
 `reference/with-websocket`, etc.) demonstrate how to extend the standard shape
-for specific capability families, using the same explicit wiring pattern.
+for specific capability families, using the same explicit wiring pattern:
+`main.run` owns process signals, `app.Start(ctx)` owns server runtime, and
+business examples live under `internal/domain/<name>`.
 
 See `docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md` for how the reference
 layer fits into the overall repository structure.

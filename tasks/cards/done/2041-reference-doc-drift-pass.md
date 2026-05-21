@@ -4,7 +4,7 @@ Milestone:
 Recipe: specs/change-recipes/review-only.yaml
 Context Package: implementation
 Priority: P2
-State: active
+State: done
 Primary Module: docs
 Owned Files:
 - docs/why-plumego.md
@@ -54,10 +54,16 @@ Review current docs/examples for stale `Start()` lifecycle, old handler/domain l
 
 ## Done Definition
 
-- [ ] Acceptance Tests pass.
-- [ ] All Validation commands exit 0.
-- [ ] gofmt -l . produces no output.
-- [ ] Docs Sync targets updated (if applicable).
+- [x] Acceptance Tests pass.
+- [x] All Validation commands exit 0.
+- [x] gofmt -l . produces no output.
+- [x] Docs Sync targets updated (if applicable).
 
 ## Outcome
 
+- Updated current guidance in why, migration, and CLI docs to reference `main.run -> app.Start(ctx)` and `internal/domain/<name>` layout.
+- Left historical release output unchanged.
+- Validation:
+  - `go run ./internal/tools/doc-snippets`
+  - `rg -n "app\\.Start\\(\\)|func \\(a \\*App\\) Start\\(\\)" docs cmd/plumego/README.md` returned no matches.
+  - `gofmt -l .`

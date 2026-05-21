@@ -5,6 +5,11 @@ middleware, and tests can move with small edits. The main changes are route
 registration, route metadata, application lifecycle wiring, and response/error
 helpers.
 
+Use the standard-service project shape while migrating: `main.run` creates the
+process signal context and calls `app.Start(ctx)`, routes stay in
+`internal/app/routes.go`, handlers stay in `internal/handler`, and business
+models/repositories live under `internal/domain/<name>`.
+
 ## Compatibility Statement
 
 Chi-compatible middleware already has the Plumego middleware shape:
@@ -155,6 +160,8 @@ func WrapEndpoint(endpoint http.Handler) http.Handler {
 
 - Swap `chi.NewRouter()` as the application root for `core.New(...)` and
   explicit route registration through `core.App`.
+- Create the process signal context in `main.run` and pass it to
+  `app.Start(ctx)` instead of hiding lifecycle ownership inside app wiring.
 - Use `router.NewRouter()` only when you need a bare router outside a full app.
 - Use `contract.WriteResponse` and `contract.WriteError` instead of ad-hoc JSON
   helpers.
