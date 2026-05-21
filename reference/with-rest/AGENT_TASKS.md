@@ -23,7 +23,7 @@ Read `docs/modules/x-rest/README.md` for the `x/rest` API.
 | Path | Constraint |
 |---|---|
 | `internal/app/app.go` | Middleware order and resource construction are load-bearing |
-| `main.go` | Four wiring calls only; do not add logic |
+| `main.go` | Owns process signal context and top-level wiring only |
 
 ### Frozen
 

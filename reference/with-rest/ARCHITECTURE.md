@@ -13,7 +13,7 @@ exactly one extension capability: REST resource controllers (`x/rest`).
 Everything else remains identical to the standard service shape.
 
 ```
-main.go
+main.go      signal context and top-level wiring
 internal/
   config/       config.go
   domain/
@@ -80,12 +80,12 @@ database-backed implementation of the same interface.
 ## Shutdown sequence
 
 ```
-SIGTERM / context cancel
+main.run signal context cancel
   → a.Core.Shutdown(ctx)   — drain in-flight HTTP requests
 ```
 
 `x/rest` controllers hold no background state. Shutdown only requires draining
-the HTTP server.
+the HTTP server, and `internal/app` reacts to the caller-owned context.
 
 ---
 
