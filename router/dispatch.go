@@ -36,12 +36,7 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 
 	path := fastNormalizePath(req.URL.Path)
-	cachePath := path
-	if path != "/" {
-		cachePath = "/" + path
-	}
-
-	cacheKey := fastBuildCacheKey(req.Method, cachePath)
+	cacheKey := req.Method + ":" + path
 	if cachedResult, exists := r.state.matchCache.Get(cacheKey); exists {
 		effectiveW := responseWriterForMatch(w, req, cachedResult)
 		r.attachRouteContextAndServe(effectiveW, req, cachedResult)
@@ -79,8 +74,13 @@ func responseWriterForMatch(w http.ResponseWriter, req *http.Request, result *ma
 }
 
 func (r *Router) matchRoute(method, path string) *matchResult {
-	r.state.mu.RLock()
-	defer r.state.mu.RUnlock()
+	// After Freeze() the trie is immutable: skip the lock to avoid RLock
+	// overhead on every cache-miss request. The write lock in Freeze() ensures
+	// all prior AddRoute calls are visible before the flag is published.
+	if !r.state.frozen.Load() {
+		r.state.mu.RLock()
+		defer r.state.mu.RUnlock()
+	}
 
 	if path == "/" {
 		if method != MethodAny {
@@ -123,7 +123,7 @@ func (r *Router) matchRoute(method, path string) *matchResult {
 	if method != MethodAny {
 		tree := r.state.trees[method]
 		if tree != nil {
-			result := matchNode(tree, parts)
+			result := matchNode(tree, parts, path)
 			if result != nil {
 				result.RouteMethod = method
 				return result
@@ -134,7 +134,7 @@ func (r *Router) matchRoute(method, path string) *matchResult {
 	// RFC 7231 §4.3.2: fall back to GET handler for HEAD requests.
 	if method == http.MethodHead {
 		if getTree := r.state.trees[http.MethodGet]; getTree != nil {
-			result := matchNode(getTree, parts)
+			result := matchNode(getTree, parts, path)
 			if result != nil {
 				result.RouteMethod = http.MethodGet
 				return result
@@ -144,7 +144,7 @@ func (r *Router) matchRoute(method, path string) *matchResult {
 
 	// Fall back to ANY handler.
 	if anyTree := r.state.trees[MethodAny]; anyTree != nil {
-		result := matchNode(anyTree, parts)
+		result := matchNode(anyTree, parts, path)
 		if result != nil {
 			result.RouteMethod = MethodAny
 			return result
@@ -210,7 +210,7 @@ func (r *Router) allowedMethods(path string) []string {
 			if method == MethodAny || tree == nil {
 				continue
 			}
-			if matchNode(tree, parts) != nil {
+			if matchNode(tree, parts, normalized) != nil {
 				allowed = append(allowed, method)
 			}
 		}

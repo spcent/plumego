@@ -52,11 +52,11 @@ type route struct {
 type routerState struct {
 	trees            map[string]*node
 	routes           map[string][]route
-	frozen           bool
 	mu               sync.RWMutex
 	matchCache       *matchCache
 	namedRoutes      map[string]*NamedRoute
 	methodNotAllowed atomic.Bool
+	frozen           atomic.Bool
 }
 
 // Router represents an HTTP router with path-based routing.
@@ -147,7 +147,7 @@ func (r *Router) SetMethodNotAllowed(enabled bool) {
 	}
 	r.state.mu.Lock()
 	defer r.state.mu.Unlock()
-	if r.state.frozen {
+	if r.state.frozen.Load() {
 		return
 	}
 	r.state.methodNotAllowed.Store(enabled)
@@ -162,13 +162,15 @@ func (r *Router) MethodNotAllowedEnabled() bool {
 }
 
 // Freeze prevents the router from accepting new route registrations.
+// The write lock ensures all in-progress AddRoute calls complete before the
+// frozen flag is published, making the trie safe to read without a lock.
 func (r *Router) Freeze() {
 	if !r.ready() {
 		return
 	}
 	r.state.mu.Lock()
-	defer r.state.mu.Unlock()
-	r.state.frozen = true
+	r.state.frozen.Store(true)
+	r.state.mu.Unlock()
 }
 
 func findStaticChild(parent *node, path string) *node {
