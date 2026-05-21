@@ -57,11 +57,7 @@ func (r *Router) routeRegistrationLifecycleError(method, path string) error {
 	if err := r.routeRegistrationReadinessError(method, path); err != nil {
 		return err
 	}
-
-	r.state.mu.RLock()
-	frozen := r.state.frozen
-	r.state.mu.RUnlock()
-	if frozen {
+	if r.state.frozen.Load() {
 		return routeRegistrationFrozenError(method, path)
 	}
 	return nil
@@ -77,7 +73,7 @@ func (r *Router) AddRoute(method, path string, handler http.Handler, opts ...Rou
 	r.state.mu.Lock()
 	defer r.state.mu.Unlock()
 
-	if r.state.frozen {
+	if r.state.frozen.Load() {
 		return routeRegistrationFrozenError(method, path)
 	}
 	if err := validateMethod(method); err != nil {

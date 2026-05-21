@@ -1,14 +1,14 @@
 package router
 
-import "strings"
-
 // matchNode traverses the trie to find the best matching route for a given URL path.
+// rawPath is the normalized path string from which parts were sliced; it is used
+// for zero-allocation wildcard suffix extraction.
 //
 // Matching strategy:
 //  1. Try static path segments first (exact match)
 //  2. Try parameter segments (dynamic segments like ":id")
 //  3. Try wildcard segments (catch-all segments like "*path")
-func matchNode(root *node, parts []string) *matchResult {
+func matchNode(root *node, parts []string, rawPath string) *matchResult {
 	if root == nil {
 		return nil
 	}
@@ -41,8 +41,14 @@ func matchNode(root *node, parts []string) *matchResult {
 
 		// Try wildcard match
 		if wildChild := findWildChild(current); wildChild != nil {
-			wildValue := strings.Join(parts[i:], "/")
-			paramValues = append(paramValues, wildValue)
+			// Compute the byte offset of parts[i] in rawPath via the lengths of
+			// preceding segments (each separated by one '/'), then slice directly
+			// to avoid the strings.Join allocation.
+			off := 1 // skip the leading '/'
+			for j := 0; j < i; j++ {
+				off += len(parts[j]) + 1 // +1 for the '/' separator
+			}
+			paramValues = append(paramValues, rawPath[off:])
 			current = wildChild
 			break
 		}

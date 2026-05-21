@@ -311,6 +311,14 @@ produces any change.
 | `docs/modules/*/README.md` | `website/src/generated/modules.ts` | run `make website-sync` |
 | `specs/task-routing.yaml` | `website/src/generated/routing.ts` | run `make website-sync` |
 | `README.md` / `specs/task-routing.yaml` | `website/src/generated/releases.ts` | run `make website-sync` |
+| any `website/src/content/docs/**/*.mdx` (en or zh) | `website/src/generated/translation-lag.ts` | run `make website-sync` |
+
+`translation-lag.ts` is special: it is derived from **git commit timestamps**,
+not file content. This means it must be regenerated after every commit that
+touches any en or zh `.mdx` doc file — even if the commit only adds new files
+or updates translations. Always run `make website-sync` as the final step of
+any docs-related commit, and include the updated generated files in the same
+commit.
 
 After any edit to a source listed above, run `make website-sync` and include
 the updated `website/src/generated/` files in the same commit. Never commit
