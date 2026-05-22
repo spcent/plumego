@@ -27,10 +27,10 @@ type App struct {
 	preparationState PreparationState // Tracks mutation and preparation phase
 
 	// Server components
-	httpServer  *http.Server              // HTTP server instance
-	connTracker *connectionTracker        // Open HTTP connection tracker
-	handler     http.Handler              // Combined handler with middleware applied; guarded by mu
-	handlerOnce sync.Once                 // Ensures handler initialization happens once
+	httpServer  *http.Server               // HTTP server instance
+	connTracker *connectionTracker         // Open HTTP connection tracker
+	handler     http.Handler               // Combined handler with middleware applied; guarded by mu
+	handlerOnce sync.Once                  // Ensures handler initialization happens once
 	handlerFast atomic.Pointer[handlerRef] // Hot-path cache of handler; written once by buildHandler
 }
 
