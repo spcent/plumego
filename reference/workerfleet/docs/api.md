@@ -8,8 +8,14 @@ Worker ingress auth:
 
 - `POST /v1/workers/register` and `POST /v1/workers/heartbeat` require `Authorization: Bearer <token>` when `WORKERFLEET_WORKER_AUTH_TOKEN` is configured.
 - Missing, malformed, or invalid credentials return `401` with a generic authentication error and do not echo credential values.
-- Query endpoints are not changed by worker ingress auth.
 - `WORKERFLEET_PROFILE=prod` requires `WORKERFLEET_WORKER_AUTH_TOKEN` at startup, so production ingress fails closed by default.
+
+Query API auth:
+
+- Query endpoints require `Authorization: Bearer <token>` when `WORKERFLEET_ADMIN_AUTH_TOKEN` is configured and query auth is required.
+- `WORKERFLEET_QUERY_AUTH_REQUIRED=true` requires an admin token outside production; `WORKERFLEET_PROFILE=prod` requires `WORKERFLEET_ADMIN_AUTH_TOKEN` at startup.
+- Worker ingress auth and query API auth are separate credentials. A worker token cannot list workers, tasks, alerts, or fleet summaries.
+- `/healthz`, `/readyz`, and `/metrics` are not covered by query API auth in this reference app.
 
 ## `POST /v1/workers/register`
 

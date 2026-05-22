@@ -83,11 +83,16 @@ packages such as `core`, `router`, `contract`, `middleware`, `security`,
   on missing, malformed, or invalid credentials.
 - `WORKERFLEET_PROFILE=prod` must fail startup when
   `WORKERFLEET_WORKER_AUTH_TOKEN` is missing.
-- Worker token checks must use timing-safe comparison. Do not replace the
-  current fixed-length digest plus constant-time compare pattern with plain
+- `WORKERFLEET_ADMIN_AUTH_TOKEN` controls query API auth. Query endpoints must
+  fail closed when query auth is required and credentials are missing,
+  malformed, or invalid.
+- `WORKERFLEET_PROFILE=prod` must fail startup when
+  `WORKERFLEET_ADMIN_AUTH_TOKEN` is missing.
+- Worker and admin token checks must use timing-safe comparison. Do not replace
+  the current fixed-length digest plus constant-time compare pattern with plain
   string equality.
-- Query endpoints are not covered by worker ingress auth unless a task
-  explicitly changes the public access model and updates docs/tests.
+- Worker ingress auth and query API auth are separate credentials. Do not allow
+  worker tokens to authorize query endpoints.
 - Kubernetes bearer tokens and notifier webhook headers must stay out of error
   messages and metric labels.
 

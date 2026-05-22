@@ -39,6 +39,7 @@ type Config struct {
 	Kube         KubeConfig
 	Notifier     NotifierConfig
 	WorkerAuth   WorkerIngressAuthConfig
+	AdminAuth    AdminAuthConfig
 }
 
 type PolicyConfig struct {
@@ -87,6 +88,11 @@ type WorkerIngressAuthConfig struct {
 	Token string
 }
 
+type AdminAuthConfig struct {
+	Token    string
+	Required bool
+}
+
 func DefaultConfig() Config {
 	return DefaultConfigForProfile(ProfileDevelopment)
 }
@@ -117,6 +123,9 @@ func DefaultConfigForProfile(profile string) Config {
 		},
 		Kube: KubeConfig{
 			WorkerContainer: "worker",
+		},
+		AdminAuth: AdminAuthConfig{
+			Required: normalized == ProfileProduction,
 		},
 	}
 }
@@ -322,6 +331,20 @@ func LoadConfig(lookup func(string) (string, bool)) (Config, error) {
 		}
 		cfg.WorkerAuth.Token = token
 	}
+	if value, ok := lookup("WORKERFLEET_QUERY_AUTH_REQUIRED"); ok {
+		required, err := parseBoolEnv("WORKERFLEET_QUERY_AUTH_REQUIRED", value)
+		if err != nil {
+			return Config{}, err
+		}
+		cfg.AdminAuth.Required = required
+	}
+	if value, ok := lookup("WORKERFLEET_ADMIN_AUTH_TOKEN"); ok {
+		token := strings.TrimSpace(value)
+		if token == "" {
+			return Config{}, errors.New("WORKERFLEET_ADMIN_AUTH_TOKEN must not be empty when set")
+		}
+		cfg.AdminAuth.Token = token
+	}
 
 	return cfg, ValidateConfig(cfg)
 }
@@ -347,6 +370,12 @@ func ValidateConfig(cfg Config) error {
 	}
 	if cfg.Profile == ProfileProduction && strings.TrimSpace(cfg.WorkerAuth.Token) == "" {
 		return errors.New("WORKERFLEET_WORKER_AUTH_TOKEN is required when WORKERFLEET_PROFILE=prod")
+	}
+	if cfg.Profile == ProfileProduction && strings.TrimSpace(cfg.AdminAuth.Token) == "" {
+		return errors.New("WORKERFLEET_ADMIN_AUTH_TOKEN is required when WORKERFLEET_PROFILE=prod")
+	}
+	if cfg.AdminAuth.Required && strings.TrimSpace(cfg.AdminAuth.Token) == "" {
+		return errors.New("WORKERFLEET_ADMIN_AUTH_TOKEN is required when WORKERFLEET_QUERY_AUTH_REQUIRED=true")
 	}
 	if cfg.Runtime.NotificationEnabled &&
 		strings.TrimSpace(cfg.Notifier.FeishuWebhookURL) == "" &&

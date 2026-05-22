@@ -45,6 +45,14 @@ Worker ingress authentication:
 - when set, missing, malformed, or invalid credentials fail closed with `401`
 - `WORKERFLEET_PROFILE=prod` requires `WORKERFLEET_WORKER_AUTH_TOKEN` at startup
 
+Query API authentication:
+
+- `WORKERFLEET_ADMIN_AUTH_TOKEN` enables Bearer-token auth for query endpoints such as `/v1/workers`, `/v1/tasks/:task_id`, `/v1/fleet/summary`, and `/v1/alerts`
+- `WORKERFLEET_QUERY_AUTH_REQUIRED=true` requires `WORKERFLEET_ADMIN_AUTH_TOKEN` even outside the production profile
+- worker ingress auth and query API auth use separate tokens so worker pods cannot query fleet state unless explicitly granted the admin token
+- `/healthz`, `/readyz`, and `/metrics` are not covered by query API auth in this reference app
+- `WORKERFLEET_PROFILE=prod` requires `WORKERFLEET_ADMIN_AUTH_TOKEN` at startup
+
 Runtime loop configuration:
 
 - `WORKERFLEET_PROFILE=dev|prod`, default `dev`

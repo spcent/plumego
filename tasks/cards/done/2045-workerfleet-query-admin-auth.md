@@ -4,7 +4,7 @@ Milestone:
 Recipe: specs/change-recipes/http-endpoint-bugfix.yaml
 Context Package: implementation
 Priority: P0
-State: active
+State: done
 Primary Module: reference/workerfleet
 Owned Files:
 - reference/workerfleet/internal/app/config.go
@@ -52,9 +52,16 @@ Validation:
 - gofmt -l reference/workerfleet/internal/app reference/workerfleet/internal/handler
 
 Done Definition:
-- [ ] Acceptance Tests pass.
-- [ ] All Validation commands exit 0.
-- [ ] gofmt -l . produces no output.
-- [ ] Docs Sync targets updated (if applicable).
+- [x] Acceptance Tests pass.
+- [x] All Validation commands exit 0.
+- [x] gofmt -l . produces no output.
+- [x] Docs Sync targets updated (if applicable).
 
 Outcome:
+Added separate workerfleet admin/query Bearer auth with production fail-closed config validation, route-level query protection, deployment/env documentation, and local AGENTS/design guidance sync.
+
+Validation:
+- `cd reference/workerfleet && go test -timeout 30s ./internal/app ./internal/handler`
+- `cd reference/workerfleet && go vet ./internal/app ./internal/handler`
+- `gofmt -l reference/workerfleet/internal/app reference/workerfleet/internal/handler`
+- `git diff --check`

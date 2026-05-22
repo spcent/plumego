@@ -454,6 +454,13 @@ Worker 接入认证：
 - `WORKERFLEET_WORKER_AUTH_TOKEN` 会为 worker 注册和心跳接入启用 Bearer token 认证。
 - `WORKERFLEET_PROFILE=prod` 启动时要求配置 `WORKERFLEET_WORKER_AUTH_TOKEN`。
 
+Query API 认证：
+
+- `WORKERFLEET_ADMIN_AUTH_TOKEN` 会为 worker、task、fleet summary 和 alert 查询接口启用 Bearer token 认证。
+- `WORKERFLEET_QUERY_AUTH_REQUIRED=true` 会在非生产 profile 中也要求配置 `WORKERFLEET_ADMIN_AUTH_TOKEN`。
+- `WORKERFLEET_PROFILE=prod` 启动时要求配置 `WORKERFLEET_ADMIN_AUTH_TOKEN`。
+- 健康检查、readiness 和 metrics 端点不纳入 query API 认证范围。
+
 ## 13. 容量和可靠性
 
 目标规模：
@@ -504,6 +511,7 @@ Worker 接入认证：
 
 - 不能记录 webhook secret、bearer token、private key 或 signature。
 - 配置 `WORKERFLEET_WORKER_AUTH_TOKEN` 后，worker 注册和心跳接入认证失败必须 fail closed。
+- query API 认证启用时，查询接口认证失败必须 fail closed。
 - Mongo 必填配置缺失时 fail closed。
 - Kubernetes API 使用 service account 或显式 bearer token。
 - notifier 错误不能暴露 header secret。

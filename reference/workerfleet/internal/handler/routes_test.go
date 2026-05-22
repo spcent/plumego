@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/spcent/plumego/core"
+	workerapp "workerfleet/internal/app"
 	workerfleetmetrics "workerfleet/internal/platform/metrics"
 )
 
@@ -64,5 +65,49 @@ func TestRegisterRoutesWiresDrilldownRoutes(t *testing.T) {
 		if rec.Code == http.StatusNotFound {
 			t.Fatalf("%s was not routed", path)
 		}
+	}
+}
+
+func TestQueryRoutesRequireAdminAuthWhenConfigured(t *testing.T) {
+	app := core.New(core.DefaultConfig(), core.AppDependencies{})
+	workers := New(nil, WithAdminAuth(workerapp.AdminAuthConfig{
+		Token:    "admin-secret",
+		Required: true,
+	}))
+	if err := RegisterRoutes(app, workers, NewHealthHandler(nil), nil); err != nil {
+		t.Fatalf("register routes: %v", err)
+	}
+
+	queryPaths := []string{
+		"/v1/workers",
+		"/v1/workers/worker-1",
+		"/v1/tasks/task-1/timeline",
+		"/v1/tasks/task-1",
+		"/v1/exec-plans/plan-1/cases",
+		"/v1/fleet/summary",
+		"/v1/alerts",
+	}
+	for _, path := range queryPaths {
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodGet, path, nil)
+		app.ServeHTTP(rec, req)
+		if rec.Code != http.StatusUnauthorized {
+			t.Fatalf("%s status = %d, want 401", path, rec.Code)
+		}
+
+		rec = httptest.NewRecorder()
+		req = httptest.NewRequest(http.MethodGet, path, nil)
+		req.Header.Set("Authorization", "Bearer admin-secret")
+		app.ServeHTTP(rec, req)
+		if rec.Code == http.StatusUnauthorized || rec.Code == http.StatusNotFound {
+			t.Fatalf("%s authorized status = %d, want routed past auth", path, rec.Code)
+		}
+	}
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/healthz", nil)
+	app.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("healthz status = %d, want 200", rec.Code)
 	}
 }

@@ -129,13 +129,16 @@ func TestNewAppWiresCoreMiddlewareAndRoutes(t *testing.T) {
 	serverCfg := DefaultServerConfig()
 	called := false
 
-	app, err := New(context.Background(), cfg, serverCfg, func(coreApp *core.App, service *Service, ready func(context.Context) error, metrics http.Handler, workerAuth WorkerIngressAuthConfig) error {
+	app, err := New(context.Background(), cfg, serverCfg, func(coreApp *core.App, service *Service, ready func(context.Context) error, metrics http.Handler, workerAuth WorkerIngressAuthConfig, adminAuth AdminAuthConfig) error {
 		called = true
 		if service == nil {
 			t.Fatalf("service is nil")
 		}
 		if workerAuth.Token != "" {
 			t.Fatalf("worker auth token = %q, want empty", workerAuth.Token)
+		}
+		if adminAuth.Required || adminAuth.Token != "" {
+			t.Fatalf("admin auth = %#v, want disabled", adminAuth)
 		}
 		if ready == nil {
 			t.Fatalf("ready is nil")

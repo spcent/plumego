@@ -74,6 +74,8 @@ func TestLoadConfigParsesRuntimeSettings(t *testing.T) {
 		"WORKERFLEET_WEBHOOK_URL":               "https://webhook.example/hook",
 		"WORKERFLEET_WEBHOOK_HEADERS":           "X-Test=one,X-Token=two",
 		"WORKERFLEET_WORKER_AUTH_TOKEN":         "worker-secret",
+		"WORKERFLEET_ADMIN_AUTH_TOKEN":          "admin-secret",
+		"WORKERFLEET_QUERY_AUTH_REQUIRED":       "true",
 	}))
 	if err != nil {
 		t.Fatalf("load config: %v", err)
@@ -102,6 +104,9 @@ func TestLoadConfigParsesRuntimeSettings(t *testing.T) {
 	if cfg.WorkerAuth.Token != "worker-secret" {
 		t.Fatalf("worker auth token was not parsed")
 	}
+	if cfg.AdminAuth.Token != "admin-secret" || !cfg.AdminAuth.Required {
+		t.Fatalf("admin auth not parsed: %#v", cfg.AdminAuth)
+	}
 }
 
 func TestLoadConfigParsesStatusAndAlertPolicies(t *testing.T) {
@@ -114,6 +119,7 @@ func TestLoadConfigParsesStatusAndAlertPolicies(t *testing.T) {
 		"WORKERFLEET_ALERT_STAGE_STUCK_AFTER":        "25m",
 		"WORKERFLEET_ALERT_RESTART_BURST_THRESHOLD":  "8",
 		"WORKERFLEET_WORKER_AUTH_TOKEN":              "worker-secret",
+		"WORKERFLEET_ADMIN_AUTH_TOKEN":               "admin-secret",
 	}))
 	if err != nil {
 		t.Fatalf("load config: %v", err)
@@ -146,6 +152,7 @@ func TestLoadConfigParsesExperimentalMetricFlags(t *testing.T) {
 		"WORKERFLEET_PROFILE":                      "prod",
 		"WORKERFLEET_EXPERIMENTAL_METRICS_ENABLED": "true",
 		"WORKERFLEET_WORKER_AUTH_TOKEN":            "worker-secret",
+		"WORKERFLEET_ADMIN_AUTH_TOKEN":             "admin-secret",
 	}))
 	if err != nil {
 		t.Fatalf("load config: %v", err)
@@ -157,6 +164,7 @@ func TestLoadConfigParsesExperimentalMetricFlags(t *testing.T) {
 	cfg, err = LoadConfig(testLookup(map[string]string{
 		"WORKERFLEET_PROFILE":           "prod",
 		"WORKERFLEET_WORKER_AUTH_TOKEN": "worker-secret",
+		"WORKERFLEET_ADMIN_AUTH_TOKEN":  "admin-secret",
 	}))
 	if err != nil {
 		t.Fatalf("load config: %v", err)
@@ -209,11 +217,34 @@ func TestLoadConfigRejectsEmptyWorkerAuthTokenWhenSet(t *testing.T) {
 	assertConfigErrorMentions(t, err, "WORKERFLEET_WORKER_AUTH_TOKEN")
 }
 
+func TestLoadConfigRejectsEmptyAdminAuthTokenWhenSet(t *testing.T) {
+	_, err := LoadConfig(testLookup(map[string]string{
+		"WORKERFLEET_ADMIN_AUTH_TOKEN": " ",
+	}))
+	assertConfigErrorMentions(t, err, "WORKERFLEET_ADMIN_AUTH_TOKEN")
+}
+
 func TestLoadConfigRejectsProductionWithoutWorkerAuthToken(t *testing.T) {
 	_, err := LoadConfig(testLookup(map[string]string{
-		"WORKERFLEET_PROFILE": "prod",
+		"WORKERFLEET_PROFILE":          "prod",
+		"WORKERFLEET_ADMIN_AUTH_TOKEN": "admin-secret",
 	}))
 	assertConfigErrorMentions(t, err, "WORKERFLEET_WORKER_AUTH_TOKEN")
+}
+
+func TestLoadConfigRejectsProductionWithoutAdminAuthToken(t *testing.T) {
+	_, err := LoadConfig(testLookup(map[string]string{
+		"WORKERFLEET_PROFILE":           "prod",
+		"WORKERFLEET_WORKER_AUTH_TOKEN": "worker-secret",
+	}))
+	assertConfigErrorMentions(t, err, "WORKERFLEET_ADMIN_AUTH_TOKEN")
+}
+
+func TestLoadConfigRejectsRequiredQueryAuthWithoutAdminAuthToken(t *testing.T) {
+	_, err := LoadConfig(testLookup(map[string]string{
+		"WORKERFLEET_QUERY_AUTH_REQUIRED": "true",
+	}))
+	assertConfigErrorMentions(t, err, "WORKERFLEET_ADMIN_AUTH_TOKEN")
 }
 
 func TestLoadConfigRejectsEnabledNotificationsWithoutSink(t *testing.T) {

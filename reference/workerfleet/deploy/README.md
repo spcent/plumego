@@ -24,12 +24,14 @@ Create the secret before applying `deployment.yaml` when you use these features:
 - `workerfleet-secrets`
   - `mongo-uri`
   - `worker-auth-token`
+  - `admin-auth-token`
   - `kube-bearer-token`
   - `feishu-webhook-url`
   - `webhook-url`
 
-`worker-auth-token` is required by the reference production profile. Other
-unused keys may be omitted when the corresponding feature is disabled.
+`worker-auth-token` and `admin-auth-token` are required by the reference
+production profile. Other unused keys may be omitted when the corresponding
+feature is disabled.
 
 ## Profile And Metrics Defaults
 
@@ -38,6 +40,7 @@ The reference deployment uses:
 - `WORKERFLEET_PROFILE=prod`
 - `WORKERFLEET_STORE_BACKEND=mongo`
 - `WORKERFLEET_EXPERIMENTAL_METRICS_ENABLED=false`
+- `WORKERFLEET_QUERY_AUTH_REQUIRED=true`
 - `WORKERFLEET_KUBE_SYNC_ENABLED=true`
 - `WORKERFLEET_STATUS_SWEEP_ENABLED=true`
 - `WORKERFLEET_ALERT_EVALUATION_ENABLED=true`

@@ -30,6 +30,7 @@ type Service interface {
 type Handler struct {
 	service    Service
 	workerAuth workerapp.WorkerIngressAuthConfig
+	adminAuth  workerapp.AdminAuthConfig
 }
 
 type Option func(*Handler)
@@ -37,6 +38,12 @@ type Option func(*Handler)
 func WithWorkerIngressAuth(auth workerapp.WorkerIngressAuthConfig) Option {
 	return func(h *Handler) {
 		h.workerAuth = auth
+	}
+}
+
+func WithAdminAuth(auth workerapp.AdminAuthConfig) Option {
+	return func(h *Handler) {
+		h.adminAuth = auth
 	}
 }
 
@@ -134,6 +141,24 @@ func (h *Handler) requireWorkerIngressAuth(w http.ResponseWriter, r *http.Reques
 	return true
 }
 
+func (h *Handler) requireAdminAuth(w http.ResponseWriter, r *http.Request) bool {
+	token := strings.TrimSpace(h.adminAuth.Token)
+	if !h.adminAuth.Required && token == "" {
+		return true
+	}
+	if token == "" {
+		writeAdminAuthError(w, r)
+		return false
+	}
+
+	got, ok := bearerToken(r.Header.Get("Authorization"))
+	if !ok || !constantTimeTokenEqual(got, token) {
+		writeAdminAuthError(w, r)
+		return false
+	}
+	return true
+}
+
 func bearerToken(header string) (string, bool) {
 	scheme, token, ok := strings.Cut(strings.TrimSpace(header), " ")
 	if !ok || !strings.EqualFold(scheme, "Bearer") {
@@ -157,6 +182,14 @@ func writeWorkerAuthError(w http.ResponseWriter, r *http.Request) {
 		Type(contract.TypeUnauthorized).
 		Code(contract.CodeUnauthorized).
 		Message("worker ingress authentication required").
+		Build())
+}
+
+func writeAdminAuthError(w http.ResponseWriter, r *http.Request) {
+	_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+		Type(contract.TypeUnauthorized).
+		Code(contract.CodeUnauthorized).
+		Message("workerfleet admin authentication required").
 		Build())
 }
 

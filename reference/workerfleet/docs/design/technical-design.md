@@ -435,6 +435,13 @@ Worker ingress auth:
 - `WORKERFLEET_WORKER_AUTH_TOKEN` enables Bearer-token auth for worker registration and heartbeat ingress.
 - `WORKERFLEET_PROFILE=prod` requires `WORKERFLEET_WORKER_AUTH_TOKEN` at startup.
 
+Query API auth:
+
+- `WORKERFLEET_ADMIN_AUTH_TOKEN` enables Bearer-token auth for worker, task, fleet summary, and alert query endpoints.
+- `WORKERFLEET_QUERY_AUTH_REQUIRED=true` requires `WORKERFLEET_ADMIN_AUTH_TOKEN` outside production.
+- `WORKERFLEET_PROFILE=prod` requires `WORKERFLEET_ADMIN_AUTH_TOKEN` at startup.
+- Health, readiness, and metrics endpoints remain outside query API auth in this reference service.
+
 ## 13. Capacity And Reliability Considerations
 
 Target scale:
@@ -485,6 +492,7 @@ Security requirements:
 
 - do not log webhook secrets, bearer tokens, private keys, or signatures.
 - worker registration and heartbeat ingress fail closed when `WORKERFLEET_WORKER_AUTH_TOKEN` is configured.
+- query endpoints fail closed when query API auth is required.
 - fail closed when required Mongo config is missing.
 - use explicit service account or bearer token for Kubernetes API access.
 - keep notification headers out of error messages.
