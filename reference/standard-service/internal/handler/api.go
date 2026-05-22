@@ -13,6 +13,8 @@ import (
 // During local development it defaults to "dev" to signal an unversioned build.
 var version = "dev"
 
+const codeGreetNameRequired = "greet.name.required"
+
 // APIHandler handles the core JSON API endpoints.
 // Logger is optional: when non-nil it emits structured log entries on each request.
 // Pass a.Core.Logger() from routes.go to demonstrate structured logging.
@@ -124,7 +126,7 @@ func (h APIHandler) Greet(w http.ResponseWriter, r *http.Request) {
 	if name == "" {
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeRequired).
-			Code("greet.name.required").
+			Code(codeGreetNameRequired).
 			Detail("field", "name").
 			Message("name is required").
 			Build())

@@ -10,6 +10,8 @@ import (
 // WriteKeyHeader is the request header that carries the write-operation key.
 const WriteKeyHeader = "X-Write-Key"
 
+const codeAuthKeyInvalid = "auth.key.invalid"
+
 // RequireWriteKey returns a middleware that gates mutating operations behind a
 // static bearer key supplied via the X-Write-Key header.
 //
@@ -33,7 +35,7 @@ func RequireWriteKey(key string) func(http.Handler) http.Handler {
 			if subtle.ConstantTimeCompare([]byte(headerVal), []byte(key)) != 1 {
 				_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 					Type(contract.TypeUnauthorized).
-					Code("auth.key.invalid").
+					Code(codeAuthKeyInvalid).
 					Message("valid X-Write-Key header required").
 					Build())
 				return
