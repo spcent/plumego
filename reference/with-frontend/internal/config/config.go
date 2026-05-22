@@ -9,10 +9,10 @@ import (
 
 // Config holds all runtime configuration for the with-frontend reference app.
 type Config struct {
-	Core       core.AppConfig
-	APIPrefix  string
-	UIPrefix   string
-	AssetsDir  string
+	Core        core.AppConfig
+	APIPrefix   string
+	UIPrefix    string
+	AssetsDir   string
 	SPAFallback bool
 }
 
