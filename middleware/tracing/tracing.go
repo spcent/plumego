@@ -5,7 +5,7 @@ import (
 	"net/http"
 
 	"github.com/spcent/plumego/middleware"
-	internalobs "github.com/spcent/plumego/middleware/internal/observability"
+	internaltelemetry "github.com/spcent/plumego/middleware/internal/telemetry"
 )
 
 type TraceSpan interface {
@@ -25,13 +25,13 @@ func Middleware(tracer Tracer) middleware.Middleware {
 		}
 
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			prepared := internalobs.PrepareRequest(w, r)
-			r, span := internalobs.BeginTrace(w, prepared, func(ctx context.Context, r *http.Request) (context.Context, internalobs.TraceSpan) {
+			prepared := internaltelemetry.PrepareRequest(w, r)
+			r, span := internaltelemetry.BeginTrace(w, prepared, func(ctx context.Context, r *http.Request) (context.Context, internaltelemetry.TraceSpan) {
 				return tracer.Start(ctx, r)
 			})
 			recorder := prepared.Recorder
-			defer internalobs.FinishPreservingPanic(func() {
-				internalobs.EndTrace(span, prepared.Complete(r))
+			defer internaltelemetry.FinishPreservingPanic(func() {
+				internaltelemetry.EndTrace(span, prepared.Complete(r))
 			})
 
 			next.ServeHTTP(recorder, r)

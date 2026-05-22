@@ -75,3 +75,81 @@ func (a *App) Patch(path string, handler http.Handler) error {
 func (a *App) Any(path string, handler http.Handler, opts ...router.RouteOption) error {
 	return a.registerRoute(router.MethodAny, path, handler, opts...)
 }
+
+// Group returns a RouteGroup with the given path prefix.
+// All routes registered on the group share the prefix without repeating it.
+// Group itself does not register any routes; call Get/Post/Delete/etc. on the
+// returned group to register individual routes.
+//
+// Example:
+//
+//	v1 := app.Group("/api/v1")
+//	if err := v1.Get("/items", listHandler); err != nil { return err }
+//	if err := v1.Post("/items", createHandler); err != nil { return err }
+//	if err := v1.Get("/items/:id", getHandler); err != nil { return err }
+//	if err := v1.Delete("/items/:id", deleteHandler); err != nil { return err }
+func (a *App) Group(prefix string) *RouteGroup {
+	return &RouteGroup{app: a, r: a.ensureRouter().Group(prefix)}
+}
+
+// RouteGroup represents a set of routes sharing a common path prefix.
+// Create one with App.Group; use its methods to register routes without
+// repeating the prefix on every call.
+type RouteGroup struct {
+	app *App
+	r   *router.Router
+}
+
+// Group returns a nested RouteGroup with an additional path prefix appended.
+func (g *RouteGroup) Group(prefix string) *RouteGroup {
+	return &RouteGroup{app: g.app, r: g.r.Group(prefix)}
+}
+
+// Get registers a GET route on this group.
+func (g *RouteGroup) Get(path string, handler http.Handler) error {
+	return g.addRoute(http.MethodGet, path, handler)
+}
+
+// Post registers a POST route on this group.
+func (g *RouteGroup) Post(path string, handler http.Handler) error {
+	return g.addRoute(http.MethodPost, path, handler)
+}
+
+// Put registers a PUT route on this group.
+func (g *RouteGroup) Put(path string, handler http.Handler) error {
+	return g.addRoute(http.MethodPut, path, handler)
+}
+
+// Delete registers a DELETE route on this group.
+func (g *RouteGroup) Delete(path string, handler http.Handler) error {
+	return g.addRoute(http.MethodDelete, path, handler)
+}
+
+// Patch registers a PATCH route on this group.
+func (g *RouteGroup) Patch(path string, handler http.Handler) error {
+	return g.addRoute(http.MethodPatch, path, handler)
+}
+
+// AddRoute registers a route with an explicit method and optional route metadata.
+func (g *RouteGroup) AddRoute(method, path string, handler http.Handler, opts ...router.RouteOption) error {
+	return g.addRoute(method, path, handler, opts...)
+}
+
+// addRoute is the single implementation for RouteGroup route registration.
+// It mirrors the preparation-state and nil-handler validation from App.registerRoute
+// while directing registrations into the group's prefixed router rather than the
+// App's root router.
+func (g *RouteGroup) addRoute(method, path string, handler http.Handler, opts ...router.RouteOption) error {
+	params := map[string]any{"method": method, "path": path}
+
+	g.app.mu.Lock()
+	defer g.app.mu.Unlock()
+
+	if g.app.preparationState != PreparationStateMutable {
+		return immutableAppError(operationAddRoute, "register route", params)
+	}
+	if handler == nil {
+		return wrapCoreError(contract.ErrHandlerNil, operationAddRoute, params)
+	}
+	return g.r.AddRoute(method, path, handler, opts...)
+}

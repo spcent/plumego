@@ -364,14 +364,44 @@ func TestGetCaseTimelineSuccess(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
 	}
-	var envelope testResponseEnvelope[struct {
-		TaskID string `json:"task_id"`
-	}]
+	var envelope testResponseEnvelope[workerapp.CaseTimelineResult]
 	if err := json.Unmarshal(rec.Body.Bytes(), &envelope); err != nil {
 		t.Fatalf("unmarshal response: %v", err)
 	}
 	if envelope.Data.TaskID != "case-1" {
 		t.Fatalf("task_id = %#v, want case-1", envelope.Data.TaskID)
+	}
+}
+
+func TestGetTaskOmitsEmptyCurrentStep(t *testing.T) {
+	h := New(stubService{getTaskFn: func(ctx context.Context, taskID domain.TaskID) (workerapp.TaskDetail, error) {
+		if taskID != "task-1" {
+			t.Fatalf("task_id = %q, want task-1", taskID)
+		}
+		return workerapp.TaskDetail{
+			TaskID:     "task-1",
+			WorkerID:   "worker-1",
+			ExecPlanID: "plan-1",
+			TaskType:   "simulation",
+			Phase:      "running",
+			PhaseName:  "running",
+			Status:     "active",
+		}, nil
+	}})
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/tasks/task-1", nil)
+	req = req.WithContext(contract.WithRequestContext(req.Context(), contract.RequestContext{
+		Params: map[string]string{"task_id": "task-1"},
+	}))
+	rec := httptest.NewRecorder()
+
+	h.GetTask(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+	if bytes.Contains(rec.Body.Bytes(), []byte(`"current_step"`)) {
+		t.Fatalf("response should omit empty current_step: %s", rec.Body.String())
 	}
 }
 

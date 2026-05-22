@@ -38,17 +38,26 @@ func Defaults() Config {
 
 // Load reads configuration from environment variables and flags.
 func Load() (Config, error) {
+	return load(os.Args, os.LookupEnv)
+}
+
+func load(args []string, lookupEnv func(string) (string, bool)) (Config, error) {
 	cfg := Defaults()
+	if lookupEnv == nil {
+		lookupEnv = os.LookupEnv
+	}
 
-	cfg.App.EnvFile = resolveEnvFile(os.Args, cfg.App.EnvFile)
-	if err := loadEnvFile(cfg.App.EnvFile); err != nil {
+	cfg.App.EnvFile = resolveEnvFile(args, lookupEnv, cfg.App.EnvFile)
+	fileEnv, err := readEnvFile(cfg.App.EnvFile)
+	if err != nil {
 		return cfg, err
 	}
 
-	if err := applyEnv(&cfg); err != nil {
+	applyEnvMap(&cfg, fileEnv)
+	applyEnv(&cfg, lookupEnv)
+	if err := applyFlags(&cfg, args); err != nil {
 		return cfg, err
 	}
-	applyFlags(&cfg)
 
 	return cfg, Validate(cfg)
 }
@@ -61,22 +70,75 @@ func Validate(cfg Config) error {
 	return nil
 }
 
-func applyEnv(cfg *Config) error {
-	cfg.Core.Addr = envString("APP_ADDR", cfg.Core.Addr)
-	cfg.App.EnvFile = envString("APP_ENV_FILE", cfg.App.EnvFile)
-	cfg.App.Debug = envBool("APP_DEBUG", cfg.App.Debug)
-	return nil
+func applyEnv(cfg *Config, lookupEnv func(string) (string, bool)) {
+	cfg.Core.Addr = envString(lookupEnv, "APP_ADDR", cfg.Core.Addr)
+	cfg.App.EnvFile = envString(lookupEnv, "APP_ENV_FILE", cfg.App.EnvFile)
+	cfg.App.Debug = envBool(lookupEnv, "APP_DEBUG", cfg.App.Debug)
 }
 
-func applyFlags(cfg *Config) {
-	flag.StringVar(&cfg.Core.Addr, "addr", cfg.Core.Addr, "listen address")
-	flag.StringVar(&cfg.App.EnvFile, "env-file", cfg.App.EnvFile, "path to .env file")
-	flag.BoolVar(&cfg.App.Debug, "debug", cfg.App.Debug, "enable debug mode")
-	flag.Parse()
+func applyEnvMap(cfg *Config, values map[string]string) {
+	if values == nil {
+		return
+	}
+	if value := strings.TrimSpace(values["APP_ADDR"]); value != "" {
+		cfg.Core.Addr = value
+	}
+	if value := strings.TrimSpace(values["APP_ENV_FILE"]); value != "" {
+		cfg.App.EnvFile = value
+	}
+	if value := strings.TrimSpace(values["APP_DEBUG"]); value != "" {
+		if parsed, err := strconv.ParseBool(value); err == nil {
+			cfg.App.Debug = parsed
+		}
+	}
 }
 
-func resolveEnvFile(args []string, defaultPath string) string {
-	if envPath := strings.TrimSpace(os.Getenv("APP_ENV_FILE")); envPath != "" {
+func applyFlags(cfg *Config, args []string) error {
+	fs := flag.NewFlagSet("with-messaging", flag.ContinueOnError)
+	fs.StringVar(&cfg.Core.Addr, "addr", cfg.Core.Addr, "listen address")
+	fs.StringVar(&cfg.App.EnvFile, "env-file", cfg.App.EnvFile, "path to .env file")
+	fs.BoolVar(&cfg.App.Debug, "debug", cfg.App.Debug, "enable debug mode")
+	if len(args) == 0 {
+		return fs.Parse(nil)
+	}
+	return fs.Parse(configFlagArgs(args[1:]))
+}
+
+func configFlagArgs(args []string) []string {
+	out := make([]string, 0, len(args))
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		name, hasValue := flagName(arg)
+		switch name {
+		case "addr", "env-file":
+			out = append(out, arg)
+			if !hasValue && i+1 < len(args) {
+				i++
+				out = append(out, args[i])
+			}
+		case "debug":
+			out = append(out, arg)
+		}
+	}
+	return out
+}
+
+func flagName(arg string) (name string, hasValue bool) {
+	if strings.HasPrefix(arg, "--") {
+		arg = strings.TrimPrefix(arg, "--")
+	} else if strings.HasPrefix(arg, "-") {
+		arg = strings.TrimPrefix(arg, "-")
+	} else {
+		return "", false
+	}
+	if idx := strings.IndexByte(arg, '='); idx >= 0 {
+		return arg[:idx], true
+	}
+	return arg, false
+}
+
+func resolveEnvFile(args []string, lookupEnv func(string) (string, bool), defaultPath string) string {
+	if envPath, ok := lookupEnv("APP_ENV_FILE"); ok && strings.TrimSpace(envPath) != "" {
 		defaultPath = envPath
 	}
 	for i := 0; i < len(args); i++ {
@@ -96,19 +158,20 @@ func resolveEnvFile(args []string, defaultPath string) string {
 	return defaultPath
 }
 
-func loadEnvFile(path string) error {
+func readEnvFile(path string) (map[string]string, error) {
 	if path == "" {
-		return nil
-	}
-	if _, err := os.Stat(path); err != nil {
-		return nil
+		return nil, nil
 	}
 	file, err := os.Open(path)
 	if err != nil {
-		return err
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, err
 	}
 	defer file.Close()
 
+	values := make(map[string]string)
 	scanner := bufio.NewScanner(file)
 	scanner.Buffer(make([]byte, 64*1024), 1024*1024)
 	for scanner.Scan() {
@@ -116,26 +179,28 @@ func loadEnvFile(path string) error {
 		if !ok {
 			continue
 		}
-		if err := os.Setenv(key, value); err != nil {
-			return err
-		}
+		values[key] = value
 	}
-	return scanner.Err()
+	return values, scanner.Err()
 }
 
-func envString(key, fallback string) string {
-	if value := os.Getenv(key); value != "" {
+func envString(lookupEnv func(string) (string, bool), key, fallback string) string {
+	if value, ok := lookupEnv(key); ok && value != "" {
 		return value
 	}
 	return fallback
 }
 
-func envBool(key string, fallback bool) bool {
-	value, err := strconv.ParseBool(os.Getenv(key))
+func envBool(lookupEnv func(string) (string, bool), key string, fallback bool) bool {
+	value, ok := lookupEnv(key)
+	if !ok {
+		return fallback
+	}
+	parsed, err := strconv.ParseBool(value)
 	if err != nil {
 		return fallback
 	}
-	return value
+	return parsed
 }
 
 func parseEnvLine(line string) (key, value string, ok bool) {

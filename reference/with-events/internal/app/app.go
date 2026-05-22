@@ -3,7 +3,9 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"net/http"
 
 	"github.com/spcent/plumego/core"
 	plumelog "github.com/spcent/plumego/log"
@@ -77,6 +79,8 @@ func New(cfg config.Config, deps Deps) (*App, error) {
 }
 
 // Start prepares the runtime and blocks while the HTTP server runs.
+// ctx should be a signal-aware context created in main; cancelling it
+// triggers graceful shutdown of the HTTP server and messaging service.
 func (a *App) Start(ctx context.Context) error {
 	if a.Messaging != nil {
 		if err := a.Messaging.Start(ctx); err != nil {
@@ -98,10 +102,11 @@ func (a *App) Start(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("get server: %w", err)
 	}
-	defer func() {
-		_ = a.Core.Shutdown(ctx)
+	go func() {
+		<-ctx.Done()
+		_ = a.Core.Shutdown(context.Background())
 	}()
-	if err := srv.ListenAndServe(); err != nil {
+	if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		return fmt.Errorf("server stopped: %w", err)
 	}
 	return nil

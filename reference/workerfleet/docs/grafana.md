@@ -2,7 +2,12 @@
 
 This dashboard assumes Prometheus scrapes `GET /metrics` from the workerfleet service and stores seven days of workerfleet metrics. The workerfleet metrics are app-local and intentionally avoid worker IDs, task IDs, case IDs, and pod names as default labels.
 
-The pod/worker/exec-plan/case/step metric phase is implemented in the workerfleet exporter. See [Case And Step Metrics Design](./case-step-metrics.md) for the full rationale; the implementation intentionally allows `pod` on selected metrics for pod-level throughput and duration panels while keeping `case_id` and `task_id` out of Prometheus.
+The primary dashboard and alert examples use the stabilized workerfleet metric catalog. Experimental pod, exec-plan, case-step, and drilldown panels are called out separately and should not be treated as long-term alert-rule contracts yet.
+
+Metric semantics:
+
+- snapshot-derived gauges represent current state such as worker status and active cases; optional experimental gauges add pod-level heartbeat age and stuck-step signals.
+- event-derived counters and histograms represent throughput and duration, so Grafana rate and histogram panels should be read as domain-event streams rather than snapshot diffs.
 
 Recommended template variables:
 
@@ -121,37 +126,6 @@ and
 sum(rate(workerfleet_case_finished_total[10m])) == 0
 ```
 
-Pod throughput panels:
-
-- Per-pod successful cases per hour.
-- Per-pod failed cases per hour.
-- Per-pod success rate.
-- Failure class distribution by node and pod.
-
-PromQL:
-
-```promql
-sum by (node, pod) (
-  increase(workerfleet_case_completed_total{result="succeeded"}[1h])
-)
-```
-
-```promql
-sum by (node, pod) (
-  increase(workerfleet_case_completed_total{result="failed"}[1h])
-)
-```
-
-```promql
-sum by (node, pod) (
-  increase(workerfleet_case_completed_total{result="succeeded"}[1h])
-)
-/
-sum by (node, pod) (
-  increase(workerfleet_case_completed_total[1h])
-)
-```
-
 ## Phase Latency
 
 Panels:
@@ -194,11 +168,15 @@ Recommended alerting:
 - warn when phase p95 exceeds the stage timeout used by workerfleet status policy.
 - fire when a task phase latency panel shows sustained p99 growth together with degraded workers.
 
-## Case And Step Duration
+## Experimental Drilldown Panels
+
+The following panels depend on experimental metric families. They are useful for diagnosis, but should not be treated as stable dashboard or alert-rule contracts until the metric catalog promotes them.
 
 Panels:
 
-- Case total duration p50/p95/p99 by node.
+- Per-pod successful cases per hour.
+- Per-pod failed cases per hour.
+- Per-pod success rate.
 - Case total duration p50/p95/p99 by pod.
 - Step duration p50/p95/p99 by step.
 - Step duration p95 by node and pod.

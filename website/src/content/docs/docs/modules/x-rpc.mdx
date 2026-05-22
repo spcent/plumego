@@ -1,0 +1,76 @@
+---
+title: x/rpc Primer
+description: Read this when the change is about hosting or consuming an RPC service (gRPC, Connect-Go, Twirp) alongside standard HTTP routes in a Plumego application.
+translationKey: modules-x-rpc
+sidebar:
+  order: 25
+---
+
+# x/rpc Primer
+
+> **Experimental** — API compatibility is not frozen. Evaluate before adopting in production. Check [Release Posture](/docs/release-posture) for current maturity status.
+
+Open this page after [x/* Family](/docs/x-family) when the change involves wrapping an RPC server lifecycle, pooling client connections, or mounting a caller-owned RPC HTTP handler on a Plumego route group.
+
+`x/rpc` keeps its dependency surface clean: concrete runtimes (gRPC, Connect-Go, Twirp) and generated stubs live in application code or out-of-tree adapters. `x/rpc` provides only lifecycle helpers (`x/rpc/server`), a target-keyed connection pool (`x/rpc/client`), and an HTTP transcoder that bridges caller-owned RPC handlers to standard `net/http` (`x/rpc/gateway`).
+
+## Start here when
+
+- you are wrapping a caller-owned RPC runtime in Plumego's graceful shutdown lifecycle (`x/rpc/server`)
+- you need structured connection reuse across an outbound RPC service (`x/rpc/client`)
+- you are composing logging, retry, or tracing interceptors for outbound RPC calls
+- you need to mount gRPC-Web, Connect-Go, or another HTTP-over-RPC handler alongside REST endpoints (`x/rpc/gateway`)
+
+## Do not start here when
+
+- service discovery for RPC backends is the goal — start from `x/gateway/discovery`
+- routing or proxying RPC traffic across services — start from `x/gateway`
+- runtime-level gRPC configuration (TLS, keepalive, codecs) belongs in your application code, not in `x/rpc`
+- importing a concrete RPC runtime package into `x/rpc` itself — keep concrete runtimes in application code
+
+## First files to read
+
+1. `x/rpc/server/` — `server.Runtime` interface and lifecycle wrapper
+2. `x/rpc/client/` — `client.Pool` and transport-neutral interceptors
+3. `x/rpc/gateway/` — `gateway.HTTPTranscoder` and route registration
+4. `reference/with-rpc/README.md` — canonical in-process wiring example
+
+## Concrete ownership examples
+
+| Keep it in `x/rpc` when the work is about | Move out when the work becomes |
+| --- | --- |
+| `server`: wrapping any runtime that satisfies `server.Runtime` | importing a concrete gRPC runtime into `x/rpc` — keep that in application code |
+| `client.Pool`: target-keyed connection reuse | feature-specific dial configuration — keep in your service's constructor |
+| interceptors: logging, retry, tracing for outbound calls | business-level error mapping or circuit breaking — use `x/resilience` |
+| `gateway.HTTPTranscoder`: adapting RPC HTTP handlers to `net/http` | protocol translation or body transformation — that is the caller-owned handler's responsibility |
+
+## Lifecycle wiring shape
+
+`x/rpc/server` wraps a caller-owned runtime and shares the graceful-shutdown contract with `core.App`:
+
+```go
+// reference/with-rpc (abbreviated)
+srv := rpcsrv.New(grpcServer)
+srv.RegisterService(&MyService_ServiceDesc, &myImpl{})
+
+lis, _ := net.Listen("tcp", ":9090")
+go srv.Serve(lis)
+
+// At shutdown — shares deadline with app.Shutdown().
+shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+defer cancel()
+srv.GracefulStop(shutdownCtx)
+```
+
+`GracefulStop` waits for in-flight RPCs to finish. If the context deadline passes first, it calls `Stop()` to force-close. Run `cd reference/with-rpc && go run .` to see a working in-process example.
+
+## Why this primer exists
+
+Mounting an RPC service on a Plumego app has two distinct problems: lifecycle coupling (the gRPC server must share graceful shutdown with `core.App`) and transport bridging (HTTP-over-RPC handlers must be mountable as ordinary `http.Handler` values). Splitting these into `x/rpc/server` and `x/rpc/gateway` keeps both surfaces minimal and independently testable. The client pool prevents unconstrained connection growth when one service calls many others.
+
+## Read next
+
+- [x/* Family](/docs/x-family)
+- [x/gateway Primer](/docs/modules/x-gateway)
+- [x/resilience Primer](/docs/modules/x-resilience)
+- [Reference App](/docs/reference-app)

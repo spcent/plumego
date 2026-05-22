@@ -70,17 +70,11 @@ Each item is a conscious decision, not a default assumption.
 
 ## Lifecycle
 
-- [ ] **Graceful shutdown** handles in-flight requests.
-  `app.Start` defers `app.Core.Shutdown`. Verify that the shutdown timeout is
-  long enough for the slowest expected request in your environment.
-
-- [ ] **Signal handling** is wired at the process boundary.
-  For production, replace the bare `context.Background()` in `app.Start` with a
-  context that responds to `SIGTERM` and `SIGINT`:
-  ```go
-  ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-  defer stop()
-  ```
+- [ ] **Graceful shutdown with signal handling** is wired.
+  `main.run` creates a `signal.NotifyContext(SIGTERM, SIGINT)` and passes it to
+  `app.Start(ctx)`, which triggers `app.Core.Shutdown` when the context is
+  canceled. Verify that the shutdown timeout is long enough for the slowest
+  expected request in your environment.
 
 - [ ] **Configuration is loaded from the environment**, not from checked-in files.
   `.env` files are for local development only. Production environments should

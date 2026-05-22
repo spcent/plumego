@@ -4,7 +4,9 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"net/http"
 
 	"github.com/spcent/plumego/core"
 	plumelog "github.com/spcent/plumego/log"
@@ -52,9 +54,11 @@ func New(cfg config.Config) (*App, error) {
 }
 
 // Start prepares the runtime and blocks while the HTTP server runs.
-func (a *App) Start() error {
-	ctx := context.Background()
-
+// Shutdown is driven by ctx so the application owner controls process signals.
+func (a *App) Start(ctx context.Context) error {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	if err := a.Core.Prepare(); err != nil {
 		return fmt.Errorf("prepare server: %w", err)
 	}
@@ -62,18 +66,27 @@ func (a *App) Start() error {
 	if err != nil {
 		return fmt.Errorf("get server: %w", err)
 	}
-	defer func() {
-		_ = a.Core.Shutdown(ctx)
+	shutdownErr := make(chan error, 1)
+	go func() {
+		<-ctx.Done()
+		shutdownErr <- a.Core.Shutdown(context.Background())
 	}()
 
+	var serveErr error
 	if a.Cfg.Core.TLS.Enabled {
-		if err := srv.ListenAndServeTLS("", ""); err != nil {
-			return fmt.Errorf("server stopped: %w", err)
-		}
-		return nil
+		serveErr = srv.ListenAndServeTLS("", "")
+	} else {
+		serveErr = srv.ListenAndServe()
 	}
-	if err := srv.ListenAndServe(); err != nil {
-		return fmt.Errorf("server stopped: %w", err)
+	if serveErr != nil && !errors.Is(serveErr, http.ErrServerClosed) {
+		return fmt.Errorf("server stopped: %w", serveErr)
+	}
+	select {
+	case err := <-shutdownErr:
+		if err != nil {
+			return fmt.Errorf("shutdown server: %w", err)
+		}
+	default:
 	}
 	return nil
 }

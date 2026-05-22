@@ -7,12 +7,16 @@ Read by intent instead of scanning everything.
 ## Start Here
 
 - `getting-started.md` — smallest runnable example and the canonical next reads
+- `getting-started_CN.md` — 中文入门指南（Chinese onboarding guide）
 - `ADOPTION_PATH.md` — narrow 5-minute, 30-minute, and 1-day adoption path
 - `why-plumego.md` — what Plumego is for, core principles, and fit summary
 - `when-not-to-use-plumego.md` — honest cases where a different tool fits better
+- `troubleshooting.md` — common problems and fixes (routes, middleware, JWT, lifecycle)
+- `benchmarks/README.md` — performance results and methodology vs. Chi, Gin, Echo
 - `../reference/standard-service/README.md` — canonical reference app layout and route wiring
 - `CANONICAL_STYLE_GUIDE.md` — the default handler, route, middleware, and response style
-- `agent-first.md` — agent-first design rationale, mechanisms, and operating reference
+- `agent-first.md` — agent-first design rationale, mechanisms, zones, and operating reference (detailed internal guide)
+- `AGENT_FIRST.md` — external-facing overview of the four control planes (docs, specs, tasks, reference); read this to understand the design philosophy or adopt the model in another project
 - `architecture/AGENT_FIRST_REPO_BLUEPRINT.md` — repository shape, boundaries, and canonical implementation path
 - `architecture/core-boundary.md` — stable root package responsibilities and wiring patterns
 - `architecture/extension-boundary.md` — x/* taxonomy, maturity ladder, and promotion criteria
@@ -62,6 +66,7 @@ layout or promote experimental `x/*` APIs to stable status.
 
 - `CODEX_WORKFLOW.md` — milestone execution guide tied to the current `Makefile`
 - `AGENT_CODE_QUALITY_RULES.md` — agent preflight, review output, risk focus, and gate selection rules
+- `AGENT_CONTEXT_BUDGET.md` — token-bounded context packages, task-card limits, and validation output compression
 - `MILESTONE_PIPELINE.md` — artifact contract for milestone, plan, card, verify, and PR handoffs
 - `DEPRECATION.md` — compatibility and deprecation policy
 - `EXTENSION_MATURITY.md` — extension family maturity dashboard
@@ -122,7 +127,8 @@ When guidance overlaps, use this order:
 
 1. `AGENTS.md`
 2. `docs/CANONICAL_STYLE_GUIDE.md`
-3. `docs/AGENT_CODE_QUALITY_RULES.md`
-4. `specs/*`
-5. the touched module's `module.yaml`
-6. existing local patterns in touched files
+3. `docs/AGENT_CONTEXT_BUDGET.md` for context package selection
+4. `docs/AGENT_CODE_QUALITY_RULES.md`
+5. `specs/*`
+6. the touched module's `module.yaml`
+7. existing local patterns in touched files

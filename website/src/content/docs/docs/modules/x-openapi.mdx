@@ -1,0 +1,99 @@
+---
+title: x/openapi Primer
+description: Read this when the change is about generating OpenAPI 3.1 documents from registered Plumego routes or adding operation hints to the generated spec.
+translationKey: modules-x-openapi
+sidebar:
+  order: 26
+---
+
+# x/openapi Primer
+
+> **Experimental** — API compatibility is not frozen. Evaluate before adopting in production. Check [Release Posture](/docs/release-posture) for current maturity status.
+
+Open this page after [x/* Family](/docs/x-family) when the change involves generating an OpenAPI 3.1 spec from `router.RouteInfo` values, annotating operations with hints, or serialising the result to JSON or YAML without external dependencies.
+
+`x/openapi` generates document structures from explicit route metadata — it does not inspect handler functions via reflection and depends only on the standard library. The CLI integration lives in `cmd/plumego/commands/spec.go`; `x/openapi` owns only the document model and generator.
+
+## Start here when
+
+- you are running `plumego generate spec` and need to understand what it generates or why a route is missing
+- you are annotating operations with a `plumego.spec.yaml` hints file
+- you are calling `openapi.New().Generate(routes, hints)` directly from Go code
+- you need JSON or YAML output from a collection of `router.RouteInfo` values without pulling in an external library
+
+## Do not start here when
+
+- adding a Swagger UI endpoint at runtime — that is application code, not `x/openapi`
+- schema validation or OpenAPI document linting — use an external tool
+- the change requires parsing YAML input — `x/openapi` emits YAML but does not parse it
+- the CLI command itself (`cmd/plumego/commands/spec.go`) is what needs to change, not the document model
+
+## First files to read
+
+1. `x/openapi/` — `Document`, `Generator`, schema helpers, and serializers
+2. `cmd/plumego/commands/spec.go` — CLI integration for `plumego generate spec`
+3. `reference/standard-service` — canonical route registration used as generation input
+
+## Concrete ownership examples
+
+| Keep it in `x/openapi` when the work is about | Move out when the work becomes |
+| --- | --- |
+| `Generator.Generate`: mapping `router.RouteInfo` to `Document` | schema inference from handler function signatures via reflection |
+| `Op` hints: merging caller-supplied operation metadata | YAML parsing of `plumego.spec.yaml` — that belongs in the CLI command |
+| `MarshalJSON` / `MarshalYAML`: serialisation without external deps | validating the generated document against the OpenAPI 3.1 JSON Schema — use an external tool |
+| `PathParam`, `QueryParam`, `HeaderParam` helpers | full JSON Schema generation from Go struct tags |
+
+## Quick start
+
+```bash
+# Generate from a project using the standard-service layout
+plumego generate spec --format json --output openapi.json
+plumego generate spec --format yaml --output openapi.yaml
+```
+
+Annotate individual routes in `plumego.spec.yaml` at the project root:
+
+```yaml
+info:
+  title: My API
+  version: 1.0.0
+
+operations:
+  "GET /users/:id":
+    summary: Get a user by ID
+    tags: [users]
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    responses:
+      "200":
+        description: User found
+      "404":
+        description: User not found
+```
+
+Routes without a hint entry receive a default `"200"` response. Hint keys are either the route's registered name or `"METHOD /path"`.
+
+## Path template conversion
+
+Router paths using `:param` notation are converted to OpenAPI `{param}` templates automatically:
+
+| Router path | OpenAPI path |
+| --- | --- |
+| `/users/:id` | `/users/{id}` |
+| `/files/*path` | `/files/{path}` |
+| `/api/v1/users/:id/posts/:postId` | `/api/v1/users/{id}/posts/{postId}` |
+
+## Why this primer exists
+
+Most OpenAPI generation tools require struct tags, reflection over handler parameters, or a heavy code-generation pipeline. `x/openapi` takes a different approach: it reads the `router.RouteInfo` values the router already produces and merges them with explicit hints. This keeps generated docs honest about what the router actually registers, without coupling the document model to handler implementation details.
+
+## Read next
+
+- [x/* Family](/docs/x-family)
+- [Router Primer](/docs/modules/router)
+- [Reference App](/docs/reference-app)
+- [Repository Control Plane](/docs/concepts/repo-control-plane)

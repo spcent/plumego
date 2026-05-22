@@ -1,10 +1,14 @@
 package app
 
 import (
+	"context"
 	"errors"
 	"time"
 
 	"workerfleet/internal/domain"
+	workerfleetmetrics "workerfleet/internal/platform/metrics"
+	"workerfleet/internal/platform/notifier"
+	platformstore "workerfleet/internal/platform/store"
 )
 
 var (
@@ -12,6 +16,95 @@ var (
 	ErrNotImplemented = errors.New("workerfleet operation not implemented")
 	ErrConflict       = errors.New("workerfleet conflict")
 )
+
+type Runtime struct {
+	Service *Service
+	Metrics *workerfleetmetrics.Collector
+	Close   func(context.Context) error
+	Ready   func(context.Context) error
+	shell   runtimeShell
+}
+
+type runtimeShell struct {
+	ingest *domain.IngestService
+	query  *Service
+	loops  *LoopRunner
+	alerts *AlertRunner
+}
+
+type RuntimeErrorObserver interface {
+	ObserveRuntimeError(operation string, err error)
+}
+
+type runtimeStore interface {
+	platformstore.QueryStore
+	platformstore.NotificationOutboxStore
+	platformstore.WorkerEventStore
+	domain.SnapshotStore
+	domain.TaskHistoryStore
+	domain.WorkerEventStore
+}
+
+type LoopRunner struct {
+	store             runtimeStore
+	policy            domain.StatusPolicy
+	metrics           *workerfleetmetrics.Observer
+	errors            RuntimeErrorObserver
+	lease             LoopLeaseCoordinator
+	inventorySyncerFn func(Config) (inventorySyncer, error)
+}
+
+type AlertRunner struct {
+	store         runtimeStore
+	policy        domain.StatusPolicy
+	alertPolicy   domain.AlertPolicy
+	metrics       *workerfleetmetrics.Observer
+	errors        RuntimeErrorObserver
+	lease         LoopLeaseCoordinator
+	dispatcherFn  func(Config) alertDispatcher
+	engineFactory func() domainAlertEngine
+}
+
+type loopExecutionSettings struct {
+	Name              string
+	Interval          time.Duration
+	Timeout           time.Duration
+	FailureBackoff    time.Duration
+	MaxFailureBackoff time.Duration
+	Lease             LoopLeaseCoordinator
+}
+
+type loopExecutionResult struct {
+	err      error
+	timedOut bool
+}
+
+type LoopLeaseCoordinator interface {
+	TryAcquire(ctx context.Context, loopName string) (release func(), acquired bool, err error)
+}
+
+type nopLoopLease struct{}
+
+func (nopLoopLease) TryAcquire(context.Context, string) (func(), bool, error) {
+	return nil, true, nil
+}
+
+type inventorySyncer interface {
+	SyncOnce(ctx context.Context) (resourceVersion string, err error)
+}
+
+type inventoryWatcher interface {
+	SyncWatch(ctx context.Context) (resourceVersion string, err error)
+}
+
+type alertDispatcher interface {
+	Notify(ctx context.Context, alert domain.AlertRecord) error
+	Bindings() []notifier.SinkBinding
+}
+
+type domainAlertEngine interface {
+	Evaluate(ctx context.Context) ([]domain.AlertRecord, error)
+}
 
 type RegisterWorkerInput struct {
 	Identity   domain.WorkerIdentity
@@ -42,44 +135,44 @@ type HeartbeatWorkerResult struct {
 }
 
 type TaskView struct {
-	TaskID      string
-	ExecPlanID  string
-	TaskType    string
-	Phase       string
-	PhaseName   string
-	CurrentStep *StepView
-	StartedAt   time.Time
-	UpdatedAt   time.Time
-	Metadata    map[string]string
+	TaskID      string            `json:"task_id"`
+	ExecPlanID  string            `json:"exec_plan_id,omitempty"`
+	TaskType    string            `json:"task_type,omitempty"`
+	Phase       string            `json:"phase,omitempty"`
+	PhaseName   string            `json:"phase_name,omitempty"`
+	CurrentStep *StepView         `json:"current_step,omitempty"`
+	StartedAt   time.Time         `json:"started_at,omitempty"`
+	UpdatedAt   time.Time         `json:"updated_at,omitempty"`
+	Metadata    map[string]string `json:"metadata,omitempty"`
 }
 
 type StepView struct {
-	Step       string
-	StepName   string
-	Status     domain.CaseStepStatus
-	StartedAt  time.Time
-	UpdatedAt  time.Time
-	FinishedAt time.Time
-	Attempt    int
-	ErrorClass string
+	Step       string                `json:"step,omitempty"`
+	StepName   string                `json:"step_name,omitempty"`
+	Status     domain.CaseStepStatus `json:"status,omitempty"`
+	StartedAt  time.Time             `json:"started_at,omitempty"`
+	UpdatedAt  time.Time             `json:"updated_at,omitempty"`
+	FinishedAt time.Time             `json:"finished_at,omitempty"`
+	Attempt    int                   `json:"attempt,omitempty"`
+	ErrorClass string                `json:"error_class,omitempty"`
 }
 
 type WorkerView struct {
-	WorkerID        string
-	Namespace       string
-	PodName         string
-	NodeName        string
-	ContainerName   string
-	Image           string
-	Version         string
-	Status          string
-	StatusReason    string
-	ProcessAlive    bool
-	AcceptingTasks  bool
-	LastSeenAt      time.Time
-	LastReadyAt     time.Time
-	ActiveTaskCount int
-	ActiveTasks     []TaskView
+	WorkerID        string     `json:"worker_id"`
+	Namespace       string     `json:"namespace,omitempty"`
+	PodName         string     `json:"pod_name,omitempty"`
+	NodeName        string     `json:"node_name,omitempty"`
+	ContainerName   string     `json:"container_name,omitempty"`
+	Image           string     `json:"image,omitempty"`
+	Version         string     `json:"version,omitempty"`
+	Status          string     `json:"status"`
+	StatusReason    string     `json:"status_reason,omitempty"`
+	ProcessAlive    bool       `json:"process_alive"`
+	AcceptingTasks  bool       `json:"accepting_tasks"`
+	LastSeenAt      time.Time  `json:"last_seen_at,omitempty"`
+	LastReadyAt     time.Time  `json:"last_ready_at,omitempty"`
+	ActiveTaskCount int        `json:"active_task_count"`
+	ActiveTasks     []TaskView `json:"active_tasks,omitempty"`
 }
 
 type WorkerDetail = WorkerView
@@ -95,49 +188,49 @@ type WorkerListQuery struct {
 }
 
 type WorkerListResult struct {
-	Items    []WorkerView
-	Page     int
-	PageSize int
-	Total    int
+	Items    []WorkerView `json:"items"`
+	Page     int          `json:"page"`
+	PageSize int          `json:"page_size"`
+	Total    int          `json:"total"`
 }
 
 type TaskDetail struct {
-	TaskID      string
-	WorkerID    string
-	ExecPlanID  string
-	TaskType    string
-	Phase       string
-	PhaseName   string
-	CurrentStep *StepView
-	Status      string
-	StartedAt   time.Time
-	UpdatedAt   time.Time
-	EndedAt     time.Time
-	Metadata    map[string]string
+	TaskID      string            `json:"task_id"`
+	WorkerID    string            `json:"worker_id,omitempty"`
+	ExecPlanID  string            `json:"exec_plan_id,omitempty"`
+	TaskType    string            `json:"task_type,omitempty"`
+	Phase       string            `json:"phase,omitempty"`
+	PhaseName   string            `json:"phase_name,omitempty"`
+	CurrentStep *StepView         `json:"current_step,omitempty"`
+	Status      string            `json:"status,omitempty"`
+	StartedAt   time.Time         `json:"started_at,omitempty"`
+	UpdatedAt   time.Time         `json:"updated_at,omitempty"`
+	EndedAt     time.Time         `json:"ended_at,omitempty"`
+	Metadata    map[string]string `json:"metadata,omitempty"`
 }
 
 type CaseStepView struct {
-	TaskID     string
-	WorkerID   string
-	ExecPlanID string
-	Namespace  string
-	PodName    string
-	NodeName   string
-	Step       string
-	StepName   string
-	Status     domain.CaseStepStatus
-	Result     string
-	ErrorClass string
-	Attempt    int
-	StartedAt  time.Time
-	FinishedAt time.Time
-	ObservedAt time.Time
-	EventType  domain.EventType
+	TaskID     string                `json:"task_id"`
+	WorkerID   string                `json:"worker_id,omitempty"`
+	ExecPlanID string                `json:"exec_plan_id,omitempty"`
+	Namespace  string                `json:"namespace,omitempty"`
+	PodName    string                `json:"pod_name,omitempty"`
+	NodeName   string                `json:"node_name,omitempty"`
+	Step       string                `json:"step"`
+	StepName   string                `json:"step_name,omitempty"`
+	Status     domain.CaseStepStatus `json:"status,omitempty"`
+	Result     string                `json:"result,omitempty"`
+	ErrorClass string                `json:"error_class,omitempty"`
+	Attempt    int                   `json:"attempt,omitempty"`
+	StartedAt  time.Time             `json:"started_at,omitempty"`
+	FinishedAt time.Time             `json:"finished_at,omitempty"`
+	ObservedAt time.Time             `json:"observed_at,omitempty"`
+	EventType  domain.EventType      `json:"event_type,omitempty"`
 }
 
 type CaseTimelineResult struct {
-	TaskID string
-	Items  []CaseStepView
+	TaskID string         `json:"task_id"`
+	Items  []CaseStepView `json:"items"`
 }
 
 type ExecPlanCaseDrilldownQuery struct {
@@ -150,22 +243,22 @@ type ExecPlanCaseDrilldownQuery struct {
 }
 
 type ExecPlanCaseDrilldownResult struct {
-	ExecPlanID string
-	Items      []CaseStepView
-	Page       int
-	PageSize   int
-	Total      int
+	ExecPlanID string         `json:"exec_plan_id"`
+	Items      []CaseStepView `json:"items"`
+	Page       int            `json:"page"`
+	PageSize   int            `json:"page_size"`
+	Total      int            `json:"total"`
 }
 
 type FleetSummary struct {
-	TotalWorkers     int
-	OnlineWorkers    int
-	DegradedWorkers  int
-	OfflineWorkers   int
-	UnknownWorkers   int
-	AcceptingWorkers int
-	BusyWorkers      int
-	ActiveTaskCount  int
+	TotalWorkers     int `json:"total_workers"`
+	OnlineWorkers    int `json:"online_workers"`
+	DegradedWorkers  int `json:"degraded_workers"`
+	OfflineWorkers   int `json:"offline_workers"`
+	UnknownWorkers   int `json:"unknown_workers"`
+	AcceptingWorkers int `json:"accepting_workers"`
+	BusyWorkers      int `json:"busy_workers"`
+	ActiveTaskCount  int `json:"active_task_count"`
 }
 
 type AlertListQuery struct {
@@ -177,20 +270,20 @@ type AlertListQuery struct {
 }
 
 type AlertView struct {
-	AlertID     string
-	WorkerID    string
-	TaskID      string
-	AlertType   string
-	Status      string
-	Severity    string
-	Message     string
-	TriggeredAt time.Time
-	ResolvedAt  time.Time
+	AlertID     string    `json:"alert_id"`
+	WorkerID    string    `json:"worker_id,omitempty"`
+	TaskID      string    `json:"task_id,omitempty"`
+	AlertType   string    `json:"alert_type"`
+	Status      string    `json:"status"`
+	Severity    string    `json:"severity,omitempty"`
+	Message     string    `json:"message"`
+	TriggeredAt time.Time `json:"triggered_at"`
+	ResolvedAt  time.Time `json:"resolved_at,omitempty"`
 }
 
 type AlertListResult struct {
-	Items    []AlertView
-	Page     int
-	PageSize int
-	Total    int
+	Items    []AlertView `json:"items"`
+	Page     int         `json:"page"`
+	PageSize int         `json:"page_size"`
+	Total    int         `json:"total"`
 }

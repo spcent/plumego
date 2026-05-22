@@ -89,8 +89,12 @@ func New(cfg config.Config, deps Deps) (*App, error) {
 	}, nil
 }
 
-func (a *App) Start() error {
-	ctx := context.Background()
+// Start prepares the runtime and blocks while the HTTP server runs.
+// Shutdown is driven by ctx so the application owner controls process signals.
+func (a *App) Start(ctx context.Context) error {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	if err := a.Core.Prepare(); err != nil {
 		return fmt.Errorf("prepare server: %w", err)
 	}
@@ -98,12 +102,21 @@ func (a *App) Start() error {
 	if err != nil {
 		return fmt.Errorf("get server: %w", err)
 	}
-	defer func() {
-		_ = a.Core.Shutdown(ctx)
+	shutdownErr := make(chan error, 1)
+	go func() {
+		<-ctx.Done()
+		shutdownErr <- a.Core.Shutdown(context.Background())
 	}()
 
 	if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		return fmt.Errorf("server stopped: %w", err)
+	}
+	select {
+	case err := <-shutdownErr:
+		if err != nil {
+			return fmt.Errorf("shutdown server: %w", err)
+		}
+	default:
 	}
 	return nil
 }

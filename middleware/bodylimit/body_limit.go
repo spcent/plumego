@@ -9,10 +9,10 @@ import (
 	"time"
 
 	"github.com/spcent/plumego/contract"
+	internaltransport "github.com/spcent/plumego/internal/httputil"
 	"github.com/spcent/plumego/log"
 	mw "github.com/spcent/plumego/middleware"
-	internalobs "github.com/spcent/plumego/middleware/internal/observability"
-	internaltransport "github.com/spcent/plumego/middleware/internal/transport"
+	internaltelemetry "github.com/spcent/plumego/middleware/internal/telemetry"
 )
 
 var errRequestTooLarge = errors.New("request body too large")
@@ -167,11 +167,11 @@ func (l *limitedBodyReader) failErr() error {
 		l.exceeded = true
 		l.w.writeLimitError(l.req, l.maxBytes, l.used, l.now())
 		if l.logger != nil {
-			fields := internalobs.MiddlewareLogFields(l.req, http.StatusRequestEntityTooLarge, 0)
+			fields := internaltelemetry.MiddlewareLogFields(l.req, http.StatusRequestEntityTooLarge, 0)
 			fields["max_bytes"] = l.maxBytes
 			fields["seen_bytes"] = l.used
-			internalobs.RunSafeFinalizer(func() {
-				l.logger.WithFields(log.Fields(internalobs.RedactFields(fields))).Warn("request body too large")
+			internaltelemetry.RunSafeFinalizer(func() {
+				l.logger.WithFields(log.Fields(internaltelemetry.RedactFields(fields))).Warn("request body too large")
 			})
 		}
 	}

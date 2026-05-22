@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"time"
 
+	internaltransport "github.com/spcent/plumego/internal/httputil"
 	mw "github.com/spcent/plumego/middleware"
-	internaltransport "github.com/spcent/plumego/middleware/internal/transport"
 )
 
 const defaultQueueTimeout = 100 * time.Millisecond

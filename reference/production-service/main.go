@@ -6,29 +6,41 @@
 package main
 
 import (
+	"context"
 	"log"
+	"os"
+	"os/signal"
+	"syscall"
 
 	"production-service/internal/app"
 	"production-service/internal/config"
 )
 
 func main() {
+	if err := run(); err != nil {
+		log.Printf("server stopped: %v", err)
+		os.Exit(1)
+	}
+}
+
+func run() error {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
 	cfg, err := config.Load()
 	if err != nil {
-		log.Fatalf("failed to load config: %v", err)
+		return err
 	}
 
 	a, err := app.New(cfg)
 	if err != nil {
-		log.Fatalf("failed to initialize app: %v", err)
+		return err
 	}
 
 	if err := a.RegisterRoutes(); err != nil {
-		log.Fatalf("failed to register routes: %v", err)
+		return err
 	}
 
 	log.Printf("Starting Plumego Production Reference on %s", cfg.Core.Addr)
-	if err := a.Start(); err != nil {
-		log.Fatalf("server stopped: %v", err)
-	}
+	return a.Start(ctx)
 }

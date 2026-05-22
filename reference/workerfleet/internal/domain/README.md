@@ -8,6 +8,7 @@ This package defines:
 - pod state merged from Kubernetes
 - active task state for a single worker
 - worker status evaluation rules
+- explicit status and alert policy objects
 - domain events for worker, task, and pod transitions
 - alert type constants used by later cards
 
@@ -18,3 +19,5 @@ Key rules:
 - online/offline state is not derived from heartbeat freshness alone.
 - a worker with active tasks and `accepting_tasks=false` is still online, but busy.
 - a worker with `accepting_tasks=false` and no active tasks is degraded.
+- `StatusPolicy` owns heartbeat, offline, stuck-stage, and restart thresholds for status evaluation.
+- `AlertPolicy` owns the alert-side stuck-stage and restart thresholds so alert behavior can evolve without scattering constants across rules.

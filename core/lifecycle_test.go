@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"errors"
+	"fmt"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -37,6 +38,21 @@ func requireNetwork(t *testing.T) string {
 	}
 	_ = ln.Close()
 	return addr
+}
+
+func TestNormalizeRunErrorTreatsWrappedServerClosedAsCleanShutdown(t *testing.T) {
+	err := normalizeRunError(fmt.Errorf("serve stopped: %w", http.ErrServerClosed))
+	if err != nil {
+		t.Fatalf("normalizeRunError returned %v, want nil", err)
+	}
+}
+
+func TestNormalizeRunErrorPreservesUnexpectedErrors(t *testing.T) {
+	unexpected := errors.New("listen failed")
+	err := normalizeRunError(fmt.Errorf("serve stopped: %w", unexpected))
+	if !errors.Is(err, unexpected) {
+		t.Fatalf("normalizeRunError returned %v, want error wrapping %v", err, unexpected)
+	}
 }
 
 func TestPrepareServeAndShutdown(t *testing.T) {

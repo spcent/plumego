@@ -7,7 +7,7 @@ import CautionIcon from '../../components/shared/CautionIcon.astro';
 
 const journeySteps = [
   { label: '为什么选择', href: '/zh/why-plumego' },
-  { label: '生态系统', href: '/zh/ecosystem' },
+  { label: '示例', href: '/zh/examples' },
   { label: '发布', href: '/zh/releases' },
 ];
 
@@ -78,11 +78,13 @@ const fitProfiles = [
   {
     kicker: 'best fit',
     title: '人类工程师与 AI 代码 Agent 共同维护的仓库',
-    body: 'Plumego 专为 AI Agent 参与执行和评审的代码库设计。机器可读规范、每模块 manifest、标准化检查命令和显式任务卡，让 Agent 有清晰的操作模型——让人类评审更容易的结构，同样让 Agent 的贡献可被验证。',
+    body: 'Plumego 专为 AI Agent 参与执行和评审的代码库设计。四个机器可读控制面——<code>docs/</code>、<code>specs/</code>、<code>tasks/</code> 和 <code>reference/</code>——给 Agent 提供确定性操作模型：任务如何分类、先读哪些文件、正确改动应该是什么样子、贡献落地前哪些检查必须通过。让人类评审更容易的结构，同样让 Agent 的贡献可被验证。',
     points: [
-      'specs/ 以 YAML 提供任务路由、依赖规则和改动作用域',
-      'module.yaml 在编辑开始前将改动和检查限定到所属模块',
-      'make gates 提供可重复、Agent 可执行的验证循环',
+      'specs/task-routing.yaml 在打开任何代码文件之前先将任务意图映射到归属模块',
+      'specs/change-recipes/ 为 15 种常见修改类型定义了有序步骤和止步条件',
+      '每个 module/module.yaml 声明该包的改动范围、风险等级、测试命令和评审清单',
+      'internal/checks/ 以程序化方式执行边界规则——本地运行与 CI 运行的检查完全相同',
+      'make gates 在每次推送前提供 Agent 可执行的、等同于 CI 的验证循环',
     ],
   },
 ] as const;
@@ -570,11 +572,11 @@ const frameworkRows = [
     <div class="section__intro reveal">
       <h2>下一步。</h2>
       <p>
-        适配判断已经完成。进入生态系统页选择合适的 x/* 能力家族，查看架构页了解完整分层图，或直接进入实现路径。
+        适配判断已经完成。前往架构页浏览 x/* 能力家族和完整分层图，或直接进入实现路径。
       </p>
     </div>
     <div class="page-links">
-      <a class="text-link" href="/zh/ecosystem">生态系统——浏览所有 x/* 家族 →</a>
+      <a class="text-link" href="/zh/architecture#extensions">架构——浏览所有 x/* 家族 →</a>
       <a class="text-link" href="/zh/architecture">架构——分层图与模块布局 →</a>
       <a class="text-link" href="/zh/docs/getting-started">开始使用 →</a>
     </div>
@@ -594,6 +596,16 @@ const frameworkRows = [
   @media (min-width: 860px) {
     .timeline-grid {
       grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+
+  .fit-check-board__track {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  @media (max-width: 719px) {
+    .fit-check-board__track {
+      grid-template-columns: 1fr;
     }
   }
 
@@ -732,28 +744,23 @@ const frameworkRows = [
   .migration-grid {
     display: grid;
     grid-template-columns: 1fr;
-    gap: 0.85rem;
+    gap: 1rem;
     max-width: 64rem;
     margin-inline: auto;
   }
 
   @media (min-width: 640px) {
     .migration-grid {
-      grid-template-columns: repeat(2, 1fr);
-    }
-  }
-
-  @media (min-width: 960px) {
-    .migration-grid {
-      grid-template-columns: repeat(4, 1fr);
+      grid-template-columns: repeat(2, minmax(0, 1fr));
     }
   }
 
   .migration-card {
-    display: flex;
-    align-items: flex-start;
+    display: grid;
+    grid-template-columns: auto auto minmax(0, 1fr);
+    align-items: baseline;
     gap: 0.75rem;
-    padding: 1.1rem 1.2rem;
+    padding: 1.15rem 1.2rem 1.2rem;
     background: var(--bg-elevated);
     border: 1px solid var(--line);
     border-radius: 0.65rem;
@@ -778,21 +785,16 @@ const frameworkRows = [
     border-radius: 0.25rem;
     white-space: nowrap;
     flex-shrink: 0;
-    margin-top: 0.15rem;
   }
 
   .migration-card__arrow {
     color: var(--fg-soft);
     font-size: 0.9rem;
     flex-shrink: 0;
-    margin-top: 0.1rem;
   }
 
   .migration-card__body {
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-    min-width: 0;
+    display: contents;
   }
 
   .migration-card__body strong {
@@ -803,9 +805,26 @@ const frameworkRows = [
   }
 
   .migration-card__body p {
+    grid-column: 1 / -1;
     font-size: 0.8rem;
     color: var(--fg-soft);
     margin: 0;
     line-height: 1.5;
+  }
+
+  @media (max-width: 520px) {
+    .migration-card__body strong {
+      grid-column: 1 / -1;
+    }
+  }
+
+  @media (min-width: 720px) and (max-width: 1180px) {
+    .fit-check-board {
+      grid-template-columns: 1fr;
+    }
+
+    .fit-check-board__track {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
   }
 </style>

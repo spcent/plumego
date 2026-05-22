@@ -15,7 +15,7 @@ const experimentalGroups = RELEASE_FACTS.supportMatrix.filter((entry) =>
 
 const journeySteps = [
   { label: 'Why Plumego', href: '/why-plumego' },
-  { label: 'Ecosystem', href: '/ecosystem' },
+  { label: 'Examples', href: '/examples' },
   { label: 'Releases', href: '/releases' },
 ];
 
@@ -28,7 +28,7 @@ const adoptionGuidance = [
   {
     kicker: 'evaluate with evidence',
     title: 'Beta extensions have frozen APIs between minor release refs',
-    body: 'x/rest, x/websocket, x/gateway, and x/observability are promoted to beta — meaning their exported API surface did not change across two tagged release refs. Adopt them knowing the API is frozen between refs, not unconditionally.',
+    body: 'Seven extension families are promoted to beta — x/rest, x/websocket, x/gateway, x/observability (promoted at v1.0.0) and x/tenant, x/frontend, x/messaging (promoted at v1.1.0). Their exported API surfaces did not change across two consecutive tagged refs. Adopt them knowing the API is frozen between refs, not unconditionally.',
   },
   {
     kicker: 'evaluate deliberately',
@@ -58,7 +58,7 @@ const releaseChannels = [
   {
     kicker: 'beta',
     title: 'Beta extension families',
-    body: 'x/rest, x/websocket, x/gateway, and x/observability completed the promotion checklist: two consecutive release refs, no exported API changes, release-backed snapshots, and owner sign-off.',
+    body: 'Seven families completed the promotion checklist: x/rest, x/websocket, x/gateway, x/observability (v1.0.0), and x/tenant, x/frontend, x/messaging (v1.1.0). Two consecutive release refs, no exported API changes, release-backed snapshots, and owner sign-off.',
     details: ['API frozen between minor release refs', 'promotion requires two tagged refs and snapshot comparison', 'behavior is tested; compatibility is not unconditional'],
   },
   {
@@ -125,6 +125,82 @@ function badgeClass(status: string): string {
     <p>Current version</p>
     <strong>{SITE.currentVersion}</strong>
     <a class="text-link" href={SITE.githubUrl + '/releases'} target="_blank" rel="noreferrer">GitHub Releases</a>
+  </section>
+
+  <!-- Inline changelog summary -->
+  <section class="section changelog-section">
+    <div class="section__intro">
+      <h2>What changed in v1.1.0.</h2>
+      <p>Key highlights for this release. Full diff and tagged artifacts are on <a class="text-link" href={SITE.githubUrl + '/releases'} target="_blank" rel="noreferrer">GitHub Releases</a>.</p>
+    </div>
+    <div class="changelog-list">
+      <div class="changelog-entry">
+        <span class="changelog-entry__tag changelog-entry__tag--beta">beta</span>
+        <div>
+          <p class="changelog-entry__title">3 more extension families promoted to beta</p>
+          <p class="changelog-entry__body"><code>x/tenant</code>, <code>x/frontend</code>, and <code>x/messaging</code> (app-facing service layer) completed two consecutive tagged refs (<code>v1.0.0</code>, <code>v1.1.0</code>) with no exported API changes, release-backed snapshots, and owner sign-off. Subordinate messaging primitives remain experimental.</p>
+        </div>
+      </div>
+      <div class="changelog-entry">
+        <span class="changelog-entry__tag changelog-entry__tag--beta">beta surface</span>
+        <div>
+          <p class="changelog-entry__title">Selected x/ai and x/data subpackages confirmed as beta surfaces</p>
+          <p class="changelog-entry__body"><code>x/ai/provider</code>, <code>x/ai/session</code>, <code>x/ai/streaming</code>, <code>x/ai/tool</code>, <code>x/data/file</code>, and <code>x/data/idempotency</code> have two release refs, API snapshots, and owner sign-off. Parent families remain experimental.</p>
+        </div>
+      </div>
+      <div class="changelog-entry">
+        <span class="changelog-entry__tag changelog-entry__tag--new">agent</span>
+        <div>
+          <p class="changelog-entry__title">Agent workflow improvements</p>
+          <p class="changelog-entry__body">Route, diff-validation, task-bundle, recipe, and manifest guidance expanded so AI coding assistants find landing zones and validation paths more deterministically. <code>internal/checks/cross-extension-deps</code> validates forbidden imports against actual Go imports.</p>
+        </div>
+      </div>
+      <div class="changelog-entry">
+        <span class="changelog-entry__tag changelog-entry__tag--new">docs</span>
+        <div>
+          <p class="changelog-entry__title">Website and bilingual docs synchronized</p>
+          <p class="changelog-entry__body">Release posture, status, architecture, migration, benchmark, and bilingual docs pages were synchronized and rebuilt. All 77 docs pages available in both English and Chinese.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- v1.0.0 history -->
+  <section class="section changelog-section">
+    <div class="section__intro">
+      <h2>What changed in v1.0.0.</h2>
+      <p>The initial stable release on May 15, 2026. Full evidence in <a class="text-link" href={SITE.githubUrl + '/blob/main/docs/release/v1.0.0.md'} target="_blank" rel="noreferrer">docs/release/v1.0.0.md</a>.</p>
+    </div>
+    <div class="changelog-list">
+      <div class="changelog-entry">
+        <span class="changelog-entry__tag changelog-entry__tag--stable">stable</span>
+        <div>
+          <p class="changelog-entry__title">9 stable roots reach v1 compatibility promise</p>
+          <p class="changelog-entry__body"><code>core</code>, <code>router</code>, <code>contract</code>, <code>middleware</code>, <code>security</code>, <code>store</code>, <code>health</code>, <code>log</code>, <code>metrics</code> — public API surface frozen. Breaking changes require a major version.</p>
+        </div>
+      </div>
+      <div class="changelog-entry">
+        <span class="changelog-entry__tag changelog-entry__tag--beta">beta</span>
+        <div>
+          <p class="changelog-entry__title">4 extension families promoted to beta</p>
+          <p class="changelog-entry__body"><code>x/gateway</code>, <code>x/observability</code>, <code>x/rest</code>, <code>x/websocket</code> completed two consecutive tagged refs with no exported API changes and owner sign-off.</p>
+        </div>
+      </div>
+      <div class="changelog-entry">
+        <span class="changelog-entry__tag changelog-entry__tag--perf">perf</span>
+        <div>
+          <p class="changelog-entry__title">Router now faster than Chi in sequential and parallel benchmarks</p>
+          <p class="changelog-entry__body">Phase 2 (pooled RouteState) and Phase 3 (FIFO cache, read-only RLock) reduced per-request allocation. Sequential: 4291 ns/op vs Chi's 4547 ns/op. Parallel: 663 ns/op vs Chi's 1013 ns/op.</p>
+        </div>
+      </div>
+      <div class="changelog-entry">
+        <span class="changelog-entry__tag changelog-entry__tag--new">new</span>
+        <div>
+          <p class="changelog-entry__title">Machine-readable control plane</p>
+          <p class="changelog-entry__body"><code>specs/task-routing.yaml</code>, <code>specs/dependency-rules.yaml</code>, and <code>specs/change-recipes/</code> ship as first-class artifacts. AI coding assistants and CI share the same routing and boundary model.</p>
+        </div>
+      </div>
+    </div>
   </section>
 
   <section class="section">
@@ -337,13 +413,13 @@ function badgeClass(status: string): string {
       <h2>How beta extensions are promoted.</h2>
       <p>
         A module does not become beta by declaration. It must complete a governed checklist: two consecutive tagged release refs with no exported API changes,
-        release-backed API snapshots on record, and owner sign-off. The four modules below completed this checklist at v0.1.0–v0.2.0.
+        release-backed API snapshots on record, and owner sign-off. The first four completed at v0.1.0–v0.2.0; the remaining three completed at v1.0.0–v1.1.0.
       </p>
     </div>
     <div class="control-grid control-grid--tight">
       <article class="control-grid__item">
         <p class="signal-list__kicker">two release refs</p>
-        <h3>API frozen across v0.1.0 and v0.2.0</h3>
+        <h3>API frozen across two consecutive refs</h3>
         <p>Each promoted module was snapshotted at both refs using <code>go run ./internal/checks/extension-release-evidence</code>. No exported symbol changed.</p>
       </article>
       <article class="control-grid__item">
@@ -382,6 +458,21 @@ function badgeClass(status: string): string {
         <p class="signal-list__kicker" style="color: #4f46e5">x/observability</p>
         <h3>Exporter, tracer, collector, and adapter wiring</h3>
         <p>Owner: <code>observability</code>. Evidence: exporter and tracer wiring, collector adapter surface, observability pipeline integration.</p>
+      </article>
+      <article class="control-grid__item">
+        <p class="signal-list__kicker" style="color: #4f46e5">x/tenant</p>
+        <h3>Per-tenant routing, quota enforcement, and JWT-backed policy</h3>
+        <p>Owner: <code>tenant</code>. Promoted at v1.1.0. Evidence: JWT tenant identity, per-tenant quota evaluation, policy enforcement at transport layer, tenant lifecycle, isolation tests.</p>
+      </article>
+      <article class="control-grid__item">
+        <p class="signal-list__kicker" style="color: #4f46e5">x/frontend</p>
+        <h3>Static asset serving and SPA embedding</h3>
+        <p>Owner: <code>assets</code>. Promoted at v1.1.0. Evidence: embedded and directory-based asset serving, cache-busting, pre-compressed delivery, directory safety, transport-layer attachment.</p>
+      </article>
+      <article class="control-grid__item">
+        <p class="signal-list__kicker" style="color: #4f46e5">x/messaging</p>
+        <h3>Async messaging, queues, and inbound webhook delivery</h3>
+        <p>Owner: <code>messaging</code>. Promoted at v1.1.0 (app-facing family entrypoint). Evidence: queue and pubsub flow wiring, inbound webhook transport, scheduled job surface. Subordinate primitives remain experimental.</p>
       </article>
     </div>
   </section>
@@ -552,3 +643,110 @@ go test -bench=BenchmarkCmp -benchmem -count=5 -benchtime=3s ./router/</code></p
     </div>
   </section>
 </MarketingLayout>
+
+<style>
+  .changelog-section { padding-block: 3rem; }
+
+  .changelog-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    max-width: 56rem;
+    margin-inline: auto;
+    border: 1px solid var(--line);
+    border-radius: 0.75rem;
+    overflow: hidden;
+    background: var(--bg-elevated);
+  }
+
+  .changelog-entry {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+    padding: 1.1rem 1.4rem;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .changelog-entry:last-child { border-bottom: none; }
+
+  .changelog-entry__tag {
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    padding: 0.2rem 0.5rem;
+    border-radius: 0.28rem;
+    white-space: nowrap;
+    flex-shrink: 0;
+    margin-top: 0.15rem;
+  }
+
+  .changelog-entry__tag--stable {
+    background: color-mix(in srgb, var(--accent) 10%, var(--bg-elevated));
+    color: var(--accent-strong);
+    border: 1px solid color-mix(in srgb, var(--accent) 22%, var(--line));
+  }
+
+  :root[data-theme="dark"] .changelog-entry__tag--stable { color: var(--accent); }
+
+  .changelog-entry__tag--beta {
+    background: color-mix(in srgb, #2a7d4f 12%, var(--bg-elevated));
+    color: #2a7d4f;
+    border: 1px solid color-mix(in srgb, #2a7d4f 25%, transparent);
+  }
+
+  :root[data-theme="dark"] .changelog-entry__tag--beta {
+    color: #5ecf8a;
+    background: color-mix(in srgb, #5ecf8a 12%, var(--bg-elevated));
+    border-color: color-mix(in srgb, #5ecf8a 22%, transparent);
+  }
+
+  .changelog-entry__tag--perf {
+    background: color-mix(in srgb, #4f46e5 10%, var(--bg-elevated));
+    color: #4f46e5;
+    border: 1px solid color-mix(in srgb, #4f46e5 20%, transparent);
+  }
+
+  :root[data-theme="dark"] .changelog-entry__tag--perf {
+    color: #818cf8;
+    background: color-mix(in srgb, #818cf8 10%, var(--bg-elevated));
+    border-color: color-mix(in srgb, #818cf8 20%, transparent);
+  }
+
+  .changelog-entry__tag--new {
+    background: color-mix(in srgb, #b45309 10%, var(--bg-elevated));
+    color: #b45309;
+    border: 1px solid color-mix(in srgb, #b45309 20%, transparent);
+  }
+
+  :root[data-theme="dark"] .changelog-entry__tag--new {
+    color: #fbbf24;
+    background: color-mix(in srgb, #fbbf24 10%, var(--bg-elevated));
+    border-color: color-mix(in srgb, #fbbf24 18%, transparent);
+  }
+
+  .changelog-entry__title {
+    font-size: 0.92rem;
+    font-weight: 600;
+    color: var(--fg);
+    margin: 0 0 0.3rem;
+    line-height: 1.35;
+  }
+
+  .changelog-entry__body {
+    font-size: 0.84rem;
+    color: var(--fg-soft);
+    line-height: 1.6;
+    margin: 0;
+  }
+
+  .changelog-entry__body code {
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    color: var(--accent);
+    background: var(--accent-soft);
+    padding: 0.06rem 0.32rem;
+    border-radius: 0.22rem;
+  }
+</style>

@@ -1,0 +1,55 @@
+---
+title: x/openapi Primer
+description: 当改动涉及从已注册的 Plumego 路由生成 OpenAPI 3.1 文档或为生成的规范添加操作提示时，先读这里。
+translationKey: modules-x-openapi
+sidebar:
+  order: 26
+---
+
+# x/openapi Primer
+
+> **实验性** — API 兼容性未冻结。采用前请先评估。查看[发布策略](/zh/docs/release-posture)了解当前成熟度。
+
+当你已经通过 [x/* 家族](/zh/docs/x-family) 确认问题属于从 `router.RouteInfo` 值生成 OpenAPI 3.1 规范、用操作提示注解路由，或在不依赖外部库的情况下输出 JSON/YAML 时，打开这一页。
+
+`x/openapi` 从显式路由元数据生成文档结构 — 不通过反射检查处理器函数，且仅依赖标准库。CLI 集成住在 `cmd/plumego/commands/spec.go`；`x/openapi` 只负责文档模型和生成器。
+
+## 什么时候从这里开始
+
+- 你正在运行 `plumego generate spec` 并需要理解它生成什么，或者为什么某个路由缺失
+- 你正在使用 `plumego.spec.yaml` 提示文件注解操作
+- 你正在直接从 Go 代码调用 `openapi.New().Generate(routes, hints)`
+- 你需要从 `router.RouteInfo` 值输出 JSON 或 YAML 而无需外部库
+
+## 什么时候不该从这里开始
+
+- 运行时添加 Swagger UI 端点 — 那是应用程序代码，不是 `x/openapi`
+- 对 OpenAPI 文档进行模式验证或 linting — 使用外部工具
+- 改动需要解析 YAML 输入 — `x/openapi` 输出 YAML 但不解析它
+- 需要修改的是 CLI 命令本身（`cmd/plumego/commands/spec.go`），而非文档模型
+
+## 当前仓库里先读哪些文件
+
+1. `x/openapi/` — `Document`、`Generator`、模式辅助工具、序列化器
+2. `cmd/plumego/commands/spec.go` — `plumego generate spec` 的 CLI 集成
+3. `reference/standard-service` — 用作生成输入的规范路由注册
+
+## 更具体的归属例子
+
+| 这些工作适合留在 `x/openapi` | 一旦变成这些问题就应移出 |
+| --- | --- |
+| `Generator.Generate`：将 `router.RouteInfo` 映射到 `Document` | 通过反射从处理器函数参数推断模式 |
+| `Op` 提示：合并调用方提供的操作元数据 | 解析 `plumego.spec.yaml` 中的 YAML — 那属于 CLI 命令 |
+| `MarshalJSON` / `MarshalYAML`：无外部依赖的序列化 | 根据 OpenAPI 3.1 JSON Schema 验证生成的文档 — 使用外部工具 |
+| `PathParam`、`QueryParam`、`HeaderParam` 辅助工具 | 从 Go 结构体标签生成完整的 JSON Schema |
+
+## 为什么单独写这一页
+
+大多数 OpenAPI 生成工具需要结构体标签、对处理器参数的反射，或沉重的代码生成管道。`x/openapi` 采用不同的方式：读取路由器已经生成的 `router.RouteInfo` 值，并将它们与显式提示合并。这使生成的文档能忠实反映路由器实际注册的内容，而不将文档模型与处理器实现细节耦合。
+
+## 下一步阅读
+
+- [x/* 家族](/zh/docs/x-family)
+- [Router Primer](/zh/docs/modules/router)
+- [参考应用](/zh/docs/reference-app)
+- [仓库控制面](/zh/docs/concepts/repo-control-plane)

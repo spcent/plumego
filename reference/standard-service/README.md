@@ -20,6 +20,9 @@ Design constraints:
 - keeps all route registration explicit in `internal/app/routes.go`
 - keeps app-local configuration in `internal/config`
 
+Configuration precedence is explicit and test-covered:
+`Defaults()` < `.env` file < process environment < command-line flags.
+
 Production services should extend this layout with explicit middleware wiring in
 `internal/app/app.go`. Start from the minimal reference stack, then add body
 limits, timeouts, security headers, abuse guard rate limiting, auth adapters,
@@ -38,8 +41,10 @@ Canonical files:
 - `main.go`
 - `internal/app/app.go`
 - `internal/app/routes.go`
+- `internal/domain/item/item.go`
 - `internal/handler/api.go`
 - `internal/handler/health.go`
+- `internal/handler/items.go`
 - `internal/config/config.go`
 
 Run it with:

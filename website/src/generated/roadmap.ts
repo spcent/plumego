@@ -14,14 +14,15 @@ export const ROADMAP_FACTS = {
     "`v1.0.0` tagged on May 15, 2026; release notes and evidence in `docs/release/v1.0.0.md`"
   ],
   "inProgress": [
-    "Phase 13: Docs and Onboarding Sync"
+    "Phase 16: Active Extension Evaluations"
   ],
   "planned": [],
   "suggestedExecutionOrder": [
-    "Keep Phase 13 docs and onboarding sync continuous.",
+    "Keep Phase 13 and Phase 15 docs and onboarding sync continuous.",
     "Keep `docs/EXTENSION_MATURITY.md` aligned with module manifests and evidence records.",
-    "Evaluate `x/ai` stable-tier subpackages individually after release-history evidence is available.",
-    "Advance `x/tenant` production readiness.",
+    "Execute task card 1500 (x/tenant GA evaluation) once v1.2.0 release evidence is available.",
+    "Execute task card 1501 (x/ai stable-tier subpackages beta evaluation) per-subpackage after release evidence.",
+    "Execute task card 1502 (x/openapi module.yaml cleanup and beta evaluation) once release evidence is available.",
     "Clarify `x/data` and `x/fileapi` operational guidance.",
     "Expand `x/gateway/discovery` backends only when explicit adapters are ready."
   ]

@@ -17,6 +17,12 @@ func (a *App) ensureHandlerPrepared() {
 		r := a.ensureRouter()
 		if r != nil {
 			r.Freeze()
+			// Warn when no routes have been registered before Prepare is called.
+			// A service with no routes silently returns 404 or 405 for every
+			// request, which is always a bootstrap programming error.
+			if len(r.Routes()) == 0 {
+				a.Logger().Warn("no routes registered: all requests will receive 404; call app.Get/Post/… before Prepare", nil)
+			}
 		}
 		a.buildHandler()
 	})
@@ -132,14 +138,10 @@ func prepareTLSConfig(cfg TLSConfig) (*tls.Config, error) {
 func (a *App) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	a.ensureHandlerPrepared()
 
-	a.mu.RLock()
-	handler := a.handler
-	a.mu.RUnlock()
-
-	if handler == nil {
-		_ = contract.WriteError(w, r, contract.NewErrorBuilder().Type(contract.TypeUnavailable).Message("handler not configured").Build())
+	if ref := a.handlerFast.Load(); ref != nil {
+		ref.h.ServeHTTP(w, r)
 		return
 	}
 
-	handler.ServeHTTP(w, r)
+	_ = contract.WriteError(w, r, contract.NewErrorBuilder().Type(contract.TypeUnavailable).Message("handler not configured").Build())
 }

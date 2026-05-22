@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
+	internaltransport "github.com/spcent/plumego/internal/httputil"
 	"github.com/spcent/plumego/log"
-	internaltransport "github.com/spcent/plumego/middleware/internal/transport"
 	"github.com/spcent/plumego/security/abuse"
 )
 

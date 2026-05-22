@@ -51,4 +51,8 @@ func (a *App) buildHandler() {
 	a.mu.Lock()
 	a.handler = handler
 	a.mu.Unlock()
+
+	if handler != nil {
+		a.handlerFast.Store(&handlerRef{h: handler})
+	}
 }

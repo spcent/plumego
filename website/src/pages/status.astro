@@ -7,11 +7,11 @@ import { ROADMAP_FACTS } from '../generated/roadmap';
 
 const stableCount = MODULE_FACTS.stableRoots.length;
 const betaCount = MODULE_FACTS.betaExtensionFamilies.length;
-const experimentalCount = MODULE_FACTS.allExtensionPaths.length - betaCount;
+const experimentalCount = MODULE_FACTS.experimentalFamilies.length;
 
 const releaseChecklist = [
   { label: '9 stable roots with API snapshots', done: true, subitems: [] },
-  { label: '4 beta extensions with promotion evidence', done: true, subitems: [] },
+  { label: '4 beta extensions with promotion evidence (v1.0.0)', done: true, subitems: [] },
   { label: 'Boundary checks enforced in CI', done: true, subitems: [] },
   { label: 'Race-detector test suite passing', done: true, subitems: [] },
   { label: 'Deprecation policy published', done: true, subitems: [] },
@@ -24,6 +24,20 @@ const releaseChecklist = [
       { label: 'Reference app primer complete and aligned with current code', done: true },
     ],
   },
+];
+
+const v11Checklist = [
+  { label: '3 more extension families promoted to beta (x/tenant, x/frontend, x/messaging)', done: true, subitems: [] },
+  {
+    label: 'Selected beta surfaces confirmed within experimental families',
+    done: true,
+    subitems: [
+      { label: 'x/ai/provider, x/ai/session, x/ai/streaming, x/ai/tool — beta surface evidence recorded', done: true },
+      { label: 'x/data/file, x/data/idempotency — beta surface evidence recorded', done: true },
+    ],
+  },
+  { label: 'Agent workflow improvements — cross-extension-deps boundary checker added', done: true, subitems: [] },
+  { label: 'Website and bilingual docs synchronized — all 77 pages in EN + ZH', done: true, subitems: [] },
 ];
 ---
 
@@ -70,10 +84,50 @@ const releaseChecklist = [
   <!-- Release evidence tracker -->
   <section class="section section--tinted">
     <div class="section__intro">
-      <h2>v1 release evidence.</h2>
+      <h2>v1.1.0 release evidence.</h2>
       <p>
-        Plumego v1.0.0 is tagged. Each item here records a gate or evidence artifact that supports the
-        current release posture. Items marked done are machine-enforced or already published.
+        Plumego v1.1.0 is tagged (May 18, 2026). Each item records a gate or evidence artifact. Items marked done are machine-enforced or already published.
+      </p>
+    </div>
+    <div class="v1-checklist">
+      {v11Checklist.map((item) => (
+        <div class={`v1-item-group ${item.done ? 'v1-item-group--done' : 'v1-item-group--pending'}`}>
+          <div class={`v1-item ${item.done ? 'v1-item--done' : 'v1-item--pending'}`}>
+            <span class="v1-item__icon" aria-hidden="true">
+              {item.done ? '✓' : '○'}
+            </span>
+            <span class="v1-item__label">{item.label}</span>
+            <span class={`v1-item__badge ${item.done ? 'v1-item__badge--done' : 'v1-item__badge--pending'}`}>
+              {item.done ? 'done' : 'in progress'}
+            </span>
+          </div>
+          {item.subitems && item.subitems.length > 0 && (
+            <div class="v1-subitems">
+              {item.subitems.map((sub) => (
+                <div class={`v1-subitem ${sub.done ? 'v1-subitem--done' : 'v1-subitem--pending'}`}>
+                  <span class="v1-subitem__icon" aria-hidden="true">{sub.done ? '✓' : '○'}</span>
+                  <span class="v1-subitem__label">{sub.label}</span>
+                  <span class={`v1-item__badge v1-item__badge--sm ${sub.done ? 'v1-item__badge--done' : 'v1-item__badge--pending'}`}>
+                    {sub.done ? 'done' : 'pending'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+    <p class="v1-note">
+      Release evidence: <a class="text-link" href="https://github.com/spcent/plumego/blob/main/docs/release/v1.1.0.md">docs/release/v1.1.0.md →</a>
+    </p>
+  </section>
+
+  <!-- v1.0.0 evidence (historical) -->
+  <section class="section section--tinted">
+    <div class="section__intro">
+      <h2>v1.0.0 release evidence.</h2>
+      <p>
+        The initial stable release on May 15, 2026. Items recorded at the time of tagging.
       </p>
     </div>
     <div class="v1-checklist">
@@ -139,9 +193,7 @@ const releaseChecklist = [
         <h3>Experimental extensions</h3>
         <p>Not API-frozen. Evaluate for clear reasons; expect faster iteration than stable roots.</p>
         <div class="tier-card__chips">
-          {MODULE_FACTS.allExtensionPaths
-            .filter((m) => !MODULE_FACTS.betaExtensionFamilies.includes(m as any))
-            .map((m) => <code>{m}</code>)}
+          {MODULE_FACTS.experimentalFamilies.map((m) => <code>{m}</code>)}
         </div>
         <a class="text-link" href="/releases">Full release matrix →</a>
       </article>

@@ -294,7 +294,7 @@ coalesce forwards that request without creating or joining an in-flight slot.
 
 ## Internal transport primitives
 
-`middleware/internal/transport` contains shared response-writing helpers used across middleware packages:
+`internal/httputil` contains shared response-writing helpers used across middleware packages:
 
 - `EnsureNoSniff(h http.Header)` — sets `X-Content-Type-Options: nosniff` unless already present
 - `SafeWrite(w http.ResponseWriter, body []byte)` — writes body and sets the nosniff header; silently no-ops for nil writers
@@ -306,10 +306,10 @@ coalesce forwards that request without creating or joining an in-flight slot.
 - `ResponseRecorder` — wraps an `http.ResponseWriter` to capture status code, body, and bytes written
 - `BufferedResponse` — buffers the full response body with an optional max-bytes overflow guard; supports `WriteTo` for deferred flushing
 
-These are internal; import them only from within the `middleware` module.
+These are repo-internal helpers; add new callers only through
+`specs/dependency-rules.yaml` so intentional internal package use remains
+visible.
 
-Do not confuse `middleware/internal/transport.CopyHeaders` with
-`internal/httputil.CopyHeaders`. The middleware helper overlays destination
-values; the lower-level `internal/httputil` helper appends values for
-pass-through recorder use. Use `ReplaceHeaders` when replaying a fully buffered
-response that should remove stale destination headers.
+`CopyHeaders` overlays destination values and preserves destination keys absent
+from `src`. Use `ReplaceHeaders` when replaying a fully buffered response that
+should remove stale destination headers.

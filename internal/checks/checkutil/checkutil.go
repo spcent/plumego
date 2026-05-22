@@ -402,6 +402,109 @@ func ValidateManifestDependencyRuleConsistency(repoRoot string) ([]string, error
 	return violations, nil
 }
 
+func ValidateDeclaredInternalCallers(repoRoot string) ([]string, error) {
+	rules, err := ReadDependencyRules(repoRoot)
+	if err != nil {
+		return nil, err
+	}
+
+	var internalModuleNames []string
+	for name, rule := range rules.Modules {
+		if strings.HasPrefix(rule.Path, "internal/") {
+			internalModuleNames = append(internalModuleNames, name)
+		}
+	}
+	sort.Strings(internalModuleNames)
+
+	actualCallers := map[string]map[string]struct{}{}
+	for _, name := range internalModuleNames {
+		actualCallers[name] = map[string]struct{}{}
+	}
+
+	var violations []string
+	err = walkGoImports(repoRoot, repoRoot, false, func(relPath, importPath string) {
+		if !strings.HasPrefix(importPath, rules.ModulePath+"/internal/") {
+			return
+		}
+
+		caller := filepath.ToSlash(filepath.Dir(relPath))
+		relImportPath := strings.TrimPrefix(importPath, rules.ModulePath+"/")
+		if strings.HasPrefix(caller, "internal/") {
+			return
+		}
+
+		name, rule, ok := matchingInternalRule(relImportPath, rules, internalModuleNames)
+		if !ok {
+			violations = append(violations, fmt.Sprintf("%s imports %s but no specs/dependency-rules.yaml internal module declares it", relPath, importPath))
+			return
+		}
+
+		if len(rule.DeclaredCallers) == 0 {
+			violations = append(violations, fmt.Sprintf("%s imports %s but specs/dependency-rules.yaml module %s has no declared_callers", relPath, importPath, name))
+			return
+		}
+
+		if !matchesAnyDeclaredCaller(caller, rule.DeclaredCallers) {
+			violations = append(violations, fmt.Sprintf("%s imports %s but caller %q is not listed in specs/dependency-rules.yaml module %s declared_callers", relPath, importPath, caller, name))
+			return
+		}
+		actualCallers[name][caller] = struct{}{}
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	for _, name := range internalModuleNames {
+		rule := rules.Modules[name]
+		for _, declared := range rule.DeclaredCallers {
+			if declared == "" {
+				continue
+			}
+			if !hasActualDeclaredCaller(declared, actualCallers[name]) {
+				violations = append(violations, fmt.Sprintf("specs/dependency-rules.yaml module %s declares caller %q but no non-test Go import uses it", name, declared))
+			}
+		}
+	}
+
+	sort.Strings(violations)
+	return violations, nil
+}
+
+func matchingInternalRule(relImportPath string, rules dependencyRulesDoc, internalModuleNames []string) (string, dependencyModuleRule, bool) {
+	var matchedName string
+	var matchedRule dependencyModuleRule
+	for _, name := range internalModuleNames {
+		rule := rules.Modules[name]
+		if !matchesRepoPattern(relImportPath, rule.Path) {
+			continue
+		}
+		if len(rule.Path) <= len(matchedRule.Path) {
+			continue
+		}
+		matchedName = name
+		matchedRule = rule
+	}
+	return matchedName, matchedRule, matchedName != ""
+}
+
+func matchesAnyDeclaredCaller(caller string, declaredCallers []string) bool {
+	for _, declared := range declaredCallers {
+		if caller == declared || strings.HasPrefix(caller, declared+"/") {
+			return true
+		}
+	}
+	return false
+}
+
+func hasActualDeclaredCaller(declared string, actual map[string]struct{}) bool {
+	for caller := range actual {
+		if caller == declared || strings.HasPrefix(caller, declared+"/") {
+			return true
+		}
+	}
+	return false
+}
+
 func matchesAnyRepoPattern(relPath string, patterns []string) bool {
 	for _, pattern := range patterns {
 		if matchesRepoPattern(relPath, pattern) {

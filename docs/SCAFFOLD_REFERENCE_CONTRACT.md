@@ -9,9 +9,10 @@ shape, but it is generated as a project-local layout.
 The canonical scaffold must preserve these properties:
 
 - `cmd/app/main.go` loads config, constructs the app, registers routes, and
-  starts the server.
+  starts the server with a signal-aware context.
 - `internal/app/app.go` owns app construction and middleware wiring.
 - `internal/app/routes.go` owns explicit route registration.
+- `internal/domain/item/item.go` owns the sample item model and repository.
 - `internal/handler/*` owns HTTP handlers and local DTOs.
 - `internal/config/config.go` owns generated project config.
 - No `x/*` imports appear in the canonical template.

@@ -1,0 +1,13 @@
+name: add-grpc-method
+scope: adding a gRPC service method via x/rpc alongside an existing HTTP surface
+steps:
+  - Read x/rpc/module.yaml and reference/with-rpc for the canonical gRPC + HTTP wiring shape.
+  - Define the new method in the .proto file and regenerate stubs; do not hand-write gRPC service boilerplate.
+  - Implement the method in the service struct; keep it thin — delegate to the same domain logic used by the HTTP handler.
+  - Register the new service method through the explicit x/rpc server constructor; do not use server-reflection auto-discovery as the only registration path.
+  - Add tests using grpc/test/bufconn or httptest for the gRPC surface; confirm the HTTP surface still passes its existing tests.
+  - Run x/rpc tests and boundary checks; run make gates if the change is cross-module.
+stop_conditions:
+  - Do not import x/rpc from stable roots.
+  - Do not duplicate business logic between the HTTP handler and the gRPC method implementation; share the domain layer.
+  - Do not add gRPC service registration to core or to the standard-service scaffold unless the project has explicitly opted into gRPC.

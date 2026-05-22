@@ -43,7 +43,7 @@ import (
 	"time"
 
 	"github.com/spcent/plumego/contract"
-	internaltransport "github.com/spcent/plumego/middleware/internal/transport"
+	internaltransport "github.com/spcent/plumego/internal/httputil"
 )
 
 var errUpstreamPanic = errors.New("upstream request panicked")

@@ -13,26 +13,26 @@ export const SITE = {
 
 export const SITE_COPY: Record<Locale, { footerTagline: string }> = {
   en: {
-    footerTagline: 'stdlib-only Go HTTP toolkit — explicit by design, agent-ready by structure.',
+    footerTagline: 'stdlib-only Go HTTP toolkit — explicit by design, machine-readable specs by structure.',
   },
   zh: {
-    footerTagline: 'stdlib only 的 Go HTTP 工具包——显式设计，结构化 Agent 就绪。',
+    footerTagline: 'stdlib only 的 Go HTTP 工具包——显式设计，机器可读规范内置于结构。',
   },
 };
 
 export const NAV_LINKS: Record<Locale, Array<{ label: string; href: string }>> = {
   en: [
+    { label: 'Why Plumego', href: '/why-plumego' },
     { label: 'Docs', href: '/docs' },
-    { label: 'Why', href: '/why-plumego' },
-    { label: 'Ecosystem', href: '/ecosystem' },
-    { label: 'Agents', href: '/agent-workflow' },
+    { label: 'Examples', href: '/examples' },
+    { label: 'Architecture', href: '/architecture' },
     { label: 'Releases', href: '/releases' },
   ],
   zh: [
-    { label: '文档', href: '/zh/docs' },
     { label: '为什么选择', href: '/zh/why-plumego' },
-    { label: '生态系统', href: '/zh/ecosystem' },
-    { label: 'Agents', href: '/zh/agent-workflow' },
+    { label: '文档', href: '/zh/docs' },
+    { label: '示例', href: '/zh/examples' },
+    { label: '架构', href: '/zh/architecture' },
     { label: '发布', href: '/zh/releases' },
   ],
 };
@@ -44,12 +44,12 @@ export const FOOTER_GROUPS: Record<Locale, Array<{ title: string; links: Array<{
       links: [
         { label: 'Docs', href: '/docs' },
         { label: 'Why Plumego', href: '/why-plumego' },
-        { label: 'Ecosystem', href: '/ecosystem' },
-        { label: 'Agent Workflow', href: '/agent-workflow' },
-        { label: 'Architecture', href: '/architecture' },
-        { label: 'Compare Frameworks', href: '/compare' },
-        { label: 'Benchmarks', href: '/benchmarks' },
+        { label: 'Use Cases', href: '/use-cases' },
         { label: 'Examples', href: '/examples' },
+        { label: 'Architecture', href: '/architecture' },
+        { label: 'Compare & Benchmarks', href: '/compare' },
+        { label: 'x/* Extensions', href: '/architecture#extensions' },
+        { label: 'Agent Workflow', href: '/docs/concepts/agent-first-workflow' },
       ],
     },
     {
@@ -82,12 +82,12 @@ export const FOOTER_GROUPS: Record<Locale, Array<{ title: string; links: Array<{
       links: [
         { label: '文档', href: '/zh/docs' },
         { label: '为什么选择 Plumego', href: '/zh/why-plumego' },
-        { label: '生态系统', href: '/zh/ecosystem' },
-        { label: 'Agent 工作流', href: '/zh/agent-workflow' },
-        { label: '架构', href: '/zh/architecture' },
-        { label: '框架横向对比', href: '/zh/compare' },
-        { label: '性能测试', href: '/zh/benchmarks' },
+        { label: '使用场景', href: '/zh/use-cases' },
         { label: '示例', href: '/zh/examples' },
+        { label: '架构', href: '/zh/architecture' },
+        { label: '框架对比与性能', href: '/zh/compare' },
+        { label: 'x/* 扩展家族', href: '/zh/architecture#extensions' },
+        { label: 'Agent 工作流', href: '/zh/docs/concepts/agent-first-workflow' },
       ],
     },
     {
@@ -118,10 +118,10 @@ export const FOOTER_GROUPS: Record<Locale, Array<{ title: string; links: Array<{
 
 export const HOME_COPY = {
   en: {
-    eyebrow: 'stdlib-only · explicit routing · agent-ready · v1.0.0',
+    eyebrow: 'stdlib-only · explicit routing · machine-readable specs · v1.1.0',
     headline: 'Explicit Go HTTP. Built for humans and agents.',
     summary:
-      'Explicit routing that survives code review. Machine-readable specs and per-module manifests give AI coding agents a clear operating model. Zero external dependencies. 9 stable modules with the v1 stable-root compatibility promise.',
+      'Explicit routing that survives code review. Machine-readable route specs and per-module manifests let AI coding agents and human reviewers share the same code model — no LLM integration needed. Zero external dependencies. 9 stable modules with the v1 stable-root compatibility promise.',
     primaryCta: { label: 'Get Started', href: '/docs/getting-started' },
     secondaryCta: { label: 'See the difference', href: '#contrast' },
     scenarioCards: [
@@ -129,8 +129,7 @@ export const HOME_COPY = {
         kicker: 'REST API',
         title: 'Build a REST API in minutes',
         code: `r := router.New()
-api := r.Group("/api/v1",
-    middleware.Auth(cfg.JWTSecret))
+api := r.Group("/api/v1")
 api.Get("/users/:id", users.Get)
 api.Post("/users",    users.Create)`,
         body: 'Trie-based routing with path params, middleware groups, and typed responses — all using standard net/http handlers. No custom context types.',
@@ -141,11 +140,16 @@ api.Post("/users",    users.Create)`,
       {
         kicker: 'WebSocket',
         title: 'Add real-time without touching core',
-        code: `hub := websocket.NewHub()
-r.Get("/ws", hub.Handler(onMessage))
+        code: `ws, err := websocket.New(websocket.DefaultWebSocketConfig())
+if err != nil {
+    return err
+}
+if err := ws.RegisterRoutes(r); err != nil {
+    return err
+}
 
 // broadcast to all connected clients
-hub.Broadcast([]byte("update"))`,
+ws.Hub().BroadcastAll(websocket.OpcodeText, []byte("update"))`,
         body: 'x/websocket adds a managed hub on top of the stable HTTP kernel. Routes stay explicit; transport concerns stay separate.',
         href: '/docs/modules/x-websocket',
         label: 'WebSocket module',
@@ -154,22 +158,24 @@ hub.Broadcast([]byte("update"))`,
       {
         kicker: 'Multi-tenant SaaS',
         title: 'Isolate tenants without changing core',
-        code: `api.Use(tenant.FromJWT(cfg.Secret))
-api.Get("/data", tenant.Guard(data.List))
+        code: `api.Use(resolve.Middleware(resolve.Options{
+    HeaderName: "X-Tenant-ID",
+}))
+api.Get("/data", data.List)
 
 // tenant identity resolved at transport
 // stable roots never see tenant logic`,
         body: 'x/tenant attaches per-tenant identity and policy at the transport layer. The stable root API stays unchanged as your tenant logic evolves.',
         href: '/docs/modules/x-tenant',
         label: 'Tenant module',
-        maturity: 'experimental',
+        maturity: 'beta',
       },
     ],
     stabilityBandTitle: 'Know exactly what you can rely on.',
     stabilityBandItems: [
-      { label: '9 stable modules', detail: 'v1 compatibility promise', status: 'stable', href: '/stability' },
-      { label: '4 beta extensions', detail: 'API frozen between refs', status: 'beta', href: '/stability' },
-      { label: '16 experimental', detail: 'Evaluate before adopting', status: 'experimental', href: '/stability' },
+      { label: '9 stable modules', detail: 'core · router · contract · middleware · security · store · health · log · metrics', status: 'stable', href: '/stability' },
+      { label: '7 beta extensions', detail: 'API frozen between refs', status: 'beta', href: '/stability' },
+      { label: '7 experimental families', detail: 'Evaluate before adopting', status: 'experimental', href: '/stability' },
     ],
     stabilityBandCta: { label: 'Project status & release evidence', href: '/status' },
     moduleTitle: 'Stable modules.',
@@ -187,12 +193,12 @@ api.Get("/data", tenant.Guard(data.List))
       { name: 'metrics',    description: 'Recorder and AggregateCollector interfaces, HTTPObserver, and collector composition',             docHref: '/docs/modules/metrics' },
     ],
     extensionTitle: 'Extension families (x/*).',
-    extensionNote: '4 beta — API frozen between release refs: x/rest, x/gateway, x/websocket, x/observability. 16 experimental families for product-specific capability work.',
+    extensionNote: '7 beta — API frozen between release refs: x/rest, x/gateway, x/websocket, x/observability, x/tenant, x/frontend, x/messaging. 7 experimental primary families for product-specific capability work.',
     extensionDocsHref: '/docs/x-family',
     extensionReleasesHref: '/releases',
     adoptionTitle: 'Where to go next.',
     adoptionBody:
-      'Start with Why if the question is fit. Explore the Ecosystem to find the right x/* family. See how agents use the control plane in the Agents page.',
+      'Start with Why if the question is fit. Browse x/* extension families on Architecture. Read the agent-first workflow to see how the control plane works.',
     adoptionCards: [
       {
         kicker: 'fit',
@@ -202,25 +208,25 @@ api.Get("/data", tenant.Guard(data.List))
         label: 'Evaluate fit',
       },
       {
-        kicker: 'ecosystem',
-        title: 'Ecosystem',
-        body: 'Browse all x/* capability families grouped by maturity. Each card shows the scenario, a concrete use case, and the module link — so you know exactly which package to reach for.',
-        href: '/ecosystem',
-        label: 'Explore ecosystem',
+        kicker: 'extensions',
+        title: 'x/* Extension Families',
+        body: 'Browse all x/* capability families grouped by maturity on the Architecture page. Each card shows the scenario, a concrete use case, and links to the module primer.',
+        href: '/architecture#extensions',
+        label: 'Browse extensions',
       },
       {
         kicker: 'agents',
-        title: 'Agent Workflow',
-        body: 'See how machine-readable specs give AI coding agents a clear operating model — task routing, boundary enforcement, per-module manifests, and standardized check commands.',
-        href: '/agent-workflow',
-        label: 'See agent workflow',
+        title: 'Agent-First Workflow',
+        body: 'See how machine-readable specs give AI coding assistants a clear operating model — task routing, boundary enforcement, per-module manifests, and standardized check commands.',
+        href: '/docs/concepts/agent-first-workflow',
+        label: 'Read agent workflow',
       },
     ],
     finalTitle: 'Start from the reference app. Pick the right x/* family. Keep boundaries clear.',
     finalBody:
-      'Clone reference/standard-service for the stable kernel path. Check the Ecosystem page to find the right capability family. Let the control plane guide agents and reviewers alike.',
+      'Clone reference/standard-service for the stable kernel path. See the Architecture page to find the right capability family. Let the control plane guide coding assistants and reviewers alike.',
     finalPrimary: { label: 'Read Docs', href: '/docs' },
-    finalSecondary: { label: 'Explore Ecosystem', href: '/ecosystem' },
+    finalSecondary: { label: 'Browse Extensions', href: '/architecture#extensions' },
     contrastTitle: 'The difference shows in code review.',
     contrastLead:
       'When routes are spread across packages, a reviewer has to open each one to understand what paths exist and what middleware runs. Plumego keeps the full route map in one explicit file — and adds a structured <code>contract</code> layer so error and success responses stay consistent across all handlers.',
@@ -228,10 +234,10 @@ api.Get("/data", tenant.Guard(data.List))
     contrastAfterLabel: 'plumego: one file, one contract',
   },
   zh: {
-    eyebrow: 'stdlib only · 显式路由 · agent-ready · v1.0.0',
+    eyebrow: 'stdlib only · 显式路由 · 机器可读规范 · v1.1.0',
     headline: '显式 Go HTTP。为人类和 Agent 而生。',
     summary:
-      '在代码评审中清晰可见的显式路由。机器可读的规范与模块清单，让 AI 编程代理精准定位变更边界。零外部依赖。9 个稳定模块承载 v1 稳定根兼容性承诺。',
+      '在代码评审中清晰可见的显式路由。机器可读的路由规范与模块清单，让 AI 编程代理和人工评审者共享同一份代码模型——无需 LLM 集成。零外部依赖。9 个稳定模块承载 v1 稳定根兼容性承诺。',
     primaryCta: { label: '开始使用', href: '/zh/docs/getting-started' },
     secondaryCta: { label: '看看有什么不同', href: '#contrast' },
     scenarioCards: [
@@ -239,8 +245,7 @@ api.Get("/data", tenant.Guard(data.List))
         kicker: 'REST API',
         title: '几分钟搭一个 REST API',
         code: `r := router.New()
-api := r.Group("/api/v1",
-    middleware.Auth(cfg.JWTSecret))
+api := r.Group("/api/v1")
 api.Get("/users/:id", users.Get)
 api.Post("/users",    users.Create)`,
         body: '基于 trie 树的路由，支持路径参数、中间件组和类型化响应，全部使用标准 net/http handler，无自定义 context 类型。',
@@ -251,11 +256,16 @@ api.Post("/users",    users.Create)`,
       {
         kicker: 'WebSocket',
         title: '不动内核，加入实时能力',
-        code: `hub := websocket.NewHub()
-r.Get("/ws", hub.Handler(onMessage))
+        code: `ws, err := websocket.New(websocket.DefaultWebSocketConfig())
+if err != nil {
+    return err
+}
+if err := ws.RegisterRoutes(r); err != nil {
+    return err
+}
 
 // 向所有连接的客户端广播
-hub.Broadcast([]byte("update"))`,
+ws.Hub().BroadcastAll(websocket.OpcodeText, []byte("update"))`,
         body: 'x/websocket 在稳定 HTTP 内核上加了一个托管 hub，路由保持显式，传输层关注点保持独立。',
         href: '/zh/docs/modules/x-websocket',
         label: 'WebSocket 模块',
@@ -264,22 +274,24 @@ hub.Broadcast([]byte("update"))`,
       {
         kicker: '多租户 SaaS',
         title: '不改内核，隔离多租户',
-        code: `api.Use(tenant.FromJWT(cfg.Secret))
-api.Get("/data", tenant.Guard(data.List))
+        code: `api.Use(resolve.Middleware(resolve.Options{
+    HeaderName: "X-Tenant-ID",
+}))
+api.Get("/data", data.List)
 
 // 租户身份在传输层解析
 // 稳定根永远感知不到租户逻辑`,
         body: 'x/tenant 在传输层附加每租户身份与策略，稳定根 API 不受租户逻辑演进影响。',
         href: '/zh/docs/modules/x-tenant',
         label: '租户模块',
-        maturity: 'experimental',
+        maturity: 'beta',
       },
     ],
     stabilityBandTitle: '清楚知道哪些可以依赖。',
     stabilityBandItems: [
-      { label: '9 个稳定模块', detail: 'v1 兼容性承诺', status: 'stable', href: '/zh/stability' },
-      { label: '4 个 beta 扩展', detail: 'ref 间 API 冻结', status: 'beta', href: '/zh/stability' },
-      { label: '16 个实验性', detail: '采用前请先评估', status: 'experimental', href: '/zh/stability' },
+      { label: '9 个稳定模块', detail: 'core · router · contract · middleware · security · store · health · log · metrics', status: 'stable', href: '/zh/stability' },
+      { label: '7 个 beta 扩展', detail: 'ref 间 API 冻结', status: 'beta', href: '/zh/stability' },
+      { label: '7 个实验性家族', detail: '采用前请先评估', status: 'experimental', href: '/zh/stability' },
     ],
     stabilityBandCta: { label: '项目状态与发布证据', href: '/zh/status' },
     moduleTitle: '稳定模块。',
@@ -297,12 +309,12 @@ api.Get("/data", tenant.Guard(data.List))
       { name: 'metrics',    description: 'Recorder 与 AggregateCollector 接口、HTTPObserver 及多 collector 组合',      docHref: '/zh/docs/modules/metrics' },
     ],
     extensionTitle: '扩展家族 (x/*)。',
-    extensionNote: '4 个 beta（版本引用间 API 冻结）：x/rest、x/gateway、x/websocket、x/observability。另有 16 个实验性家族，用于产品能力工作。',
+    extensionNote: '7 个 beta（版本引用间 API 冻结）：x/rest、x/gateway、x/websocket、x/observability、x/tenant、x/frontend、x/messaging。另有 7 个实验性主入口家族，用于产品能力工作。',
     extensionDocsHref: '/zh/docs/x-family',
     extensionReleasesHref: '/zh/releases',
     adoptionTitle: '下一步去哪里。',
     adoptionBody:
-      '如果问题是适用性，先看「为什么选择 Plumego」。浏览生态系统找到合适的 x/* 家族。在 Agents 页面了解 Agent 如何使用控制平面。',
+      '如果问题是适用性，先看「为什么选择 Plumego」。在架构页浏览 x/* 扩展家族。阅读 Agent 工作流了解控制平面如何运作。',
     adoptionCards: [
       {
         kicker: 'fit',
@@ -312,24 +324,24 @@ api.Get("/data", tenant.Guard(data.List))
         label: '判断是否适合',
       },
       {
-        kicker: 'ecosystem',
-        title: '生态系统',
-        body: '按成熟度分组浏览所有 x/* 能力家族。每张卡片展示场景、具体用例和模块链接——帮你明确应该用哪个包。',
-        href: '/zh/ecosystem',
-        label: '探索生态系统',
+        kicker: 'extensions',
+        title: 'x/* 扩展家族',
+        body: '在架构页按成熟度分组浏览所有 x/* 能力家族。每张卡片展示场景、具体用例和模块链接——帮你明确应该用哪个包。',
+        href: '/zh/architecture#extensions',
+        label: '浏览扩展家族',
       },
       {
         kicker: 'agents',
         title: 'Agent 工作流',
-        body: '了解机器可读规范如何为 AI 编程代理提供清晰的操作模型——任务路由、边界执行、模块清单与标准化验证命令。',
-        href: '/zh/agent-workflow',
-        label: '查看 Agent 工作流',
+        body: '了解机器可读规范如何为 AI 编程助手提供清晰的操作模型——任务路由、边界执行、模块清单与标准化验证命令。',
+        href: '/zh/docs/concepts/agent-first-workflow',
+        label: '阅读 Agent 工作流',
       },
     ],
     finalTitle: '从 reference app 起步。选对 x/* 家族。保持边界清晰。',
-    finalBody: 'clone reference/standard-service 沿稳定内核路径出发。在生态系统页选择合适的能力家族。让控制平面同时引导 Agent 和代码评审者。',
+    finalBody: 'clone reference/standard-service 沿稳定内核路径出发。在架构页选择合适的能力家族。让控制平面同时引导编程助手和代码评审者。',
     finalPrimary: { label: '阅读文档', href: '/zh/docs' },
-    finalSecondary: { label: '探索生态系统', href: '/zh/ecosystem' },
+    finalSecondary: { label: '浏览扩展家族', href: '/zh/architecture#extensions' },
     contrastTitle: '差异在代码评审时最明显。',
     contrastLead:
       '当路由分散在各个包里时，评审者必须逐个打开才能知道有哪些路径和中间件在运行。Plumego 把完整路由表放在一个显式文件里——同时加入结构化的 <code>contract</code> 层，让所有 handler 的错误响应和成功响应保持一致。',
@@ -951,7 +963,7 @@ export const EXAMPLES_COPY = {
         kicker: 'multi-tenant saas',
         title: 'reference/with-tenant',
         body: 'Per-tenant routing, quota enforcement, and JWT-backed policy evaluation. Adds x/tenant outside the HTTP kernel so stable roots stay compatible when tenant logic evolves.',
-        maturity: 'x/tenant — Experimental',
+        maturity: 'x/tenant — Beta',
         details: [
           'tenant identity from JWT or header, evaluated at the transport layer',
           'per-tenant quota and policy separate from route wiring',
@@ -967,12 +979,18 @@ export const EXAMPLES_COPY = {
     referenceMatrixBody:
       'Each app adds one x/* family to the standard-service baseline. Read the canonical reference app first, then open the one that matches your capability.',
     referenceMatrix: [
+      { name: 'reference/with-ai', kicker: 'x/ai', description: 'Multi-provider AI with streaming responses and tool routing', href: '/docs/modules/x-ai', maturity: 'Experimental' },
+      { name: 'reference/with-tenant', kicker: 'x/tenant', description: 'Per-tenant routing, quota enforcement, and JWT-backed policy', href: '/docs/modules/x-tenant', maturity: 'Beta' },
+      { name: 'reference/with-tenant-admin', kicker: 'x/tenant', description: 'Multi-tenant admin plane: lifecycle, quota admin, and usage recording', href: '/docs/modules/x-tenant', maturity: 'Beta' },
       { name: 'reference/with-gateway', kicker: 'x/gateway', description: 'Edge proxy, load balancing, and route rewriting', href: '/docs/modules/x-gateway', maturity: 'Beta' },
-      { name: 'reference/with-messaging', kicker: 'x/messaging', description: 'Async message publishing and subscription wiring', href: '/docs/modules/x-messaging', maturity: 'Experimental' },
-      { name: 'reference/with-websocket', kicker: 'x/websocket', description: 'WebSocket real-time transport', href: '/docs/modules/x-websocket', maturity: 'Beta' },
-      { name: 'reference/with-webhook', kicker: 'x/webhook', description: 'Webhook receiver with signature verification', href: '/docs/modules/x-webhook', maturity: 'Experimental' },
       { name: 'reference/with-rest', kicker: 'x/rest', description: 'CRUD resource controllers and REST conventions', href: '/docs/modules/x-rest', maturity: 'Beta' },
-      { name: 'reference/with-ops', kicker: 'x/ops', description: 'Protected admin and operations surfaces', href: '/docs/modules/x-ops', maturity: 'Experimental' },
+      { name: 'reference/with-websocket', kicker: 'x/websocket', description: 'WebSocket real-time transport', href: '/docs/modules/x-websocket', maturity: 'Beta' },
+      { name: 'reference/with-messaging', kicker: 'x/messaging', description: 'Async message publishing and subscription wiring', href: '/docs/modules/x-messaging', maturity: 'Beta' },
+      { name: 'reference/with-events', kicker: 'x/messaging', description: 'In-process pubsub, idempotent consumption, delayed retry, and webhook delivery', href: '/docs/modules/x-messaging', maturity: 'Experimental' },
+      { name: 'reference/with-rpc', kicker: 'x/rpc', description: 'gRPC server with HTTP gateway mount via x/rpc/server and x/rpc/gateway', href: '/docs/modules/x-rpc', maturity: 'Experimental' },
+      { name: 'reference/with-webhook', kicker: 'x/messaging/webhook', description: 'Webhook receiver with signature verification', href: '/docs/modules/x-webhook', maturity: 'Experimental' },
+      { name: 'reference/with-ops', kicker: 'x/observability/ops', description: 'Protected admin and operations surfaces', href: '/docs/modules/x-ops', maturity: 'Experimental' },
+      { name: 'reference/with-frontend', kicker: 'x/frontend', description: 'Static and embedded SPA serving with cache headers, SPA fallback, and API co-location', href: '/docs/modules/x-frontend', maturity: 'Beta' },
       { name: 'reference/production-service', kicker: 'stable roots', description: 'Production-hardened variant with full lifecycle, TLS, and tests', href: '/docs/reference-app', maturity: 'Supported reference' },
     ],
     workerfleetTitle: 'Production-scale reference: reference/workerfleet',
@@ -1078,7 +1096,7 @@ export const EXAMPLES_COPY = {
         kicker: 'multi-tenant saas',
         title: 'reference/with-tenant',
         body: '带 per-tenant 路由、配额执行和 JWT 策略评估的多租户服务。x/tenant 在 HTTP 内核之外承接租户层，稳定根不受租户逻辑演进影响。',
-        maturity: 'x/tenant — 实验性',
+        maturity: 'x/tenant — Beta',
         details: [
           '租户身份来自 JWT 或 header，在传输层评估',
           'per-tenant 配额与策略与 route wiring 分开',
@@ -1094,12 +1112,18 @@ export const EXAMPLES_COPY = {
     referenceMatrixBody:
       '每个参考应用都在 standard-service 的基础上加入一个 x/* 家族。先读 canonical 参考应用，再按你需要评估的能力选择进入。',
     referenceMatrix: [
+      { name: 'reference/with-ai', kicker: 'x/ai', description: '带 streaming 响应与 tool 路由的多 provider AI 服务', href: '/zh/docs/modules/x-ai', maturity: '实验性' },
+      { name: 'reference/with-tenant', kicker: 'x/tenant', description: 'Per-tenant 路由、配额执行与 JWT 策略评估', href: '/zh/docs/modules/x-tenant', maturity: 'Beta' },
+      { name: 'reference/with-tenant-admin', kicker: 'x/tenant', description: '多租户管理平面：生命周期、配额管理与用量记录', href: '/zh/docs/modules/x-tenant', maturity: 'Beta' },
       { name: 'reference/with-gateway', kicker: 'x/gateway', description: '边缘代理、负载均衡与路由重写', href: '/zh/docs/modules/x-gateway', maturity: 'Beta' },
-      { name: 'reference/with-messaging', kicker: 'x/messaging', description: '异步消息发布与订阅接线', href: '/zh/docs/modules/x-messaging', maturity: '实验性' },
-      { name: 'reference/with-websocket', kicker: 'x/websocket', description: 'WebSocket 实时传输', href: '/zh/docs/modules/x-websocket', maturity: 'Beta' },
-      { name: 'reference/with-webhook', kicker: 'x/webhook', description: '带签名校验的 Webhook 接收器', href: '/zh/docs/modules/x-webhook', maturity: '实验性' },
       { name: 'reference/with-rest', kicker: 'x/rest', description: 'CRUD 资源控制器与 REST 规范', href: '/zh/docs/modules/x-rest', maturity: 'Beta' },
-      { name: 'reference/with-ops', kicker: 'x/ops', description: '受保护的管理与运维表面', href: '/zh/docs/modules/x-ops', maturity: '实验性' },
+      { name: 'reference/with-websocket', kicker: 'x/websocket', description: 'WebSocket 实时传输', href: '/zh/docs/modules/x-websocket', maturity: 'Beta' },
+      { name: 'reference/with-messaging', kicker: 'x/messaging', description: '异步消息发布与订阅接线', href: '/zh/docs/modules/x-messaging', maturity: 'Beta' },
+      { name: 'reference/with-events', kicker: 'x/messaging', description: '进程内 pubsub、幂等消费、延迟重试与 webhook 投递', href: '/zh/docs/modules/x-messaging', maturity: '实验性' },
+      { name: 'reference/with-rpc', kicker: 'x/rpc', description: '通过 x/rpc/server 托管 gRPC 服务并经 x/rpc/gateway 挂载 HTTP 端点', href: '/zh/docs/modules/x-rpc', maturity: '实验性' },
+      { name: 'reference/with-webhook', kicker: 'x/messaging/webhook', description: '带签名校验的 Webhook 接收器', href: '/zh/docs/modules/x-webhook', maturity: '实验性' },
+      { name: 'reference/with-ops', kicker: 'x/observability/ops', description: '受保护的管理与运维表面', href: '/zh/docs/modules/x-ops', maturity: '实验性' },
+      { name: 'reference/with-frontend', kicker: 'x/frontend', description: '静态与内嵌 SPA 服务，支持缓存头、SPA fallback 与 API 同挂载', href: '/zh/docs/modules/x-frontend', maturity: 'Beta' },
       { name: 'reference/production-service', kicker: 'stable roots', description: '带完整生命周期、TLS 和测试的生产级加固变体', href: '/zh/docs/reference-app', maturity: '受支持参考' },
     ],
     workerfleetTitle: '生产规模参考：reference/workerfleet',
@@ -1147,7 +1171,7 @@ export const STABILITY_COPY = {
         badge: 'beta',
         promise: 'API frozen between minor release refs.',
         adopt: 'Safe to adopt with awareness — check release notes before upgrades.',
-        modules: ['x/rest', 'x/gateway', 'x/websocket', 'x/observability'],
+        modules: ['x/rest', 'x/gateway', 'x/websocket', 'x/observability', 'x/tenant', 'x/frontend', 'x/messaging'],
       },
       {
         status: 'experimental',
@@ -1155,7 +1179,7 @@ export const STABILITY_COPY = {
         badge: 'experimental',
         promise: 'API may change. Evaluate deliberately before adopting.',
         adopt: 'Adopt for clear reasons after reading the module primer and maturity evidence.',
-        modules: ['x/ai', 'x/tenant', 'x/data', 'x/fileapi', 'x/messaging', 'x/resilience', 'x/cache', 'x/devtools', 'x/discovery', 'x/frontend', 'x/ipc', 'x/mq', 'x/ops', 'x/pubsub', 'x/scheduler', 'x/webhook'],
+        modules: ['x/ai', 'x/data', 'x/fileapi', 'x/openapi', 'x/resilience', 'x/rpc', 'x/validate', 'x/data/cache', 'x/gateway/discovery', 'x/gateway/ipc', 'x/messaging/mq', 'x/messaging/pubsub', 'x/messaging/scheduler', 'x/messaging/webhook', 'x/observability/devtools', 'x/observability/ops'],
       },
     ],
     promotionTitle: 'How modules get promoted',
@@ -1199,7 +1223,7 @@ export const STABILITY_COPY = {
         badge: 'beta',
         promise: 'minor 发布 ref 间 API 冻结。',
         adopt: '可以采用，但升级前需要查看 release notes。',
-        modules: ['x/rest', 'x/gateway', 'x/websocket', 'x/observability'],
+        modules: ['x/rest', 'x/gateway', 'x/websocket', 'x/observability', 'x/tenant', 'x/frontend', 'x/messaging'],
       },
       {
         status: 'experimental',
@@ -1207,7 +1231,7 @@ export const STABILITY_COPY = {
         badge: '实验性',
         promise: 'API 可能变化，采用前请评估。',
         adopt: '在阅读模块手册和成熟度证据后，有明确理由时再采用。',
-        modules: ['x/ai', 'x/tenant', 'x/data', 'x/fileapi', 'x/messaging', 'x/resilience', 'x/cache', 'x/devtools', 'x/discovery', 'x/frontend', 'x/ipc', 'x/mq', 'x/ops', 'x/pubsub', 'x/scheduler', 'x/webhook'],
+        modules: ['x/ai', 'x/data', 'x/fileapi', 'x/openapi', 'x/resilience', 'x/rpc', 'x/validate', 'x/data/cache', 'x/gateway/discovery', 'x/gateway/ipc', 'x/messaging/mq', 'x/messaging/pubsub', 'x/messaging/scheduler', 'x/messaging/webhook', 'x/observability/devtools', 'x/observability/ops'],
       },
     ],
     promotionTitle: '模块如何晋级',
@@ -1297,33 +1321,40 @@ export const ECOSYSTEM_COPY = {
         maturity: 'beta',
         docsHref: '/docs/modules/x-observability',
       },
+      {
+        name: 'x/tenant',
+        scenario: 'Multi-tenant SaaS',
+        useCase: 'Resolve tenant identity at the transport layer and enforce per-tenant policy without letting tenant logic leak into stable roots or handler code.',
+        maturity: 'beta',
+        docsHref: '/docs/modules/x-tenant',
+      },
+      {
+        name: 'x/frontend',
+        scenario: 'Frontend asset serving',
+        useCase: 'Serve static assets, embed SPA shells, and handle cache-busting strategies as a transport-layer concern — without polluting handler or business logic.',
+        maturity: 'beta',
+        docsHref: '/docs/modules/x-frontend',
+      },
+      {
+        name: 'x/messaging',
+        scenario: 'Messaging, queues & webhooks',
+        useCase: 'Connect message queues, publish/subscribe flows, scheduled jobs, and inbound or outbound webhook transport — all under one family entrypoint. Subordinate primitives (mq, pubsub, scheduler, webhook) remain experimental.',
+        maturity: 'beta',
+        docsHref: '/docs/modules/x-messaging',
+      },
     ],
     experimentalFamilies: [
       {
         name: 'x/ai',
         scenario: 'AI streaming & tool routing',
-        useCase: 'Build AI streaming SSE endpoints with provider contracts, session state management, and explicit tool invocation policy — without coupling AI logic to the HTTP kernel.',
+        useCase: 'Build AI streaming SSE endpoints with provider contracts, session state management, and explicit tool invocation policy — without coupling AI logic to the HTTP kernel. Stable-tier subpackages (provider, session, streaming, tool) have beta evidence.',
         maturity: 'experimental',
         docsHref: '/docs/modules/x-ai',
       },
       {
-        name: 'x/tenant',
-        scenario: 'Multi-tenant SaaS',
-        useCase: 'Resolve tenant identity at the transport layer and enforce per-tenant policy without letting tenant logic leak into stable roots or handler code.',
-        maturity: 'experimental',
-        docsHref: '/docs/modules/x-tenant',
-      },
-      {
-        name: 'x/messaging',
-        scenario: 'Messaging, queues & webhooks',
-        useCase: 'Connect message queues, publish/subscribe flows, scheduled jobs, and inbound or outbound webhook transport — all under one family entrypoint.',
-        maturity: 'experimental',
-        docsHref: '/docs/modules/x-messaging',
-      },
-      {
         name: 'x/data',
         scenario: 'Data access & storage',
-        useCase: 'Add structured data access primitives on top of the store stable root — typed queries, migrations, and repository patterns for common persistence scenarios.',
+        useCase: 'Add structured data access primitives on top of the store stable root — typed queries, migrations, and repository patterns for common persistence scenarios. x/data/file and x/data/idempotency have beta surface evidence.',
         maturity: 'experimental',
         docsHref: '/docs/modules/x-data',
       },
@@ -1335,6 +1366,13 @@ export const ECOSYSTEM_COPY = {
         docsHref: '/docs/modules/x-fileapi',
       },
       {
+        name: 'x/openapi',
+        scenario: 'OpenAPI document generation',
+        useCase: 'Generate OpenAPI 3.1 specifications from registered routes and operation hints — dependency-free JSON/YAML output wired through the CLI.',
+        maturity: 'experimental',
+        docsHref: '/docs/modules/x-openapi',
+      },
+      {
         name: 'x/resilience',
         scenario: 'Resilience & circuit breaking',
         useCase: 'Wrap upstream calls with retry logic, circuit breakers, and timeout policies — composable primitives that stay outside the stable transport layer.',
@@ -1342,11 +1380,18 @@ export const ECOSYSTEM_COPY = {
         docsHref: '/docs/modules/x-resilience',
       },
       {
-        name: 'x/frontend',
-        scenario: 'Frontend asset serving',
-        useCase: 'Serve static assets, embed SPA shells, and handle cache-busting strategies as a transport-layer concern — without polluting handler or business logic.',
+        name: 'x/rpc',
+        scenario: 'gRPC server and gateway',
+        useCase: 'Optional gRPC server lifecycle helpers, outbound connection pooling, and HTTP-over-RPC gateway adapters alongside standard HTTP routes.',
         maturity: 'experimental',
-        docsHref: '/docs/modules/x-frontend',
+        docsHref: '/docs/modules/x-rpc',
+      },
+      {
+        name: 'x/validate',
+        scenario: 'Request validation',
+        useCase: 'Explicit BindJSON and Bind call sites in handlers that decode JSON and return structured contract.APIError responses — no tag-based global validator.',
+        maturity: 'experimental',
+        docsHref: '/docs/modules/x-validate',
       },
     ],
     maturityNote: 'Beta families have API snapshots and promotion evidence. Experimental families are tested but not API-frozen. See',
@@ -1401,33 +1446,40 @@ export const ECOSYSTEM_COPY = {
         maturity: 'beta',
         docsHref: '/zh/docs/modules/x-observability',
       },
+      {
+        name: 'x/tenant',
+        scenario: '多租户 SaaS',
+        useCase: '在传输层解析租户身份并执行每租户策略——不让租户逻辑泄漏到稳定根或 handler 代码。',
+        maturity: 'beta',
+        docsHref: '/zh/docs/modules/x-tenant',
+      },
+      {
+        name: 'x/frontend',
+        scenario: '前端资产服务',
+        useCase: '提供静态资产服务、嵌入 SPA shell、处理缓存清除策略——作为传输层关注点，不污染 handler 或业务逻辑。',
+        maturity: 'beta',
+        docsHref: '/zh/docs/modules/x-frontend',
+      },
+      {
+        name: 'x/messaging',
+        scenario: '消息队列与 Webhook',
+        useCase: '连接消息队列、发布/订阅流、定时任务以及入站或出站 Webhook 传输——统一在一个家族入口点下。下级原语（mq、pubsub、scheduler、webhook）仍为实验性。',
+        maturity: 'beta',
+        docsHref: '/zh/docs/modules/x-messaging',
+      },
     ],
     experimentalFamilies: [
       {
         name: 'x/ai',
         scenario: 'AI 流式与工具路由',
-        useCase: '使用 provider contract、session 状态管理和显式工具调用策略构建 AI 流式 SSE 端点——不让 AI 逻辑与 HTTP 内核耦合。',
+        useCase: '使用 provider contract、session 状态管理和显式工具调用策略构建 AI 流式 SSE 端点——不让 AI 逻辑与 HTTP 内核耦合。稳定层子包（provider、session、streaming、tool）已有 beta 证据。',
         maturity: 'experimental',
         docsHref: '/zh/docs/modules/x-ai',
       },
       {
-        name: 'x/tenant',
-        scenario: '多租户 SaaS',
-        useCase: '在传输层解析租户身份并执行每租户策略——不让租户逻辑泄漏到稳定根或 handler 代码。',
-        maturity: 'experimental',
-        docsHref: '/zh/docs/modules/x-tenant',
-      },
-      {
-        name: 'x/messaging',
-        scenario: '消息队列与 Webhook',
-        useCase: '连接消息队列、发布/订阅流、定时任务以及入站或出站 Webhook 传输——统一在一个家族入口点下。',
-        maturity: 'experimental',
-        docsHref: '/zh/docs/modules/x-messaging',
-      },
-      {
         name: 'x/data',
         scenario: '数据访问与存储',
-        useCase: '在 store 稳定根之上添加结构化数据访问原语——类型化查询、迁移和常见持久化场景的 repository 模式。',
+        useCase: '在 store 稳定根之上添加结构化数据访问原语——类型化查询、迁移和常见持久化场景的 repository 模式。x/data/file 和 x/data/idempotency 已有 beta surface 证据。',
         maturity: 'experimental',
         docsHref: '/zh/docs/modules/x-data',
       },
@@ -1439,6 +1491,13 @@ export const ECOSYSTEM_COPY = {
         docsHref: '/zh/docs/modules/x-fileapi',
       },
       {
+        name: 'x/openapi',
+        scenario: 'OpenAPI 文档生成',
+        useCase: '从已注册路由和操作提示生成 OpenAPI 3.1 规范——无依赖的 JSON/YAML 输出，通过 CLI 集成。',
+        maturity: 'experimental',
+        docsHref: '/zh/docs/modules/x-openapi',
+      },
+      {
         name: 'x/resilience',
         scenario: '弹性与熔断',
         useCase: '用重试逻辑、熔断器和超时策略包装上游调用——可组合的原语，保持在稳定传输层之外。',
@@ -1446,11 +1505,18 @@ export const ECOSYSTEM_COPY = {
         docsHref: '/zh/docs/modules/x-resilience',
       },
       {
-        name: 'x/frontend',
-        scenario: '前端资产服务',
-        useCase: '提供静态资产服务、嵌入 SPA shell、处理缓存清除策略——作为传输层关注点，不污染 handler 或业务逻辑。',
+        name: 'x/rpc',
+        scenario: 'gRPC 服务与网关',
+        useCase: '可选的 gRPC 服务端生命周期助手、出站连接池和 HTTP-over-RPC 网关适配器，与标准 HTTP 路由并行运行。',
         maturity: 'experimental',
-        docsHref: '/zh/docs/modules/x-frontend',
+        docsHref: '/zh/docs/modules/x-rpc',
+      },
+      {
+        name: 'x/validate',
+        scenario: '请求验证',
+        useCase: '在 handler 中显式调用 BindJSON 和 Bind，解码 JSON 并返回结构化的 contract.APIError——不使用 tag 驱动的全局验证器。',
+        maturity: 'experimental',
+        docsHref: '/zh/docs/modules/x-validate',
       },
     ],
     maturityNote: 'Beta 家族有 API 快照和晋级证据。Experimental 家族有测试但 API 未冻结。详见',

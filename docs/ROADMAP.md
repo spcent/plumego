@@ -168,12 +168,11 @@ Next work:
 
 ## Phase 13: Docs and Onboarding Sync
 
-Status: in progress
+Status: substantially complete (2026-05-20)
 
-Current state:
+Work completed:
 
 - the repository now has four distinct control surfaces: `docs/`, `specs/`, `tasks/`, and `reference/`
-- onboarding docs must stay aligned with the current `Makefile`, manifests, and reference app
 - `README.md` and `README_CN.md` are structurally aligned
 - `docs/getting-started.md` matches the actual API surface
 - `env.example` now includes `AUTH_TOKEN` (used by `x/observability/ops` but previously missing)
@@ -181,8 +180,13 @@ Current state:
 - user-facing scenario entrypoint maps now identify the first reads for REST API,
   multi-tenant API, edge gateway, realtime, AI, and observability work without
   treating `x/*` packages as application bootstrap paths
+- `docs/AGENT_FIRST.md` added as external-facing agent-first design overview
+- `docs/README.md` updated to distinguish `agent-first.md` (internal operating reference)
+  from `AGENT_FIRST.md` (external design overview)
+- website module primers added for `x/rpc`, `x/openapi`, and `x/validate`
+- `x/tenant` and `x/frontend` stability labels corrected to Beta across website and sidebar
 
-Next work:
+Ongoing (continuous):
 
 - keep `README.md` and `README_CN.md` aligned in scope and meaning as features land
 - keep `docs/getting-started.md` and module primers aligned with `reference/standard-service`
@@ -195,7 +199,7 @@ Non-goals:
 
 ## Phase 14: Extension Stability Evaluation
 
-Status: substantially complete
+Status: complete
 
 Current state:
 
@@ -226,14 +230,77 @@ Current state:
   `ErrHubStopped`), `RangeConns` iteration and early return, `BroadcastRoom`/
   `BroadcastAll` no-op after stop, `Leave`/`RemoveConn` non-member no-op; primer
   updated with boundary section and coverage section
+- `x/tenant`, `x/frontend`, and `x/messaging` (app-facing service) promoted to
+  `beta` with two consecutive release refs (`v1.0.0`, `v1.1.0`), API unchanged
+  across both refs, release-backed snapshots recorded, owner sign-off complete,
+  all blockers cleared in `specs/extension-beta-evidence.yaml`
+- selected surfaces under `x/ai` (`provider`, `session`, `streaming`, `tool`)
+  and `x/data` (`file`, `idempotency`) confirmed as beta surfaces with two
+  release refs, owner sign-off, and evidence recorded; parent families remain
+  experimental
+- `specs/task-routing.yaml` `beta_families` updated to include `x/tenant`,
+  `x/frontend`, and `x/messaging`
+- `docs/DEPRECATION.md` beta extension table updated to include all promoted families
+
+## Phase 16: Active Extension Evaluations
+
+Status: in progress
+
+Current state:
+
+- task card 1500 (x/tenant GA evaluation) is in the active queue pending
+  `v1.2.0` release evidence; `x/tenant` is beta — GA requires one additional
+  release ref with no API changes and a second owner sign-off cycle
+- task card 1501 (x/ai stable-tier subpackages beta evaluation) is in the active
+  queue; each subpackage (`provider`, `session`, `streaming`, `tool`) requires
+  its own per-subpackage evaluation after `v1.2.0` release evidence
+- task card 1502 (x/openapi beta evaluation) is in the active queue; `x/openapi`
+  requires cleanup of stale milestone-card language in `module.yaml` and two
+  consecutive release refs before promotion
 
 Next work:
 
-- promote remaining candidates (`x/tenant`, `x/frontend`) only after release-history
-  evidence proves two consecutive minor releases without exported API changes
-- extend `docs/DEPRECATION.md` beta extension table as more modules are promoted
-- evaluate `x/ai` stable-tier subpackages individually after release-history
-  evidence is available
+- execute task card 1500 once `v1.2.0` release evidence is available
+- execute task card 1501 per stable-tier subpackage after `v1.2.0` release evidence
+- execute task card 1502 after `x/openapi` release-history evidence is complete
+- clarify `x/data` and `x/fileapi` operational guidance as topology surfaces mature
+- expand `x/gateway/discovery` backends only when explicit adapters are ready
+
+Non-goals:
+
+- do not promote extensions without two consecutive release refs and owner sign-off
+- do not bundle multiple subpackage evaluations into a single promotion card
+
+## Phase 15: Community Onboarding Improvements
+
+Status: substantially complete (2026-05-20)
+
+Work completed:
+
+- `README.md` and `README_CN.md`: scenario routing decision table added
+- `docs/benchmarks/README.md`: benchmark methodology, medians vs. Chi/Gin/Echo,
+  net/http compatibility cost explanation
+- `docs/troubleshooting.md`: 14-category onboarding troubleshooting guide
+- `docs/getting-started_CN.md`: Chinese onboarding guide (complete)
+- `docs/modules/x-rpc/README.md`: expanded from 23 lines to full primer
+  (server lifecycle, client pool, interceptors, gateway, wiring diagram)
+- `docs/modules/x-openapi/README.md`: expanded from 7 lines to full primer
+  (CLI quick start, hint file format, Go API, serialisation, boundary rules)
+- `docs/modules/x-validate/README.md`: expanded from 18 lines to full primer
+  (BindJSON/Bind usage, Validator interface, adapter pattern, error shape)
+- `docs/modules/x-resilience/README.md`: usage examples added (circuit breaker,
+  keyed rate limiter, HTTP middleware integration)
+- `docs/ADOPTION_PATH.md`: gRPC/RPC and OpenAPI entries added
+- `specs/change-recipes/`: three new recipes (add-websocket-room, add-ai-tool,
+  add-grpc-method)
+- `internal/checks/cross-extension-deps`: new boundary checker validates
+  module.yaml forbidden_imports against actual Go imports in x/* packages
+- task cards 1500–1502 added to active queue for B1/B2/B3 evaluation
+
+Non-goals:
+
+- do not add Chinese versions of all module primers in this phase
+- do not promote extensions without release-history evidence
 
 ## Cross-Cutting Workstreams
 
@@ -268,15 +335,18 @@ Next work:
 - keep docs examples compatible with the current API surface
 - run `go run ./internal/checks/extension-maturity` when extension manifest
   status or risk changes so the dashboard stays aligned
+- run `go run ./internal/checks/cross-extension-deps` when x/* module.yaml
+  forbidden_imports or actual imports change to confirm boundary compliance
 
 ## Suggested Execution Order
 
-1. Keep Phase 13 docs and onboarding sync continuous.
+1. Keep Phase 13 and Phase 15 docs and onboarding sync continuous.
 2. Keep `docs/EXTENSION_MATURITY.md` aligned with module manifests and evidence records.
-3. Evaluate `x/ai` stable-tier subpackages individually after release-history evidence is available.
-4. Advance `x/tenant` production readiness.
-5. Clarify `x/data` and `x/fileapi` operational guidance.
-6. Expand `x/gateway/discovery` backends only when explicit adapters are ready.
+3. Execute task card 1500 (x/tenant GA evaluation) once v1.2.0 release evidence is available.
+4. Execute task card 1501 (x/ai stable-tier subpackages beta evaluation) per-subpackage after release evidence.
+5. Execute task card 1502 (x/openapi module.yaml cleanup and beta evaluation) once release evidence is available.
+6. Clarify `x/data` and `x/fileapi` operational guidance.
+7. Expand `x/gateway/discovery` backends only when explicit adapters are ready.
 
 ## What Not to Do
 

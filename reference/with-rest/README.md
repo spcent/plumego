@@ -15,6 +15,7 @@ this scenario reference as wiring guidance, not as a compatibility claim.
 - explicit `x/validate.Bind[T]` request validation with an app-local validator
 - visible route registration through `core.App`
 - standard `contract.WriteResponse` for app-local handlers
+- canonical `main.run -> app.Start(ctx)` lifecycle ownership
 
 ## Routes
 

@@ -10,7 +10,7 @@ const copy = STABILITY_COPY.zh;
 
 const journeySteps = [
   { label: '为什么选择', href: '/zh/why-plumego' },
-  { label: '生态系统', href: '/zh/ecosystem' },
+  { label: '示例', href: '/zh/examples' },
   { label: '发布', href: '/zh/releases' },
 ];
 
@@ -66,7 +66,7 @@ function badgeClass(status: string): string {
       </div>
       <div class="stat-hero__cell">
         <span class="stat-hero__num stat-hero__num--warn">
-          {MODULE_FACTS.allExtensionPaths.length - MODULE_FACTS.betaExtensionFamilies.length}
+          {MODULE_FACTS.experimentalFamilies.length}
         </span>
         <span class="stat-hero__label">实验性扩展</span>
       </div>
@@ -140,7 +140,7 @@ function badgeClass(status: string): string {
     <div class="section__intro">
       <h2>Beta 扩展——ref 间 API 冻结。</h2>
       <p>
-        这四个模块完成了晋级清单：连续两个 tagged release ref 内 API 无变化、有 release-backed 快照、以及负责人签字确认。
+        七个家族已完成晋级清单：连续两个 tagged release ref 内 API 无变化、有 release-backed 快照、以及负责人签字确认。
         可以采用，但升级前需要查看 release notes。
       </p>
     </div>
@@ -150,6 +150,9 @@ function badgeClass(status: string): string {
         { name: 'x/gateway', owner: 'edge', desc: '代理、重写、负载均衡与边缘传输', href: '/zh/docs/modules/x-gateway' },
         { name: 'x/websocket', owner: 'realtime', desc: 'WebSocket hub 与显式路由注册', href: '/zh/docs/modules/x-websocket' },
         { name: 'x/observability', owner: 'observability', desc: 'Exporter、tracer、collector 与 adapter 接线', href: '/zh/docs/modules/x-observability' },
+        { name: 'x/tenant', owner: 'tenant', desc: '租户路由、配额执行与 JWT 策略', href: '/zh/docs/modules/x-tenant' },
+        { name: 'x/frontend', owner: 'assets', desc: '静态资产服务、SPA 嵌入与预压缩投递', href: '/zh/docs/modules/x-frontend' },
+        { name: 'x/messaging', owner: 'messaging', desc: '异步消息、队列、pubsub 流与入站 Webhook 投递', href: '/zh/docs/modules/x-messaging' },
       ].map((mod) => (
         <a class="page-panel page-panel--info beta-panel" href={mod.href}>
           <p class="signal-list__kicker">beta</p>

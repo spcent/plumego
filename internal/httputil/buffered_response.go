@@ -21,6 +21,10 @@ type BufferedResponseRecorder struct {
 	overflow       bool
 }
 
+// BufferedResponse captures headers, status, and body in memory.
+// It does not write to an underlying ResponseWriter.
+type BufferedResponse = BufferedResponseRecorder
+
 // NewBufferedResponseRecorder creates a non-forwarding response recorder.
 func NewBufferedResponseRecorder(w http.ResponseWriter) *BufferedResponseRecorder {
 	return newBufferedResponseRecorder(w, 0)
@@ -129,22 +133,8 @@ func (r *BufferedResponseRecorder) WriteTo(dst http.ResponseWriter) (int, error)
 	if r == nil || dst == nil {
 		return 0, nil
 	}
-	replaceHeaders(dst.Header(), r.header)
+	ReplaceHeaders(dst.Header(), r.header)
 	EnsureNoSniff(dst.Header())
 	dst.WriteHeader(r.StatusCode())
 	return SafeWrite(dst, r.Body())
-}
-
-func replaceHeaders(dst, src http.Header) {
-	if dst == nil {
-		return
-	}
-	for key := range dst {
-		delete(dst, key)
-	}
-	for key, values := range src {
-		cloned := make([]string, len(values))
-		copy(cloned, values)
-		dst[key] = cloned
-	}
 }

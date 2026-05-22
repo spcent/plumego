@@ -1,11 +1,9 @@
 ---
-import AgentFirstShowcase from '../components/home/AgentFirstShowcase.astro';
 import CoreDifferentiators from '../components/home/CoreDifferentiators.astro';
 import FinalCta from '../components/home/FinalCta.astro';
 import Hero from '../components/home/Hero.astro';
 import MinimalExample from '../components/home/MinimalExample.astro';
 import StabilityBand from '../components/home/StabilityBand.astro';
-import ValueProps from '../components/home/ValueProps.astro';
 import MarketingLayout from '../layouts/MarketingLayout.astro';
 import { HOME_COPY } from '../data/site';
 
@@ -14,8 +12,8 @@ const copy = HOME_COPY.en;
 
 <MarketingLayout
   locale="en"
-  title="Explicit Go HTTP. Built for humans and agents."
-  description="Explicit routing that survives code review. Machine-readable specs give AI coding agents a clear operating model. Zero external dependencies. 9 stable modules with the v1 compatibility promise."
+  title="Standard Library Go HTTP Toolkit — Explicit, Zero-Dependency, Machine-Readable Specs"
+  description="Plumego is a Go 1.26+ stdlib-first HTTP toolkit. Routing, middleware, and service wiring stay visible in code — readable by human reviewers and AI coding agents sharing the same route map."
   currentPath="/"
 >
   <Hero copy={copy} />
@@ -29,10 +27,6 @@ const copy = HOME_COPY.en;
     items={copy.stabilityBandItems}
     cta={copy.stabilityBandCta}
   />
-
-  <AgentFirstShowcase locale="en" />
-
-  <ValueProps copy={copy} />
 
   <section class="section entry-points-section">
     <div class="section__intro section__intro--center">
@@ -48,6 +42,33 @@ const copy = HOME_COPY.en;
           <a class="entry-point-card__cta" href={card.href}>{card.label} →</a>
         </article>
       ))}
+    </div>
+  </section>
+
+  <!-- Use-case trust strip -->
+  <section class="section use-case-strip">
+    <p class="use-case-strip__eyebrow">common use cases</p>
+    <div class="use-case-grid">
+      <div class="use-case-card">
+        <p class="use-case-card__label">Internal HTTP APIs</p>
+        <p class="use-case-card__desc">Route ownership and middleware order visible in every code review. No hidden wiring.</p>
+        <a class="use-case-card__link" href="/examples">See example →</a>
+      </div>
+      <div class="use-case-card">
+        <p class="use-case-card__label">Platform services</p>
+        <p class="use-case-card__desc">Multiple teams start from one reference shape. Structural drift stays low as services grow.</p>
+        <a class="use-case-card__link" href="/docs/reference-app">See reference app →</a>
+      </div>
+      <div class="use-case-card">
+        <p class="use-case-card__label">AI-enabled services</p>
+        <p class="use-case-card__desc">x/ai adds provider abstraction and streaming — separated cleanly from the stable HTTP kernel.</p>
+        <a class="use-case-card__link" href="/docs/modules/x-ai">See x/ai primer →</a>
+      </div>
+      <div class="use-case-card">
+        <p class="use-case-card__label">Agent-maintained repos</p>
+        <p class="use-case-card__desc">Machine-readable specs route AI coding assistants to the right module before a line is written.</p>
+        <a class="use-case-card__link" href="/docs/concepts/agent-first-workflow">See agent workflow →</a>
+      </div>
     </div>
   </section>
 
@@ -125,6 +146,84 @@ const copy = HOME_COPY.en;
   }
 
   .entry-point-card__cta:hover {
+    color: var(--accent-strong);
+    text-decoration: underline;
+  }
+
+  /* ── Use-case trust strip ─────────────────────────────── */
+  .use-case-strip {
+    padding-block: 3rem;
+    background: var(--bg-strong);
+  }
+
+  .use-case-strip__eyebrow {
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--accent);
+    text-align: center;
+    margin-bottom: 1.5rem;
+  }
+
+  .use-case-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1rem;
+    max-width: 64rem;
+    margin-inline: auto;
+  }
+
+  @media (min-width: 640px) {
+    .use-case-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+
+  @media (min-width: 960px) {
+    .use-case-grid { grid-template-columns: repeat(4, 1fr); }
+  }
+
+  .use-case-card {
+    background: var(--bg-elevated);
+    border: 1px solid var(--line);
+    border-radius: 0.75rem;
+    padding: 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    transition: border-color 0.18s, box-shadow 0.18s;
+  }
+
+  .use-case-card:hover {
+    border-color: color-mix(in srgb, var(--accent) 25%, var(--line));
+    box-shadow: var(--shadow);
+  }
+
+  .use-case-card__label {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--fg);
+    margin: 0;
+    line-height: 1.3;
+  }
+
+  .use-case-card__desc {
+    font-size: 0.84rem;
+    color: var(--fg-soft);
+    line-height: 1.6;
+    margin: 0;
+    flex: 1;
+  }
+
+  .use-case-card__link {
+    font-size: 0.82rem;
+    font-weight: 500;
+    color: var(--accent);
+    text-decoration: none;
+    margin-top: 0.2rem;
+    transition: color 0.15s;
+  }
+
+  .use-case-card__link:hover {
     color: var(--accent-strong);
     text-decoration: underline;
   }

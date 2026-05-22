@@ -1,0 +1,227 @@
+---
+title: Migrate from Chi
+description: Side-by-side code comparison and a step-by-step path for moving a Chi service to Plumego.
+translationKey: guides-migrate-from-chi
+sidebar:
+  order: 19
+---
+
+# Migrate from Chi
+
+This guide is for teams running a Chi service who want to move to Plumego. Because Chi also uses plain `func(http.ResponseWriter, *http.Request)` handlers, the migration is primarily about adding the `contract` response layer, replacing param extraction, updating route syntax, and adopting the structured app lifecycle.
+
+Estimated effort: **hours to one day per service**, depending on handler count. Middleware ports without changes.
+
+## Before you start
+
+Read [Why Plumego](/why-plumego) and check the [comparison table](/compare) first. The core trade-off: Chi is routing-only with zero opinions on response shape, service structure, or module stability. Plumego adds a `contract` layer, a canonical service shape, and explicit maturity tiers on top of the same stdlib handler model.
+
+If Chi already fits your team and you are happy building your own response envelope and service shape, this migration is not the right investment.
+
+## What changes and what stays the same
+
+| Surface | Chi | Plumego |
+| --- | --- | --- |
+| Handler signature | `func(w http.ResponseWriter, r *http.Request)` | `func(w http.ResponseWriter, r *http.Request)` |
+| Route registration | `r.Get(path, h)` | `r.Get(path, h)` |
+| Path parameter syntax | `/users/{id}` | `/users/:id` |
+| Path parameter read | `chi.URLParam(r, "id")` | `r.PathValue("id")` |
+| Query parameters | `r.URL.Query().Get("k")` | `r.URL.Query().Get("k")` |
+| JSON body | `json.NewDecoder(r.Body).Decode(&v)` | `json.NewDecoder(r.Body).Decode(&v)` |
+| JSON response | caller writes manually | `contract.WriteResponse(w, r, 200, v, nil)` |
+| Error response | caller writes manually | `contract.WriteError(w, r, err)` |
+| Middleware | `func(http.Handler) http.Handler` | `func(http.Handler) http.Handler` |
+| Groups | `r.Group(prefix, fn)` | `r.Group(prefix, middleware...)` |
+| App setup | `chi.NewRouter()` / `http.ListenAndServe` | `core.New(cfg, deps)` / `app.Run()` |
+
+**Middleware is fully compatible.** All existing `func(http.Handler) http.Handler` middleware ports without changes.
+
+---
+
+## Step 1 — Update route parameter syntax
+
+Chi uses curly braces (`{id}`). Plumego uses colons (`:id`). This is a mechanical substitution across all route registrations.
+
+**Chi before:**
+
+```go
+r.Get("/users/{id}", GetUser)
+r.Put("/users/{id}", UpdateUser)
+r.Delete("/users/{id}", DeleteUser)
+```
+
+**Plumego after:**
+
+```go
+r.Get("/users/:id",    http.HandlerFunc(GetUser))
+r.Put("/users/:id",    http.HandlerFunc(UpdateUser))
+r.Delete("/users/:id", http.HandlerFunc(DeleteUser))
+```
+
+## Step 2 — Update path parameter extraction
+
+Chi uses `chi.URLParam(r, "id")`. Plumego uses `r.PathValue("id")` (standard library since Go 1.22).
+
+**Chi before:**
+
+```go
+func GetUser(w http.ResponseWriter, r *http.Request) {
+    id := chi.URLParam(r, "id")
+    // ...
+}
+```
+
+**Plumego after:**
+
+```go
+func GetUser(w http.ResponseWriter, r *http.Request) {
+    id := r.PathValue("id")
+    // ...
+}
+```
+
+Run a global search-and-replace across your handlers:
+
+```bash
+rg -n --glob '*.go' 'chi\.URLParam' .
+```
+
+## Step 3 — Add the contract response layer
+
+Chi has no structured response contract. Plumego adds `contract.WriteResponse` and `contract.WriteError` as the single canonical path for all JSON responses.
+
+**Chi before (manual JSON write):**
+
+```go
+func GetUser(w http.ResponseWriter, r *http.Request) {
+    id := chi.URLParam(r, "id")
+    user, err := store.Get(id)
+    if err != nil {
+        w.Header().Set("Content-Type", "application/json")
+        w.WriteHeader(http.StatusNotFound)
+        json.NewEncoder(w).Encode(map[string]string{"error": "not found"})
+        return
+    }
+    w.Header().Set("Content-Type", "application/json")
+    w.WriteHeader(http.StatusOK)
+    json.NewEncoder(w).Encode(user)
+}
+```
+
+**Plumego after:**
+
+```go
+func GetUser(w http.ResponseWriter, r *http.Request) {
+    id := r.PathValue("id")
+    user, err := store.Get(id)
+    if err != nil {
+        contract.WriteError(w, r, contract.NewErrorBuilder().Type(contract.TypeNotFound).Build())
+        return
+    }
+    contract.WriteResponse(w, r, http.StatusOK, user, nil)
+}
+```
+
+See [Error Model](/docs/concepts/error-model) for the full list of built-in error codes.
+
+## Step 4 — Migrate route groups
+
+Chi uses a callback-style group with `r.Group(prefix, func(r chi.Router) { ... })`. Plumego uses a fluent group that accepts middleware as variadic arguments.
+
+**Chi before:**
+
+```go
+r.Route("/api/v1", func(r chi.Router) {
+    r.Use(AuthMiddleware(cfg.Secret))
+    r.Get("/users/{id}", GetUser)
+    r.Post("/users", CreateUser)
+})
+```
+
+**Plumego after:**
+
+```go
+v1 := app.Group("/api/v1", AuthMiddleware(cfg.Secret))
+v1.Get("/users/:id",  http.HandlerFunc(GetUser))
+v1.Post("/users",     http.HandlerFunc(CreateUser))
+```
+
+Move all route and group wiring into `internal/app/routes.go` for the canonical layout. See [Reference App](/docs/reference-app) for the full structure.
+
+## Step 5 — Replace app setup and lifecycle
+
+Chi uses `chi.NewRouter()` directly and relies on `http.ListenAndServe`. Plumego adds explicit app construction, lifecycle hooks, and graceful shutdown.
+
+**Chi before:**
+
+```go
+func main() {
+    r := chi.NewRouter()
+    r.Use(middleware.RequestID)
+    r.Use(middleware.Logger(log.New(os.Stdout, "", log.LstdFlags), "", 0))
+    r.Use(middleware.Recoverer)
+    registerRoutes(r)
+    log.Fatal(http.ListenAndServe(":8080", r))
+}
+```
+
+**Plumego after:**
+
+```go
+func main() {
+    cfg := core.DefaultConfig()
+    deps := core.AppDependencies{
+        Logger: plog.NewLogger(),
+    }
+    app := core.New(cfg, deps)
+    app.Use(
+        middleware.RequestID(),
+        middleware.Logger(deps.Logger),
+        middleware.Recovery(deps.Logger),
+    )
+    registerRoutes(app)
+    app.Run()
+}
+```
+
+The Plumego pattern keeps bootstrap, dependency construction, and route registration in separate functions. See [Reference App](/docs/reference-app) for how `internal/app/app.go` and `internal/app/routes.go` split these responsibilities.
+
+## Incremental migration path
+
+Because both Chi and Plumego use `func(http.ResponseWriter, *http.Request)` handlers, you can migrate one route at a time while running both routers behind a shared entry point:
+
+1. Start with one service
+2. Replace the router and app setup
+3. Update route param syntax (`{id}` → `:id`) across all routes
+4. Replace `chi.URLParam` calls with `r.PathValue`
+5. Add `contract.WriteResponse` and `contract.WriteError` to handlers file by file
+6. Move route registration into `internal/app/routes.go`
+7. Run `make gates` before pushing each batch
+
+The whole migration is primarily mechanical — no handler signature changes, no middleware adapters, no context type porting.
+
+## What to watch for
+
+**Route group middleware** — Chi's `r.Use` inside `r.Group` applies to all routes in the callback. Plumego's `r.Group(prefix, middleware...)` applies middleware at group construction. Audit all middleware attachment points and confirm the same middleware applies to the same routes after migration.
+
+**`chi.RouteContext` usage** — If your code reads `chi.RouteContext(r.Context())` for routing metadata, replace with `r.PathValue` for params. Other chi.RouteContext fields have no direct equivalent; audit each usage.
+
+**Status code defaults** — Chi does not set a default status code; handlers that do not write headers get HTTP 200 from `http.ResponseWriter`. Plumego's `contract.WriteResponse` always sets the status code explicitly. Confirm every handler has an explicit status code in the call.
+
+## Run the gates
+
+After migrating a service, confirm boundary compliance:
+
+```bash
+go run ./internal/checks/dependency-rules
+make gates
+```
+
+`make gates` runs `gofmt`, `go vet`, tests, and boundary checks — the same suite CI uses.
+
+## Read next
+
+- [Reference App](/docs/reference-app) — canonical layout every migrated service should target
+- [Compare Frameworks](/compare) — detailed feature matrix for Gin, Echo, Chi, Fiber, and Plumego
+- [Error Model](/docs/concepts/error-model) — structured error codes and response envelope
+- [Middleware Model](/docs/concepts/middleware-model) — transport-only middleware contracts

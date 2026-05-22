@@ -64,11 +64,16 @@ func (s *ingestEventStore) AppendWorkerEvent(ctx context.Context, event DomainEv
 
 type ingestMetricsObserver struct {
 	snapshots int
+	events    int
 	applied   int
 }
 
 func (o *ingestMetricsObserver) ObserveWorkerSnapshot(WorkerSnapshot, WorkerSnapshot) {
 	o.snapshots++
+}
+
+func (o *ingestMetricsObserver) ObserveWorkerEvents(WorkerSnapshot, WorkerSnapshot, []DomainEvent) {
+	o.events++
 }
 
 func (o *ingestMetricsObserver) ObserveWorkerReportApplied(string, time.Duration) {
@@ -194,8 +199,8 @@ func TestIngestServiceCallsMetricsObserverAfterHeartbeat(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("heartbeat: %v", err)
 	}
-	if observer.snapshots != 1 || observer.applied != 1 {
-		t.Fatalf("observer calls = snapshots:%d applied:%d, want 1/1", observer.snapshots, observer.applied)
+	if observer.snapshots != 1 || observer.events != 1 || observer.applied != 1 {
+		t.Fatalf("observer calls = snapshots:%d events:%d applied:%d, want 1/1/1", observer.snapshots, observer.events, observer.applied)
 	}
 }
 

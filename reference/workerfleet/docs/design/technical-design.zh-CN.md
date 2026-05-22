@@ -62,7 +62,7 @@ flowchart LR
 分层职责：
 
 - `main.go`：薄进程入口，只负责加载配置、构造应用并运行。
-- `internal/app`：应用启动、显式依赖注入、service 方法、运行时循环、HTTP 服务生命周期、路由注册器调用和优雅关闭编排。
+- `internal/app`：应用启动、显式依赖注入、HTTP 对外 service facade、runtime 生命周期壳、loop runner、alert runner、路由注册器调用和优雅关闭编排。
 - `internal/handler`：HTTP 请求解析和响应层。
 - `internal/domain`：worker 状态规则、任务对账、Pod 对账、告警、领域事件。
 - `internal/platform/store`：应用本地存储接口和查询过滤类型。
@@ -88,6 +88,14 @@ Workerfleet 是独立 Go 子模块：
 - Metrics 通过显式可选 observer 注入，不能使用隐藏全局 collector。
 - 存储依赖必须通过应用本地接口隔离。
 - 不能把 workerfleet 专属 label、store 或 alert rule 放到 Plumego 稳定包中。
+
+运行时装配说明：
+
+- `Runtime` 只保留生命周期壳职责，不再默认持有所有业务依赖。
+- Bootstrap 会显式装配 ingest、query、loop 执行和 alert 执行组件，再只把 `App` 需要的生命周期钩子暴露出来。
+- 周期性 Kubernetes sync 和 status sweep 逻辑收敛在 `LoopRunner`。
+- 周期性 alert evaluation 和 notification delivery 逻辑收敛在 `AlertRunner`。
+- 应用配置层持有按 profile 选出的 `StatusPolicy` 和 `AlertPolicy`，启动时会先校验，再把生效策略显式注入 ingest、loop 和 alert 组件。
 
 ## 5. 领域模型
 
@@ -118,6 +126,13 @@ Worker 状态：
 - `degraded`
 - `offline`
 - `unknown`
+
+策略面：
+
+- `StatusPolicy` 负责心跳 stale/offline 阈值，以及状态判断使用的 stage-stuck 和 restart 阈值。
+- `AlertPolicy` 负责告警侧使用的 stage-stuck 和 restart 阈值；默认从状态策略派生，也可以由运行时配置显式覆盖。
+- `internal/app/config.go` 通过环境变量暴露两类策略，并提供 `dev` / `prod` profile 默认值和逐字段校验。
+- 同一层应用配置还负责控制是否输出 experimental 的 pod、exec plan 和 case-step 指标；`prod` 默认关闭这些高维度指标。
 
 在线定义为进程存活且可以接新任务。当 worker 有活跃任务但暂时不接更多任务时，它可以仍然被认为在线且忙碌。当信号过期、worker 上报错误、空闲但不接任务、或任务阶段卡住时，状态会变为降级。当进程不存活、Pod 失败、Pod 消失、或心跳超过离线阈值时，状态会变为离线。
 
@@ -203,6 +218,9 @@ Pod 映射：
 
 对账行为：
 
+- 每次启用的 kube loop 会先 list Pod，再从返回的 `resourceVersion` 开始 watch。
+- watch 事件覆盖 `ADDED`、`MODIFIED`、`DELETED`、`BOOKMARK` 和 Kubernetes `ERROR`。
+- watch resourceVersion 过期会触发 relist，而不是作为永久 loop 失败暴露。
 - restart count 增加时产生 Pod 重启事件。
 - Pod 消失时标记删除时间。
 - Pod failed 或 succeeded 会推动 worker 状态进入离线。
@@ -211,9 +229,17 @@ Pod 映射：
 已实现运行时行为：
 
 - `internal/platform/kube` 中的 sync 基础能力已经接入应用运行时。
-- `WORKERFLEET_KUBE_SYNC_ENABLED=true` 时，`internal/app` 会启动周期性 Kubernetes sync loop。
+- `WORKERFLEET_KUBE_SYNC_ENABLED=true` 时，`internal/app` 会启动周期性 Kubernetes list/watch sync loop。
+- 运行时 loop scheduler 会防止同进程重入，默认单次执行超时为 `25s`，失败后按 `5s` 起步、`1m` 封顶做退避。
 - sync 错误会通过 runtime error observer 上报，并以低基数指标导出，不再静默丢弃。
+- loop 调度统一经过 `LoopLeaseCoordinator`；Mongo 存储会接入 `loop_leases` 集合，memory 存储保持进程内语义。
 - 优雅关闭时会先停止该循环，再关闭 runtime store。
+
+当前副本约束：
+
+- 使用 Mongo 存储时，Kubernetes sync、status sweep 和 alert evaluation loop 会按 loop family 获取 lease 后再执行。
+- 使用 memory 存储时，lease 仍是进程内语义，启用后台 loop 时仍应单副本运行。
+- reference deployment 默认仍保持 `replicas: 1`；只有确认 Mongo 存储、唯一 lease owner 和外部通知预期后，运维才应提高副本数。
 
 ## 8. 存储设计
 
@@ -227,12 +253,14 @@ Pod 映射：
 历史集合：
 
 - `task_history`
+- `case_step_history`
 - `worker_events`
 - `alert_events`
 
 保留策略：
 
 - task history：7 天。
+- case step history：7 天。
 - worker events：7 天。
 - alert events：7 天。
 - 当前 worker snapshot 和 active-task projection 不走 TTL 清理。
@@ -244,6 +272,7 @@ MongoDB 行为：
 - 历史写入从应用视角是 append-only。
 - 重试导致的重复生成文档 ID 视为幂等成功。
 - `expire_at` 用于历史和告警集合的 TTL 清理。
+- `case_step_history` 在 MongoDB 生产后端中支持 case timeline 和 exec-plan drilldown。
 
 内存后端：
 
@@ -286,8 +315,6 @@ Base path：`/v1`
 
 - 按 worker status 统计 fleet size。
 - Pod phase 分布。
-- pod 维度 worker 状态、心跳年龄和 active case 数。
-- pod 维度 case 吞吐，包括每小时成功数和失败数。
 - 按 namespace、node、task type、phase 统计 active case。
 - 按 node 统计 active case。
 - 任务开始和完成速率。
@@ -298,6 +325,7 @@ Base path：`/v1`
 - worker 状态转换 counter。
 - 告警产生 counter 和当前 firing gauge。
 - 接入和 Kubernetes 同步操作耗时。
+- experimental 指标开启时，提供可选的 pod 维度 worker 状态、心跳年龄、active case、吞吐和耗时分布。
 
 默认 label：
 
@@ -314,6 +342,7 @@ Base path：`/v1`
 - `to_status`
 - `operation`
 - `result`
+- `error_class`
 
 禁止作为默认 label：
 
@@ -322,8 +351,15 @@ Base path：`/v1`
 - `worker_id`
 - `pod_name`
 - `pod_uid`
+- `raw_error`
+- `error_message`
 
-下一阶段 case/step 指标会在部分指标中允许 `pod` label，因为 pod 维度吞吐和耗时分布是明确业务诉求。`exec_plan_id` 是可选 label，只有在活跃 plan 数量受控时才应默认开启。
+当前指标契约已经区分 stable 和 experimental：
+
+- stable 指标用于常规 Grafana 聚合面板和告警规则，label contract 视为冻结。
+- experimental 指标主要覆盖 pod、exec plan、case step 维度的吞吐和耗时明细，用于诊断和演进，不默认视为长期兼容接口。
+
+experimental 指标允许在部分指标中使用 `pod` label，因为 pod 维度吞吐和耗时分布是明确业务诉求。`exec_plan_id` 是受控可选 label，只有在活跃 plan 数量受控时才应开启。`prod` profile 默认关闭 pod、exec-plan 和 step-heavy 指标。
 
 Grafana 看板应以聚合视图为主。单 case 或单 task 的细节排查应该通过 workerfleet 查询 API 和 MongoDB 历史记录完成，而不是把高基数字段放进 Prometheus label。完整 case/step 指标方案见 [Case And Step Metrics Design](../case-step-metrics.md)。
 
@@ -359,7 +395,9 @@ Grafana 看板应以聚合视图为主。单 case 或单 task 的细节排查应
 
 - 告警评估和 notifier 基础能力已经接入应用运行时。
 - `WORKERFLEET_ALERT_EVALUATION_ENABLED=true` 时，`internal/app` 会启动周期性告警评估循环。
-- `WORKERFLEET_NOTIFICATION_ENABLED=true` 时，已产生的告警记录会通过配置的 notifier 投递，并使用 `WORKERFLEET_NOTIFIER_DELIVERY_TIMEOUT` 控制超时。
+- `WORKERFLEET_NOTIFICATION_ENABLED=true` 时，已产生的告警记录会先按 sink 写入 `notification_jobs`，再由投递循环使用配置的 notifier 发送，并使用 `WORKERFLEET_NOTIFIER_DELIVERY_TIMEOUT` 控制超时。
+- 开启通知投递但未配置飞书或通用 Webhook URL 时，启动会 fail closed。
+- 告警评估和通知投递复用同一套 guarded loop scheduler，同样具备防重入、单次执行超时、有界失败退避，并在 Mongo 存储启用时使用 Mongo-backed loop lease。
 - 评估和通知错误会通过 runtime error observer 上报，并以低基数指标导出，不再静默丢弃。
 - 优雅关闭时会先停止告警循环，再关闭 runtime store。
 
@@ -382,6 +420,7 @@ HTTP：
 
 运行时循环配置：
 
+- `WORKERFLEET_PROFILE`，默认 `dev`。
 - `WORKERFLEET_KUBE_SYNC_ENABLED`，默认 `false`。
 - `WORKERFLEET_STATUS_SWEEP_ENABLED`，默认 `false`。
 - `WORKERFLEET_ALERT_EVALUATION_ENABLED`，默认 `false`。
@@ -389,7 +428,10 @@ HTTP：
 - `WORKERFLEET_KUBE_SYNC_INTERVAL`，默认 `30s`。
 - `WORKERFLEET_STATUS_SWEEP_INTERVAL`，默认 `30s`。
 - `WORKERFLEET_ALERT_EVALUATION_INTERVAL`，默认 `30s`。
+- Loop guardrail 默认值：单次执行超时 `25s`，失败退避起点 `5s`，最大退避 `1m`。
 - `WORKERFLEET_NOTIFIER_DELIVERY_TIMEOUT`，默认 `5s`。
+- `WORKERFLEET_LOOP_LEASE_TTL`，默认 `90s`。
+- `WORKERFLEET_LOOP_LEASE_OWNER`，默认 hostname。
 - `WORKERFLEET_KUBE_API_HOST`。
 - `WORKERFLEET_KUBE_BEARER_TOKEN`。
 - `WORKERFLEET_KUBE_NAMESPACE`。
@@ -399,9 +441,30 @@ HTTP：
 - `WORKERFLEET_WEBHOOK_URL`。
 - `WORKERFLEET_WEBHOOK_HEADERS`，格式为逗号分隔的 `Header=Value`。
 
+状态和告警策略配置：
+
+- `WORKERFLEET_PROFILE=dev` 使用应用本地开发默认阈值。
+- `WORKERFLEET_PROFILE=prod` 切换为更保守的生产默认阈值。
+- `WORKERFLEET_STATUS_STALE_AFTER` 覆盖 worker 心跳 stale 阈值。
+- `WORKERFLEET_STATUS_OFFLINE_AFTER` 覆盖 worker 离线阈值。
+- `WORKERFLEET_STATUS_STAGE_STUCK_AFTER` 覆盖 worker stage-stuck 状态判断阈值。
+- `WORKERFLEET_STATUS_RESTART_BURST_THRESHOLD` 覆盖 worker restart-burst 状态判断阈值。
+- `WORKERFLEET_ALERT_STAGE_STUCK_AFTER` 覆盖告警侧 stage-stuck 触发阈值。
+- `WORKERFLEET_ALERT_RESTART_BURST_THRESHOLD` 覆盖告警侧 restart-burst 触发阈值。
+- `WORKERFLEET_EXPERIMENTAL_METRICS_ENABLED` 用于显式启用或禁用 experimental pod、exec-plan、case/step 指标；`dev` 默认开启，`prod` 默认关闭。
+- 策略值启动时会 fail closed 校验；例如过低阈值和互相矛盾的 stale/offline 组合都会直接拒绝启动。
+
 Worker 接入认证：
 
 - `WORKERFLEET_WORKER_AUTH_TOKEN` 会为 worker 注册和心跳接入启用 Bearer token 认证。
+- `WORKERFLEET_PROFILE=prod` 启动时要求配置 `WORKERFLEET_WORKER_AUTH_TOKEN`。
+
+Query API 认证：
+
+- `WORKERFLEET_ADMIN_AUTH_TOKEN` 会为 worker、task、fleet summary 和 alert 查询接口启用 Bearer token 认证。
+- `WORKERFLEET_QUERY_AUTH_REQUIRED=true` 会在非生产 profile 中也要求配置 `WORKERFLEET_ADMIN_AUTH_TOKEN`。
+- `WORKERFLEET_PROFILE=prod` 启动时要求配置 `WORKERFLEET_ADMIN_AUTH_TOKEN`。
+- 健康检查、readiness 和 metrics 端点不纳入 query API 认证范围。
 
 ## 13. 容量和可靠性
 
@@ -434,12 +497,22 @@ Worker 接入认证：
 - 暴露接入耗时和库存同步耗时指标。
 - Grafana 优先看聚合面板，再通过 API 下钻。
 
+多副本 lease 实现：
+
+- owner 粒度：至少按 `kube_sync`、`status_sweep`、`alert_evaluate` 三类 loop 分别持有 lease。
+- lease 后端：在启用 Mongo 后端时复用 workerfleet 自己的 Mongo，避免再引入第二套协调系统。
+- lease 文档字段：`_id` loop name、`owner_id`、`created_at`、`updated_at` 和 `expires_at`。
+- 续约模型：当前 owner 在每次 loop 周期内续约；未持有 lease 的副本只跳过本轮工作，并按正常调度间隔继续尝试获取。
+- 失败转移模型：如果 owner 在 `expire_at` 前未续约，其他副本可以重新获取 lease 并接管 loop。
+- 剩余路线：在默认把 reference deployment 提高到 1 个以上副本前，补充 lease state metrics 和调试可见性。
+
 ## 14. 安全和失败策略
 
 安全要求：
 
 - 不能记录 webhook secret、bearer token、private key 或 signature。
 - 配置 `WORKERFLEET_WORKER_AUTH_TOKEN` 后，worker 注册和心跳接入认证失败必须 fail closed。
+- query API 认证启用时，查询接口认证失败必须 fail closed。
 - Mongo 必填配置缺失时 fail closed。
 - Kubernetes API 使用 service account 或显式 bearer token。
 - notifier 错误不能暴露 header secret。
@@ -459,16 +532,14 @@ Worker 接入认证：
 - `workerfleet` module path 的独立子模块。
 - worker 注册、心跳、列表、详情、task 查询、fleet summary、alert 查询 HTTP 路由。
 - memory 和 Mongo 后端启动 wiring。
-- Mongo schema、索引、snapshot、active task、history、event、alert 持久化。
+- Mongo schema、索引、snapshot、active task、case-step history、task history、event、alert 持久化。
 - worker status、active-task 对账、Pod 对账和告警规则。
 - 飞书和通用 Webhook notifier 基础能力。
 - Prometheus collector、exporter、instrumentation 和 `/metrics` 路由。
 - HTTP 服务入口和优雅关闭。
 - 周期性 Kubernetes 库存同步、状态 sweep、告警评估和告警通知循环。
 - Kubernetes 和 notifier 的运行时环境变量配置。
+- profile 驱动的状态和告警策略配置，以及启动期 fail-closed 校验。
+- stable / experimental metrics catalog 契约和 label 集冻结测试。
+- Kubernetes 部署、Prometheus 抓取和基线告警规则 reference manifests。
 - Grafana 看板规划文档。
-
-建议下一批卡片：
-
-- 增加 worker 注册和心跳认证。
-- 增加 Kubernetes 部署配置示例。

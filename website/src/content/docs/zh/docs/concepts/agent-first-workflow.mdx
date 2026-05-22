@@ -139,16 +139,65 @@ go run ./internal/checks/dependency-rules
 
 ## Change recipes
 
-`specs/change-recipes/` 里包含 YAML 文件，定义了常见改动类型的正确执行顺序：
+`specs/change-recipes/` 里包含 YAML 文件，定义了已知改动类型的正确执行顺序。每个 recipe 声明：改动范围、有序步骤，以及止步条件（recipe 绝对不能做的事）。
+
+### 完整 recipe 索引
 
 | Recipe | 适用场景 |
 | --- | --- |
-| `fix-bug.yaml` | 修复现有模块里的缺陷 |
+| `add-http-endpoint.yaml` | 在应用本地代码中添加新路由和处理器 |
+| `add-middleware.yaml` | 向 middleware 包添加纯传输层中间件 |
+| `fix-bug.yaml` | 定位并修复缺陷，同时添加回归测试 |
+| `http-endpoint-bugfix.yaml` | 修复 HTTP 处理器、路由装配或传输契约中的缺陷 |
+| `symbol-change.yaml` | 对导出符号进行重命名、删除或行为变更 |
+| `new-extension-module.yaml` | 创建新的 `x/*` 能力家族 |
 | `new-stable-module.yaml` | 向稳定根添加新包 |
-| `new-extension-module.yaml` | 添加新的 `x/*` 能力家族 |
-| `deprecation.yaml` | 把某个符号或模块标记为废弃 |
+| `add-websocket-room.yaml` | 在 `x/websocket` 中添加新房间类型或连接策略 |
+| `add-grpc-method.yaml` | 通过 `x/rpc` 在现有 HTTP 表面旁添加 gRPC 方法 |
+| `add-ai-tool.yaml` | 在 `x/ai/tool` 注册新工具或将其接入 session |
+| `add-acceptance-tests.yaml` | 编写预先失败的验收测试以定义任务卡的完成条件 |
+| `tenant-policy-change.yaml` | 修改租户解析、策略评估、配额或速率限制行为 |
+| `stable-root-boundary-review.yaml` | 仅审查稳定根边界安全性，不编写代码 |
+| `analysis-only.yaml` | 研究和规划任务——不允许修改任何文件 |
+| `review-only.yaml` | 代码审查任务——只产出发现，不打补丁 |
 
-按照 recipe 工作的 agent 读取定义好的步骤，依次完成每一步，然后在认为改动完成之前运行 recipe 中指定的检查器。这缩小了已知改动类型上的 hallucination 空间。
+### 实例演练：添加新 HTTP 端点
+
+**任务描述**："添加 `GET /users/:id` 处理器，返回用户详情。"
+
+第一步 — 用 `specs/task-routing.yaml` 分类。这是应用本地 HTTP 功能工作 → 路由条目为 `app_wiring`，recipe 为 `add-http-endpoint`。
+
+第二步 — 读取 recipe，按步骤顺序执行：
+
+```go
+// reference/standard-service/internal/app/routes.go
+mux.Get("/users/:id", handlers.GetUser)
+
+// reference/standard-service/internal/handlers/users.go
+func GetUser(w http.ResponseWriter, r *http.Request) {
+    id := router.Param(r, "id")
+    user, err := svc.FindUser(r.Context(), id)
+    if err != nil {
+        _ = contract.WriteError(w, r, contract.NewErrorBuilder().
+            WithType(contract.TypeNotFound).
+            WithMessage("user not found").
+            Build())
+        return
+    }
+    _ = contract.WriteResponse(w, r, http.StatusOK, user, nil)
+}
+```
+
+第三步 — 按 recipe 要求运行验证：
+
+```bash
+go test -race ./internal/...
+go run ./internal/checks/dependency-rules
+```
+
+**结论：** recipe 消除了处理器放在哪里、使用什么响应助手、运行哪些测试的歧义——无需评审者记忆任何规则。
+
+按照 recipe 工作的 agent 读取定义好的步骤，依次完成每一步，然后在认为改动完成之前运行 recipe 中指定的检查器。
 
 ## Agent 生成改动之后运行 gates
 

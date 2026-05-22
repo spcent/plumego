@@ -1,0 +1,56 @@
+---
+title: x/rpc Primer
+description: 当改动涉及在 Plumego 应用中托管或消费 RPC 服务（gRPC、Connect-Go、Twirp）时，先读这里。
+translationKey: modules-x-rpc
+sidebar:
+  order: 25
+---
+
+# x/rpc Primer
+
+> **实验性** — API 兼容性未冻结。采用前请先评估。查看[发布策略](/zh/docs/release-posture)了解当前成熟度。
+
+当你已经通过 [x/* 家族](/zh/docs/x-family) 确认问题属于封装 RPC 服务器生命周期、池化客户端连接，或在 Plumego 路由组上挂载调用方提供的 RPC HTTP 处理器时，打开这一页。
+
+`x/rpc` 保持依赖表面干净：具体的运行时（gRPC、Connect-Go、Twirp）和生成的 stub 住在应用程序代码或树外适配器中。`x/rpc` 只提供生命周期辅助工具（`x/rpc/server`）、按目标键的连接池（`x/rpc/client`），以及将调用方提供的 RPC HTTP 处理器桥接到标准 `net/http` 的 HTTP 转码器（`x/rpc/gateway`）。
+
+## 什么时候从这里开始
+
+- 你正在将调用方提供的 RPC 运行时包装进 Plumego 的优雅关闭生命周期（`x/rpc/server`）
+- 你需要跨出站 RPC 服务的结构化连接复用（`x/rpc/client`）
+- 你正在为出站 RPC 调用组合日志、重试或追踪拦截器
+- 你需要将 gRPC-Web、Connect-Go 或其他 HTTP-over-RPC 处理器与 REST 端点并排挂载（`x/rpc/gateway`）
+
+## 什么时候不该从这里开始
+
+- RPC 后端的服务发现是目标 — 从 `x/gateway/discovery` 开始
+- 跨服务路由或代理 RPC 流量 — 从 `x/gateway` 开始
+- 运行时级别的 gRPC 配置（TLS、keepalive、codec）属于应用程序代码，不属于 `x/rpc`
+- 将具体的 RPC 运行时包导入 `x/rpc` 本身 — 将具体运行时保留在应用程序代码中
+
+## 当前仓库里先读哪些文件
+
+1. `x/rpc/server/` — `server.Runtime` 接口和生命周期封装
+2. `x/rpc/client/` — `client.Pool` 和传输中立的拦截器
+3. `x/rpc/gateway/` — `gateway.HTTPTranscoder` 和路由注册
+4. `reference/with-rpc/README.md` — 规范的进程内装配示例
+
+## 更具体的归属例子
+
+| 这些工作适合留在 `x/rpc` | 一旦变成这些问题就应移出 |
+| --- | --- |
+| `server`：封装任何满足 `server.Runtime` 的运行时 | 将具体 gRPC 运行时导入 `x/rpc` — 保留在应用程序代码 |
+| `client.Pool`：按目标键的连接复用 | 功能专属的拨号配置 — 保留在服务的构造器中 |
+| 拦截器：出站调用的日志、重试、追踪 | 业务层错误映射或熔断 — 使用 `x/resilience` |
+| `gateway.HTTPTranscoder`：将 RPC HTTP 处理器适配为 `net/http` | 协议转换或请求体变换 — 这是调用方提供的处理器的职责 |
+
+## 为什么单独写这一页
+
+在 Plumego 应用上挂载 RPC 服务有两个不同的问题：生命周期耦合（gRPC 服务器必须与 `core.App` 共享优雅关闭）和传输桥接（HTTP-over-RPC 处理器必须能作为普通的 `http.Handler` 值挂载）。将这两个问题拆分为 `x/rpc/server` 和 `x/rpc/gateway`，使两个表面都保持最小化并可独立测试。客户端连接池防止一个服务调用多个其他服务时的无约束连接增长。
+
+## 下一步阅读
+
+- [x/* 家族](/zh/docs/x-family)
+- [x/gateway Primer](/zh/docs/modules/x-gateway)
+- [x/resilience Primer](/zh/docs/modules/x-resilience)
+- [参考应用](/zh/docs/reference-app)

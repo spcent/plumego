@@ -29,7 +29,6 @@ export const ROUTING_SCENARIOS = {
       "destination": "contract/ + router/",
       "startWith": [
         "AGENTS.md",
-        "docs/CODEX_WORKFLOW.md",
         "docs/CANONICAL_STYLE_GUIDE.md",
         "specs/change-recipes/http-endpoint-bugfix.yaml",
         "reference/standard-service/internal/app/routes.go",
@@ -52,7 +51,6 @@ export const ROUTING_SCENARIOS = {
       "destination": "x/tenant/",
       "startWith": [
         "AGENTS.md",
-        "docs/CODEX_WORKFLOW.md",
         "specs/change-recipes/tenant-policy-change.yaml",
         "x/tenant/module.yaml",
         "docs/architecture/X_TENANT_BLUEPRINT.md",
@@ -191,7 +189,6 @@ export const ROUTING_SCENARIOS = {
       "destination": "stable roots (new package)",
       "startWith": [
         "AGENTS.md",
-        "docs/CODEX_WORKFLOW.md",
         "specs/change-recipes/stable-root-boundary-review.yaml",
         "specs/repo.yaml",
         "specs/dependency-rules.yaml",
@@ -242,7 +239,6 @@ export const ROUTING_SCENARIOS = {
       "destination": "contract/ + router/",
       "startWith": [
         "AGENTS.md",
-        "docs/CODEX_WORKFLOW.md",
         "docs/CANONICAL_STYLE_GUIDE.md",
         "specs/change-recipes/http-endpoint-bugfix.yaml",
         "reference/standard-service/internal/app/routes.go",
@@ -265,7 +261,6 @@ export const ROUTING_SCENARIOS = {
       "destination": "x/tenant/",
       "startWith": [
         "AGENTS.md",
-        "docs/CODEX_WORKFLOW.md",
         "specs/change-recipes/tenant-policy-change.yaml",
         "x/tenant/module.yaml",
         "docs/architecture/X_TENANT_BLUEPRINT.md",
@@ -404,7 +399,6 @@ export const ROUTING_SCENARIOS = {
       "destination": "stable roots (new package)",
       "startWith": [
         "AGENTS.md",
-        "docs/CODEX_WORKFLOW.md",
         "specs/change-recipes/stable-root-boundary-review.yaml",
         "specs/repo.yaml",
         "specs/dependency-rules.yaml",

@@ -22,11 +22,11 @@ Read `docs/modules/x-websocket/README.md` for the `x/websocket` API.
 | Path | Constraint |
 |---|---|
 | `internal/app/app.go` | Hub configuration and shutdown order are load-bearing |
-| `main.go` | Four wiring calls only; do not add logic |
+| `main.go` | Owns process signal context and top-level wiring only |
 
 ### Frozen
 
-- Do not remove the WebSocket shutdown before the HTTP server shutdown in `Start()`.
+- Do not remove the WebSocket shutdown before the HTTP server shutdown in `Start(ctx)`.
 - Do not add `x/*` imports beyond `x/websocket` without justification.
 - Do not set `AllowUnauthenticated = true` in production configurations.
 

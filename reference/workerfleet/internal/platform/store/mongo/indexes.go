@@ -47,6 +47,14 @@ func CollectionIndexSpecs() map[string][]IndexSpec {
 			{Name: "worker_updated_desc", Keys: bson.D{{Key: "worker_id", Value: 1}, {Key: "last_updated_at", Value: -1}}},
 			{Name: "expire_at_ttl", Keys: bson.D{{Key: "expire_at", Value: 1}}, ExpireAfterSeconds: &ttlZero},
 		},
+		CollectionCaseStepHistory: {
+			{Name: "task_observed_asc", Keys: bson.D{{Key: "task_id", Value: 1}, {Key: "observed_at", Value: 1}}},
+			{Name: "exec_plan_observed_desc", Keys: bson.D{{Key: "exec_plan_id", Value: 1}, {Key: "observed_at", Value: -1}}},
+			{Name: "node_observed_desc", Keys: bson.D{{Key: "node_name", Value: 1}, {Key: "observed_at", Value: -1}}},
+			{Name: "pod_observed_desc", Keys: bson.D{{Key: "pod_name", Value: 1}, {Key: "observed_at", Value: -1}}},
+			{Name: "step_observed_desc", Keys: bson.D{{Key: "step", Value: 1}, {Key: "observed_at", Value: -1}}},
+			{Name: "expire_at_ttl", Keys: bson.D{{Key: "expire_at", Value: 1}}, ExpireAfterSeconds: &ttlZero},
+		},
 		CollectionWorkerEvents: {
 			{Name: "worker_occurred_desc", Keys: bson.D{{Key: "worker_id", Value: 1}, {Key: "occurred_at", Value: -1}}},
 			{Name: "task_occurred_desc", Keys: bson.D{{Key: "task_id", Value: 1}, {Key: "occurred_at", Value: -1}}},
@@ -58,6 +66,15 @@ func CollectionIndexSpecs() map[string][]IndexSpec {
 			{Name: "worker_triggered_desc", Keys: bson.D{{Key: "worker_id", Value: 1}, {Key: "triggered_at", Value: -1}}},
 			{Name: "alert_type_status", Keys: bson.D{{Key: "alert_type", Value: 1}, {Key: "status", Value: 1}}},
 			{Name: "expire_at_ttl", Keys: bson.D{{Key: "expire_at", Value: 1}}, ExpireAfterSeconds: &ttlZero},
+		},
+		CollectionLoopLeases: {
+			{Name: "owner_expires", Keys: bson.D{{Key: "owner_id", Value: 1}, {Key: "expires_at", Value: 1}}},
+			{Name: "expires_at_ttl", Keys: bson.D{{Key: "expires_at", Value: 1}}, ExpireAfterSeconds: &ttlZero},
+		},
+		CollectionNotificationJobs: {
+			{Name: "alert_sink_unique", Keys: bson.D{{Key: "alert_id", Value: 1}, {Key: "sink_type", Value: 1}}, Unique: true},
+			{Name: "status_next_attempt", Keys: bson.D{{Key: "status", Value: 1}, {Key: "next_attempt_at", Value: 1}}},
+			{Name: "status_locked_until", Keys: bson.D{{Key: "status", Value: 1}, {Key: "locked_until", Value: 1}}},
 		},
 	}
 }

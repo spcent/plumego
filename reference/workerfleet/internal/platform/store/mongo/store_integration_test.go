@@ -186,12 +186,39 @@ func TestStoreHistoryAndAlertIntegration(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("append worker event: %v", err)
 	}
-	events, err := store.ListWorkerEvents("worker-1")
+	events, err := store.ListWorkerEvents(context.Background(), "worker-1")
 	if err != nil {
 		t.Fatalf("list worker events: %v", err)
 	}
 	if len(events) != 1 || events[0].Attributes["source"] != "test" {
 		t.Fatalf("unexpected events %#v", events)
+	}
+	if err := store.AppendCaseStepHistory(context.Background(), platformstore.CaseStepHistoryRecord{
+		TaskID:     "task-1",
+		WorkerID:   "worker-1",
+		ExecPlanID: "plan-1",
+		Namespace:  "sim",
+		PodName:    "pod-a",
+		NodeName:   "node-a",
+		Step:       "simulate",
+		Status:     domain.CaseStepStatusSucceeded,
+		Result:     "succeeded",
+		ObservedAt: now,
+		EventType:  domain.EventTaskStepFinished,
+	}); err != nil {
+		t.Fatalf("append case step history: %v", err)
+	}
+	steps, err := store.ListCaseStepHistory(context.Background(), platformstore.CaseStepHistoryFilter{
+		ExecPlanID: "plan-1",
+		NodeName:   "node-a",
+		PodName:    "pod-a",
+		Step:       "simulate",
+	})
+	if err != nil {
+		t.Fatalf("list case step history: %v", err)
+	}
+	if len(steps) != 1 || steps[0].TaskID != "task-1" || steps[0].Result != "succeeded" {
+		t.Fatalf("unexpected case step history %#v", steps)
 	}
 
 	if err := store.AppendAlert(context.Background(), platformstore.AlertRecord{

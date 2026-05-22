@@ -114,6 +114,31 @@ curl 'http://localhost:8080/api/v1/greet?name=Alice'
 
 ---
 
+## 选择下一个模块
+
+基础示例跑通之后，保持 `reference/standard-service` 的应用布局，只按需添加对应的能力家族：
+
+| 目标 | 从这里开始 |
+| --- | --- |
+| 标准 JSON API，显式 handler | 稳定根：`core`、`router`、`contract`、`middleware` |
+| 可复用 CRUD 与资源规范 | `x/rest` |
+| 租户解析、策略、配额与隔离 | `x/tenant` |
+| 反向代理、重写、负载均衡与 edge 传输 | `x/gateway`，仅在需要动态后端查找时再加 `x/gateway/discovery` |
+| WebSocket 传输 | `x/websocket` |
+| 消息编排工作流 | `x/messaging` |
+| 入站 webhook 验证或出站 webhook 投递 | `x/messaging/webhook`，当任务比传输机制更宽泛时从 `x/messaging` 开始 |
+| 文件上传、下载与临时 URL 传输 | `x/fileapi`，存储与元数据实现在 `x/data/file` |
+| 可复用熔断器或限流原语 | `x/resilience` |
+| AI provider、session、streaming 与工具 | `x/ai/provider`、`x/ai/session`、`x/ai/streaming`、`x/ai/tool` |
+| 可观测性导出、受保护诊断或本地调试端点 | `x/observability`、`x/observability/ops` 或 `x/observability/devtools`，按需选择 |
+| gRPC + HTTP 服务托管或出站 RPC 客户端连接池 | `x/rpc` |
+| 从已注册路由生成 OpenAPI 3.1 文档 | `x/openapi` |
+| 显式 JSON 绑定与调用方自有请求验证 | `x/validate` |
+
+不要从 `x/*` 包开始一个新的应用布局。扩展是对 `reference/standard-service` canonical 接线的显式补充。
+
+---
+
 ## 什么时候离开这页
 
 | 下一个问题 | 去哪里 |

@@ -350,6 +350,7 @@ new-card: ## Scaffold a task card: make new-card ID=0001 SLUG=slice-router-work 
 
 check-boundaries: ## Run boundary and manifest checks (no website)
 	go run ./internal/checks/dependency-rules
+	go run ./internal/checks/cross-extension-deps
 	go run ./internal/checks/agent-workflow
 	go run ./internal/checks/module-manifests
 	go run ./internal/checks/reference-layout
@@ -450,7 +451,20 @@ reference-test: ## Run tests for every standalone reference module
 	  (cd "$$dir" && go test ./...); \
 	done
 
+workerfleet-mongo-test: ## Run optional workerfleet MongoDB integration tests
+	@if [ -z "$$WORKERFLEET_MONGO_TEST_URI" ]; then \
+	  echo "Skipping workerfleet MongoDB integration tests."; \
+	  echo "Set WORKERFLEET_MONGO_TEST_URI=mongodb://127.0.0.1:27017 to run them."; \
+	else \
+	  cd reference/workerfleet && go test -timeout 60s ./internal/platform/store/mongo; \
+	fi
+
 # ── Git Hooks ─────────────────────────────────────────────────────────────────
+
+website-sync: ## Regenerate website/src/generated/ from docs sources and stage the result
+	cd website && pnpm sync
+	git add website/src/generated/
+	@echo "Generated files staged. Review with 'git diff --cached website/src/generated/' then commit."
 
 setup-hooks: ## Install local git hooks (pre-push quality gates)
 	@cp .githooks/pre-push .git/hooks/pre-push

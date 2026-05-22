@@ -1,0 +1,227 @@
+---
+title: 从 Chi 迁移
+description: 代码并排对比，以及将 Chi 服务迁移到 Plumego 的分步路径。
+translationKey: guides-migrate-from-chi
+sidebar:
+  order: 19
+---
+
+# 从 Chi 迁移
+
+本指南面向正在运行 Chi 服务、希望迁移到 Plumego 的团队。由于 Chi 同样使用标准 `func(http.ResponseWriter, *http.Request)` handler，迁移的主要工作是添加 `contract` 响应层、替换参数提取方式、更新路由语法，以及采用结构化应用生命周期。
+
+预估工时：**数小时至一天**，具体取决于 handler 数量。中间件无需改动即可直接沿用。
+
+## 开始之前
+
+先读 [为什么选择 Plumego](/zh/why-plumego) 并查看[框架对比表](/zh/compare)。核心权衡：Chi 只提供路由，对响应格式、服务结构或模块成熟度均无意见。Plumego 在同样的 stdlib handler 模型上，增加了 `contract` 层、canonical 服务形态，以及明确的成熟度分级。
+
+如果 Chi 已经很适合你的团队，且你乐于自行构建响应封装和服务结构，这次迁移不是正确的投入。
+
+## 什么会变，什么不变
+
+| 修改面 | Chi | Plumego |
+| --- | --- | --- |
+| Handler 签名 | `func(w http.ResponseWriter, r *http.Request)` | `func(w http.ResponseWriter, r *http.Request)` |
+| 路由注册 | `r.Get(path, h)` | `r.Get(path, h)` |
+| 路径参数语法 | `/users/{id}` | `/users/:id` |
+| 路径参数读取 | `chi.URLParam(r, "id")` | `r.PathValue("id")` |
+| 查询参数 | `r.URL.Query().Get("k")` | `r.URL.Query().Get("k")` |
+| JSON body | `json.NewDecoder(r.Body).Decode(&v)` | `json.NewDecoder(r.Body).Decode(&v)` |
+| JSON 响应 | 调用方手动写入 | `contract.WriteResponse(w, r, 200, v, nil)` |
+| 错误响应 | 调用方手动写入 | `contract.WriteError(w, r, err)` |
+| 中间件 | `func(http.Handler) http.Handler` | `func(http.Handler) http.Handler` |
+| 路由分组 | `r.Group(prefix, fn)` | `r.Group(prefix, middleware...)` |
+| 应用初始化 | `chi.NewRouter()` / `http.ListenAndServe` | `core.New(cfg, deps)` / `app.Run()` |
+
+**中间件完全兼容。** 所有现有的 `func(http.Handler) http.Handler` 中间件无需修改即可直接使用。
+
+---
+
+## 第一步 — 更新路由参数语法
+
+Chi 使用花括号（`{id}`），Plumego 使用冒号（`:id`）。这是一次机械性的全局替换。
+
+**Chi 之前：**
+
+```go
+r.Get("/users/{id}", GetUser)
+r.Put("/users/{id}", UpdateUser)
+r.Delete("/users/{id}", DeleteUser)
+```
+
+**Plumego 之后：**
+
+```go
+r.Get("/users/:id",    http.HandlerFunc(GetUser))
+r.Put("/users/:id",    http.HandlerFunc(UpdateUser))
+r.Delete("/users/:id", http.HandlerFunc(DeleteUser))
+```
+
+## 第二步 — 更新路径参数提取
+
+Chi 使用 `chi.URLParam(r, "id")`，Plumego 使用 `r.PathValue("id")`（Go 1.22 起的标准库方法）。
+
+**Chi 之前：**
+
+```go
+func GetUser(w http.ResponseWriter, r *http.Request) {
+    id := chi.URLParam(r, "id")
+    // ...
+}
+```
+
+**Plumego 之后：**
+
+```go
+func GetUser(w http.ResponseWriter, r *http.Request) {
+    id := r.PathValue("id")
+    // ...
+}
+```
+
+在所有 handler 中执行全局搜索替换：
+
+```bash
+rg -n --glob '*.go' 'chi\.URLParam' .
+```
+
+## 第三步 — 添加 contract 响应层
+
+Chi 没有结构化响应契约。Plumego 添加了 `contract.WriteResponse` 和 `contract.WriteError` 作为所有 JSON 响应的唯一 canonical 路径。
+
+**Chi 之前（手动写 JSON）：**
+
+```go
+func GetUser(w http.ResponseWriter, r *http.Request) {
+    id := chi.URLParam(r, "id")
+    user, err := store.Get(id)
+    if err != nil {
+        w.Header().Set("Content-Type", "application/json")
+        w.WriteHeader(http.StatusNotFound)
+        json.NewEncoder(w).Encode(map[string]string{"error": "not found"})
+        return
+    }
+    w.Header().Set("Content-Type", "application/json")
+    w.WriteHeader(http.StatusOK)
+    json.NewEncoder(w).Encode(user)
+}
+```
+
+**Plumego 之后：**
+
+```go
+func GetUser(w http.ResponseWriter, r *http.Request) {
+    id := r.PathValue("id")
+    user, err := store.Get(id)
+    if err != nil {
+        contract.WriteError(w, r, contract.NewErrorBuilder().Type(contract.TypeNotFound).Build())
+        return
+    }
+    contract.WriteResponse(w, r, http.StatusOK, user, nil)
+}
+```
+
+完整的内置错误码列表见 [错误模型](/zh/docs/concepts/error-model)。
+
+## 第四步 — 迁移路由分组
+
+Chi 采用回调风格的分组：`r.Group(prefix, func(r chi.Router) { ... })`。Plumego 使用流式 API，将中间件作为可变参数传入。
+
+**Chi 之前：**
+
+```go
+r.Route("/api/v1", func(r chi.Router) {
+    r.Use(AuthMiddleware(cfg.Secret))
+    r.Get("/users/{id}", GetUser)
+    r.Post("/users", CreateUser)
+})
+```
+
+**Plumego 之后：**
+
+```go
+v1 := app.Group("/api/v1", AuthMiddleware(cfg.Secret))
+v1.Get("/users/:id",  http.HandlerFunc(GetUser))
+v1.Post("/users",     http.HandlerFunc(CreateUser))
+```
+
+将所有路由和分组注册移至 `internal/app/routes.go`。完整结构见 [参考应用](/zh/docs/reference-app)。
+
+## 第五步 — 替换应用初始化和生命周期
+
+Chi 直接使用 `chi.NewRouter()` 并依赖 `http.ListenAndServe`。Plumego 增加了显式的应用构建、生命周期钩子和优雅关闭。
+
+**Chi 之前：**
+
+```go
+func main() {
+    r := chi.NewRouter()
+    r.Use(middleware.RequestID)
+    r.Use(middleware.Logger(log.New(os.Stdout, "", log.LstdFlags), "", 0))
+    r.Use(middleware.Recoverer)
+    registerRoutes(r)
+    log.Fatal(http.ListenAndServe(":8080", r))
+}
+```
+
+**Plumego 之后：**
+
+```go
+func main() {
+    cfg := core.DefaultConfig()
+    deps := core.AppDependencies{
+        Logger: plog.NewLogger(),
+    }
+    app := core.New(cfg, deps)
+    app.Use(
+        middleware.RequestID(),
+        middleware.Logger(deps.Logger),
+        middleware.Recovery(deps.Logger),
+    )
+    registerRoutes(app)
+    app.Run()
+}
+```
+
+Plumego 将 bootstrap、依赖构建和路由注册分开放置。完整结构见 [参考应用](/zh/docs/reference-app)，了解 `internal/app/app.go` 与 `internal/app/routes.go` 如何划分职责。
+
+## 渐进式迁移路径
+
+由于 Chi 和 Plumego 的 handler 签名完全相同，可以在共享入口点后同时运行两个 router，逐条路由推进迁移：
+
+1. 从一个服务开始
+2. 替换 router 和应用初始化
+3. 在所有路由中将参数语法从 `{id}` 改为 `:id`
+4. 将 `chi.URLParam` 替换为 `r.PathValue`
+5. 逐文件为 handler 添加 `contract.WriteResponse` 和 `contract.WriteError`
+6. 将路由注册迁移至 `internal/app/routes.go`
+7. 每次推送前运行 `make gates`
+
+整个迁移过程以机械替换为主——无需修改 handler 签名、无需中间件适配器、无需替换 context 类型。
+
+## 需要注意的地方
+
+**路由分组中间件** — Chi 的 `r.Use` 在 `r.Group` 回调内部对组内所有路由生效。Plumego 的 `r.Group(prefix, middleware...)` 在分组构建时绑定中间件。迁移后，请逐一核查所有中间件挂载点，确认相同的中间件作用于相同的路由。
+
+**`chi.RouteContext` 用法** — 如果代码通过 `chi.RouteContext(r.Context())` 读取路由元数据，请用 `r.PathValue` 替换参数部分。其他 `chi.RouteContext` 字段没有直接对应物，需逐一审查。
+
+**状态码默认值** — Chi 不设置默认状态码，未写入 header 的 handler 会返回 HTTP 200。Plumego 的 `contract.WriteResponse` 始终显式设置状态码。确认每个 handler 调用中都有明确的状态码。
+
+## 运行质量门控
+
+迁移完成后，确认边界合规性：
+
+```bash
+go run ./internal/checks/dependency-rules
+make gates
+```
+
+`make gates` 会运行 `gofmt`、`go vet`、测试和边界检查——与 CI 使用的同一套流程。
+
+## 延伸阅读
+
+- [参考应用](/zh/docs/reference-app) — 每个迁移后服务都应对照的 canonical 布局
+- [框架对比](/zh/compare) — Gin、Echo、Chi、Fiber 与 Plumego 的详细功能矩阵
+- [错误模型](/zh/docs/concepts/error-model) — 结构化错误码和响应封装
+- [中间件模型](/zh/docs/concepts/middleware-model) — 传输层专用中间件契约

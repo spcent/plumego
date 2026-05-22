@@ -19,7 +19,16 @@ export async function ensureGeneratedDir() {
 
 export async function writeGeneratedFile(filename, contents) {
   await ensureGeneratedDir();
-  await fs.writeFile(path.join(GENERATED_DIR, filename), contents, 'utf8');
+  const filePath = path.join(GENERATED_DIR, filename);
+  // Skip the write when content is already identical so that running pnpm sync
+  // twice in a row does not produce a spurious git diff.
+  try {
+    const existing = await fs.readFile(filePath, 'utf8');
+    if (existing === contents) return;
+  } catch {
+    // File does not exist yet — fall through to write.
+  }
+  await fs.writeFile(filePath, contents, 'utf8');
 }
 
 export function blockList(text, label) {

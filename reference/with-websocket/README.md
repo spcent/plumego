@@ -11,7 +11,9 @@ follows the same bootstrap structure as `reference/standard-service`.
 
 - Wiring an `x/websocket` server into the app constructor
 - Registering WebSocket routes via `ws.RegisterRoutes`
-- Keeping the bootstrap shape (config → app → routes → start) identical to the canonical path
+- Keeping the bootstrap shape (`main.run` → `app.Start(ctx)`) aligned with the canonical path
+- Loading app config with the same precedence as the canonical service:
+  `Defaults < .env < process env < flags`
 
 ## Design constraints
 
@@ -19,6 +21,7 @@ follows the same bootstrap structure as `reference/standard-service`.
 - also imports `x/websocket` for the server (intentional — this is a scenario reference)
 - keeps WebSocket wiring in `internal/app/app.go`, not in `main.go`
 - keeps route registration explicit in `internal/app/routes.go`
+- keeps process signal ownership in `main.go`; `internal/app` shuts down WebSocket before HTTP when the caller-owned context is canceled
 
 ## Configuration
 
@@ -26,6 +29,9 @@ follows the same bootstrap structure as `reference/standard-service`.
 |--------------|----------|------------------------------------|
 | `APP_ADDR`   | `:8084`  | Listen address                     |
 | `WS_SECRET`  | required | JWT secret (min 32 bytes)          |
+
+`WS_SECRET` is intentionally not exposed as a command-line flag. Set it through
+the environment or a local `.env` file.
 
 ## Run it
 

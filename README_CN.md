@@ -1,7 +1,7 @@
 # Plumego — 标准库优先的 Go Web 工具包
 
 [![Go 版本](https://img.shields.io/badge/Go-1.26%2B-00ADD8?style=flat&logo=go)](https://go.dev/)
-[![状态](https://img.shields.io/badge/status-v1.0.0-blue)](https://github.com/spcent/plumego/releases/tag/v1.0.0)
+[![状态](https://img.shields.io/badge/status-v1.1.0-blue)](https://github.com/spcent/plumego/releases/tag/v1.1.0)
 [![许可证](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 Plumego 是一个基于 Go 标准库构建的小型 HTTP 工具包。它把 `net/http`
@@ -61,6 +61,24 @@ go run main.go
 完成这个示例后，再阅读
 [`reference/standard-service`](./reference/standard-service)，查看生产风格的规范应用结构。
 
+## 选择你的起点
+
+根据你的项目场景选择对应入口：
+
+| 我想构建… | 从这里开始 |
+| --- | --- |
+| 普通 JSON API | `reference/standard-service` → 仅使用稳定根包 |
+| 带 CRUD 约定的 REST 资源 | `reference/with-rest` → `x/rest` |
+| 多租户 SaaS API | `reference/with-tenant` → `x/tenant` |
+| API 网关或反向代理 | `reference/with-gateway` → `x/gateway` |
+| 实时 WebSocket 功能 | `reference/with-websocket` → `x/websocket` |
+| AI 驱动的服务 | `reference/with-ai` → `x/ai/provider` |
+| 带消息队列/Webhook 的服务 | `reference/with-messaging` → `x/messaging` |
+| gRPC + HTTP 混合服务 | `reference/with-rpc` → `x/rpc` |
+| 可观测性（Prometheus / OpenTelemetry） | `x/observability` |
+
+所有路径都以 `reference/standard-service` 为基础结构。扩展包是显式增量，而不是另一套应用启动框架。
+
 ## 为什么选择 plumego
 
 Plumego 适合那些需要比原生 `http.ServeMux` 更多结构、但又不想引入大型框架模型的 Go 服务。
@@ -118,3 +136,5 @@ Plumego 使用 agent-first 控制面维护仓库：`docs/` 解释架构，`specs
 - 阅读 [`docs/CANONICAL_STYLE_GUIDE.md`](./docs/CANONICAL_STYLE_GUIDE.md)，了解处理器、中间件、路由和依赖注入约定。
 - 浏览 [`docs/modules`](./docs/modules)，查看各包的模块导读。
 - 查看 [`docs/ADOPTION_PATH.md`](./docs/ADOPTION_PATH.md)，了解 5 分钟、30 分钟和 1 天采用路径。
+- 查看 [`docs/troubleshooting.md`](./docs/troubleshooting.md)，解决常见问题：路由冻结、中间件顺序、JWT 验证错误和生命周期问题。
+- 查看 [`docs/benchmarks/README.md`](./docs/benchmarks/README.md)，了解与 Chi、Gin、Echo 的性能对比。

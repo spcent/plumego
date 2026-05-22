@@ -114,8 +114,9 @@ and `ops-service`.
 
 The `canonical` template is aligned with `reference/standard-service`: stable
 root imports only, explicit config loading, explicit route registration in
-`internal/app/routes.go`, local handler DTOs, and no `x/*` capability wiring by
-default.
+`internal/app/routes.go`, `main.run -> app.Start(ctx)` lifecycle ownership,
+local handler DTOs, `internal/domain/<name>` business examples, and no `x/*`
+capability wiring by default.
 
 The `minimal`, `fullstack`, and `microservice` template names are stable CLI
 inputs, but their v1 hardening output now uses the same canonical bootstrap

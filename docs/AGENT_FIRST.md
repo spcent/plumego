@@ -11,19 +11,21 @@ The model has four control planes.
 
 The first is `docs/`. Documentation describes observable behavior, architecture
 boundaries, release policy, migration paths, and module primers. Agent-facing
-docs such as `docs/CODEX_WORKFLOW.md`, `docs/AGENT_CODE_QUALITY_RULES.md`, and
-`docs/CANONICAL_STYLE_GUIDE.md` keep implementation style consistent. Product
+docs such as `docs/CODEX_WORKFLOW.md`, `docs/AGENT_CONTEXT_BUDGET.md`,
+`docs/AGENT_CODE_QUALITY_RULES.md`, and `docs/CANONICAL_STYLE_GUIDE.md` keep
+implementation style consistent while keeping default context small. Product
 docs stay close to the code they explain, so doc drift is visible in review
 instead of hidden in a separate planning system.
 
 The second is `specs/`. These machine-readable files make repository policy
-queryable. `specs/task-routing.yaml` maps request shapes to the owning module
-and required reading. `specs/dependency-rules.yaml` prevents stable roots from
-importing extension packages or gaining unapproved dependencies. `specs/checks.yaml`
-and `specs/gate-profiles.yaml` describe validation expectations. `specs/stop-condition-handlers.yaml`
-turns uncertainty into deterministic next steps instead of letting an agent
-guess. The goal is not to make every rule executable, but to keep important
-rules structured enough for tools and humans to compare against behavior.
+queryable. `specs/task-routing.yaml` maps request shapes to the owning module,
+context package, and bounded first reads. `specs/dependency-rules.yaml` prevents
+stable roots from importing extension packages or gaining unapproved
+dependencies. `specs/checks.yaml` and `specs/gate-profiles.yaml` describe
+validation expectations. `specs/stop-condition-handlers.yaml` turns uncertainty
+into deterministic next steps instead of letting an agent guess. The goal is not
+to make every rule executable, but to keep important rules structured enough for
+tools and humans to compare against behavior.
 
 The third is `tasks/`. Milestones and task cards are the execution surface.
 A milestone under `tasks/milestones/active/` defines one reviewable unit:

@@ -16,7 +16,8 @@ Use this file for hard rules and validation order. Read only the control-plane
 files needed for the task:
 
 - Workflow: `docs/CODEX_WORKFLOW.md`, `docs/AGENT_CODE_QUALITY_RULES.md`,
-  `specs/agent-quality-rules.yaml`, and `specs/change-recipes/`
+  `docs/AGENT_CONTEXT_BUDGET.md`, `specs/agent-quality-rules.yaml`, and
+  `specs/change-recipes/`
 - Style: `docs/CANONICAL_STYLE_GUIDE.md`
 - Architecture: `docs/agent-first.md`,
   `docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md`,
@@ -30,6 +31,12 @@ files needed for the task:
   `specs/stop-condition-handlers.yaml`, and `specs/request-flows.yaml`
 - Local scope: target `<module>/module.yaml`
 - Canonical app wiring: `reference/standard-service`
+
+Default to the smallest safe context package. Read `AGENTS.md`, select the
+matching `specs/task-routing.yaml` entry, then load only that entry's
+`start_with` files and the target `<module>/module.yaml` when module behavior
+changes. Use the full control plane only for architecture, boundary, release, or
+workflow-rule changes.
 
 When guidance conflicts, follow this order:
 
@@ -60,6 +67,20 @@ When guidance conflicts, follow this order:
   caller. Do not leave dead wrappers behind.
 - Keep one canonical success-response path and one canonical error-construction
   path per layer.
+
+## 2.1 Context Budget
+
+- Use `docs/AGENT_CONTEXT_BUDGET.md` for context package selection, task-card
+  limits, output compression, and resume discipline.
+- Prefer the matching `specs/task-routing.yaml` `start_with` list over the full
+  control-plane read order.
+- Stop reading when ownership, boundaries, touched files, and validation are
+  clear.
+- Split broad work before implementation when it spans more than one primary
+  module, more than five files, more than three validation commands, or unclear
+  API/dependency/security impact.
+- Summarize validation with command, status, key failure, and next step instead
+  of pasting full logs.
 
 ## 3. Where To Work
 
@@ -166,6 +187,7 @@ Before editing, complete the following preflight checklist (full rules in
 `docs/AGENT_CODE_QUALITY_RULES.md`):
 
 ```text
+Context package:
 Owning module:
 Target module.yaml read:
 In-scope paths:
@@ -218,6 +240,7 @@ Boundary and manifest checks:
 
 ```bash
 go run ./internal/checks/dependency-rules
+go run ./internal/checks/cross-extension-deps
 go run ./internal/checks/agent-workflow
 go run ./internal/checks/module-manifests
 go run ./internal/checks/reference-layout
@@ -264,6 +287,7 @@ semantics, lifecycle behavior, or boundaries change. Common sync targets:
 - `README.md`
 - `README_CN.md`
 - `AGENTS.md`
+- `docs/AGENT_CONTEXT_BUDGET.md`
 - `env.example`
 
 Also update module primers under `docs/modules/`, `docs/EXTENSION_MATURITY.md`,
@@ -271,6 +295,34 @@ Also update module primers under `docs/modules/`, `docs/EXTENSION_MATURITY.md`,
 that surface.
 
 Document implemented behavior only.
+
+### Website Generated Files
+
+`website/src/generated/` contains files generated from docs sources. These
+files are checked in and must stay in sync. `make gates` detects staleness by
+running the sync and comparing before/after diffs; it errors if the sync
+produces any change.
+
+**Required when editing any of these sources:**
+
+| Source file | Generated file | Rule |
+|---|---|---|
+| `docs/ROADMAP.md` | `website/src/generated/roadmap.ts` | run `make website-sync` |
+| `docs/modules/*/README.md` | `website/src/generated/modules.ts` | run `make website-sync` |
+| `specs/task-routing.yaml` | `website/src/generated/routing.ts` | run `make website-sync` |
+| `README.md` / `specs/task-routing.yaml` | `website/src/generated/releases.ts` | run `make website-sync` |
+| any `website/src/content/docs/**/*.mdx` (en or zh) | `website/src/generated/translation-lag.ts` | run `make website-sync` |
+
+`translation-lag.ts` is special: it is derived from **git commit timestamps**,
+not file content. This means it must be regenerated after every commit that
+touches any en or zh `.mdx` doc file — even if the commit only adds new files
+or updates translations. Always run `make website-sync` as the final step of
+any docs-related commit, and include the updated generated files in the same
+commit.
+
+After any edit to a source listed above, run `make website-sync` and include
+the updated `website/src/generated/` files in the same commit. Never commit
+source changes without the corresponding generated file update.
 
 ## 10. Milestones
 

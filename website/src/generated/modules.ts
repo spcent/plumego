@@ -31,7 +31,19 @@ export const MODULE_FACTS = {
     "x/gateway",
     "x/observability",
     "x/rest",
-    "x/websocket"
+    "x/websocket",
+    "x/tenant",
+    "x/frontend",
+    "x/messaging"
+  ],
+  "experimentalFamilies": [
+    "x/fileapi",
+    "x/openapi",
+    "x/resilience",
+    "x/rpc",
+    "x/data",
+    "x/ai",
+    "x/validate"
   ],
   "primaryExtensionFamilies": [
     "x/tenant",

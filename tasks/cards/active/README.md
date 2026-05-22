@@ -8,6 +8,7 @@ Rules:
 - move completed cards to `tasks/cards/done/`
 - prefer one primary module
 - keep each card small enough for one focused implementation pass
+- keep each card within the context budget limits: five files, three validation commands, and one reversible commit
 - make the next card obvious without rereading the whole roadmap
 
 State model:
@@ -33,12 +34,11 @@ Maintenance rules:
 
 Read order:
 
-1. `docs/CODEX_WORKFLOW.md`
-2. `docs/CANONICAL_STYLE_GUIDE.md`
-3. `docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md`
-4. `specs/repo.yaml`
-5. `specs/task-routing.yaml`
-6. the active card itself
+1. `AGENTS.md`
+2. the matching `specs/task-routing.yaml` entry
+3. the active card itself
+4. the card's `Recipe:` file, if present
+5. the target module manifest, when module behavior changes
 
 The active queue is an execution surface, not an archive.
 
@@ -62,6 +62,8 @@ chain in tasks/milestones/ROADMAP.md.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
+| 1500-m009-x-tenant-ga-evaluation.md | P1 | x/tenant | GA promotion evaluation: release evidence, snapshot comparison, owner sign-off |
+| 1501-m009-x-ai-stable-tier-beta-evaluation.md | P1 | x/ai | Beta evaluation for provider, session, streaming, tool subpackages individually |
 
 ### M-010 — Beta Promotions Round 2 (P1, depends on M-009)
 
@@ -82,6 +84,7 @@ chain in tasks/milestones/ROADMAP.md.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
+| 1502-m014-x-openapi-cli-integration.md | P1 | x/openapi | Add `plumego openapi generate` subcommand, JSON serialization, expand primer |
 
 ### M-015 — Database Adapters (P2, depends on M-009)
 

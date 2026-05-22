@@ -12,7 +12,9 @@ that follows the same bootstrap structure as `reference/standard-service`.
 - Wiring an `x/messaging` in-process broker into the app constructor
 - Injecting the broker into a handler via constructor injection
 - Registering a publish endpoint alongside the standard health routes
-- Keeping the bootstrap shape (config → app → routes → start) identical to the canonical path
+- Keeping the bootstrap shape (`main.run` → `app.Start(ctx)`) aligned with the canonical path
+- Loading config with the same precedence as the canonical service:
+  `Defaults < .env < process env < flags`
 
 ## Design constraints
 
@@ -20,6 +22,7 @@ that follows the same bootstrap structure as `reference/standard-service`.
 - also imports `x/messaging` for the broker (intentional — this is a scenario reference)
 - keeps `x/messaging` wiring in `internal/app/app.go`, not in `main.go`
 - keeps route registration explicit in `internal/app/routes.go`
+- keeps process signal ownership in `main.go`; `internal/app` only reacts to the caller-owned context
 
 ## Run it
 

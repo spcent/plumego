@@ -2,7 +2,7 @@
 
 本文档定义 workerfleet 面向 pod、worker、exec plan、case 和 step 的完整 Prometheus 指标体系。目标是让 Grafana 能比较全面地展示系统当前状态、pod 实际吞吐、node/pod 维度 case 运行时间分布，以及 case 内关键 step 的耗时分布。
 
-当前代码已经实现基础 worker、pod、case phase、alert 和 runtime 指标。本文档描述的是下一阶段目标指标体系，落地时应继续遵守 workerfleet app-local metrics 边界，不扩展 Plumego 稳定 `metrics` 包。
+当前代码已经实现基础 worker、pod、case phase、alert 和 runtime 指标。本文档描述的 pod、exec plan、case 和 step 细粒度指标目前属于 experimental contract，用于诊断和演进，不应默认视为长期稳定的 Grafana/告警规则接口。落地时应继续遵守 workerfleet app-local metrics 边界，不扩展 Plumego 稳定 `metrics` 包。
 
 ## 1. 概念口径
 
@@ -47,6 +47,7 @@
 - `exec_plan_id` 可以用于吞吐和耗时分布，但只有在活跃 exec plan 数量受控时默认开启。
 - `step` 必须是受控枚举，worker 不能自由上报任意 step 名称。
 - `error_class` 必须是低基数分类，例如 `network`、`storage`、`validation`、`simulation`、`timeout`、`unknown`。
+- 含 `exec_plan_id` 或 `step` 的指标默认归类为 experimental，只有在生产基数、查询成本和告警稳定性都验证过后才应升级为 stable。
 
 禁止作为 Prometheus label：
 
@@ -493,6 +494,9 @@ workerfleet_case_step_oldest_active_age_seconds{step="download_bundle"} > 1800
 
 ## 8. 完整指标清单
 
+本节列出的 pod、exec plan 和 step 维度指标属于 experimental 指标面，
+受 `WORKERFLEET_EXPERIMENTAL_METRICS_ENABLED` 控制；`prod` profile 默认关闭。
+
 状态类：
 
 - `workerfleet_pod_status`
@@ -725,4 +729,3 @@ Worker 上报建议：
 - 每个 node/pod 的 case 总耗时分布。
 - 每个关键 step 的耗时分布。
 - 当前业务指标是否出现波动，以及波动集中在哪个 node、pod、step 或 exec plan。
-

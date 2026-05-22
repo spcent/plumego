@@ -41,12 +41,11 @@ entries:
     category: internal_alias
     status: keep
     owner: transport
-    decision: Internal middleware response recorder aliases keep middleware internals on one shared httputil implementation.
+    decision: Internal response recorder aliases keep middleware internals on one shared httputil implementation.
     replacement: internal/httputil.ResponseRecorder and internal/httputil.BufferedResponseRecorder
     paths:
-      - middleware/internal/transport/http.go
-      - middleware/internal/transport/response_buffer.go
-      - middleware/internal/observability/helpers.go
+      - internal/httputil/buffered_response.go
+      - middleware/internal/telemetry/helpers.go
 
   - id: middleware-httpmetrics-observer-alias
     category: public_alias
@@ -117,10 +116,9 @@ entries:
     category: reference_alias
     status: keep
     owner: reference
-    decision: Workerfleet reference layers alias domain records for local platform and handler package readability.
+    decision: Workerfleet reference layers alias domain records for local platform package readability.
     replacement: direct domain types
     paths:
-      - reference/workerfleet/internal/handler/worker_query.go
       - reference/workerfleet/internal/platform/store/types.go
 
   - id: reference-workerfleet-app-compatibility-markers

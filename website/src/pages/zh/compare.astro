@@ -215,7 +215,7 @@ const matrixRows = [
   },
   {
     feature: 'AI / Agent 就绪控制面',
-    note: '机器可读规范、任务路由、边界检查',
+    note: 'specs/task-routing.yaml 在代码打开前就对工作分类；specs/change-recipes/ 为 15 种修改类型定义有序步骤；module.yaml 约束每个包的范围；internal/checks/ 在 CI 中机械执行边界检查',
     values: { gin: false, echo: false, fiber: false, chi: false, plumego: true },
   },
 ] as const;
@@ -223,10 +223,25 @@ const matrixRows = [
 type FwId = 'gin' | 'echo' | 'fiber' | 'chi' | 'plumego';
 const fwIds: FwId[] = ['gin', 'echo', 'fiber', 'chi', 'plumego'];
 
+// ── 性能基准数据 ─────────────────────────────────────────────────────────────
+// go test -bench -benchmem -count=3 · GET /users/:id · linux/amd64 · Intel Xeon @ 2.10 GHz
+const routerRows = [
+  { name: 'Plumego', nsOp: 4291, allocsOp: 16, bytesOp: 5715, relative: '1.0×', isPlumego: true },
+  { name: 'Chi',     nsOp: 4547, allocsOp: 17, bytesOp: 6036, relative: '1.06×' },
+  { name: 'Gin',     nsOp: 3773, allocsOp: 13, bytesOp: 5331, relative: '0.88×', isFaster: true },
+  { name: 'Echo',    nsOp: 3743, allocsOp: 13, bytesOp: 5331, relative: '0.87×', isFaster: true },
+];
+const parallelRows = [
+  { name: 'Plumego', nsOp: 663,  allocsOp: 7, bytesOp: 592, relative: '1.0×',  isPlumego: true },
+  { name: 'Chi',     nsOp: 1013, allocsOp: 8, bytesOp: 912, relative: '1.53×' },
+  { name: 'Gin',     nsOp: 285,  allocsOp: 4, bytesOp: 208, relative: '0.43×', isFaster: true },
+  { name: 'Echo',    nsOp: 231,  allocsOp: 4, bytesOp: 208, relative: '0.35×', isFaster: true },
+];
+
 const journeySteps = [
   { label: '为什么选择', href: '/zh/why-plumego' },
   { label: '示例', href: '/zh/examples' },
-  { label: '状态', href: '/zh/status' },
+  { label: '发布', href: '/zh/releases' },
 ];
 ---
 
@@ -685,6 +700,96 @@ contract.<span class="hc-fn">WriteError</span>(w, r,
     </p>
   </section>
 
+  <!-- 性能基准 -->
+  <section class="section" id="benchmarks">
+    <div class="section__intro">
+      <h2>路由性能基准数据。</h2>
+      <p>
+        使用 <code>go test -bench -benchmem -count=3</code> 实测的顺序与并发调度数据。
+        路由：<code>GET /users/:id</code>，无中间件。linux/amd64，Intel Xeon @ 2.10 GHz。
+        包含完整 <code>httptest</code> 请求/响应周期。相对列以 Plumego 为基准（1.0×）。
+      </p>
+      <p class="bench-note">
+        路由开销很少是真正的瓶颈——数据库调用耗时 500 µs–5 ms，路由仅 1–5 µs。
+        选择框架时，以团队真正关注的因素为准。
+      </p>
+    </div>
+
+    <div class="bench-tables">
+      <div class="bench-table-block">
+        <h3 class="bench-table-title">顺序调度（ns/op）</h3>
+        <div class="bench-table-wrap">
+          <table class="bench-table">
+            <thead>
+              <tr>
+                <th>框架</th>
+                <th>ns/op</th>
+                <th>allocs/op</th>
+                <th>B/op</th>
+                <th>vs Plumego</th>
+              </tr>
+            </thead>
+            <tbody>
+              {routerRows.map((row) => (
+                <tr class:list={[row.isPlumego && 'bench-row--plumego']}>
+                  <td class="bench-td--name">
+                    {row.name}
+                    {row.isPlumego && <span class="bench-badge">本项</span>}
+                    {row.isFaster && <span class="bench-badge bench-badge--faster">更快</span>}
+                  </td>
+                  <td class="bench-td--num">{row.nsOp}</td>
+                  <td class="bench-td--num">{row.allocsOp}</td>
+                  <td class="bench-td--num">{row.bytesOp}</td>
+                  <td class="bench-td--relative">{row.relative}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="bench-table-block">
+        <h3 class="bench-table-title">并发吞吐 — b.RunParallel at GOMAXPROCS</h3>
+        <div class="bench-table-wrap">
+          <table class="bench-table">
+            <thead>
+              <tr>
+                <th>框架</th>
+                <th>ns/op</th>
+                <th>allocs/op</th>
+                <th>B/op</th>
+                <th>vs Plumego</th>
+              </tr>
+            </thead>
+            <tbody>
+              {parallelRows.map((row) => (
+                <tr class:list={[row.isPlumego && 'bench-row--plumego']}>
+                  <td class="bench-td--name">
+                    {row.name}
+                    {row.isPlumego && <span class="bench-badge">本项</span>}
+                    {row.isFaster && <span class="bench-badge bench-badge--faster">更快</span>}
+                  </td>
+                  <td class="bench-td--num">{row.nsOp}</td>
+                  <td class="bench-td--num">{row.allocsOp}</td>
+                  <td class="bench-td--num">{row.bytesOp}</td>
+                  <td class="bench-td--relative">{row.relative}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p class="bench-footnote">
+          Gin 和 Echo 在并发负载下快 ~2.5–3×，因为 <code>sync.Pool</code> context
+          消除了每次请求的内存分配——代价是使用与标准库中间件不兼容的自定义 context 类型。
+        </p>
+      </div>
+    </div>
+
+    <p class="bench-reproduce">
+      复现方法：<code>cd reference/benchmark &amp;&amp; go test -bench=. -benchmem -count=3 ./...</code>
+    </p>
+  </section>
+
   <!-- CTA -->
   <section class="section section--cta">
     <div class="section__intro section__intro--cta">
@@ -1102,4 +1207,78 @@ contract.<span class="hc-fn">WriteError</span>(w, r,
   }
 
   :root[data-theme="dark"] .fw-warning-chip { color: #fbbf24; }
+
+  /* ── 性能基准区块 ────────────────────────────────────────── */
+  .bench-note {
+    font-size: 0.88rem;
+    color: var(--fg-soft);
+    line-height: 1.6;
+    border-left: 2px solid var(--line);
+    padding-left: 0.85rem;
+    margin-top: 0.5rem;
+  }
+  .bench-tables {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 2rem;
+    max-width: 1100px;
+    margin-inline: auto;
+  }
+  @media (min-width: 900px) {
+    .bench-tables { grid-template-columns: 1fr 1fr; }
+  }
+  .bench-table-block { display: flex; flex-direction: column; gap: 0.6rem; }
+  .bench-table-title { font-size: 0.9rem; font-weight: 600; color: var(--fg-soft); margin: 0; }
+  .bench-table-wrap { overflow-x: auto; }
+  .bench-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+    border: 1px solid var(--line);
+    border-radius: 0.5rem;
+    overflow: hidden;
+  }
+  .bench-table th {
+    text-align: left;
+    padding: 0.6rem 0.9rem;
+    background: var(--bg-strong);
+    color: var(--fg-soft);
+    font-weight: 600;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    border-bottom: 1px solid var(--line);
+  }
+  .bench-table td { padding: 0.6rem 0.9rem; border-bottom: 1px solid var(--line); color: var(--fg-soft); }
+  .bench-table tr:last-child td { border-bottom: none; }
+  .bench-row--plumego td {
+    background: color-mix(in srgb, var(--accent-soft) 60%, var(--bg-elevated));
+    color: var(--fg);
+  }
+  .bench-td--name { font-weight: 500; color: var(--fg); font-family: var(--font-mono); white-space: nowrap; }
+  .bench-td--num { font-family: var(--font-mono); text-align: right; white-space: nowrap; }
+  .bench-td--relative { font-family: var(--font-mono); font-weight: 600; white-space: nowrap; text-align: right; }
+  .bench-badge {
+    display: inline-block;
+    font-size: 0.65rem;
+    font-weight: 700;
+    padding: 0.1rem 0.38rem;
+    border-radius: 3px;
+    margin-left: 0.4rem;
+    font-family: var(--font-mono);
+    vertical-align: middle;
+    background: var(--accent);
+    color: var(--bg);
+  }
+  .bench-badge--faster {
+    background: color-mix(in srgb, #b45309 15%, var(--bg-elevated));
+    color: #b45309;
+    border: 1px solid color-mix(in srgb, #b45309 25%, transparent);
+  }
+  :root[data-theme="dark"] .bench-badge--faster {
+    color: #fbbf24;
+    background: color-mix(in srgb, #fbbf24 12%, var(--bg-elevated));
+    border-color: color-mix(in srgb, #fbbf24 20%, transparent);
+  }
+  .bench-footnote { font-size: 0.8rem; color: var(--fg-soft); line-height: 1.55; }
+  .bench-reproduce { font-size: 0.82rem; color: var(--fg-soft); margin-top: 1.25rem; max-width: 1100px; margin-inline: auto; }
 </style>

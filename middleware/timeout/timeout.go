@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/spcent/plumego/contract"
+	internaltransport "github.com/spcent/plumego/internal/httputil"
 	mw "github.com/spcent/plumego/middleware"
-	internaltransport "github.com/spcent/plumego/middleware/internal/transport"
 )
 
 const (

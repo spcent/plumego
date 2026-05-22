@@ -16,6 +16,22 @@ import GeneratedExtensionFacts from '../../../../components/docs/GeneratedExtens
 
 <GeneratedExtensionFacts locale="zh" />
 
+## Beta 扩展家族
+
+以下家族已达到 `beta` 状态：API 在 minor release ref 间冻结，有两个连续 release ref、导出 API 快照和负责人签字支撑。
+
+| 家族 | 状态 | 晋升版本 | 推荐入口 |
+| --- | --- | --- | --- |
+| `x/gateway` | beta | v0.2.0 | 代理、重写、负载均衡、edge transport |
+| `x/observability` | beta | v0.2.0 | exporter、tracer、collector、适配器接线 |
+| `x/rest` | beta | v0.2.0 | 资源控制器与 CRUD 路由规范 |
+| `x/websocket` | beta | v0.2.0 | WebSocket hub 与显式路由注册 |
+| `x/tenant` | beta | v1.1.0 | 解析、策略、配额、限流、session |
+| `x/frontend` | beta | v1.1.0 | 静态与嵌入式资产服务 |
+| `x/messaging` | beta | v1.1.0（应用侧服务） | 应用侧 queue、pubsub、scheduler、webhook 服务 |
+
+包含实验性家族内 beta surface 的完整成熟度看板，请参阅[扩展成熟度](/zh/docs/concepts/extension-maturity)。
+
 ## 什么时候应该从这里开始
 
 当工作主要围绕可复用能力行为，而不是最小规范服务形态时，就应该从 `x/*` 家族开始。
@@ -48,6 +64,9 @@ import GeneratedExtensionFacts from '../../../../components/docs/GeneratedExtens
 | `x/rest` | 可复用 CRUD 传输行为、query parsing、pagination rule 与 repository-backed resource wiring | 服务启动、gateway topology、business repository 归属或领域验证 |
 | `x/messaging` | app-facing 的 queue、pubsub、scheduler、webhook 编排，以及家族级消息入口 | 最小可运行服务路径、稳定抽象，或一个已经明确只属于 `x/messaging/mq` / `x/messaging/pubsub` 的窄任务 |
 | `x/observability` | exporter wiring、telemetry 适配器、buffered metrics inspection、rolling metrics helper 与更高层 diagnostics integration | request ID、tracing hook、access logging 这类传输层请求中间件原语 |
+| `x/rpc` | RPC 服务器生命周期辅助工具、出站连接池，以及将 HTTP-over-RPC 处理器与标准路由并排转码 | 后端服务发现（使用 `x/gateway/discovery`），或将具体 gRPC 运行时导入 `x/rpc` 本身 |
+| `x/openapi` | 从 `router.RouteInfo` 值和操作提示生成 OpenAPI 3.1 文档结构，无需外部依赖 | 基于 handler 反射的模式推断、运行时 Swagger UI，或 YAML 解析 |
+| `x/validate` | 处理器中显式的 `BindJSON`/`Bind` 调用点，解码 JSON 并返回结构化 `contract.APIError` 响应 | 中间件层预验证、基于标签的结构体验证框架，或全局验证器实例 |
 
 这些例子的重要性在于：它们说明 `x/*` 不是单纯把代码从稳定根里挪走的地方。每个家族都应该成为一个可发现、可解释的主入口，并带着清晰 归属。
 
@@ -57,8 +76,11 @@ import GeneratedExtensionFacts from '../../../../components/docs/GeneratedExtens
 
 | 如果工作主要触及 | 下一步打开的 primer | 为什么这里是更合适的下一跳 |
 | --- | --- | --- |
-| 可复用 CRUD controller 行为、共享分页规则与资源路由标准化 | [x/rest Primer](/zh/docs/modules/x-rest) | 它会把家族级规则继续落到 应用本地接线、仓储代码 与 领域验证 的具体拆分 |
+| 可复用 CRUD controller 行为、共享分页规则与资源路由标准化 | [x/rest Primer](/zh/docs/modules/x-rest) | 它会把家族级规则继续落到应用本地接线、仓储代码与领域验证的具体拆分 |
 | app-facing queue、pubsub、scheduler 与 webhook 编排 | [x/messaging Primer](/zh/docs/modules/x-messaging) | 它会继续说明什么时候应该停留在家族入口，什么时候才适合下钻更窄 sibling |
+| RPC 服务器生命周期、出站连接池或 HTTP-over-RPC 网关 | [x/rpc Primer](/zh/docs/modules/x-rpc) | 它说明哪些表面是调用方自有的，`x/rpc` 提供了哪些生命周期辅助工具 |
+| 从已注册路由生成 OpenAPI 3.1 文档 | [x/openapi Primer](/zh/docs/modules/x-openapi) | 它解释路由驱动的生成模型，以及 CLI 集成的边界在哪里 |
+| 处理器中的显式 JSON 绑定和调用方自有验证 | [x/validate Primer](/zh/docs/modules/x-validate) | 它阐明何时使用 `BindJSON` vs `Bind`，错误如何映射到 `contract.APIError`，以及为什么验证要留在处理器中 |
 | 那些看起来很像扩展，但其实仍可能属于稳定表面的改动 | [稳定根](/zh/docs/stable-roots) | 当问题本质上仍然是默认路径归属时，这里才是正确回退页 |
 
 ## 更具体的路由判断例子
@@ -94,6 +116,9 @@ import GeneratedExtensionFacts from '../../../../components/docs/GeneratedExtens
 
 - [x/rest Primer](/zh/docs/modules/x-rest)
 - [x/messaging Primer](/zh/docs/modules/x-messaging)
+- [x/rpc Primer](/zh/docs/modules/x-rpc)
+- [x/openapi Primer](/zh/docs/modules/x-openapi)
+- [x/validate Primer](/zh/docs/modules/x-validate)
 - [稳定根](/zh/docs/stable-roots)
 - [模块总览](/zh/docs/modules/overview)
 - [API 快速参考](/zh/docs/reference) — 稳定根签名，有助于区分扩展 API 和稳定 API

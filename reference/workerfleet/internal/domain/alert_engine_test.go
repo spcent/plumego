@@ -190,3 +190,98 @@ func TestAlertEngineCallsMetricsObserver(t *testing.T) {
 		t.Fatalf("observer records = %d, want 1", len(observer.records))
 	}
 }
+
+func TestAlertEngineUsesConfiguredThresholds(t *testing.T) {
+	now := time.Date(2026, 4, 19, 15, 25, 0, 0, time.UTC)
+	engine := NewAlertEngine(
+		snapshotListStub{snapshots: []WorkerSnapshot{{
+			Identity: WorkerIdentity{WorkerID: "worker-1"},
+			Status:   WorkerStatusDegraded,
+			Runtime: WorkerRuntime{
+				AcceptingTasks: false,
+			},
+			Pod: PodSnapshot{
+				RestartCount: 4,
+			},
+			ActiveTasks: []ActiveTask{{
+				TaskID:     "task-1",
+				ExecPlanID: "plan-1",
+				TaskType:   "simulation",
+				Phase:      TaskPhaseRunning,
+				PhaseName:  "running",
+				UpdatedAt:  now.Add(-3 * time.Minute),
+				CurrentStep: CaseStepRuntime{
+					Step:      "simulate",
+					Status:    CaseStepStatusRunning,
+					StartedAt: now.Add(-3 * time.Minute),
+				},
+			}},
+		}}},
+		&alertStoreStub{},
+		DefaultStatusPolicy(),
+		fixedClock{now: now},
+		WithAlertPolicy(AlertPolicy{
+			StageStuckAfter:       2 * time.Minute,
+			RestartBurstThreshold: 5,
+		}),
+	)
+
+	emitted, err := engine.Evaluate(context.Background())
+	if err != nil {
+		t.Fatalf("evaluate: %v", err)
+	}
+	if !hasAlertType(emitted, AlertWorkerStageStuck) {
+		t.Fatalf("expected stage stuck alert, got %#v", emitted)
+	}
+	if hasAlertType(emitted, AlertPodRestartBurst) {
+		t.Fatalf("restart burst alert should not fire under configured threshold: %#v", emitted)
+	}
+}
+
+func TestAlertEngineDefaultPolicyMatchesCurrentBehavior(t *testing.T) {
+	now := time.Date(2026, 4, 19, 15, 30, 0, 0, time.UTC)
+	engine := NewAlertEngine(
+		snapshotListStub{snapshots: []WorkerSnapshot{{
+			Identity: WorkerIdentity{WorkerID: "worker-1"},
+			Status:   WorkerStatusOnline,
+			Pod: PodSnapshot{
+				RestartCount: 3,
+			},
+			ActiveTasks: []ActiveTask{{
+				TaskID:    "task-1",
+				TaskType:  "simulation",
+				Phase:     TaskPhaseRunning,
+				PhaseName: "running",
+				UpdatedAt: now.Add(-11 * time.Minute),
+				CurrentStep: CaseStepRuntime{
+					Step:      "simulate",
+					Status:    CaseStepStatusRunning,
+					StartedAt: now.Add(-11 * time.Minute),
+				},
+			}},
+		}}},
+		&alertStoreStub{},
+		DefaultStatusPolicy(),
+		fixedClock{now: now},
+	)
+
+	emitted, err := engine.Evaluate(context.Background())
+	if err != nil {
+		t.Fatalf("evaluate: %v", err)
+	}
+	if !hasAlertType(emitted, AlertWorkerStageStuck) {
+		t.Fatalf("expected default stage stuck alert, got %#v", emitted)
+	}
+	if !hasAlertType(emitted, AlertPodRestartBurst) {
+		t.Fatalf("expected default restart burst alert, got %#v", emitted)
+	}
+}
+
+func hasAlertType(records []AlertRecord, want AlertType) bool {
+	for _, record := range records {
+		if record.AlertType == want {
+			return true
+		}
+	}
+	return false
+}

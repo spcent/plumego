@@ -62,7 +62,7 @@ flowchart LR
 Layer responsibilities:
 
 - `main.go`: thin process entrypoint that loads config, constructs the app, and runs it.
-- `internal/app`: application bootstrap, explicit dependency wiring, service methods, runtime loops, HTTP server lifecycle, route registrar invocation, and graceful shutdown orchestration.
+- `internal/app`: application bootstrap, explicit dependency wiring, the HTTP-facing service facade, runtime lifecycle shell, loop runners, alert runners, route registrar invocation, and graceful shutdown orchestration.
 - `internal/handler`: HTTP request and response layer.
 - `internal/domain`: worker status rules, task reconciliation, pod reconciliation, alerts, domain events.
 - `internal/platform/store`: app-local storage interfaces and shared query/filter types.
@@ -88,6 +88,14 @@ Boundary rules:
 - Metrics are injected as explicit optional observers, not hidden globals.
 - Storage dependencies are behind app-local interfaces.
 - No workerfleet-specific labels, stores, or alert rules are added to Plumego stable packages.
+
+Runtime wiring notes:
+
+- `Runtime` is intentionally kept as a lifecycle shell rather than the default owner of every business dependency.
+- Bootstrap wires explicit components for ingest, query, loop execution, and alert evaluation, then exposes only the lifecycle hooks needed by `App`.
+- Periodic Kubernetes sync and status sweep logic live behind `LoopRunner`.
+- Periodic alert evaluation and notification delivery live behind `AlertRunner`.
+- App config owns the profile-selected `StatusPolicy` and `AlertPolicy` values; bootstrap validates them at startup and injects the effective policies into ingest, loop, and alert components explicitly.
 
 ## 5. Domain Model
 
@@ -118,6 +126,13 @@ Worker status:
 - `degraded`
 - `offline`
 - `unknown`
+
+Policy surface:
+
+- `StatusPolicy` owns heartbeat stale/offline thresholds plus stage-stuck and restart thresholds used by status evaluation.
+- `AlertPolicy` owns alert-side stage-stuck and restart thresholds and is derived from defaults unless runtime wiring overrides it explicitly.
+- `internal/app/config.go` exposes both policies through env-driven app config, with `dev` and `prod` profile defaults plus validated per-field overrides.
+- the same app config layer also owns whether experimental pod, exec-plan, and case-step metrics are emitted.
 
 Online means the process is alive and ready to accept tasks. A worker can still be online while busy when it has active tasks but is not accepting additional work. A worker becomes degraded when signals are stale, it reports errors, it is not accepting tasks while idle, or task phases are stuck. A worker becomes offline when the process is not alive, the pod has failed, the pod has disappeared, or heartbeat expiry crosses policy thresholds.
 
@@ -203,6 +218,9 @@ Pod mapping:
 
 Reconciliation behavior:
 
+- each enabled kube loop iteration starts with a pod list and then watches from the returned `resourceVersion`.
+- watch events handle `ADDED`, `MODIFIED`, `DELETED`, `BOOKMARK`, and Kubernetes `ERROR`.
+- expired watch resource versions trigger a relist rather than surfacing as a permanent loop failure.
 - pod restart count increases emit pod restart events.
 - pod disappearance marks pod deletion.
 - failed or succeeded pods push worker status toward offline.
@@ -211,9 +229,17 @@ Reconciliation behavior:
 Implemented runtime behavior:
 
 - `internal/platform/kube` sync primitives are wired into the app runtime.
-- When `WORKERFLEET_KUBE_SYNC_ENABLED=true`, `internal/app` starts a periodic Kubernetes sync loop.
+- When `WORKERFLEET_KUBE_SYNC_ENABLED=true`, `internal/app` starts a periodic Kubernetes list/watch sync loop.
+- The runtime loop scheduler prevents same-process overlap, applies a default `25s` per-iteration timeout, and backs off from `5s` up to `1m` after failures.
 - Sync errors are reported through the runtime error observer and exported through low-cardinality metrics instead of being silently discarded.
+- Loop scheduling routes through `LoopLeaseCoordinator`; Mongo storage wires this to the `loop_leases` collection, while memory storage remains process-local.
 - The loop is stopped during graceful shutdown before the runtime store is closed.
+
+Current replica assumption:
+
+- With Mongo storage, Kubernetes sync, status sweep, and alert evaluation loops acquire one lease per loop family before doing work.
+- With memory storage, leases are process-local and enabled loops should still run as a single replica.
+- The reference deployment remains `replicas: 1` by default; operators may raise replicas only after confirming Mongo storage, unique lease owners, and external notification expectations.
 
 ## 8. Storage Design
 
@@ -227,12 +253,14 @@ Current state collections:
 History collections:
 
 - `task_history`
+- `case_step_history`
 - `worker_events`
 - `alert_events`
 
 Retention:
 
 - task history: seven days.
+- case step history: seven days.
 - worker events: seven days.
 - alert events: seven days.
 - current worker snapshots and active-task projections are not TTL-pruned.
@@ -244,6 +272,8 @@ MongoDB behavior:
 - history writes are append-only from the app perspective.
 - generated duplicate history IDs are treated as idempotent retry success.
 - `expire_at` drives TTL cleanup for history and alert collections.
+- `case_step_history` supports case timeline and exec-plan drilldown in the
+  production MongoDB backend.
 
 Memory backend:
 
@@ -286,8 +316,6 @@ Metric goals:
 
 - fleet size by worker status.
 - pod phase distribution.
-- pod-level worker state, heartbeat age, and active case count.
-- pod-level case throughput, including hourly success and failure counts.
 - active case count by namespace, node, task type, and phase.
 - active case count by node.
 - task start and finish rates.
@@ -298,6 +326,8 @@ Metric goals:
 - worker status transition counters.
 - alert emission counters and firing gauges.
 - ingest and Kubernetes sync operation durations.
+- optional pod-level worker state, heartbeat age, active case count, throughput,
+  and duration distribution when experimental metrics are enabled.
 
 Default labels:
 
@@ -323,7 +353,7 @@ Forbidden labels:
 - `pod_name`
 - `pod_uid`
 
-The next case/step metrics phase intentionally allows `pod` on selected metrics because pod-level throughput and duration distribution are explicit business requirements. `exec_plan_id` is optional and should only be enabled when active plan cardinality is bounded.
+Experimental metrics intentionally allow `pod` on selected metrics because pod-level throughput and duration distribution are explicit business requirements. `exec_plan_id` is optional and should only be enabled when active plan cardinality is bounded. The `prod` profile disables these pod, exec-plan, and step-heavy series by default.
 
 Grafana dashboards should stay aggregate-first. Per-case and per-task drilldown should use workerfleet APIs and MongoDB history instead of high-cardinality Prometheus labels. The complete case/step metric plan is documented in [Case And Step Metrics Design](../case-step-metrics.md).
 
@@ -359,7 +389,10 @@ Implemented runtime behavior:
 
 - Alert evaluation and notifier primitives are wired into the app runtime.
 - When `WORKERFLEET_ALERT_EVALUATION_ENABLED=true`, `internal/app` starts a periodic alert evaluation loop.
-- When `WORKERFLEET_NOTIFICATION_ENABLED=true`, emitted alert records are dispatched through configured notifiers with `WORKERFLEET_NOTIFIER_DELIVERY_TIMEOUT`.
+- When `WORKERFLEET_NOTIFICATION_ENABLED=true`, emitted alert records enqueue per-sink `notification_jobs`, and a delivery loop sends due jobs through configured notifiers with `WORKERFLEET_NOTIFIER_DELIVERY_TIMEOUT`.
+- Startup fails when notification delivery is enabled without a configured
+  Feishu or generic webhook URL.
+- Alert evaluation and notification delivery use the same guarded loop scheduler, including non-overlap, per-iteration timeout, bounded failure backoff, and Mongo-backed loop leases when Mongo storage is enabled.
 - Evaluation and notification errors are reported through the runtime error observer and exported through low-cardinality metrics instead of being silently discarded.
 - The alert loop is stopped during graceful shutdown before the runtime store is closed.
 
@@ -389,7 +422,10 @@ Runtime loop configuration:
 - `WORKERFLEET_KUBE_SYNC_INTERVAL`, default `30s`.
 - `WORKERFLEET_STATUS_SWEEP_INTERVAL`, default `30s`.
 - `WORKERFLEET_ALERT_EVALUATION_INTERVAL`, default `30s`.
+- Loop guardrail defaults: per-iteration timeout `25s`, initial failure backoff `5s`, max failure backoff `1m`.
 - `WORKERFLEET_NOTIFIER_DELIVERY_TIMEOUT`, default `5s`.
+- `WORKERFLEET_LOOP_LEASE_TTL`, default `90s`.
+- `WORKERFLEET_LOOP_LEASE_OWNER`, default host name.
 - `WORKERFLEET_KUBE_API_HOST`.
 - `WORKERFLEET_KUBE_BEARER_TOKEN`.
 - `WORKERFLEET_KUBE_NAMESPACE`.
@@ -402,6 +438,14 @@ Runtime loop configuration:
 Worker ingress auth:
 
 - `WORKERFLEET_WORKER_AUTH_TOKEN` enables Bearer-token auth for worker registration and heartbeat ingress.
+- `WORKERFLEET_PROFILE=prod` requires `WORKERFLEET_WORKER_AUTH_TOKEN` at startup.
+
+Query API auth:
+
+- `WORKERFLEET_ADMIN_AUTH_TOKEN` enables Bearer-token auth for worker, task, fleet summary, and alert query endpoints.
+- `WORKERFLEET_QUERY_AUTH_REQUIRED=true` requires `WORKERFLEET_ADMIN_AUTH_TOKEN` outside production.
+- `WORKERFLEET_PROFILE=prod` requires `WORKERFLEET_ADMIN_AUTH_TOKEN` at startup.
+- Health, readiness, and metrics endpoints remain outside query API auth in this reference service.
 
 ## 13. Capacity And Reliability Considerations
 
@@ -424,7 +468,7 @@ Operational risks:
 - simultaneous heartbeat bursts can create write pressure.
 - full active-task replacement requires workers to report complete state correctly.
 - stale pod inventory can delay pod failure visibility until sync recovers.
-- notification delivery failures can delay external visibility while persisted alert records remain queryable.
+- notification delivery failures can delay external visibility while persisted alert records and durable outbox jobs remain queryable.
 
 Mitigations:
 
@@ -434,12 +478,22 @@ Mitigations:
 - expose ingest and inventory sync duration metrics.
 - use Grafana aggregate panels before drilling into APIs.
 
+Multi-replica lease implementation:
+
+- ownership unit: one lease per runtime loop family, at minimum `kube_sync`, `status_sweep`, and `alert_evaluate`.
+- lease backend: reuse the workerfleet Mongo backend when enabled so replicated deployments do not need a second coordination system.
+- lease document shape: `_id` loop name, `owner_id`, `created_at`, `updated_at`, and `expires_at`.
+- renewal model: the active holder renews on every loop interval; non-holders skip work and retry acquisition after the normal scheduler interval.
+- failure model: if the holder stops renewing before `expire_at`, another replica may acquire the lease and resume loop ownership.
+- remaining roadmap: expose lease state metrics and debug visibility before raising the reference deployment above one replica by default.
+
 ## 14. Security And Failure Policy
 
 Security requirements:
 
 - do not log webhook secrets, bearer tokens, private keys, or signatures.
 - worker registration and heartbeat ingress fail closed when `WORKERFLEET_WORKER_AUTH_TOKEN` is configured.
+- query endpoints fail closed when query API auth is required.
 - fail closed when required Mongo config is missing.
 - use explicit service account or bearer token for Kubernetes API access.
 - keep notification headers out of error messages.
@@ -459,16 +513,12 @@ Implemented:
 - workerfleet submodule with module path `workerfleet`.
 - HTTP worker register, heartbeat, list, detail, task, fleet summary, and alert query routes.
 - app bootstrap with memory and Mongo backends.
-- Mongo schema, indexes, snapshot, active task, history, event, and alert persistence.
+- Mongo schema, indexes, snapshot, active task, case-step history, task history, event, and alert persistence.
 - domain worker status, active-task reconciliation, pod reconciliation, and alert rules.
 - Feishu and generic webhook notifier primitives.
 - Prometheus collector, exporter, instrumentation, and `/metrics` route.
 - service entrypoint with HTTP server startup and graceful shutdown.
 - periodic Kubernetes inventory sync, status sweep, alert evaluation, and alert notification loops.
 - runtime env config for Kubernetes and notifiers.
+- reference Kubernetes deployment, scraping, and baseline alerting manifests.
 - Grafana dashboard planning documentation.
-
-Recommended next cards:
-
-- add worker register and heartbeat authentication.
-- add operational config examples for Kubernetes deployment.

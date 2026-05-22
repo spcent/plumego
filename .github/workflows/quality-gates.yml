@@ -229,11 +229,11 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v6
         with:
-          go-version-file: benchmark/go.mod
+          go-version-file: reference/benchmark/go.mod
 
       - name: Run benchmarks
         id: bench
-        working-directory: benchmark
+        working-directory: reference/benchmark
         run: |
           set -euo pipefail
           go test -bench=. -benchmem -count=3 -timeout 180s ./... 2>&1 | tee benchmark.txt
@@ -243,7 +243,7 @@ jobs:
         with:
           script: |
             const fs = require("fs");
-            const output = fs.readFileSync("benchmark/benchmark.txt", "utf8");
+            const output = fs.readFileSync("reference/benchmark/benchmark.txt", "utf8");
             const body = [
               "### Plumego benchmark results",
               "",

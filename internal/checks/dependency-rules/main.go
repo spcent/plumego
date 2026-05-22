@@ -28,6 +28,11 @@ func main() {
 		failf("validate dependency rule control plane: %v", err)
 	}
 	violations = append(violations, controlPlaneViolations...)
+	internalCallerViolations, err := checkutil.ValidateDeclaredInternalCallers(repoRoot)
+	if err != nil {
+		failf("validate declared internal callers: %v", err)
+	}
+	violations = append(violations, internalCallerViolations...)
 	if len(violations) == 0 {
 		return
 	}

@@ -11,19 +11,25 @@ import (
 const SchemaVersion = 1
 
 const (
-	CollectionWorkerSnapshots = "worker_snapshots"
-	CollectionWorkerActive    = "worker_active_tasks"
-	CollectionTaskHistory     = "task_history"
-	CollectionWorkerEvents    = "worker_events"
-	CollectionAlertEvents     = "alert_events"
+	CollectionWorkerSnapshots  = "worker_snapshots"
+	CollectionWorkerActive     = "worker_active_tasks"
+	CollectionTaskHistory      = "task_history"
+	CollectionCaseStepHistory  = "case_step_history"
+	CollectionWorkerEvents     = "worker_events"
+	CollectionAlertEvents      = "alert_events"
+	CollectionLoopLeases       = "loop_leases"
+	CollectionNotificationJobs = "notification_jobs"
 )
 
 type Collections struct {
-	WorkerSnapshots *mongo.Collection
-	WorkerActive    *mongo.Collection
-	TaskHistory     *mongo.Collection
-	WorkerEvents    *mongo.Collection
-	AlertEvents     *mongo.Collection
+	WorkerSnapshots  *mongo.Collection
+	WorkerActive     *mongo.Collection
+	TaskHistory      *mongo.Collection
+	CaseStepHistory  *mongo.Collection
+	WorkerEvents     *mongo.Collection
+	AlertEvents      *mongo.Collection
+	LoopLeases       *mongo.Collection
+	NotificationJobs *mongo.Collection
 }
 
 func NewCollections(db *mongo.Database) (Collections, error) {
@@ -31,11 +37,14 @@ func NewCollections(db *mongo.Database) (Collections, error) {
 		return Collections{}, errors.New("mongo database is required")
 	}
 	return Collections{
-		WorkerSnapshots: db.Collection(CollectionWorkerSnapshots),
-		WorkerActive:    db.Collection(CollectionWorkerActive),
-		TaskHistory:     db.Collection(CollectionTaskHistory),
-		WorkerEvents:    db.Collection(CollectionWorkerEvents),
-		AlertEvents:     db.Collection(CollectionAlertEvents),
+		WorkerSnapshots:  db.Collection(CollectionWorkerSnapshots),
+		WorkerActive:     db.Collection(CollectionWorkerActive),
+		TaskHistory:      db.Collection(CollectionTaskHistory),
+		CaseStepHistory:  db.Collection(CollectionCaseStepHistory),
+		WorkerEvents:     db.Collection(CollectionWorkerEvents),
+		AlertEvents:      db.Collection(CollectionAlertEvents),
+		LoopLeases:       db.Collection(CollectionLoopLeases),
+		NotificationJobs: db.Collection(CollectionNotificationJobs),
 	}, nil
 }
 
@@ -53,8 +62,11 @@ func EnsureIndexes(ctx context.Context, db *mongo.Database) error {
 		{name: CollectionWorkerSnapshots, collection: collections.WorkerSnapshots, specs: CollectionIndexSpecs()[CollectionWorkerSnapshots]},
 		{name: CollectionWorkerActive, collection: collections.WorkerActive, specs: CollectionIndexSpecs()[CollectionWorkerActive]},
 		{name: CollectionTaskHistory, collection: collections.TaskHistory, specs: CollectionIndexSpecs()[CollectionTaskHistory]},
+		{name: CollectionCaseStepHistory, collection: collections.CaseStepHistory, specs: CollectionIndexSpecs()[CollectionCaseStepHistory]},
 		{name: CollectionWorkerEvents, collection: collections.WorkerEvents, specs: CollectionIndexSpecs()[CollectionWorkerEvents]},
 		{name: CollectionAlertEvents, collection: collections.AlertEvents, specs: CollectionIndexSpecs()[CollectionAlertEvents]},
+		{name: CollectionLoopLeases, collection: collections.LoopLeases, specs: CollectionIndexSpecs()[CollectionLoopLeases]},
+		{name: CollectionNotificationJobs, collection: collections.NotificationJobs, specs: CollectionIndexSpecs()[CollectionNotificationJobs]},
 	}
 
 	for _, entry := range ordered {

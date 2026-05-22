@@ -8,7 +8,7 @@ import CautionIcon from '../components/shared/CautionIcon.astro';
 
 const journeySteps = [
   { label: 'Why Plumego', href: '/why-plumego' },
-  { label: 'Ecosystem', href: '/ecosystem' },
+  { label: 'Examples', href: '/examples' },
   { label: 'Releases', href: '/releases' },
 ];
 
@@ -87,11 +87,13 @@ const fitProfiles = [
   {
     kicker: 'best fit',
     title: 'Repositories maintained by both human engineers and AI coding agents',
-    body: 'Plumego is designed for codebases where AI agents share execution and review responsibilities. Machine-readable specs, per-module manifests, standardized check commands, and explicit task cards give agents a clear operating model — the same structure that makes human review easier also makes agent contributions safe to verify.',
+    body: 'Plumego is built for codebases where AI agents share execution and review responsibilities. Four machine-readable control planes — <code>docs/</code>, <code>specs/</code>, <code>tasks/</code>, and <code>reference/</code> — give agents a deterministic operating model: where to classify a task, which files to read first, what a correct change looks like, and which checks must pass before a contribution lands. The same structure that makes human review tractable also makes agent contributions safe to verify.',
     points: [
-      'specs/ provides task routing, dependency rules, and change scope in YAML',
-      'module.yaml scopes changes and checks to the owning module before editing starts',
-      'make gates provides a consistent, agent-executable validation loop',
+      'specs/task-routing.yaml maps task intent to owning module before any code is opened',
+      'specs/change-recipes/ defines ordered steps and stop conditions for 15 common change types',
+      'each module/module.yaml declares scope, risk, test commands, and review checklist for that package',
+      'internal/checks/ enforces boundary rules mechanically — the same checks run locally and in CI',
+      'make gates provides an agent-executable, CI-equivalent validation loop before every push',
     ],
   },
 ] as const;
@@ -604,11 +606,11 @@ const frameworkDecision = [
     <div class="section__intro reveal">
       <h2>Continue from here.</h2>
       <p>
-        Fit check done. Move to Ecosystem to pick the right x/* capability family, check Architecture for the full layer diagram, or jump straight into implementation.
+        Fit check done. Go to Architecture to browse x/* capability families and the full layer diagram, or jump straight into implementation.
       </p>
     </div>
     <div class="page-links">
-      <a class="text-link" href="/ecosystem">Ecosystem — browse all x/* families →</a>
+      <a class="text-link" href="/architecture#extensions">Architecture — browse all x/* families →</a>
       <a class="text-link" href="/architecture">Architecture — layer diagram &amp; module layout →</a>
       <a class="text-link" href="/docs/getting-started">Getting started →</a>
     </div>
@@ -628,6 +630,16 @@ const frameworkDecision = [
   @media (min-width: 860px) {
     .timeline-grid {
       grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+
+  .fit-check-board__track {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  @media (max-width: 719px) {
+    .fit-check-board__track {
+      grid-template-columns: 1fr;
     }
   }
 
@@ -766,28 +778,23 @@ const frameworkDecision = [
   .migration-grid {
     display: grid;
     grid-template-columns: 1fr;
-    gap: 0.85rem;
+    gap: 1rem;
     max-width: 64rem;
     margin-inline: auto;
   }
 
   @media (min-width: 640px) {
     .migration-grid {
-      grid-template-columns: repeat(2, 1fr);
-    }
-  }
-
-  @media (min-width: 960px) {
-    .migration-grid {
-      grid-template-columns: repeat(4, 1fr);
+      grid-template-columns: repeat(2, minmax(0, 1fr));
     }
   }
 
   .migration-card {
-    display: flex;
-    align-items: flex-start;
+    display: grid;
+    grid-template-columns: auto auto minmax(0, 1fr);
+    align-items: baseline;
     gap: 0.75rem;
-    padding: 1.1rem 1.2rem;
+    padding: 1.15rem 1.2rem 1.2rem;
     background: var(--bg-elevated);
     border: 1px solid var(--line);
     border-radius: 0.65rem;
@@ -812,21 +819,16 @@ const frameworkDecision = [
     border-radius: 0.25rem;
     white-space: nowrap;
     flex-shrink: 0;
-    margin-top: 0.15rem;
   }
 
   .migration-card__arrow {
     color: var(--fg-soft);
     font-size: 0.9rem;
     flex-shrink: 0;
-    margin-top: 0.1rem;
   }
 
   .migration-card__body {
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-    min-width: 0;
+    display: contents;
   }
 
   .migration-card__body strong {
@@ -837,9 +839,26 @@ const frameworkDecision = [
   }
 
   .migration-card__body p {
+    grid-column: 1 / -1;
     font-size: 0.8rem;
     color: var(--fg-soft);
     margin: 0;
     line-height: 1.5;
+  }
+
+  @media (max-width: 520px) {
+    .migration-card__body strong {
+      grid-column: 1 / -1;
+    }
+  }
+
+  @media (min-width: 720px) and (max-width: 1180px) {
+    .fit-check-board {
+      grid-template-columns: 1fr;
+    }
+
+    .fit-check-board__track {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
   }
 </style>

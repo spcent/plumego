@@ -26,12 +26,19 @@ func WithAlertMetrics(observer AlertMetricsObserver) AlertEngineOption {
 	}
 }
 
+func WithAlertPolicy(policy AlertPolicy) AlertEngineOption {
+	return func(e *AlertEngine) {
+		e.alertPolicy = policy
+	}
+}
+
 type AlertEngine struct {
-	snapshots SnapshotLister
-	alerts    AlertRecordStore
-	clock     Clock
-	policy    StatusPolicy
-	metrics   AlertMetricsObserver
+	snapshots   SnapshotLister
+	alerts      AlertRecordStore
+	clock       Clock
+	policy      StatusPolicy
+	alertPolicy AlertPolicy
+	metrics     AlertMetricsObserver
 }
 
 func NewAlertEngine(snapshots SnapshotLister, alerts AlertRecordStore, policy StatusPolicy, clock Clock, opts ...AlertEngineOption) *AlertEngine {
@@ -41,16 +48,23 @@ func NewAlertEngine(snapshots SnapshotLister, alerts AlertRecordStore, policy St
 	if policy == (StatusPolicy{}) {
 		policy = DefaultStatusPolicy()
 	}
+	if err := policy.Validate(); err != nil {
+		policy = DefaultStatusPolicy()
+	}
 	engine := &AlertEngine{
-		snapshots: snapshots,
-		alerts:    alerts,
-		clock:     clock,
-		policy:    policy,
+		snapshots:   snapshots,
+		alerts:      alerts,
+		clock:       clock,
+		policy:      policy,
+		alertPolicy: policy.AlertPolicy(),
 	}
 	for _, opt := range opts {
 		if opt != nil {
 			opt(engine)
 		}
+	}
+	if err := engine.alertPolicy.Validate(); err != nil {
+		engine.alertPolicy = policy.AlertPolicy()
 	}
 	return engine
 }
@@ -68,7 +82,7 @@ func (e *AlertEngine) Evaluate(ctx context.Context) ([]AlertRecord, error) {
 
 	candidates := make([]AlertRecord, 0, len(snapshots)*2)
 	for _, snapshot := range snapshots {
-		candidates = append(candidates, EvaluateSnapshotAlerts(snapshot, now, e.policy)...)
+		candidates = append(candidates, EvaluateSnapshotAlerts(snapshot, now, e.alertPolicy)...)
 	}
 	candidates = append(candidates, EvaluateTaskConflictAlerts(snapshots, now)...)
 

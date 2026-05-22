@@ -214,7 +214,7 @@ func BenchmarkOptNormalizePath(b *testing.B) {
 	}
 }
 
-// BenchmarkOptCacheKey benchmarks cache key construction.
+// BenchmarkOptCacheKey benchmarks the inlined cache key construction used in ServeHTTP.
 func BenchmarkOptCacheKey(b *testing.B) {
 	methods := []string{"GET", "POST", "PUT"}
 	paths := []string{"/users", "/users/123", "/api/v1/health"}
@@ -224,7 +224,7 @@ func BenchmarkOptCacheKey(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		m := methods[i%len(methods)]
 		p := paths[i%len(paths)]
-		fastBuildCacheKey(m, p)
+		_ = m + ":" + p
 	}
 }
 
@@ -251,6 +251,7 @@ func BenchmarkOptParallelStatic(b *testing.B) {
 	mustAddRoute(r, http.MethodGet, "/about", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
+	r.Freeze()
 
 	b.ReportAllocs()
 	b.ResetTimer()
@@ -270,6 +271,7 @@ func BenchmarkOptParallelParam(b *testing.B) {
 	mustAddRoute(r, http.MethodGet, "/users/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
+	r.Freeze()
 
 	b.ReportAllocs()
 	b.ResetTimer()
@@ -280,5 +282,53 @@ func BenchmarkOptParallelParam(b *testing.B) {
 			w.Body.Reset()
 			r.ServeHTTP(w, req)
 		}
+	})
+}
+
+// BenchmarkOptFrozenVsUnfrozen compares trie-traversal cost with and without
+// the RLock that is skipped after Freeze(). Cache miss is forced by using a
+// cache of capacity 1 and rotating between two URLs.
+func BenchmarkOptFrozenVsUnfrozen(b *testing.B) {
+	newRouter := func() *Router {
+		r := NewRouter(withCacheCapacity(1))
+		mustAddRoute(r, http.MethodGet, "/api/v1/users/:id", http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		}))
+		return r
+	}
+	reqs := []*http.Request{
+		httptest.NewRequest("GET", "/api/v1/users/1", nil),
+		httptest.NewRequest("GET", "/api/v1/users/2", nil),
+	}
+
+	b.Run("unfrozen", func(b *testing.B) {
+		r := newRouter()
+		w := httptest.NewRecorder()
+		b.ReportAllocs()
+		b.ResetTimer()
+		b.RunParallel(func(pb *testing.PB) {
+			i := 0
+			for pb.Next() {
+				w.Body.Reset()
+				r.ServeHTTP(w, reqs[i%len(reqs)])
+				i++
+			}
+		})
+	})
+
+	b.Run("frozen", func(b *testing.B) {
+		r := newRouter()
+		r.Freeze()
+		w := httptest.NewRecorder()
+		b.ReportAllocs()
+		b.ResetTimer()
+		b.RunParallel(func(pb *testing.PB) {
+			i := 0
+			for pb.Next() {
+				w.Body.Reset()
+				r.ServeHTTP(w, reqs[i%len(reqs)])
+				i++
+			}
+		})
 	})
 }
