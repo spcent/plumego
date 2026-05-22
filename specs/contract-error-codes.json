@@ -119,6 +119,41 @@
       "path": "x/websocket/websocket.go",
       "symbol": "codeWebSocketBroadcastRejected",
       "type": "TypeUnavailable"
+    },
+    {
+      "path": "reference/standard-service/internal/handler/api.go",
+      "symbol": "codeGreetNameRequired",
+      "type": "TypeRequired"
+    },
+    {
+      "path": "reference/standard-service/internal/handler/guard.go",
+      "symbol": "codeAuthKeyInvalid",
+      "type": "TypeUnauthorized"
+    },
+    {
+      "path": "reference/standard-service/internal/handler/health.go",
+      "symbol": "codeComponentUnhealthy",
+      "type": "TypeUnavailable"
+    },
+    {
+      "path": "reference/standard-service/internal/handler/items.go",
+      "symbol": "codeItemCreateInvalidJSON",
+      "type": "TypeBadRequest"
+    },
+    {
+      "path": "reference/standard-service/internal/handler/items.go",
+      "symbol": "codeItemNameRequired",
+      "type": "TypeRequired"
+    },
+    {
+      "path": "reference/standard-service/internal/handler/items.go",
+      "symbol": "codeItemNotFound",
+      "type": "TypeNotFound"
+    },
+    {
+      "path": "reference/standard-service/internal/handler/items.go",
+      "symbol": "codeItemUpdateInvalidJSON",
+      "type": "TypeBadRequest"
     }
   ]
 }

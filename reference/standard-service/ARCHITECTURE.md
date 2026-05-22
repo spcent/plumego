@@ -133,21 +133,24 @@ Both shapes are valid; choose based on whether the handler needs injected state.
 
 ### Readiness checking
 
-`HealthHandler` supports an optional list of `ReadinessChecker` implementations.
+`HealthHandler` supports an optional list of `health.ComponentChecker` implementations.
 Each checker represents one dependency (database, cache, downstream service).
 `GET /readyz` probes them in order; the first failure returns 503 TypeUnavailable.
 
 ```go
-// handler declares the interface
-type ReadinessChecker interface {
-    Ready(ctx context.Context) error
-}
+// Implement health.ComponentChecker for your dependency.
+// Name() is used to label the component in success and error responses.
+// Check(ctx) should return nil if healthy, error if unhealthy.
+type dbChecker struct{ db *sql.DB }
+
+func (c *dbChecker) Name() string              { return "database" }
+func (c *dbChecker) Check(ctx context.Context) error { return c.db.PingContext(ctx) }
 
 // routes.go registers one checker per dependency
 health := handler.HealthHandler{
     ServiceName: a.Cfg.App.ServiceName,
-    Checkers: []handler.ReadinessChecker{
-        mydb.NewReadinessChecker(db),
+    Checkers: []health.ComponentChecker{
+        &dbChecker{db: myDB},
     },
 }
 ```

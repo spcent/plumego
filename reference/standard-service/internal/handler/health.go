@@ -8,6 +8,8 @@ import (
 	"github.com/spcent/plumego/health"
 )
 
+const codeComponentUnhealthy = "health.component.unhealthy"
+
 // HealthHandler serves the canonical liveness and readiness endpoints.
 //
 // Liveness (/healthz) always returns 200 as long as the process is alive.
@@ -63,6 +65,7 @@ func (h HealthHandler) Ready(w http.ResponseWriter, r *http.Request) {
 		if err := checker.Check(r.Context()); err != nil {
 			_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 				Type(contract.TypeUnavailable).
+				Code(codeComponentUnhealthy).
 				Detail("component", checker.Name()).
 				Detail("reason", err.Error()).
 				Message("service not ready").

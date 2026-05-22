@@ -64,6 +64,40 @@ func TestLoadIgnoresUnrelatedFlags(t *testing.T) {
 	}
 }
 
+func TestValidateFailsOnEmptyAddr(t *testing.T) {
+	cfg := Defaults()
+	cfg.Core.Addr = ""
+	if err := Validate(cfg); err == nil {
+		t.Fatal("Validate: want error for empty addr, got nil")
+	}
+}
+
+func TestLoadEnvWriteKey(t *testing.T) {
+	cfg, err := load(
+		[]string{"standard-service"},
+		mapLookup(map[string]string{"APP_WRITE_KEY": "mysecret"}),
+	)
+	if err != nil {
+		t.Fatalf("load config: %v", err)
+	}
+	if cfg.App.WriteKey != "mysecret" {
+		t.Fatalf("WriteKey = %q, want %q", cfg.App.WriteKey, "mysecret")
+	}
+}
+
+func TestLoadEnvServiceName(t *testing.T) {
+	cfg, err := load(
+		[]string{"standard-service"},
+		mapLookup(map[string]string{"APP_SERVICE_NAME": "my-service"}),
+	)
+	if err != nil {
+		t.Fatalf("load config: %v", err)
+	}
+	if cfg.App.ServiceName != "my-service" {
+		t.Fatalf("ServiceName = %q, want %q", cfg.App.ServiceName, "my-service")
+	}
+}
+
 func mapLookup(values map[string]string) func(string) (string, bool) {
 	return func(key string) (string, bool) {
 		value, ok := values[key]

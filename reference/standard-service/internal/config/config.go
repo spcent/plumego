@@ -76,35 +76,45 @@ func Validate(cfg Config) error {
 	return nil
 }
 
-func applyEnv(cfg *Config, lookupEnv func(string) (string, bool)) {
-	cfg.Core.Addr = envString(lookupEnv, "APP_ADDR", cfg.Core.Addr)
-	cfg.App.EnvFile = envString(lookupEnv, "APP_ENV_FILE", cfg.App.EnvFile)
-	cfg.App.ServiceName = envString(lookupEnv, "APP_SERVICE_NAME", cfg.App.ServiceName)
-	cfg.App.MaxBodyBytes = envInt64(lookupEnv, "APP_MAX_BODY_BYTES", cfg.App.MaxBodyBytes)
-	cfg.App.WriteKey = envString(lookupEnv, "APP_WRITE_KEY", cfg.App.WriteKey)
-}
-
+// applyEnvMap applies string key-value pairs from a map (e.g., from .env file).
+// It is the baseline implementation that all env-reading code uses.
 func applyEnvMap(cfg *Config, values map[string]string) {
 	if values == nil {
 		return
 	}
-	if value := strings.TrimSpace(values["APP_ADDR"]); value != "" {
-		cfg.Core.Addr = value
+	setEnvString := func(key, oldValue string) string {
+		if value := strings.TrimSpace(values[key]); value != "" {
+			return value
+		}
+		return oldValue
 	}
-	if value := strings.TrimSpace(values["APP_ENV_FILE"]); value != "" {
-		cfg.App.EnvFile = value
+	setEnvInt64 := func(key string, oldValue int64) int64 {
+		if value := strings.TrimSpace(values[key]); value != "" {
+			if n, err := strconv.ParseInt(value, 10, 64); err == nil {
+				return n
+			}
+		}
+		return oldValue
 	}
-	if value := strings.TrimSpace(values["APP_SERVICE_NAME"]); value != "" {
-		cfg.App.ServiceName = value
-	}
-	if value := strings.TrimSpace(values["APP_MAX_BODY_BYTES"]); value != "" {
-		if n, err := strconv.ParseInt(value, 10, 64); err == nil {
-			cfg.App.MaxBodyBytes = n
+
+	cfg.Core.Addr = setEnvString("APP_ADDR", cfg.Core.Addr)
+	cfg.App.EnvFile = setEnvString("APP_ENV_FILE", cfg.App.EnvFile)
+	cfg.App.ServiceName = setEnvString("APP_SERVICE_NAME", cfg.App.ServiceName)
+	cfg.App.MaxBodyBytes = setEnvInt64("APP_MAX_BODY_BYTES", cfg.App.MaxBodyBytes)
+	cfg.App.WriteKey = setEnvString("APP_WRITE_KEY", cfg.App.WriteKey)
+}
+
+// applyEnv applies environment variables by looking them up via lookupEnv.
+// It uses applyEnvMap internally to reduce duplication.
+func applyEnv(cfg *Config, lookupEnv func(string) (string, bool)) {
+	values := make(map[string]string)
+	keys := []string{"APP_ADDR", "APP_ENV_FILE", "APP_SERVICE_NAME", "APP_MAX_BODY_BYTES", "APP_WRITE_KEY"}
+	for _, key := range keys {
+		if val, ok := lookupEnv(key); ok {
+			values[key] = val
 		}
 	}
-	if value := strings.TrimSpace(values["APP_WRITE_KEY"]); value != "" {
-		cfg.App.WriteKey = value
-	}
+	applyEnvMap(cfg, values)
 }
 
 func applyFlags(cfg *Config, args []string) error {
@@ -193,22 +203,6 @@ func readEnvFile(path string) (map[string]string, error) {
 		values[key] = value
 	}
 	return values, scanner.Err()
-}
-
-func envString(lookupEnv func(string) (string, bool), key, fallback string) string {
-	if value, ok := lookupEnv(key); ok && value != "" {
-		return value
-	}
-	return fallback
-}
-
-func envInt64(lookupEnv func(string) (string, bool), key string, fallback int64) int64 {
-	if value, ok := lookupEnv(key); ok && value != "" {
-		if n, err := strconv.ParseInt(value, 10, 64); err == nil {
-			return n
-		}
-	}
-	return fallback
 }
 
 func parseEnvLine(line string) (key, value string, ok bool) {

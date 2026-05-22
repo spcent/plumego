@@ -12,9 +12,8 @@ import (
 // Routes that share a common path prefix are registered through a RouteGroup
 // so the prefix is declared once and not repeated on every line.
 func (a *App) RegisterRoutes() error {
-	api := handler.APIHandler{}
 	// HealthHandler receives no Checkers here because the reference has no real
-	// dependencies to probe. In a production service, pass one ReadinessChecker
+	// dependencies to probe. In a production service, pass one health.ComponentChecker
 	// per dependency (database, cache, downstream) so /readyz reflects real state.
 	health := handler.HealthHandler{ServiceName: a.Cfg.App.ServiceName}
 	// ItemHandler demonstrates constructor injection: the concrete domain store
@@ -27,6 +26,11 @@ func (a *App) RegisterRoutes() error {
 	// This demonstrates the per-route middleware wrapping pattern: only the
 	// handlers that mutate state are wrapped; read-only routes are unaffected.
 	writeGuard := handler.RequireWriteKey(a.Cfg.App.WriteKey)
+
+	// APIHandler carries the Logger dependency. The Logger field demonstrates
+	// structured logging (see handler/api.go Status method). All other handler
+	// state — endpoint list in Hello, response envelopes — is stateless.
+	api := handler.APIHandler{Logger: a.Core.Logger()}
 
 	// Top-level routes registered directly on the app.
 	root := newRouteReg(a.Core)

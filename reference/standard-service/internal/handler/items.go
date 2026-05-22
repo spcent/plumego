@@ -10,6 +10,13 @@ import (
 	"standard-service/internal/domain/item"
 )
 
+const (
+	codeItemCreateInvalidJSON = "item.create.invalid_json"
+	codeItemNameRequired      = "item.name.required"
+	codeItemNotFound          = "item.not_found"
+	codeItemUpdateInvalidJSON = "item.update.invalid_json"
+)
+
 // ItemRepository is the minimal persistence contract that ItemHandler depends on.
 // Pass a concrete implementation from routes.go; pass a stub in tests.
 type ItemRepository interface {
@@ -53,6 +60,7 @@ func (h ItemHandler) Create(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeBadRequest).
+			Code(codeItemCreateInvalidJSON).
 			Message("request body must be valid JSON").
 			Build())
 		return
@@ -60,6 +68,7 @@ func (h ItemHandler) Create(w http.ResponseWriter, r *http.Request) {
 	if req.Name == "" {
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeRequired).
+			Code(codeItemNameRequired).
 			Detail("field", "name").
 			Message("name is required").
 			Build())
@@ -126,6 +135,7 @@ func (h ItemHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeNotFound).
+			Code(codeItemNotFound).
 			Detail("id", id).
 			Message("item not found").
 			Build())
@@ -148,6 +158,7 @@ func (h ItemHandler) Update(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeBadRequest).
+			Code(codeItemUpdateInvalidJSON).
 			Message("request body must be valid JSON").
 			Build())
 		return
@@ -155,6 +166,7 @@ func (h ItemHandler) Update(w http.ResponseWriter, r *http.Request) {
 	if req.Name == "" {
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeRequired).
+			Code(codeItemNameRequired).
 			Detail("field", "name").
 			Message("name is required").
 			Build())
@@ -165,6 +177,7 @@ func (h ItemHandler) Update(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeNotFound).
+			Code(codeItemNotFound).
 			Detail("id", id).
 			Message("item not found").
 			Build())
@@ -183,6 +196,7 @@ func (h ItemHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	if !h.Repo.Delete(id) {
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeNotFound).
+			Code(codeItemNotFound).
 			Detail("id", id).
 			Message("item not found").
 			Build())
