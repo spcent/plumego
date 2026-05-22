@@ -238,6 +238,55 @@ agent_hints:
 	}
 }
 
+func TestValidateDeclaredInternalCallersReportsMissingAndStaleDeclarations(t *testing.T) {
+	repo := t.TempDir()
+	writeRepoSpec(t, repo)
+	writeFile(t, filepath.Join(repo, "specs", "dependency-rules.yaml"), `modules:
+  internal/httpx:
+    path: internal/httpx
+    allow:
+      - stdlib
+    declared_callers:
+      - x/gateway
+      - x/stale
+    deny:
+      - x/**
+special_rules:
+  forbidden_paths:
+    - plumego.go
+  forbidden_import_patterns:
+    - github.com/spcent/plumego
+`)
+	writeFile(t, filepath.Join(repo, "x", "gateway", "gateway.go"), `package gateway
+
+import _ "github.com/spcent/plumego/internal/httpx"
+`)
+	writeFile(t, filepath.Join(repo, "x", "messaging", "messaging.go"), `package messaging
+
+import _ "github.com/spcent/plumego/internal/httpx"
+`)
+	writeFile(t, filepath.Join(repo, "x", "observability", "devtools", "devtools.go"), `package devtools
+
+import _ "github.com/spcent/plumego/internal/config"
+`)
+
+	violations, err := ValidateDeclaredInternalCallers(repo)
+	if err != nil {
+		t.Fatalf("ValidateDeclaredInternalCallers: %v", err)
+	}
+
+	joined := strings.Join(violations, "\n")
+	for _, want := range []string{
+		`x/messaging/messaging.go imports github.com/spcent/plumego/internal/httpx but caller "x/messaging" is not listed`,
+		`x/observability/devtools/devtools.go imports github.com/spcent/plumego/internal/config but no specs/dependency-rules.yaml internal module declares it`,
+		`specs/dependency-rules.yaml module internal/httpx declares caller "x/stale" but no non-test Go import uses it`,
+	} {
+		if !strings.Contains(joined, want) {
+			t.Fatalf("expected violation containing %q, got:\n%s", want, joined)
+		}
+	}
+}
+
 func TestReadBaselineAcceptsLongLines(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "baseline.txt")
 	longEntry := "x/long|" + strings.Repeat("a", 70*1024)

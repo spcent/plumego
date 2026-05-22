@@ -8,10 +8,10 @@ import (
 	"reflect"
 
 	contract "github.com/spcent/plumego/contract"
+	internaltransport "github.com/spcent/plumego/internal/httputil"
 	"github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/middleware"
-	internalobs "github.com/spcent/plumego/middleware/internal/observability"
-	internaltransport "github.com/spcent/plumego/middleware/internal/transport"
+	internaltelemetry "github.com/spcent/plumego/middleware/internal/telemetry"
 )
 
 // ErrNilLogger is returned when recovery is configured without a logger.
@@ -59,10 +59,10 @@ func recoveryHandler(next http.Handler, logger log.StructuredLogger) http.Handle
 		rw := &recoveryResponseWriter{ResponseWriter: w}
 		defer func() {
 			if rec := recover(); rec != nil {
-				fields := internalobs.MiddlewareLogFields(r, http.StatusInternalServerError, 0)
+				fields := internaltelemetry.MiddlewareLogFields(r, http.StatusInternalServerError, 0)
 				fields["panic_type"] = panicType(rec)
-				internalobs.RunSafeFinalizer(func() {
-					logger.WithFields(log.Fields(internalobs.RedactFields(fields))).Error("panic recovered")
+				internaltelemetry.RunSafeFinalizer(func() {
+					logger.WithFields(log.Fields(internaltelemetry.RedactFields(fields))).Error("panic recovered")
 				})
 				if rw.wrote {
 					return

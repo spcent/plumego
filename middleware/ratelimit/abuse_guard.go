@@ -13,10 +13,10 @@ import (
 	"time"
 
 	"github.com/spcent/plumego/contract"
+	internaltransport "github.com/spcent/plumego/internal/httputil"
 	"github.com/spcent/plumego/log"
 	mw "github.com/spcent/plumego/middleware"
-	internalobs "github.com/spcent/plumego/middleware/internal/observability"
-	internaltransport "github.com/spcent/plumego/middleware/internal/transport"
+	internaltelemetry "github.com/spcent/plumego/middleware/internal/telemetry"
 	"github.com/spcent/plumego/security/abuse"
 )
 
@@ -247,11 +247,11 @@ func writeAbuseError(w http.ResponseWriter, r *http.Request, decision abuse.Deci
 	})
 
 	if logger != nil {
-		fields := internalobs.MiddlewareLogFields(r, http.StatusTooManyRequests, 0)
+		fields := internaltelemetry.MiddlewareLogFields(r, http.StatusTooManyRequests, 0)
 		fields["limit"] = decision.Limit
 		fields["remaining"] = decision.Remaining
-		internalobs.RunSafeFinalizer(func() {
-			logger.WithFields(log.Fields(internalobs.RedactFields(fields))).Warn("request rate limited")
+		internaltelemetry.RunSafeFinalizer(func() {
+			logger.WithFields(log.Fields(internaltelemetry.RedactFields(fields))).Warn("request rate limited")
 		})
 	}
 }

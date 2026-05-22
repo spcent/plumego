@@ -8,8 +8,8 @@ import (
 	"strconv"
 	"strings"
 
+	internaltransport "github.com/spcent/plumego/internal/httputil"
 	"github.com/spcent/plumego/middleware"
-	internaltransport "github.com/spcent/plumego/middleware/internal/transport"
 )
 
 // Middleware compresses HTTP responses when the client supports it via

@@ -167,6 +167,135 @@ modules:
       - store/idempotency/**
       - store/kv/**
 
+  internal/semver:
+    path: internal/semver
+    layer: internal
+    allow:
+      - stdlib
+    declared_callers:
+      - x/ai/marketplace
+    deny:
+      - core/**
+      - router/**
+      - contract/**
+      - middleware/**
+      - security/**
+      - store/**
+      - health/**
+      - log/**
+      - metrics/**
+      - x/**
+      - reference/**
+      - cmd/**
+
+  internal/httputil:
+    path: internal/httputil
+    layer: internal
+    allow:
+      - stdlib
+      - contract
+    declared_callers:
+      - middleware
+      - x/gateway/cache
+      - x/gateway/transform
+    deny:
+      - core/**
+      - router/**
+      - middleware/**
+      - security/**
+      - store/**
+      - health/**
+      - log/**
+      - metrics/**
+      - x/**
+      - reference/**
+      - cmd/**
+
+  internal/httpx:
+    path: internal/httpx
+    layer: internal
+    allow:
+      - stdlib
+    declared_callers:
+      - x/gateway
+      - x/messaging/webhook
+    deny:
+      - core/**
+      - router/**
+      - contract/**
+      - middleware/**
+      - security/**
+      - store/**
+      - health/**
+      - log/**
+      - metrics/**
+      - x/**
+      - reference/**
+      - cmd/**
+
+  internal/nethttp:
+    path: internal/nethttp
+    layer: internal
+    allow:
+      - stdlib
+    declared_callers:
+      - x/messaging
+    deny:
+      - core/**
+      - router/**
+      - contract/**
+      - middleware/**
+      - security/**
+      - store/**
+      - health/**
+      - log/**
+      - metrics/**
+      - x/**
+      - reference/**
+      - cmd/**
+
+  internal/stringsx:
+    path: internal/stringsx
+    layer: internal
+    allow:
+      - stdlib
+    declared_callers:
+      - x/messaging/webhook
+    deny:
+      - core/**
+      - router/**
+      - contract/**
+      - middleware/**
+      - security/**
+      - store/**
+      - health/**
+      - log/**
+      - metrics/**
+      - x/**
+      - reference/**
+      - cmd/**
+
+  internal/config:
+    path: internal/config
+    layer: internal
+    allow:
+      - stdlib
+      - log
+    declared_callers:
+      - x/observability/devtools
+    deny:
+      - core/**
+      - router/**
+      - contract/**
+      - middleware/**
+      - security/**
+      - store/**
+      - health/**
+      - metrics/**
+      - x/**
+      - reference/**
+      - cmd/**
+
   x/data/cache:
     path: x/data/cache
     layer: extension

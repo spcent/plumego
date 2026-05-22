@@ -1,4 +1,4 @@
-package observability
+package telemetry
 
 import (
 	"context"
@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/spcent/plumego/contract"
-	internaltransport "github.com/spcent/plumego/middleware/internal/transport"
+	internaltransport "github.com/spcent/plumego/internal/httputil"
 	"github.com/spcent/plumego/middleware/requestid"
 )
 

@@ -8,8 +8,8 @@ import (
 	"strings"
 
 	"github.com/spcent/plumego/contract"
+	internaltransport "github.com/spcent/plumego/internal/httputil"
 	"github.com/spcent/plumego/middleware"
-	internaltransport "github.com/spcent/plumego/middleware/internal/transport"
 )
 
 const defaultMaxBodyBytes = 64 << 10

@@ -1,4 +1,4 @@
-package transport
+package httputil
 
 import (
 	"net/http"
@@ -13,7 +13,7 @@ const (
 	CodeUpstreamFailed     = "upstream_failed"
 )
 
-// WriteTransportError writes middleware transport errors using the canonical contract helper.
+// WriteTransportError writes transport errors using the canonical contract helper.
 func WriteTransportError(
 	w http.ResponseWriter,
 	r *http.Request,

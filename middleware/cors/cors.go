@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
+	internaltransport "github.com/spcent/plumego/internal/httputil"
 	"github.com/spcent/plumego/middleware"
-	internaltransport "github.com/spcent/plumego/middleware/internal/transport"
 )
 
 // ErrStrictDefaultOriginsRequired is returned when strict CORS defaults are

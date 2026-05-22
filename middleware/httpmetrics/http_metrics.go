@@ -5,7 +5,7 @@ import (
 
 	"github.com/spcent/plumego/metrics"
 	"github.com/spcent/plumego/middleware"
-	internalobs "github.com/spcent/plumego/middleware/internal/observability"
+	internaltelemetry "github.com/spcent/plumego/middleware/internal/telemetry"
 )
 
 type Observer = metrics.HTTPObserver
@@ -17,11 +17,11 @@ func Middleware(collector Observer) middleware.Middleware {
 		}
 
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			prepared := internalobs.PrepareRequest(w, r)
+			prepared := internaltelemetry.PrepareRequest(w, r)
 			r = prepared.Request
 			recorder := prepared.Recorder
 
-			defer internalobs.FinishPreservingPanic(func() {
+			defer internaltelemetry.FinishPreservingPanic(func() {
 				metricsData := prepared.Complete(r)
 				collector.ObserveHTTP(r.Context(), metricsData.Method, metricsData.ObservedPath(), metricsData.Status, metricsData.Bytes, metricsData.Duration)
 			})

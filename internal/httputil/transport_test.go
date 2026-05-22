@@ -1,4 +1,4 @@
-package transport
+package httputil
 
 import (
 	"net/http"

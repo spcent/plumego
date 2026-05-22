@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/spcent/plumego/contract"
-	internalobs "github.com/spcent/plumego/middleware/internal/observability"
+	internaltelemetry "github.com/spcent/plumego/middleware/internal/telemetry"
 )
 
 type spanContextSpan struct {
@@ -69,7 +69,7 @@ func TestMiddlewareSetsTraceHeadersAndSpanContext(t *testing.T) {
 	if rec.Header().Get(contract.RequestIDHeader) == "" {
 		t.Fatalf("expected request id header to be set")
 	}
-	if rec.Header().Get(internalobs.SpanIDHeader) != tracer.span.spanID {
+	if rec.Header().Get(internaltelemetry.SpanIDHeader) != tracer.span.spanID {
 		t.Fatalf("expected span id header to be set")
 	}
 	if tracer.span == nil || !tracer.span.ended {
@@ -94,7 +94,7 @@ func TestMiddlewareDerivesTraceContextFromReturnedSpan(t *testing.T) {
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, req)
 
-	if got := rec.Header().Get(internalobs.SpanIDHeader); got != tracer.span.spanID {
+	if got := rec.Header().Get(internaltelemetry.SpanIDHeader); got != tracer.span.spanID {
 		t.Fatalf("span id header = %q, want %q", got, tracer.span.spanID)
 	}
 }
@@ -164,7 +164,7 @@ func TestMiddlewareContinuesWhenTracerStartPanics(t *testing.T) {
 	if rec.Code != http.StatusAccepted {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusAccepted)
 	}
-	if got := rec.Header().Get(internalobs.SpanIDHeader); got != "" {
+	if got := rec.Header().Get(internaltelemetry.SpanIDHeader); got != "" {
 		t.Fatalf("span id header = %q, want empty", got)
 	}
 }
