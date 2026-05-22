@@ -31,6 +31,8 @@ Runtime behavior:
 - alert evaluation can be enabled with `WORKERFLEET_ALERT_EVALUATION_ENABLED=true`.
 - `WORKERFLEET_ALERT_EVALUATION_INTERVAL` controls the evaluation loop interval.
 - notification delivery can be enabled with `WORKERFLEET_NOTIFICATION_ENABLED=true`.
+- when notification delivery is enabled, startup requires
+  `WORKERFLEET_FEISHU_WEBHOOK_URL` or `WORKERFLEET_WEBHOOK_URL`.
 - `WORKERFLEET_NOTIFIER_DELIVERY_TIMEOUT` controls per-dispatch delivery timeout.
 - emitted firing and resolved alert records are persisted before notification delivery is attempted.
 - notification delivery errors do not crash the service.

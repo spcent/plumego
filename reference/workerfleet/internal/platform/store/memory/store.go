@@ -284,7 +284,10 @@ func (s *Store) AppendWorkerEvent(ctx context.Context, event domain.DomainEvent)
 	return nil
 }
 
-func (s *Store) ListWorkerEvents(workerID domain.WorkerID) ([]domain.DomainEvent, error) {
+func (s *Store) ListWorkerEvents(ctx context.Context, workerID domain.WorkerID) ([]domain.DomainEvent, error) {
+	if err := ctxErr(ctx); err != nil {
+		return nil, err
+	}
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 

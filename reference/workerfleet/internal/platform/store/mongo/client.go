@@ -148,6 +148,7 @@ func (s *Store) operationContext(parent context.Context) (context.Context, conte
 var _ platformstore.WorkerSnapshotStore = (*Store)(nil)
 var _ platformstore.ActiveTaskStore = (*Store)(nil)
 var _ platformstore.TaskHistoryStore = (*Store)(nil)
+var _ platformstore.CaseStepHistoryStore = (*Store)(nil)
 var _ platformstore.WorkerEventStore = (*Store)(nil)
 var _ platformstore.AlertStore = (*Store)(nil)
 var _ platformstore.QueryStore = (*Store)(nil)

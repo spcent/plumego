@@ -52,7 +52,9 @@ func (o *Observer) ObserveWorkerSnapshot(previous domain.WorkerSnapshot, current
 	}
 	firstObservation := o.markObserved(current.Identity.WorkerID)
 	o.observeWorkerStatus(previous, current)
-	o.observeHeartbeatAge(previous, current)
+	if o.experimentalSeriesEnabled {
+		o.observeHeartbeatAge(previous, current)
+	}
 	o.observeAcceptingTasks(previous, current)
 	o.observeActiveTaskGauges(previous, current)
 	if o.experimentalSeriesEnabled {
@@ -294,7 +296,9 @@ func (o *Observer) observeUnchangedBaseline(previous domain.WorkerSnapshot, curr
 func (o *Observer) addActiveTaskGauge(identity domain.WorkerIdentity, task domain.ActiveTask, delta float64) {
 	o.addGauge(MetricActiveCases, activeCaseLabels(identity, task), delta)
 	o.addGauge(MetricNodeActiveCases, nodeActiveCaseLabels(identity, task), delta)
-	o.addGauge(MetricWorkerActiveCases, workerActiveCaseLabels(identity), delta)
+	if o.experimentalSeriesEnabled {
+		o.addGauge(MetricWorkerActiveCases, workerActiveCaseLabels(identity), delta)
+	}
 }
 
 func (o *Observer) observeTaskStarted(identity domain.WorkerIdentity, task domain.ActiveTask) {

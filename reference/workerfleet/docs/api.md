@@ -9,6 +9,7 @@ Worker ingress auth:
 - `POST /v1/workers/register` and `POST /v1/workers/heartbeat` require `Authorization: Bearer <token>` when `WORKERFLEET_WORKER_AUTH_TOKEN` is configured.
 - Missing, malformed, or invalid credentials return `401` with a generic authentication error and do not echo credential values.
 - Query endpoints are not changed by worker ingress auth.
+- `WORKERFLEET_PROFILE=prod` requires `WORKERFLEET_WORKER_AUTH_TOKEN` at startup, so production ingress fails closed by default.
 
 ## `POST /v1/workers/register`
 

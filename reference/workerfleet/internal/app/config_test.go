@@ -113,6 +113,7 @@ func TestLoadConfigParsesStatusAndAlertPolicies(t *testing.T) {
 		"WORKERFLEET_STATUS_RESTART_BURST_THRESHOLD": "6",
 		"WORKERFLEET_ALERT_STAGE_STUCK_AFTER":        "25m",
 		"WORKERFLEET_ALERT_RESTART_BURST_THRESHOLD":  "8",
+		"WORKERFLEET_WORKER_AUTH_TOKEN":              "worker-secret",
 	}))
 	if err != nil {
 		t.Fatalf("load config: %v", err)
@@ -144,6 +145,7 @@ func TestLoadConfigParsesExperimentalMetricFlags(t *testing.T) {
 	cfg, err := LoadConfig(testLookup(map[string]string{
 		"WORKERFLEET_PROFILE":                      "prod",
 		"WORKERFLEET_EXPERIMENTAL_METRICS_ENABLED": "true",
+		"WORKERFLEET_WORKER_AUTH_TOKEN":            "worker-secret",
 	}))
 	if err != nil {
 		t.Fatalf("load config: %v", err)
@@ -153,7 +155,8 @@ func TestLoadConfigParsesExperimentalMetricFlags(t *testing.T) {
 	}
 
 	cfg, err = LoadConfig(testLookup(map[string]string{
-		"WORKERFLEET_PROFILE": "prod",
+		"WORKERFLEET_PROFILE":           "prod",
+		"WORKERFLEET_WORKER_AUTH_TOKEN": "worker-secret",
 	}))
 	if err != nil {
 		t.Fatalf("load config: %v", err)
@@ -204,6 +207,20 @@ func TestLoadConfigRejectsEmptyWorkerAuthTokenWhenSet(t *testing.T) {
 		"WORKERFLEET_WORKER_AUTH_TOKEN": " ",
 	}))
 	assertConfigErrorMentions(t, err, "WORKERFLEET_WORKER_AUTH_TOKEN")
+}
+
+func TestLoadConfigRejectsProductionWithoutWorkerAuthToken(t *testing.T) {
+	_, err := LoadConfig(testLookup(map[string]string{
+		"WORKERFLEET_PROFILE": "prod",
+	}))
+	assertConfigErrorMentions(t, err, "WORKERFLEET_WORKER_AUTH_TOKEN")
+}
+
+func TestLoadConfigRejectsEnabledNotificationsWithoutSink(t *testing.T) {
+	_, err := LoadConfig(testLookup(map[string]string{
+		"WORKERFLEET_NOTIFICATION_ENABLED": "true",
+	}))
+	assertConfigErrorMentions(t, err, "WORKERFLEET_FEISHU_WEBHOOK_URL or WORKERFLEET_WEBHOOK_URL")
 }
 
 func TestLoadConfigRejectsMongoWithoutURI(t *testing.T) {

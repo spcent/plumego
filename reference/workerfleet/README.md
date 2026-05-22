@@ -28,7 +28,7 @@ Run locally:
 - `cd reference/workerfleet && go run .`
 - `cd reference/workerfleet && go build .`
 - `cd reference/workerfleet && WORKERFLEET_HTTP_ADDR=:9090 go run .`
-- the shared repository [env.example](env.example) now includes the current workerfleet env surface for local bootstrapping
+- [env.example](./env.example) includes the current workerfleet env surface for local bootstrapping
 
 HTTP entrypoint configuration:
 
@@ -43,6 +43,7 @@ Worker ingress authentication:
 - `WORKERFLEET_WORKER_AUTH_TOKEN` enables Bearer-token auth for `POST /v1/workers/register` and `POST /v1/workers/heartbeat`
 - when unset, worker ingress auth is disabled for local development
 - when set, missing, malformed, or invalid credentials fail closed with `401`
+- `WORKERFLEET_PROFILE=prod` requires `WORKERFLEET_WORKER_AUTH_TOKEN` at startup
 
 Runtime loop configuration:
 
@@ -56,6 +57,7 @@ Runtime loop configuration:
 - `WORKERFLEET_ALERT_EVALUATION_INTERVAL`, default `30s`
 - `WORKERFLEET_NOTIFIER_DELIVERY_TIMEOUT`, default `5s`
 - `WORKERFLEET_EXPERIMENTAL_METRICS_ENABLED`, default `true` in `dev` and `false` in `prod`
+- when `WORKERFLEET_NOTIFICATION_ENABLED=true`, at least one notifier URL must be configured
 - `WORKERFLEET_KUBE_API_HOST` optionally overrides in-cluster Kubernetes API discovery
 - `WORKERFLEET_KUBE_BEARER_TOKEN` optionally overrides service account token discovery
 - `WORKERFLEET_KUBE_NAMESPACE` controls the namespace watched by Kubernetes sync

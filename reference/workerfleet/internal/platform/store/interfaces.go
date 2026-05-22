@@ -22,7 +22,7 @@ type ActiveTaskStore interface {
 
 type WorkerEventStore interface {
 	AppendWorkerEvent(ctx context.Context, event domain.DomainEvent) error
-	ListWorkerEvents(workerID domain.WorkerID) ([]domain.DomainEvent, error)
+	ListWorkerEvents(ctx context.Context, workerID domain.WorkerID) ([]domain.DomainEvent, error)
 }
 
 type TaskHistoryStore interface {

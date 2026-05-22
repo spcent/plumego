@@ -132,7 +132,7 @@ Worker 状态：
 - `StatusPolicy` 负责心跳 stale/offline 阈值，以及状态判断使用的 stage-stuck 和 restart 阈值。
 - `AlertPolicy` 负责告警侧使用的 stage-stuck 和 restart 阈值；默认从状态策略派生，也可以由运行时配置显式覆盖。
 - `internal/app/config.go` 通过环境变量暴露两类策略，并提供 `dev` / `prod` profile 默认值和逐字段校验。
-- 同一层应用配置还负责控制是否输出 experimental 的 pod、exec plan 和 case-step 指标。
+- 同一层应用配置还负责控制是否输出 experimental 的 pod、exec plan 和 case-step 指标；`prod` 默认关闭这些高维度指标。
 
 在线定义为进程存活且可以接新任务。当 worker 有活跃任务但暂时不接更多任务时，它可以仍然被认为在线且忙碌。当信号过期、worker 上报错误、空闲但不接任务、或任务阶段卡住时，状态会变为降级。当进程不存活、Pod 失败、Pod 消失、或心跳超过离线阈值时，状态会变为离线。
 
@@ -250,12 +250,14 @@ Pod 映射：
 历史集合：
 
 - `task_history`
+- `case_step_history`
 - `worker_events`
 - `alert_events`
 
 保留策略：
 
 - task history：7 天。
+- case step history：7 天。
 - worker events：7 天。
 - alert events：7 天。
 - 当前 worker snapshot 和 active-task projection 不走 TTL 清理。
@@ -267,6 +269,7 @@ MongoDB 行为：
 - 历史写入从应用视角是 append-only。
 - 重试导致的重复生成文档 ID 视为幂等成功。
 - `expire_at` 用于历史和告警集合的 TTL 清理。
+- `case_step_history` 在 MongoDB 生产后端中支持 case timeline 和 exec-plan drilldown。
 
 内存后端：
 
@@ -309,8 +312,6 @@ Base path：`/v1`
 
 - 按 worker status 统计 fleet size。
 - Pod phase 分布。
-- pod 维度 worker 状态、心跳年龄和 active case 数。
-- pod 维度 case 吞吐，包括每小时成功数和失败数。
 - 按 namespace、node、task type、phase 统计 active case。
 - 按 node 统计 active case。
 - 任务开始和完成速率。
@@ -321,6 +322,7 @@ Base path：`/v1`
 - worker 状态转换 counter。
 - 告警产生 counter 和当前 firing gauge。
 - 接入和 Kubernetes 同步操作耗时。
+- experimental 指标开启时，提供可选的 pod 维度 worker 状态、心跳年龄、active case、吞吐和耗时分布。
 
 默认 label：
 
@@ -337,9 +339,6 @@ Base path：`/v1`
 - `to_status`
 - `operation`
 - `result`
-- `pod`
-- `exec_plan_id`
-- `step`
 - `error_class`
 
 禁止作为默认 label：
@@ -357,7 +356,7 @@ Base path：`/v1`
 - stable 指标用于常规 Grafana 聚合面板和告警规则，label contract 视为冻结。
 - experimental 指标主要覆盖 pod、exec plan、case step 维度的吞吐和耗时明细，用于诊断和演进，不默认视为长期兼容接口。
 
-case/step 指标允许在部分指标中使用 `pod` label，因为 pod 维度吞吐和耗时分布是明确业务诉求。`exec_plan_id` 是受控可选 label，只有在活跃 plan 数量受控时才应默认开启。
+experimental 指标允许在部分指标中使用 `pod` label，因为 pod 维度吞吐和耗时分布是明确业务诉求。`exec_plan_id` 是受控可选 label，只有在活跃 plan 数量受控时才应开启。`prod` profile 默认关闭 pod、exec-plan 和 step-heavy 指标。
 
 Grafana 看板应以聚合视图为主。单 case 或单 task 的细节排查应该通过 workerfleet 查询 API 和 MongoDB 历史记录完成，而不是把高基数字段放进 Prometheus label。完整 case/step 指标方案见 [Case And Step Metrics Design](../case-step-metrics.md)。
 
@@ -394,6 +393,7 @@ Grafana 看板应以聚合视图为主。单 case 或单 task 的细节排查应
 - 告警评估和 notifier 基础能力已经接入应用运行时。
 - `WORKERFLEET_ALERT_EVALUATION_ENABLED=true` 时，`internal/app` 会启动周期性告警评估循环。
 - `WORKERFLEET_NOTIFICATION_ENABLED=true` 时，已产生的告警记录会通过配置的 notifier 投递，并使用 `WORKERFLEET_NOTIFIER_DELIVERY_TIMEOUT` 控制超时。
+- 开启通知投递但未配置飞书或通用 Webhook URL 时，启动会 fail closed。
 - 告警评估复用同一套 guarded loop scheduler，同样具备防重入、单次执行超时和有界失败退避。
 - 评估和通知错误会通过 runtime error observer 上报，并以低基数指标导出，不再静默丢弃。
 - 优雅关闭时会先停止告警循环，再关闭 runtime store。
@@ -446,12 +446,13 @@ HTTP：
 - `WORKERFLEET_STATUS_RESTART_BURST_THRESHOLD` 覆盖 worker restart-burst 状态判断阈值。
 - `WORKERFLEET_ALERT_STAGE_STUCK_AFTER` 覆盖告警侧 stage-stuck 触发阈值。
 - `WORKERFLEET_ALERT_RESTART_BURST_THRESHOLD` 覆盖告警侧 restart-burst 触发阈值。
-- `WORKERFLEET_EXPERIMENTAL_METRICS_ENABLED` 用于显式启用或禁用 experimental case/step 指标；`dev` 默认开启，`prod` 默认关闭。
+- `WORKERFLEET_EXPERIMENTAL_METRICS_ENABLED` 用于显式启用或禁用 experimental pod、exec-plan、case/step 指标；`dev` 默认开启，`prod` 默认关闭。
 - 策略值启动时会 fail closed 校验；例如过低阈值和互相矛盾的 stale/offline 组合都会直接拒绝启动。
 
 Worker 接入认证：
 
 - `WORKERFLEET_WORKER_AUTH_TOKEN` 会为 worker 注册和心跳接入启用 Bearer token 认证。
+- `WORKERFLEET_PROFILE=prod` 启动时要求配置 `WORKERFLEET_WORKER_AUTH_TOKEN`。
 
 ## 13. 容量和可靠性
 
@@ -522,7 +523,7 @@ Worker 接入认证：
 - `workerfleet` module path 的独立子模块。
 - worker 注册、心跳、列表、详情、task 查询、fleet summary、alert 查询 HTTP 路由。
 - memory 和 Mongo 后端启动 wiring。
-- Mongo schema、索引、snapshot、active task、history、event、alert 持久化。
+- Mongo schema、索引、snapshot、active task、case-step history、task history、event、alert 持久化。
 - worker status、active-task 对账、Pod 对账和告警规则。
 - 飞书和通用 Webhook notifier 基础能力。
 - Prometheus collector、exporter、instrumentation 和 `/metrics` 路由。

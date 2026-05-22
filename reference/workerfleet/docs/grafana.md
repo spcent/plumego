@@ -2,11 +2,11 @@
 
 This dashboard assumes Prometheus scrapes `GET /metrics` from the workerfleet service and stores seven days of workerfleet metrics. The workerfleet metrics are app-local and intentionally avoid worker IDs, task IDs, case IDs, and pod names as default labels.
 
-This document uses only the stabilized workerfleet metric catalog for dashboard and alert examples. Experimental pod, exec-plan, case-step, and drilldown metrics are documented separately in [Case And Step Metrics Design](./case-step-metrics.md) and should not be treated as long-term alert-rule contracts yet.
+The primary dashboard and alert examples use the stabilized workerfleet metric catalog. Experimental pod, exec-plan, case-step, and drilldown panels are called out separately and should not be treated as long-term alert-rule contracts yet.
 
 Metric semantics:
 
-- snapshot-derived gauges represent current state such as worker status, active cases, heartbeat age, and stuck-step signals.
+- snapshot-derived gauges represent current state such as worker status and active cases; optional experimental gauges add pod-level heartbeat age and stuck-step signals.
 - event-derived counters and histograms represent throughput and duration, so Grafana rate and histogram panels should be read as domain-event streams rather than snapshot diffs.
 
 Recommended template variables:

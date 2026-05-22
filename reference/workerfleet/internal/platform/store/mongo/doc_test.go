@@ -97,6 +97,28 @@ func TestHistoryAndAlertDocsCarryExpireAt(t *testing.T) {
 		t.Fatalf("task history round-trip step status = %q", taskDoc.Record().CurrentStep.Status)
 	}
 
+	stepDoc := CaseStepHistoryDocFromRecord(platformstore.CaseStepHistoryRecord{
+		TaskID:     "task-1",
+		WorkerID:   "worker-1",
+		ExecPlanID: "plan-1",
+		Namespace:  "sim",
+		PodName:    "pod-a",
+		NodeName:   "node-a",
+		Step:       "cleanup_env",
+		Status:     domain.CaseStepStatusSucceeded,
+		Result:     "succeeded",
+		Attempt:    1,
+		ObservedAt: now,
+		EventType:  domain.EventTaskStepFinished,
+	}, expireAt)
+	if !stepDoc.ExpireAt.Equal(expireAt) {
+		t.Fatalf("case step expire_at = %v, want %v", stepDoc.ExpireAt, expireAt)
+	}
+	stepRecord := stepDoc.Record()
+	if stepRecord.ExecPlanID != "plan-1" || stepRecord.PodName != "pod-a" || stepRecord.EventType != domain.EventTaskStepFinished {
+		t.Fatalf("case step round-trip mismatch %#v", stepRecord)
+	}
+
 	alertDoc := AlertEventDocFromRecord(platformstore.AlertRecord{
 		DedupeKey:   "worker_offline:worker-1",
 		AlertType:   domain.AlertWorkerOffline,

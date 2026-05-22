@@ -46,9 +46,7 @@ func TestStableMetricCatalogFreezesLabelContract(t *testing.T) {
 		MetricWorkersTotal:                 {LabelNamespace, LabelNode, LabelStatus},
 		MetricPodsTotal:                    {LabelNamespace, LabelNode, LabelPhase},
 		MetricActiveCases:                  {LabelNamespace, LabelNode, LabelPhase, LabelTaskType},
-		MetricWorkerActiveCases:            {LabelNamespace, LabelNode, LabelPod},
 		MetricWorkerAcceptingTasks:         {LabelNamespace, LabelNode},
-		MetricWorkerHeartbeatAgeSeconds:    {LabelNamespace, LabelNode, LabelPod, LabelStatus},
 		MetricNodeActiveCases:              {LabelNode, LabelPhase, LabelTaskType},
 		MetricCaseStartedTotal:             {LabelNamespace, LabelNode, LabelTaskType},
 		MetricCaseFinishedTotal:            {LabelNamespace, LabelNode, LabelStatus, LabelTaskType},
@@ -91,7 +89,8 @@ func TestExperimentalMetricsAreExplicitlyFlagged(t *testing.T) {
 		labels := LabelNames(spec)
 		hasExecPlanID := containsLabel(labels, LabelExecPlanID)
 		hasStep := containsLabel(labels, LabelStep)
-		if (hasExecPlanID || hasStep) && spec.Stability != MetricStabilityExperimental {
+		hasPod := containsLabel(labels, LabelPod)
+		if (hasExecPlanID || hasStep || hasPod) && spec.Stability != MetricStabilityExperimental {
 			t.Fatalf("%s uses experimental labels but stability = %q", spec.Name, spec.Stability)
 		}
 		if spec.Stability == MetricStabilityExperimental && containsForbiddenLabel(spec.Labels) {

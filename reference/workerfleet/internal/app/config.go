@@ -345,6 +345,14 @@ func ValidateConfig(cfg Config) error {
 	if cfg.Runtime.KubeSyncEnabled && strings.TrimSpace(cfg.Kube.WorkerContainer) == "" {
 		return errors.New("WORKERFLEET_KUBE_WORKER_CONTAINER is required when WORKERFLEET_KUBE_SYNC_ENABLED=true")
 	}
+	if cfg.Profile == ProfileProduction && strings.TrimSpace(cfg.WorkerAuth.Token) == "" {
+		return errors.New("WORKERFLEET_WORKER_AUTH_TOKEN is required when WORKERFLEET_PROFILE=prod")
+	}
+	if cfg.Runtime.NotificationEnabled &&
+		strings.TrimSpace(cfg.Notifier.FeishuWebhookURL) == "" &&
+		strings.TrimSpace(cfg.Notifier.WebhookURL) == "" {
+		return errors.New("WORKERFLEET_FEISHU_WEBHOOK_URL or WORKERFLEET_WEBHOOK_URL is required when WORKERFLEET_NOTIFICATION_ENABLED=true")
+	}
 	if err := validateStatusPolicyConfig(cfg.Policy.Status); err != nil {
 		return err
 	}

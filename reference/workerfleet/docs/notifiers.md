@@ -15,6 +15,8 @@ Delivery rules:
 Runtime configuration:
 
 - `WORKERFLEET_NOTIFICATION_ENABLED=true` enables alert notification dispatch.
+- Enabling notification dispatch requires at least one configured notifier URL:
+  `WORKERFLEET_FEISHU_WEBHOOK_URL` or `WORKERFLEET_WEBHOOK_URL`.
 - `WORKERFLEET_NOTIFIER_DELIVERY_TIMEOUT` controls per-alert delivery timeout.
 - `WORKERFLEET_FEISHU_WEBHOOK_URL` configures the Feishu webhook sink.
 - `WORKERFLEET_WEBHOOK_URL` configures the generic JSON webhook sink.

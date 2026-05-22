@@ -10,7 +10,7 @@ func TestCollectionIndexSpecsIncludeTTLAndUniqueRules(t *testing.T) {
 		t.Fatalf("worker_active first index should be unique, got %#v", active)
 	}
 
-	for _, collection := range []string{CollectionTaskHistory, CollectionWorkerEvents, CollectionAlertEvents} {
+	for _, collection := range []string{CollectionTaskHistory, CollectionCaseStepHistory, CollectionWorkerEvents, CollectionAlertEvents} {
 		foundTTL := false
 		for _, spec := range specs[collection] {
 			if spec.Name == "expire_at_ttl" && spec.ExpireAfterSeconds != nil && *spec.ExpireAfterSeconds == 0 {
@@ -33,5 +33,8 @@ func TestCollectionIndexSpecsAreStableAcrossCalls(t *testing.T) {
 	}
 	if len(first[CollectionWorkerSnapshots]) != len(second[CollectionWorkerSnapshots]) {
 		t.Fatalf("worker snapshot index count mismatch")
+	}
+	if len(first[CollectionCaseStepHistory]) != len(second[CollectionCaseStepHistory]) {
+		t.Fatalf("case step history index count mismatch")
 	}
 }

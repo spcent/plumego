@@ -494,6 +494,9 @@ workerfleet_case_step_oldest_active_age_seconds{step="download_bundle"} > 1800
 
 ## 8. 完整指标清单
 
+本节列出的 pod、exec plan 和 step 维度指标属于 experimental 指标面，
+受 `WORKERFLEET_EXPERIMENTAL_METRICS_ENABLED` 控制；`prod` profile 默认关闭。
+
 状态类：
 
 - `workerfleet_pod_status`

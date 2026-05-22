@@ -73,7 +73,7 @@ func TestSweepWorkerStatusesMarksExpiredHeartbeatOffline(t *testing.T) {
 	if current.StatusReason != "heartbeat_expired" {
 		t.Fatalf("status reason = %q, want heartbeat_expired", current.StatusReason)
 	}
-	events, err := runtime.shell.loops.store.ListWorkerEvents("worker-1")
+	events, err := runtime.shell.loops.store.ListWorkerEvents(context.Background(), "worker-1")
 	if err != nil {
 		t.Fatalf("list events: %v", err)
 	}

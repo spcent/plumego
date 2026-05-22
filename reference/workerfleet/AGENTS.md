@@ -81,6 +81,8 @@ packages such as `core`, `router`, `contract`, `middleware`, `security`,
 - `WORKERFLEET_WORKER_AUTH_TOKEN` controls worker ingress auth. When it is set,
   `POST /v1/workers/register` and `POST /v1/workers/heartbeat` must fail closed
   on missing, malformed, or invalid credentials.
+- `WORKERFLEET_PROFILE=prod` must fail startup when
+  `WORKERFLEET_WORKER_AUTH_TOKEN` is missing.
 - Worker token checks must use timing-safe comparison. Do not replace the
   current fixed-length digest plus constant-time compare pattern with plain
   string equality.
@@ -126,6 +128,7 @@ security semantics, runtime lifecycle, metrics, or storage behavior changes:
 - `docs/design/technical-design.zh-CN.md`
 - `docs/metrics.md`
 - `docs/alerts.md`
+- `env.example`
 - repository root `env.example` when environment variables are added or renamed
 
 Keep the English and Chinese technical design docs aligned.

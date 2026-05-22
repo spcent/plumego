@@ -3,6 +3,7 @@ package notifier
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -120,6 +121,17 @@ func TestDispatcherFanOutsToAllSinks(t *testing.T) {
 	}
 	if feishuCalls != 1 || webhookCalls != 1 {
 		t.Fatalf("fan-out counts feishu=%d webhook=%d", feishuCalls, webhookCalls)
+	}
+}
+
+func TestDispatcherRejectsEmptySinks(t *testing.T) {
+	err := NewDispatcher().Notify(context.Background(), domain.AlertRecord{
+		AlertType: domain.AlertWorkerOffline,
+		Status:    domain.AlertStatusFiring,
+		WorkerID:  "worker-1",
+	})
+	if !errors.Is(err, ErrNoSinks) {
+		t.Fatalf("error = %v, want ErrNoSinks", err)
 	}
 }
 

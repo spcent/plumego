@@ -280,6 +280,8 @@ func TestObserverSkipsExperimentalSeriesWhenDisabled(t *testing.T) {
 		"workerfleet_case_step_duration_seconds_count",
 		"workerfleet_case_step_stuck_cases",
 		"workerfleet_case_step_oldest_active_age_seconds",
+		"workerfleet_worker_active_cases",
+		"workerfleet_worker_heartbeat_age_seconds",
 	)
 }
 

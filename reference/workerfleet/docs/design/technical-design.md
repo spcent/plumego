@@ -250,12 +250,14 @@ Current state collections:
 History collections:
 
 - `task_history`
+- `case_step_history`
 - `worker_events`
 - `alert_events`
 
 Retention:
 
 - task history: seven days.
+- case step history: seven days.
 - worker events: seven days.
 - alert events: seven days.
 - current worker snapshots and active-task projections are not TTL-pruned.
@@ -267,6 +269,8 @@ MongoDB behavior:
 - history writes are append-only from the app perspective.
 - generated duplicate history IDs are treated as idempotent retry success.
 - `expire_at` drives TTL cleanup for history and alert collections.
+- `case_step_history` supports case timeline and exec-plan drilldown in the
+  production MongoDB backend.
 
 Memory backend:
 
@@ -309,8 +313,6 @@ Metric goals:
 
 - fleet size by worker status.
 - pod phase distribution.
-- pod-level worker state, heartbeat age, and active case count.
-- pod-level case throughput, including hourly success and failure counts.
 - active case count by namespace, node, task type, and phase.
 - active case count by node.
 - task start and finish rates.
@@ -321,6 +323,8 @@ Metric goals:
 - worker status transition counters.
 - alert emission counters and firing gauges.
 - ingest and Kubernetes sync operation durations.
+- optional pod-level worker state, heartbeat age, active case count, throughput,
+  and duration distribution when experimental metrics are enabled.
 
 Default labels:
 
@@ -346,7 +350,7 @@ Forbidden labels:
 - `pod_name`
 - `pod_uid`
 
-The next case/step metrics phase intentionally allows `pod` on selected metrics because pod-level throughput and duration distribution are explicit business requirements. `exec_plan_id` is optional and should only be enabled when active plan cardinality is bounded.
+Experimental metrics intentionally allow `pod` on selected metrics because pod-level throughput and duration distribution are explicit business requirements. `exec_plan_id` is optional and should only be enabled when active plan cardinality is bounded. The `prod` profile disables these pod, exec-plan, and step-heavy series by default.
 
 Grafana dashboards should stay aggregate-first. Per-case and per-task drilldown should use workerfleet APIs and MongoDB history instead of high-cardinality Prometheus labels. The complete case/step metric plan is documented in [Case And Step Metrics Design](../case-step-metrics.md).
 
@@ -383,6 +387,8 @@ Implemented runtime behavior:
 - Alert evaluation and notifier primitives are wired into the app runtime.
 - When `WORKERFLEET_ALERT_EVALUATION_ENABLED=true`, `internal/app` starts a periodic alert evaluation loop.
 - When `WORKERFLEET_NOTIFICATION_ENABLED=true`, emitted alert records are dispatched through configured notifiers with `WORKERFLEET_NOTIFIER_DELIVERY_TIMEOUT`.
+- Startup fails when notification delivery is enabled without a configured
+  Feishu or generic webhook URL.
 - Alert evaluation uses the same guarded loop scheduler, including non-overlap, per-iteration timeout, and bounded failure backoff.
 - Evaluation and notification errors are reported through the runtime error observer and exported through low-cardinality metrics instead of being silently discarded.
 - The alert loop is stopped during graceful shutdown before the runtime store is closed.
@@ -427,6 +433,7 @@ Runtime loop configuration:
 Worker ingress auth:
 
 - `WORKERFLEET_WORKER_AUTH_TOKEN` enables Bearer-token auth for worker registration and heartbeat ingress.
+- `WORKERFLEET_PROFILE=prod` requires `WORKERFLEET_WORKER_AUTH_TOKEN` at startup.
 
 ## 13. Capacity And Reliability Considerations
 
@@ -497,7 +504,7 @@ Implemented:
 - workerfleet submodule with module path `workerfleet`.
 - HTTP worker register, heartbeat, list, detail, task, fleet summary, and alert query routes.
 - app bootstrap with memory and Mongo backends.
-- Mongo schema, indexes, snapshot, active task, history, event, and alert persistence.
+- Mongo schema, indexes, snapshot, active task, case-step history, task history, event, and alert persistence.
 - domain worker status, active-task reconciliation, pod reconciliation, and alert rules.
 - Feishu and generic webhook notifier primitives.
 - Prometheus collector, exporter, instrumentation, and `/metrics` route.

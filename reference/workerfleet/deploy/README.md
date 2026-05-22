@@ -23,12 +23,13 @@ Create the secret before applying `deployment.yaml` when you use these features:
 
 - `workerfleet-secrets`
   - `mongo-uri`
-  - `kube-bearer-token`
   - `worker-auth-token`
+  - `kube-bearer-token`
   - `feishu-webhook-url`
   - `webhook-url`
 
-Unused keys may be omitted when the corresponding feature is disabled.
+`worker-auth-token` is required by the reference production profile. Other
+unused keys may be omitted when the corresponding feature is disabled.
 
 ## Profile And Metrics Defaults
 
@@ -40,9 +41,13 @@ The reference deployment uses:
 - `WORKERFLEET_KUBE_SYNC_ENABLED=true`
 - `WORKERFLEET_STATUS_SWEEP_ENABLED=true`
 - `WORKERFLEET_ALERT_EVALUATION_ENABLED=true`
+- `WORKERFLEET_NOTIFICATION_ENABLED=false`
 
-Those defaults keep stable fleet metrics on while leaving experimental
-`exec_plan_id` and step-heavy metric families disabled unless explicitly needed.
+Those defaults keep stable fleet metrics on while leaving experimental pod,
+`exec_plan_id`, and step-heavy metric families disabled unless explicitly
+needed.
+Notification delivery is disabled until at least one notifier secret is
+configured and `WORKERFLEET_NOTIFICATION_ENABLED` is set to `true`.
 
 ## Apply Order
 

@@ -38,6 +38,10 @@ func (s *Store) GetWorkerSnapshot(ctx context.Context, workerID domain.WorkerID)
 	ctx, cancel := s.operationContext(ctx)
 	defer cancel()
 
+	return s.getWorkerSnapshot(ctx, workerID)
+}
+
+func (s *Store) getWorkerSnapshot(ctx context.Context, workerID domain.WorkerID) (domain.WorkerSnapshot, bool, error) {
 	var doc WorkerSnapshotDoc
 	err := s.collections.WorkerSnapshots.FindOne(ctx, workerSnapshotIDFilter(workerID)).Decode(&doc)
 	if errors.Is(err, mongo.ErrNoDocuments) {

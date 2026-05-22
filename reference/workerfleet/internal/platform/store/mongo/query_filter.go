@@ -30,6 +30,29 @@ func workerEventFilterDoc(workerID domain.WorkerID) bson.D {
 	return filter
 }
 
+func caseStepHistoryFilterDoc(filter platformstore.CaseStepHistoryFilter) bson.D {
+	doc := bson.D{}
+	if filter.TaskID != "" {
+		doc = append(doc, stringEq("task_id", string(filter.TaskID)))
+	}
+	if filter.WorkerID != "" {
+		doc = append(doc, stringEq("worker_id", string(filter.WorkerID)))
+	}
+	if filter.ExecPlanID != "" {
+		doc = append(doc, stringEq("exec_plan_id", string(filter.ExecPlanID)))
+	}
+	if filter.NodeName != "" {
+		doc = append(doc, stringEq("node_name", filter.NodeName))
+	}
+	if filter.PodName != "" {
+		doc = append(doc, stringEq("pod_name", filter.PodName))
+	}
+	if filter.Step != "" {
+		doc = append(doc, stringEq("step", filter.Step))
+	}
+	return doc
+}
+
 func workerSnapshotFilterDoc(filter platformstore.WorkerSnapshotFilter) bson.D {
 	doc := bson.D{}
 	if filter.Status != "" {

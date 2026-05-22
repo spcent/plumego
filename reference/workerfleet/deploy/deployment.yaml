@@ -12,7 +12,7 @@ data:
   WORKERFLEET_KUBE_SYNC_ENABLED: "true"
   WORKERFLEET_STATUS_SWEEP_ENABLED: "true"
   WORKERFLEET_ALERT_EVALUATION_ENABLED: "true"
-  WORKERFLEET_NOTIFICATION_ENABLED: "true"
+  WORKERFLEET_NOTIFICATION_ENABLED: "false"
   WORKERFLEET_KUBE_SYNC_INTERVAL: "30s"
   WORKERFLEET_STATUS_SWEEP_INTERVAL: "30s"
   WORKERFLEET_ALERT_EVALUATION_INTERVAL: "30s"
@@ -79,7 +79,6 @@ spec:
                 secretKeyRef:
                   name: workerfleet-secrets
                   key: worker-auth-token
-                  optional: true
             - name: WORKERFLEET_FEISHU_WEBHOOK_URL
               valueFrom:
                 secretKeyRef:

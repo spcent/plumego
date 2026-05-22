@@ -2,9 +2,12 @@ package notifier
 
 import (
 	"context"
+	"errors"
 
 	"workerfleet/internal/domain"
 )
+
+var ErrNoSinks = errors.New("workerfleet notifier sink is required")
 
 type Sink interface {
 	Notify(ctx context.Context, alert domain.AlertRecord) error
@@ -26,6 +29,9 @@ func NewDispatcher(sinks ...Sink) *Dispatcher {
 }
 
 func (d *Dispatcher) Notify(ctx context.Context, alert domain.AlertRecord) error {
+	if d == nil || len(d.sinks) == 0 {
+		return ErrNoSinks
+	}
 	for _, sink := range d.sinks {
 		if err := sink.Notify(ctx, alert); err != nil {
 			return err

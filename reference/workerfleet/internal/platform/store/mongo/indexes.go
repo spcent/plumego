@@ -47,6 +47,14 @@ func CollectionIndexSpecs() map[string][]IndexSpec {
 			{Name: "worker_updated_desc", Keys: bson.D{{Key: "worker_id", Value: 1}, {Key: "last_updated_at", Value: -1}}},
 			{Name: "expire_at_ttl", Keys: bson.D{{Key: "expire_at", Value: 1}}, ExpireAfterSeconds: &ttlZero},
 		},
+		CollectionCaseStepHistory: {
+			{Name: "task_observed_asc", Keys: bson.D{{Key: "task_id", Value: 1}, {Key: "observed_at", Value: 1}}},
+			{Name: "exec_plan_observed_desc", Keys: bson.D{{Key: "exec_plan_id", Value: 1}, {Key: "observed_at", Value: -1}}},
+			{Name: "node_observed_desc", Keys: bson.D{{Key: "node_name", Value: 1}, {Key: "observed_at", Value: -1}}},
+			{Name: "pod_observed_desc", Keys: bson.D{{Key: "pod_name", Value: 1}, {Key: "observed_at", Value: -1}}},
+			{Name: "step_observed_desc", Keys: bson.D{{Key: "step", Value: 1}, {Key: "observed_at", Value: -1}}},
+			{Name: "expire_at_ttl", Keys: bson.D{{Key: "expire_at", Value: 1}}, ExpireAfterSeconds: &ttlZero},
+		},
 		CollectionWorkerEvents: {
 			{Name: "worker_occurred_desc", Keys: bson.D{{Key: "worker_id", Value: 1}, {Key: "occurred_at", Value: -1}}},
 			{Name: "task_occurred_desc", Keys: bson.D{{Key: "task_id", Value: 1}, {Key: "occurred_at", Value: -1}}},
