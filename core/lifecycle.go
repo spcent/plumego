@@ -111,14 +111,11 @@ func (t *connectionTracker) track(_ net.Conn, state http.ConnState) {
 }
 
 func (t *connectionTracker) decrementOpen() {
-	for {
-		current := t.open.Load()
-		if current <= 0 {
-			return
-		}
-		if t.open.CompareAndSwap(current, current-1) {
-			return
-		}
+	if t.open.Load() <= 0 {
+		return
+	}
+	if v := t.open.Add(-1); v < 0 {
+		t.open.CompareAndSwap(v, 0)
 	}
 }
 

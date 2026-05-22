@@ -138,14 +138,10 @@ func prepareTLSConfig(cfg TLSConfig) (*tls.Config, error) {
 func (a *App) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	a.ensureHandlerPrepared()
 
-	a.mu.RLock()
-	handler := a.handler
-	a.mu.RUnlock()
-
-	if handler == nil {
-		_ = contract.WriteError(w, r, contract.NewErrorBuilder().Type(contract.TypeUnavailable).Message("handler not configured").Build())
+	if ref := a.handlerFast.Load(); ref != nil {
+		ref.h.ServeHTTP(w, r)
 		return
 	}
 
-	handler.ServeHTTP(w, r)
+	_ = contract.WriteError(w, r, contract.NewErrorBuilder().Type(contract.TypeUnavailable).Message("handler not configured").Build())
 }
