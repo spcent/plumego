@@ -63,6 +63,7 @@ func (h HealthHandler) Ready(w http.ResponseWriter, r *http.Request) {
 		if err := checker.Check(r.Context()); err != nil {
 			_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 				Type(contract.TypeUnavailable).
+				Code("health.component.unhealthy").
 				Detail("component", checker.Name()).
 				Detail("reason", err.Error()).
 				Message("service not ready").

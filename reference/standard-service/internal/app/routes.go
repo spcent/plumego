@@ -12,9 +12,8 @@ import (
 // Routes that share a common path prefix are registered through a RouteGroup
 // so the prefix is declared once and not repeated on every line.
 func (a *App) RegisterRoutes() error {
-	api := handler.APIHandler{}
 	// HealthHandler receives no Checkers here because the reference has no real
-	// dependencies to probe. In a production service, pass one ReadinessChecker
+	// dependencies to probe. In a production service, pass one health.ComponentChecker
 	// per dependency (database, cache, downstream) so /readyz reflects real state.
 	health := handler.HealthHandler{ServiceName: a.Cfg.App.ServiceName}
 	// ItemHandler demonstrates constructor injection: the concrete domain store
@@ -30,6 +29,9 @@ func (a *App) RegisterRoutes() error {
 
 	// Top-level routes registered directly on the app.
 	root := newRouteReg(a.Core)
+	// APIHandler is created with Logger for structured logging and Routes field
+	// populated after all routes are registered.
+	api := handler.APIHandler{Logger: a.Core.Logger()} // Routes field populated below after all registrations.
 	root.get("/", http.HandlerFunc(api.Root))
 	root.get("/healthz", http.HandlerFunc(health.Live))
 	root.get("/readyz", http.HandlerFunc(health.Ready))
@@ -54,7 +56,21 @@ func (a *App) RegisterRoutes() error {
 	v1.get("/items/:id", http.HandlerFunc(items.GetByID))
 	v1.put("/items/:id", writeGuard(http.HandlerFunc(items.Update)))
 	v1.delete("/items/:id", writeGuard(http.HandlerFunc(items.Delete)))
-	return v1.err
+	if v1.err != nil {
+		return v1.err
+	}
+
+	// Populate APIHandler.Routes from the authoritative router state.
+	// This ensures the /api/hello endpoint always reflects the actual registered routes
+	// without requiring manual maintenance of the endpoint list.
+	for _, ri := range a.Core.Routes() {
+		api.Routes = append(api.Routes, handler.RouteInfo{
+			Method: ri.Method,
+			Path:   ri.Path,
+		})
+	}
+
+	return nil
 }
 
 // routeAdder is the minimal interface shared by *core.App and *core.RouteGroup,

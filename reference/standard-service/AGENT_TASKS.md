@@ -101,29 +101,29 @@ func (h WidgetHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 ### Add a readiness check
 
-A `ReadinessChecker` represents one dependency (database, cache, downstream service).
+A `health.ComponentChecker` represents one dependency (database, cache, downstream service).
 Implement the interface and register it in `routes.go`.
 
 ```go
-// Implement ReadinessChecker for your dependency.
+// Implement health.ComponentChecker for your dependency.
 // This type lives in the domain or infrastructure layer, not in handler/.
 type dbChecker struct{ db *sql.DB }
 
-func (c *dbChecker) Ready(ctx context.Context) error {
-    return c.db.PingContext(ctx)
-}
+func (c *dbChecker) Name() string              { return "database" }
+func (c *dbChecker) Check(ctx context.Context) error { return c.db.PingContext(ctx) }
 
 // Wire it in routes.go alongside the other handler dependencies.
 health := handler.HealthHandler{
     ServiceName: a.Cfg.App.ServiceName,
-    Checkers: []handler.ReadinessChecker{
+    Checkers: []health.ComponentChecker{
         &dbChecker{db: myDB},
     },
 }
 ```
 
 `GET /readyz` probes each checker in order; the first error returns 503
-TypeUnavailable with `detail.reason` set to the error message.
+TypeUnavailable with `detail.component` set to the checker's Name() and
+`detail.reason` set to the error message.
 
 ### Add a DELETE or LIST endpoint
 

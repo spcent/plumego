@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"crypto/subtle"
 	"net/http"
 
 	"github.com/spcent/plumego/contract"
@@ -17,6 +18,8 @@ const WriteKeyHeader = "X-Write-Key"
 //
 // This demonstrates the per-route middleware wrapping pattern: callers wrap only
 // the handlers that need protection rather than adding the check globally.
+// Timing-safe comparison (crypto/subtle.ConstantTimeCompare) prevents attackers
+// from using response time to guess the key byte-by-byte.
 //
 //	mux.Post("/api/v1/items", RequireWriteKey(cfg.WriteKey)(http.HandlerFunc(items.Create)))
 func RequireWriteKey(key string) func(http.Handler) http.Handler {
@@ -26,9 +29,11 @@ func RequireWriteKey(key string) func(http.Handler) http.Handler {
 			return next
 		}
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if r.Header.Get(WriteKeyHeader) != key {
+			headerVal := r.Header.Get(WriteKeyHeader)
+			if subtle.ConstantTimeCompare([]byte(headerVal), []byte(key)) != 1 {
 				_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 					Type(contract.TypeUnauthorized).
+					Code("auth.key.invalid").
 					Message("valid X-Write-Key header required").
 					Build())
 				return

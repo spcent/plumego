@@ -164,7 +164,16 @@ func TestHealthHandlerReadyWithCheckers(t *testing.T) {
 }
 
 func TestAPIHandlerResponses(t *testing.T) {
-	h := APIHandler{}
+	h := APIHandler{
+		Routes: []RouteInfo{
+			{Method: http.MethodGet, Path: "/"},
+			{Method: http.MethodGet, Path: "/api/hello"},
+			{Method: http.MethodGet, Path: "/api/status"},
+			{Method: http.MethodGet, Path: "/api/v1/greet"},
+			{Method: http.MethodGet, Path: "/healthz"},
+			{Method: http.MethodGet, Path: "/readyz"},
+		},
+	}
 
 	tests := []struct {
 		name   string
@@ -202,22 +211,22 @@ func TestAPIHandlerResponses(t *testing.T) {
 				if len(got.Endpoints) == 0 {
 					t.Fatal("hello: Endpoints must not be empty")
 				}
-				// Verify each entry carries a non-empty Method, Path, and Name.
+				// Verify each entry carries a non-empty Method and Path.
 				for i, ep := range got.Endpoints {
-					if ep.Method == "" || ep.Path == "" || ep.Name == "" {
+					if ep.Method == "" || ep.Path == "" {
 						t.Fatalf("hello: endpoint[%d] missing field: %+v", i, ep)
 					}
 				}
 				// Verify a specific known entry is present with the correct method.
 				found := false
 				for _, ep := range got.Endpoints {
-					if ep.Name == "api_hello" && ep.Method == http.MethodGet && ep.Path == "/api/hello" {
+					if ep.Method == http.MethodGet && ep.Path == "/api/hello" {
 						found = true
 						break
 					}
 				}
 				if !found {
-					t.Fatalf("hello: endpoint api_hello/GET//api/hello not found in %+v", got.Endpoints)
+					t.Fatalf("hello: endpoint GET /api/hello not found in %+v", got.Endpoints)
 				}
 			},
 		},

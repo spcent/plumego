@@ -15,6 +15,7 @@ import (
 	"github.com/spcent/plumego/middleware/bodylimit"
 	"github.com/spcent/plumego/middleware/recovery"
 	"github.com/spcent/plumego/middleware/requestid"
+	"github.com/spcent/plumego/middleware/timeout"
 	"standard-service/internal/config"
 )
 
@@ -35,7 +36,13 @@ func New(cfg config.Config) (*App, error) {
 	if err != nil {
 		return nil, fmt.Errorf("configure access log middleware: %w", err)
 	}
-	// bodylimit is placed after accesslog so the access log captures the 413 status.
+	timeoutMw := timeout.Middleware(timeout.Config{Timeout: 30 * time.Second})
+	// Middleware order (innermost to outermost):
+	// - requestid: stamps correlation ID on all requests
+	// - recovery: converts panics to 500 responses
+	// - accesslog: logs request/response at transport level
+	// - bodylimit: enforces max request body size, logged by accesslog
+	// - timeout: enforces per-request wall-clock limit
 	if err := app.Use(
 		requestid.Middleware(),
 		recoveryMw,
@@ -44,6 +51,7 @@ func New(cfg config.Config) (*App, error) {
 			MaxBytes: cfg.App.MaxBodyBytes,
 			Logger:   app.Logger(),
 		}),
+		timeoutMw,
 	); err != nil {
 		return nil, fmt.Errorf("register middleware: %w", err)
 	}
