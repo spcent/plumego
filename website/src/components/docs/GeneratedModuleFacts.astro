@@ -37,8 +37,10 @@ const copy = copyByLocale[locale];
 <div class="fact-grid">
   <article class="fact-card">
     <p class="fact-card__eyebrow">{copy.stableCaption}</p>
-    <h3>{copy.stableTitle}</h3>
-    <p class="fact-card__count">{MODULE_FACTS.stableRoots.length}</p>
+    <h3 class="fact-card__title">
+      <span>{copy.stableTitle}</span>
+      <span class="fact-card__title-count">{MODULE_FACTS.stableRoots.length}</span>
+    </h3>
     <ul>
       {MODULE_FACTS.stableRoots.map((item) => <li><code>{item}</code></li>)}
     </ul>
@@ -46,8 +48,10 @@ const copy = copyByLocale[locale];
 
   <article class="fact-card">
     <p class="fact-card__eyebrow">{copy.extensionCaption}</p>
-    <h3>{copy.extensionTitle}</h3>
-    <p class="fact-card__count">{MODULE_FACTS.primaryExtensionFamilies.length}</p>
+    <h3 class="fact-card__title">
+      <span>{copy.extensionTitle}</span>
+      <span class="fact-card__title-count">{MODULE_FACTS.primaryExtensionFamilies.length}</span>
+    </h3>
     <ul>
       {MODULE_FACTS.primaryExtensionFamilies.map((item) => <li><code>{item}</code></li>)}
     </ul>
