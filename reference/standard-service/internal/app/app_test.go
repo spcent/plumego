@@ -24,6 +24,7 @@ func TestRegisterRoutesCanonicalShape(t *testing.T) {
 	// slice must follow the same order: DELETE before GET before POST,
 	// and paths alphabetically within each method.
 	got := a.Core.Routes()
+	// Sorted by Method then Path — DELETE < GET < POST < PUT.
 	want := []router.RouteInfo{
 		{Method: http.MethodDelete, Path: "/api/v1/items/:id"},
 		{Method: http.MethodGet, Path: "/"},
@@ -35,6 +36,7 @@ func TestRegisterRoutesCanonicalShape(t *testing.T) {
 		{Method: http.MethodGet, Path: "/healthz"},
 		{Method: http.MethodGet, Path: "/readyz"},
 		{Method: http.MethodPost, Path: "/api/v1/items"},
+		{Method: http.MethodPut, Path: "/api/v1/items/:id"},
 	}
 	if !slices.Equal(got, want) {
 		t.Fatalf("routes = %#v, want %#v", got, want)

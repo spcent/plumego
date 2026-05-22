@@ -118,12 +118,10 @@ func (a *App) Start(ctx context.Context) error {
 	if serveErr != nil && !errors.Is(serveErr, http.ErrServerClosed) {
 		return fmt.Errorf("server stopped: %w", serveErr)
 	}
-	select {
-	case err := <-shutdownErr:
-		if err != nil {
-			return fmt.Errorf("shutdown server: %w", err)
-		}
-	default:
+	// Always drain the shutdown channel so the goroutine is not leaked and
+	// shutdown errors are not silently discarded.
+	if err := <-shutdownErr; err != nil {
+		return fmt.Errorf("shutdown server: %w", err)
 	}
 	return nil
 }

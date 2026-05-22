@@ -117,7 +117,7 @@ func TestAPIHandlerResponses(t *testing.T) {
 					t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
 				}
 				got := decodeReferenceData[rootResponse](t, rec)
-				if got.Service != "plumego-reference" || got.Docs == "" {
+				if got.Service != "plumego-reference" || got.Docs == "" || got.Version != version {
 					t.Fatalf("unexpected root response: %+v", got)
 				}
 			},
@@ -131,8 +131,29 @@ func TestAPIHandlerResponses(t *testing.T) {
 					t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
 				}
 				got := decodeReferenceData[helloResponse](t, rec)
-				if got.Service != "plumego-reference" || got.Mode != "canonical" || got.Endpoints["api_hello"] == "" {
+				if got.Service != "plumego-reference" || got.Mode != "canonical" || got.Version != version {
 					t.Fatalf("unexpected hello response: %+v", got)
+				}
+				// Endpoints must be a non-empty slice; verify the discovery entry exists.
+				if len(got.Endpoints) == 0 {
+					t.Fatal("hello: Endpoints must not be empty")
+				}
+				// Verify each entry carries a non-empty Method, Path, and Name.
+				for i, ep := range got.Endpoints {
+					if ep.Method == "" || ep.Path == "" || ep.Name == "" {
+						t.Fatalf("hello: endpoint[%d] missing field: %+v", i, ep)
+					}
+				}
+				// Verify a specific known entry is present with the correct method.
+				found := false
+				for _, ep := range got.Endpoints {
+					if ep.Name == "api_hello" && ep.Method == http.MethodGet && ep.Path == "/api/hello" {
+						found = true
+						break
+					}
+				}
+				if !found {
+					t.Fatalf("hello: endpoint api_hello/GET//api/hello not found in %+v", got.Endpoints)
 				}
 			},
 		},
@@ -161,6 +182,9 @@ func TestAPIHandlerResponses(t *testing.T) {
 				got := decodeReferenceData[statusResponse](t, rec)
 				if got.Status != "healthy" || got.Structure.Routes != "one_method_one_path_one_handler" || len(got.Modules) == 0 {
 					t.Fatalf("unexpected status response: %+v", got)
+				}
+				if got.Version != version {
+					t.Fatalf("status.Version = %q, want %q", got.Version, version)
 				}
 			},
 		},
@@ -224,7 +248,7 @@ func TestItemHandlerList(t *testing.T) {
 		}
 	})
 
-	t.Run("populated store returns items with correct total", func(t *testing.T) {
+	t.Run("populated store returns items in creation order", func(t *testing.T) {
 		store := item.NewMemoryStore()
 		store.Create("alpha")
 		store.Create("beta")
@@ -238,6 +262,11 @@ func TestItemHandlerList(t *testing.T) {
 		resp := decodeReferenceData[listResponse](t, rec)
 		if resp.Total != 2 || len(resp.Items) != 2 {
 			t.Fatalf("total=%d items=%d, want 2/2", resp.Total, len(resp.Items))
+		}
+		// Verify stable creation order.
+		if resp.Items[0].Name != "alpha" || resp.Items[1].Name != "beta" {
+			t.Fatalf("unexpected order: [%s, %s], want [alpha, beta]",
+				resp.Items[0].Name, resp.Items[1].Name)
 		}
 	})
 
@@ -257,9 +286,13 @@ func TestItemHandlerList(t *testing.T) {
 		if resp.Total != 5 || len(resp.Items) != 3 || resp.Limit != 3 {
 			t.Fatalf("total=%d items=%d limit=%d, want 5/3/3", resp.Total, len(resp.Items), resp.Limit)
 		}
+		// First page must be the first 3 in creation order.
+		if resp.Items[0].Name != "a" || resp.Items[2].Name != "c" {
+			t.Fatalf("unexpected page items: %v", resp.Items)
+		}
 	})
 
-	t.Run("offset param skips items", func(t *testing.T) {
+	t.Run("offset param skips items in creation order", func(t *testing.T) {
 		store := item.NewMemoryStore()
 		for _, name := range []string{"a", "b", "c", "d", "e"} {
 			store.Create(name)
@@ -274,6 +307,10 @@ func TestItemHandlerList(t *testing.T) {
 		resp := decodeReferenceData[listResponse](t, rec)
 		if resp.Total != 5 || len(resp.Items) != 2 || resp.Offset != 3 {
 			t.Fatalf("total=%d items=%d offset=%d, want 5/2/3", resp.Total, len(resp.Items), resp.Offset)
+		}
+		// Items at offset 3 are "d" and "e".
+		if resp.Items[0].Name != "d" || resp.Items[1].Name != "e" {
+			t.Fatalf("unexpected offset items: %v", resp.Items)
 		}
 	})
 }
@@ -309,6 +346,100 @@ func TestItemHandlerGetByID(t *testing.T) {
 		h.GetByID(rec, req.WithContext(ctx))
 		if rec.Code != http.StatusNotFound {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusNotFound)
+		}
+	})
+}
+
+func TestItemHandlerUpdate(t *testing.T) {
+	t.Run("existing id returns 200 with updated item", func(t *testing.T) {
+		store := item.NewMemoryStore()
+		created := store.Create("original")
+		h := ItemHandler{Repo: store}
+
+		body := bytes.NewBufferString(`{"name":"renamed"}`)
+		req := httptest.NewRequest(http.MethodPut, "/api/v1/items/"+created.ID, body)
+		ctx := contract.WithRequestContext(req.Context(), contract.RequestContext{
+			Params: map[string]string{"id": created.ID},
+		})
+		rec := httptest.NewRecorder()
+		h.Update(rec, req.WithContext(ctx))
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+		}
+		got := decodeReferenceData[item.Item](t, rec)
+		if got.ID != created.ID || got.Name != "renamed" || got.CreatedAt != created.CreatedAt {
+			t.Fatalf("unexpected updated item: %+v", got)
+		}
+	})
+
+	t.Run("missing id returns 404 TypeNotFound", func(t *testing.T) {
+		h := ItemHandler{Repo: item.NewMemoryStore()}
+		body := bytes.NewBufferString(`{"name":"anything"}`)
+		req := httptest.NewRequest(http.MethodPut, "/api/v1/items/no-such-item", body)
+		ctx := contract.WithRequestContext(req.Context(), contract.RequestContext{
+			Params: map[string]string{"id": "no-such-item"},
+		})
+		rec := httptest.NewRecorder()
+		h.Update(rec, req.WithContext(ctx))
+		if rec.Code != http.StatusNotFound {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusNotFound)
+		}
+	})
+
+	t.Run("missing name returns 400 TypeRequired", func(t *testing.T) {
+		store := item.NewMemoryStore()
+		created := store.Create("original")
+		h := ItemHandler{Repo: store}
+
+		body := bytes.NewBufferString(`{"name":""}`)
+		req := httptest.NewRequest(http.MethodPut, "/api/v1/items/"+created.ID, body)
+		ctx := contract.WithRequestContext(req.Context(), contract.RequestContext{
+			Params: map[string]string{"id": created.ID},
+		})
+		rec := httptest.NewRecorder()
+		h.Update(rec, req.WithContext(ctx))
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
+		}
+	})
+
+	t.Run("invalid JSON returns 400 TypeBadRequest", func(t *testing.T) {
+		store := item.NewMemoryStore()
+		created := store.Create("original")
+		h := ItemHandler{Repo: store}
+
+		body := bytes.NewBufferString(`not-json`)
+		req := httptest.NewRequest(http.MethodPut, "/api/v1/items/"+created.ID, body)
+		ctx := contract.WithRequestContext(req.Context(), contract.RequestContext{
+			Params: map[string]string{"id": created.ID},
+		})
+		rec := httptest.NewRecorder()
+		h.Update(rec, req.WithContext(ctx))
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
+		}
+	})
+
+	t.Run("put is idempotent", func(t *testing.T) {
+		store := item.NewMemoryStore()
+		created := store.Create("original")
+		h := ItemHandler{Repo: store}
+
+		for i := 0; i < 3; i++ {
+			body := bytes.NewBufferString(`{"name":"stable"}`)
+			req := httptest.NewRequest(http.MethodPut, "/api/v1/items/"+created.ID, body)
+			ctx := contract.WithRequestContext(req.Context(), contract.RequestContext{
+				Params: map[string]string{"id": created.ID},
+			})
+			rec := httptest.NewRecorder()
+			h.Update(rec, req.WithContext(ctx))
+			if rec.Code != http.StatusOK {
+				t.Fatalf("attempt %d: status = %d, want %d", i+1, rec.Code, http.StatusOK)
+			}
+			got := decodeReferenceData[item.Item](t, rec)
+			if got.Name != "stable" {
+				t.Fatalf("attempt %d: name = %q, want stable", i+1, got.Name)
+			}
 		}
 	})
 }
@@ -354,6 +485,52 @@ func TestItemHandlerDelete(t *testing.T) {
 		h.Delete(rec, req.WithContext(ctx))
 		if rec.Code != http.StatusNotFound {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusNotFound)
+		}
+	})
+}
+
+func TestRequireWriteKey(t *testing.T) {
+	okHandler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	t.Run("empty key is a no-op — all requests pass", func(t *testing.T) {
+		mw := RequireWriteKey("")(okHandler)
+		rec := httptest.NewRecorder()
+		mw.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/", nil))
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+		}
+	})
+
+	t.Run("correct key passes through to handler", func(t *testing.T) {
+		mw := RequireWriteKey("secret")(okHandler)
+		req := httptest.NewRequest(http.MethodPost, "/", nil)
+		req.Header.Set(WriteKeyHeader, "secret")
+		rec := httptest.NewRecorder()
+		mw.ServeHTTP(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+		}
+	})
+
+	t.Run("missing header returns 401", func(t *testing.T) {
+		mw := RequireWriteKey("secret")(okHandler)
+		rec := httptest.NewRecorder()
+		mw.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/", nil))
+		if rec.Code != http.StatusUnauthorized {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusUnauthorized)
+		}
+	})
+
+	t.Run("wrong key returns 401", func(t *testing.T) {
+		mw := RequireWriteKey("secret")(okHandler)
+		req := httptest.NewRequest(http.MethodPost, "/", nil)
+		req.Header.Set(WriteKeyHeader, "wrong")
+		rec := httptest.NewRecorder()
+		mw.ServeHTTP(rec, req)
+		if rec.Code != http.StatusUnauthorized {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusUnauthorized)
 		}
 	})
 }

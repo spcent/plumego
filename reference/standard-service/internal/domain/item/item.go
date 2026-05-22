@@ -15,9 +15,11 @@ type Item struct {
 }
 
 // MemoryStore is a thread-safe in-memory item repository.
+// items is the lookup table; ids tracks insertion order so List is stable.
 type MemoryStore struct {
 	mu    sync.RWMutex
 	items map[string]Item
+	ids   []string
 	next  int
 }
 
@@ -26,7 +28,7 @@ func NewMemoryStore() *MemoryStore {
 	return &MemoryStore{items: make(map[string]Item)}
 }
 
-// Create stores an item with the provided name.
+// Create stores an item with the provided name and returns the new item.
 func (s *MemoryStore) Create(name string) Item {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -38,6 +40,7 @@ func (s *MemoryStore) Create(name string) Item {
 		CreatedAt: time.Now().UTC().Format(time.RFC3339),
 	}
 	s.items[item.ID] = item
+	s.ids = append(s.ids, item.ID)
 	return item
 }
 
@@ -50,16 +53,31 @@ func (s *MemoryStore) Get(id string) (Item, bool) {
 	return item, ok
 }
 
-// List returns all stored items in an unspecified order.
+// List returns all stored items in creation order.
 func (s *MemoryStore) List() []Item {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	result := make([]Item, 0, len(s.items))
-	for _, item := range s.items {
-		result = append(result, item)
+	result := make([]Item, 0, len(s.ids))
+	for _, id := range s.ids {
+		result = append(result, s.items[id])
 	}
 	return result
+}
+
+// Update replaces the name of an existing item and returns the updated item.
+// It reports false when no item with that id exists.
+func (s *MemoryStore) Update(id, name string) (Item, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	item, ok := s.items[id]
+	if !ok {
+		return Item{}, false
+	}
+	item.Name = name
+	s.items[id] = item
+	return item, true
 }
 
 // Delete removes an item by id and reports whether it existed.
@@ -71,5 +89,12 @@ func (s *MemoryStore) Delete(id string) bool {
 		return false
 	}
 	delete(s.items, id)
+	// Remove id from the ordered slice while preserving relative order.
+	for i, v := range s.ids {
+		if v == id {
+			s.ids = append(s.ids[:i], s.ids[i+1:]...)
+			break
+		}
+	}
 	return true
 }
