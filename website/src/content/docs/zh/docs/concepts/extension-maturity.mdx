@@ -1,6 +1,6 @@
 ---
 title: 扩展成熟度
-description: 如何阅读 x/* module.yaml 中的稳定性层级，以及 experimental 与 stable 对生产使用意味着什么。
+description: 如何阅读 x/* module.yaml 中的稳定性层级，以及 beta、beta surface 与 experimental 对生产使用意味着什么。
 translationKey: concepts-extension-maturity
 sidebar:
   order: 8
@@ -31,10 +31,38 @@ stability_tiers:            # 可选的子包细分
 
 | 状态 | 语义版本保证 | API 变更策略 | 生产建议 |
 | --- | --- | --- | --- |
-| **stable**（子包层级） | 已覆盖 — 破坏性变更需要主版本号升级 | 删除前提供弃用通知 | 可在生产中使用；锁定一个 minor 版本 |
+| **beta** | API 在 minor release refs 之间冻结 | 破坏性变更需要主版本号升级；删除前提供弃用通知 | 可在生产中使用并锁定 minor 版本；升级前审查 changelog |
+| **beta surface** | 仅覆盖指定子包 | 与 beta 相同；父 family 仍可能是 experimental | 依赖具体子包；用应用本地 adapter 隔离，并检查 `module.yaml` |
 | **experimental** | 尚未覆盖 | API 可能在没有弃用期的情况下更改 | 按用例评估；锁定精确版本并在升级时审查 changelog |
 
-目前所有 `x/*` 扩展在模块层面均为 `experimental`。在 `x/ai` 中，`provider`、`session`、`streaming` 和 `tool` 子包已晋升为 stable 层级；`orchestration`、`semanticcache`、`marketplace`、`distributed` 和 `resilience` 仍为 experimental。
+## 当前 beta 家族
+
+以下扩展 family 处于 `beta` 状态。它们的 API 在 minor release refs 之间冻结，并由连续两个 release refs、导出的 API snapshot 和 owner sign-off 支撑。
+
+| Family | 晋升版本 | 证据 |
+| --- | --- | --- |
+| `x/gateway` | v0.2.0 | [beta 证据](/zh/docs/modules/x-gateway) |
+| `x/observability` | v0.2.0 | [beta 证据](/zh/docs/modules/x-observability) |
+| `x/rest` | v0.2.0 | [beta 证据](/zh/docs/modules/x-rest) |
+| `x/websocket` | v0.2.0 | [beta 证据](/zh/docs/modules/x-websocket) |
+| `x/tenant` | v1.1.0 | [beta 证据](/zh/docs/modules/x-tenant) |
+| `x/frontend` | v1.1.0 | [beta 证据](/zh/docs/modules/x-frontend) |
+| `x/messaging` | v1.1.0（app-facing service） | [beta 证据](/zh/docs/modules/x-messaging) |
+
+## 已选 beta surface
+
+有些 family 的根层级仍是 `experimental`，但其中的特定子包已经积累了自己的 release 证据并完成 beta sign-off。父 family 的形态仍可能变化，但命名子包的 surface 是稳定的。
+
+| Surface | 父 family | 晋升版本 | 覆盖范围 |
+| --- | --- | --- | --- |
+| `x/ai/provider` | `x/ai`（experimental） | v1.1.0 | `Provider` 接口和具体构造函数 |
+| `x/ai/session` | `x/ai`（experimental） | v1.1.0 | Session 生命周期和状态管理 |
+| `x/ai/streaming` | `x/ai`（experimental） | v1.1.0 | Streaming response 协调 |
+| `x/ai/tool` | `x/ai`（experimental） | v1.1.0 | Tool 注册和调用 |
+| `x/data/file` | `x/data`（experimental） | v1.1.0 | 文件 helper 和元数据契约 |
+| `x/data/idempotency` | `x/data`（experimental） | v1.1.0 | Idempotency key store 契约 |
+
+依赖这些 surface 前，请检查 `module.yaml` 的 `stability_tiers`。列在 `stable:` 下的子包已覆盖；列在 `experimental:` 下或未列出的子包尚未覆盖。
 
 ## 依赖前如何检查
 
