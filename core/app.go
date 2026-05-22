@@ -3,11 +3,15 @@ package core
 import (
 	"net/http"
 	"sync"
+	"sync/atomic"
 
 	"github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/middleware"
 	"github.com/spcent/plumego/router"
 )
+
+// handlerRef wraps http.Handler for atomic.Pointer; the type parameter must be concrete, not an interface.
+type handlerRef struct{ h http.Handler }
 
 // App is the Plumego HTTP application kernel.
 type App struct {
@@ -23,10 +27,11 @@ type App struct {
 	preparationState PreparationState // Tracks mutation and preparation phase
 
 	// Server components
-	httpServer  *http.Server       // HTTP server instance
-	connTracker *connectionTracker // Open HTTP connection tracker
-	handler     http.Handler       // Combined handler with middleware applied
-	handlerOnce sync.Once          // Ensures handler initialization happens once
+	httpServer  *http.Server              // HTTP server instance
+	connTracker *connectionTracker        // Open HTTP connection tracker
+	handler     http.Handler              // Combined handler with middleware applied; guarded by mu
+	handlerOnce sync.Once                 // Ensures handler initialization happens once
+	handlerFast atomic.Pointer[handlerRef] // Hot-path cache of handler; written once by buildHandler
 }
 
 // New creates an App from a value-copied config and explicit dependencies.
