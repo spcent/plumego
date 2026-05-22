@@ -52,4 +52,12 @@ Startup behavior:
 - missing Mongo URI or database settings fail startup before any handler is exposed.
 - retention defaults to seven days and can be overridden with `WORKERFLEET_RETENTION_DAYS`; values must be greater than zero and no more than 106751 days.
 
+Mongo integration test gate:
+
+- Default repo gates do not require a local MongoDB instance.
+- `make workerfleet-mongo-test` is the repo-native optional gate for real MongoDB store behavior.
+- When `WORKERFLEET_MONGO_TEST_URI` is unset, the target prints a skip message with the exact environment variable to set.
+- When `WORKERFLEET_MONGO_TEST_URI` is set, the target runs `cd reference/workerfleet && go test -timeout 60s ./internal/platform/store/mongo`.
+- Run this gate before changing Mongo indexes, document mapping, retention fields, or idempotency behavior.
+
 This layout is intentionally app-local to `reference/workerfleet` and does not widen Plumego stable store packages.

@@ -29,6 +29,7 @@ Run locally:
 - `cd reference/workerfleet && go build .`
 - `cd reference/workerfleet && WORKERFLEET_HTTP_ADDR=:9090 go run .`
 - [env.example](./env.example) includes the current workerfleet env surface for local bootstrapping
+- `make workerfleet-mongo-test` runs the optional MongoDB integration gate when `WORKERFLEET_MONGO_TEST_URI` is set
 
 HTTP entrypoint configuration:
 
@@ -115,3 +116,4 @@ Storage backend configuration:
 - `mongo` requires `WORKERFLEET_MONGO_URI` and `WORKERFLEET_MONGO_DATABASE`
 - optional Mongo settings: `WORKERFLEET_MONGO_CONNECT_TIMEOUT`, `WORKERFLEET_MONGO_OPERATION_TIMEOUT`, `WORKERFLEET_MONGO_MAX_POOL_SIZE`
 - `WORKERFLEET_RETENTION_DAYS` controls Mongo `expire_at` generation for task history, worker events, and alerts; values must be greater than zero and no more than 106751 days
+- MongoDB integration tests are intentionally outside default gates; set `WORKERFLEET_MONGO_TEST_URI` and run `make workerfleet-mongo-test` before changing Mongo store behavior

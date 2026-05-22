@@ -4,7 +4,7 @@ Milestone:
 Recipe: specs/change-recipes/add-acceptance-tests.yaml
 Context Package: implementation
 Priority: P1
-State: active
+State: done
 Primary Module: reference/workerfleet
 Owned Files:
 - Makefile
@@ -46,9 +46,15 @@ Validation:
 - git diff --check
 
 Done Definition:
-- [ ] Acceptance Tests pass.
-- [ ] All Validation commands exit 0.
-- [ ] gofmt -l . produces no output.
-- [ ] Docs Sync targets updated (if applicable).
+- [x] Acceptance Tests pass.
+- [x] All Validation commands exit 0.
+- [x] gofmt -l . produces no output.
+- [x] Docs Sync targets updated (if applicable).
 
 Outcome:
+Added `make workerfleet-mongo-test` as the optional real-Mongo gate. The target skips with an actionable URI message when `WORKERFLEET_MONGO_TEST_URI` is unset and runs the workerfleet Mongo store package when configured. README and storage docs now point Mongo behavior changes to this gate.
+
+Validation:
+- `make workerfleet-mongo-test`
+- `cd reference/workerfleet && go test -timeout 30s ./internal/platform/store/mongo`
+- `git diff --check`
