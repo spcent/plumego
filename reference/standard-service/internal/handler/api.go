@@ -10,19 +10,14 @@ import (
 )
 
 // version is set at build time via -ldflags "-X standard-service/internal/handler.version=1.0.0"
-// During local development, it defaults to "dev" to signal an unversioned build.
+// During local development it defaults to "dev" to signal an unversioned build.
 var version = "dev"
 
 // APIHandler handles the core JSON API endpoints.
+// Logger is optional: when non-nil it emits structured log entries on each request.
+// Pass a.Core.Logger() from routes.go to demonstrate structured logging.
 type APIHandler struct {
-	Logger plumelog.StructuredLogger // Demonstrates structured logging capability.
-	Routes []RouteInfo                // Populated after all routes are registered via core.Routes()
-}
-
-// RouteInfo mirrors router.RouteInfo for response documentation.
-type RouteInfo struct {
-	Method string `json:"method"`
-	Path   string `json:"path"`
+	Logger plumelog.StructuredLogger
 }
 
 type rootResponse struct {
@@ -78,22 +73,17 @@ func (h APIHandler) Root(w http.ResponseWriter, r *http.Request) {
 	}, nil)
 }
 
-// Hello responds with service metadata and available endpoints in a deterministic,
-// method-aware listing. Endpoints are generated from core.Routes() at initialization,
-// so the list automatically includes all registered routes without manual maintenance.
+// Hello responds with service metadata and the canonical endpoint list.
+//
+// The list is explicit rather than auto-generated so that each entry carries a
+// meaningful name and description. app_test.go TestHelloEndpointListMatchesRegisteredRoutes
+// validates that this list stays in sync with routes.go.
+// When you add a route in routes.go, add a matching entry here.
+//
+// Ordered by method (DELETE < GET < POST < PUT) then path — matching
+// the sort order returned by a.Core.Routes().
 func (h APIHandler) Hello(w http.ResponseWriter, r *http.Request) {
-	// Build endpoint list from registered routes.
-	endpoints := make([]endpointInfo, 0, len(h.Routes))
-	for _, ri := range h.Routes {
-		endpoints = append(endpoints, endpointInfo{
-			Method: ri.Method,
-			Path:   ri.Path,
-			// Description is intentionally minimal since it's auto-generated.
-			Description: "endpoint",
-		})
-	}
-
-	resp := helloResponse{
+	_ = contract.WriteResponse(w, r, http.StatusOK, helloResponse{
 		Message:   "hello from plumego standard-service",
 		Service:   "plumego-reference",
 		Mode:      "canonical",
@@ -105,9 +95,20 @@ func (h APIHandler) Hello(w http.ResponseWriter, r *http.Request) {
 			"stdlib_handlers",
 			"minimal_bootstrap",
 		},
-		Endpoints: endpoints,
-	}
-	_ = contract.WriteResponse(w, r, http.StatusOK, resp, nil)
+		Endpoints: []endpointInfo{
+			{Name: "items_delete", Method: http.MethodDelete, Path: "/api/v1/items/:id", Description: "delete an item"},
+			{Name: "root", Method: http.MethodGet, Path: "/", Description: "service identity"},
+			{Name: "api_hello", Method: http.MethodGet, Path: "/api/hello", Description: "service discovery — this endpoint"},
+			{Name: "api_status", Method: http.MethodGet, Path: "/api/status", Description: "runtime status"},
+			{Name: "api_greet", Method: http.MethodGet, Path: "/api/v1/greet", Description: "greeting (demonstrates TypeRequired error)"},
+			{Name: "items_list", Method: http.MethodGet, Path: "/api/v1/items", Description: "list items with limit/offset pagination"},
+			{Name: "items_get", Method: http.MethodGet, Path: "/api/v1/items/:id", Description: "get item by id"},
+			{Name: "healthz", Method: http.MethodGet, Path: "/healthz", Description: "liveness probe"},
+			{Name: "readyz", Method: http.MethodGet, Path: "/readyz", Description: "readiness probe"},
+			{Name: "items_create", Method: http.MethodPost, Path: "/api/v1/items", Description: "create an item"},
+			{Name: "items_update", Method: http.MethodPut, Path: "/api/v1/items/:id", Description: "update an item"},
+		},
+	}, nil)
 }
 
 // Greet demonstrates the canonical error response pattern.
@@ -133,17 +134,17 @@ func (h APIHandler) Greet(w http.ResponseWriter, r *http.Request) {
 }
 
 // Status responds with a summary of system health and component state.
+// It demonstrates structured logging via logger.WithFields(): fields are
+// attached to the logger and emitted with every subsequent log call.
+// In production this pattern is used to annotate log lines with request ID,
+// tenant, or feature context without threading extra arguments through handlers.
 func (h APIHandler) Status(w http.ResponseWriter, r *http.Request) {
-	// Demonstrates structured logging: logger.WithFields() adds fields to subsequent entries.
-	// In production, this helps correlate log lines by request ID, tenant, or feature.
 	if h.Logger != nil {
 		h.Logger.WithFields(plumelog.Fields{
-			"endpoint":    "status",
-			"route_count": len(h.Routes),
+			"endpoint": "status",
 		}).Info("status request handled")
 	}
-
-	resp := statusResponse{
+	_ = contract.WriteResponse(w, r, http.StatusOK, statusResponse{
 		Status:    "healthy",
 		Service:   "plumego-reference",
 		Version:   version,
@@ -161,6 +162,5 @@ func (h APIHandler) Status(w http.ResponseWriter, r *http.Request) {
 			"middleware",
 			"log",
 		},
-	}
-	_ = contract.WriteResponse(w, r, http.StatusOK, resp, nil)
+	}, nil)
 }

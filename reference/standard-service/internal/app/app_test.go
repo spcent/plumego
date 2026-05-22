@@ -1,6 +1,7 @@
 package app
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"slices"
@@ -40,6 +41,74 @@ func TestRegisterRoutesCanonicalShape(t *testing.T) {
 	}
 	if !slices.Equal(got, want) {
 		t.Fatalf("routes = %#v, want %#v", got, want)
+	}
+}
+
+// TestHelloEndpointListMatchesRegisteredRoutes is a drift-detection test.
+// It validates that the explicit endpoint list in handler.APIHandler.Hello
+// contains exactly the same Method+Path pairs as the routes registered in
+// RegisterRoutes. When you add a route in routes.go you must also add it to
+// the Endpoints slice in handler/api.go Hello — this test will fail if you forget.
+func TestHelloEndpointListMatchesRegisteredRoutes(t *testing.T) {
+	a, err := New(config.Defaults())
+	if err != nil {
+		t.Fatalf("new app: %v", err)
+	}
+	if err := a.RegisterRoutes(); err != nil {
+		t.Fatalf("register routes: %v", err)
+	}
+	if err := a.Core.Prepare(); err != nil {
+		t.Fatalf("prepare app: %v", err)
+	}
+	srv, err := a.Core.Server()
+	if err != nil {
+		t.Fatalf("get server: %v", err)
+	}
+
+	rec := httptest.NewRecorder()
+	srv.Handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/hello", nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET /api/hello: status = %d, want %d", rec.Code, http.StatusOK)
+	}
+
+	var env struct {
+		Data struct {
+			Endpoints []struct {
+				Method string `json:"method"`
+				Path   string `json:"path"`
+			} `json:"endpoints"`
+		} `json:"data"`
+	}
+	if err := json.NewDecoder(rec.Body).Decode(&env); err != nil {
+		t.Fatalf("decode /api/hello response: %v", err)
+	}
+
+	// Build a sorted (method, path) set from the Hello response.
+	type methodPath struct{ method, path string }
+	helloSet := make(map[methodPath]bool, len(env.Data.Endpoints))
+	for _, ep := range env.Data.Endpoints {
+		helloSet[methodPath{ep.Method, ep.Path}] = true
+	}
+
+	// Every registered route must appear in the Hello endpoint list.
+	registered := a.Core.Routes()
+	for _, ri := range registered {
+		key := methodPath{ri.Method, ri.Path}
+		if !helloSet[key] {
+			t.Errorf("registered route %s %s is missing from GET /api/hello endpoint list", ri.Method, ri.Path)
+		}
+	}
+
+	// The Hello list must not contain paths that are not registered.
+	registeredSet := make(map[methodPath]bool, len(registered))
+	for _, ri := range registered {
+		registeredSet[methodPath{ri.Method, ri.Path}] = true
+	}
+	for _, ep := range env.Data.Endpoints {
+		key := methodPath{ep.Method, ep.Path}
+		if !registeredSet[key] {
+			t.Errorf("GET /api/hello lists %s %s which is not a registered route", ep.Method, ep.Path)
+		}
 	}
 }
 

@@ -27,11 +27,13 @@ func (a *App) RegisterRoutes() error {
 	// handlers that mutate state are wrapped; read-only routes are unaffected.
 	writeGuard := handler.RequireWriteKey(a.Cfg.App.WriteKey)
 
+	// APIHandler carries the Logger dependency. The Logger field demonstrates
+	// structured logging (see handler/api.go Status method). All other handler
+	// state — endpoint list in Hello, response envelopes — is stateless.
+	api := handler.APIHandler{Logger: a.Core.Logger()}
+
 	// Top-level routes registered directly on the app.
 	root := newRouteReg(a.Core)
-	// APIHandler is created with Logger for structured logging and Routes field
-	// populated after all routes are registered.
-	api := handler.APIHandler{Logger: a.Core.Logger()} // Routes field populated below after all registrations.
 	root.get("/", http.HandlerFunc(api.Root))
 	root.get("/healthz", http.HandlerFunc(health.Live))
 	root.get("/readyz", http.HandlerFunc(health.Ready))
@@ -56,21 +58,7 @@ func (a *App) RegisterRoutes() error {
 	v1.get("/items/:id", http.HandlerFunc(items.GetByID))
 	v1.put("/items/:id", writeGuard(http.HandlerFunc(items.Update)))
 	v1.delete("/items/:id", writeGuard(http.HandlerFunc(items.Delete)))
-	if v1.err != nil {
-		return v1.err
-	}
-
-	// Populate APIHandler.Routes from the authoritative router state.
-	// This ensures the /api/hello endpoint always reflects the actual registered routes
-	// without requiring manual maintenance of the endpoint list.
-	for _, ri := range a.Core.Routes() {
-		api.Routes = append(api.Routes, handler.RouteInfo{
-			Method: ri.Method,
-			Path:   ri.Path,
-		})
-	}
-
-	return nil
+	return v1.err
 }
 
 // routeAdder is the minimal interface shared by *core.App and *core.RouteGroup,
