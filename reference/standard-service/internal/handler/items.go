@@ -16,6 +16,7 @@ type ItemRepository interface {
 	Create(name string) item.Item
 	Get(id string) (item.Item, bool)
 	List() []item.Item
+	Update(id, name string) (item.Item, bool)
 	Delete(id string) bool
 }
 
@@ -26,6 +27,10 @@ type ItemHandler struct {
 }
 
 type createItemReq struct {
+	Name string `json:"name"`
+}
+
+type updateItemReq struct {
 	Name string `json:"name"`
 }
 
@@ -65,6 +70,7 @@ func (h ItemHandler) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 // List handles GET /api/v1/items with basic limit/offset pagination.
+// Items are returned in stable creation order.
 //
 //	GET /api/v1/items                    → 200 {items:[…], total:N, limit:20, offset:0}
 //	GET /api/v1/items?limit=5            → first 5 items; limit capped at 100
@@ -117,6 +123,45 @@ func listQueryInt(r *http.Request, key string, defaultVal, minVal, maxVal int) i
 func (h ItemHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 	id := router.Param(r, "id")
 	item, ok := h.Repo.Get(id)
+	if !ok {
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+			Type(contract.TypeNotFound).
+			Detail("id", id).
+			Message("item not found").
+			Build())
+		return
+	}
+	_ = contract.WriteResponse(w, r, http.StatusOK, item, nil)
+}
+
+// Update handles PUT /api/v1/items/:id.
+// PUT is idempotent: repeated calls with the same body yield the same result.
+// Only the name field is replaceable; id and created_at are immutable.
+//
+//	PUT /api/v1/items/item-1 {"name":"renamed"} → 200 updated item
+//	PUT /api/v1/items/item-1 {}                 → 400 TypeRequired
+//	PUT /api/v1/items/missing {"name":"x"}      → 404 TypeNotFound
+func (h ItemHandler) Update(w http.ResponseWriter, r *http.Request) {
+	id := router.Param(r, "id")
+
+	var req updateItemReq
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+			Type(contract.TypeBadRequest).
+			Message("request body must be valid JSON").
+			Build())
+		return
+	}
+	if req.Name == "" {
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+			Type(contract.TypeRequired).
+			Detail("field", "name").
+			Message("name is required").
+			Build())
+		return
+	}
+
+	item, ok := h.Repo.Update(id, req.Name)
 	if !ok {
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeNotFound).

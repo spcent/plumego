@@ -8,6 +8,8 @@ import (
 	"github.com/spcent/plumego/contract"
 )
 
+const version = "1.0.0"
+
 // APIHandler handles the core JSON API endpoints.
 type APIHandler struct{}
 
@@ -17,14 +19,22 @@ type rootResponse struct {
 	Docs    string `json:"docs"`
 }
 
+// endpointInfo describes a single HTTP endpoint in the service discovery response.
+type endpointInfo struct {
+	Name        string `json:"name"`
+	Method      string `json:"method"`
+	Path        string `json:"path"`
+	Description string `json:"description"`
+}
+
 type helloResponse struct {
-	Message   string            `json:"message"`
-	Service   string            `json:"service"`
-	Mode      string            `json:"mode"`
-	Timestamp string            `json:"timestamp"`
-	Version   string            `json:"version"`
-	Features  []string          `json:"features"`
-	Endpoints map[string]string `json:"endpoints"`
+	Message   string         `json:"message"`
+	Service   string         `json:"service"`
+	Mode      string         `json:"mode"`
+	Timestamp string         `json:"timestamp"`
+	Version   string         `json:"version"`
+	Features  []string       `json:"features"`
+	Endpoints []endpointInfo `json:"endpoints"`
 }
 
 type greetResponse struct {
@@ -51,36 +61,40 @@ type statusStructure struct {
 func (h APIHandler) Root(w http.ResponseWriter, r *http.Request) {
 	_ = contract.WriteResponse(w, r, http.StatusOK, rootResponse{
 		Service: "plumego-reference",
-		Version: "1.0.0",
+		Version: version,
 		Docs:    "/api/hello",
 	}, nil)
 }
 
-// Hello responds with service metadata and available endpoints.
+// Hello responds with service metadata and available endpoints in a deterministic,
+// method-aware listing.
 func (h APIHandler) Hello(w http.ResponseWriter, r *http.Request) {
 	resp := helloResponse{
 		Message:   "hello from plumego standard-service",
 		Service:   "plumego-reference",
 		Mode:      "canonical",
 		Timestamp: time.Now().Format(time.RFC3339),
-		Version:   "1.0.0",
+		Version:   version,
 		Features: []string{
 			"stable_root_only",
 			"explicit_routes",
 			"stdlib_handlers",
 			"minimal_bootstrap",
 		},
-		Endpoints: map[string]string{
-			"root":         "/",
-			"healthz":      "/healthz",
-			"readyz":       "/readyz",
-			"api_hello":    "/api/hello",
-			"api_status":   "/api/status",
-			"api_greet":    "/api/v1/greet",
-			"items_list":   "/api/v1/items",
-			"items_create": "/api/v1/items",
-			"items_get":    "/api/v1/items/:id",
-			"items_delete": "/api/v1/items/:id",
+		// Ordered by method then path, matching the router's canonical sort.
+		// Each entry carries an explicit Method so callers know the HTTP verb.
+		Endpoints: []endpointInfo{
+			{Name: "items_delete", Method: http.MethodDelete, Path: "/api/v1/items/:id", Description: "delete an item"},
+			{Name: "root", Method: http.MethodGet, Path: "/", Description: "service identity"},
+			{Name: "api_hello", Method: http.MethodGet, Path: "/api/hello", Description: "service discovery"},
+			{Name: "api_status", Method: http.MethodGet, Path: "/api/status", Description: "runtime status"},
+			{Name: "api_greet", Method: http.MethodGet, Path: "/api/v1/greet", Description: "greeting (demonstrates TypeRequired error)"},
+			{Name: "items_list", Method: http.MethodGet, Path: "/api/v1/items", Description: "list items with limit/offset pagination"},
+			{Name: "items_get", Method: http.MethodGet, Path: "/api/v1/items/:id", Description: "get item by id"},
+			{Name: "healthz", Method: http.MethodGet, Path: "/healthz", Description: "liveness probe"},
+			{Name: "readyz", Method: http.MethodGet, Path: "/readyz", Description: "readiness probe"},
+			{Name: "items_create", Method: http.MethodPost, Path: "/api/v1/items", Description: "create an item"},
+			{Name: "items_update", Method: http.MethodPut, Path: "/api/v1/items/:id", Description: "update an item"},
 		},
 	}
 	_ = contract.WriteResponse(w, r, http.StatusOK, resp, nil)
@@ -112,7 +126,7 @@ func (h APIHandler) Status(w http.ResponseWriter, r *http.Request) {
 	resp := statusResponse{
 		Status:    "healthy",
 		Service:   "plumego-reference",
-		Version:   "1.0.0",
+		Version:   version,
 		Timestamp: time.Now().Format(time.RFC3339),
 		Structure: statusStructure{
 			Bootstrap:  "explicit",

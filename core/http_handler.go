@@ -17,6 +17,12 @@ func (a *App) ensureHandlerPrepared() {
 		r := a.ensureRouter()
 		if r != nil {
 			r.Freeze()
+			// Warn when no routes have been registered before Prepare is called.
+			// A service with no routes silently returns 404 or 405 for every
+			// request, which is always a bootstrap programming error.
+			if len(r.Routes()) == 0 {
+				a.Logger().Warn("no routes registered: all requests will receive 404; call app.Get/Post/… before Prepare", nil)
+			}
 		}
 		a.buildHandler()
 	})

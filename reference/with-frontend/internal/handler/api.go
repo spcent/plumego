@@ -1,0 +1,19 @@
+// Package handler contains the JSON API handlers for the with-frontend demo.
+package handler
+
+import (
+	"net/http"
+
+	"github.com/spcent/plumego/contract"
+)
+
+// APIHandler serves a minimal JSON API alongside the static frontend.
+type APIHandler struct{}
+
+// Status reports that the API is healthy.
+func (h APIHandler) Status(w http.ResponseWriter, r *http.Request) {
+	_ = contract.WriteResponse(w, r, http.StatusOK, map[string]any{
+		"status":  "ok",
+		"service": "with-frontend",
+	}, nil)
+}

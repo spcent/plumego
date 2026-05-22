@@ -25,6 +25,7 @@ type AppConfig struct {
 	EnvFile      string
 	ServiceName  string // APP_SERVICE_NAME; used as the service identity in health responses.
 	MaxBodyBytes int64  // APP_MAX_BODY_BYTES; maximum request body size. 0 disables the limit.
+	WriteKey     string // APP_WRITE_KEY; when non-empty, POST/PUT/DELETE /api/v1/items require X-Write-Key header. Empty disables the guard.
 }
 
 // Defaults returns safe configuration values for local development.
@@ -80,6 +81,7 @@ func applyEnv(cfg *Config, lookupEnv func(string) (string, bool)) {
 	cfg.App.EnvFile = envString(lookupEnv, "APP_ENV_FILE", cfg.App.EnvFile)
 	cfg.App.ServiceName = envString(lookupEnv, "APP_SERVICE_NAME", cfg.App.ServiceName)
 	cfg.App.MaxBodyBytes = envInt64(lookupEnv, "APP_MAX_BODY_BYTES", cfg.App.MaxBodyBytes)
+	cfg.App.WriteKey = envString(lookupEnv, "APP_WRITE_KEY", cfg.App.WriteKey)
 }
 
 func applyEnvMap(cfg *Config, values map[string]string) {
@@ -99,6 +101,9 @@ func applyEnvMap(cfg *Config, values map[string]string) {
 		if n, err := strconv.ParseInt(value, 10, 64); err == nil {
 			cfg.App.MaxBodyBytes = n
 		}
+	}
+	if value := strings.TrimSpace(values["APP_WRITE_KEY"]); value != "" {
+		cfg.App.WriteKey = value
 	}
 }
 

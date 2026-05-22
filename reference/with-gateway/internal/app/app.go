@@ -78,12 +78,8 @@ func (a *App) Start(ctx context.Context) error {
 	if serveErr != nil && !errors.Is(serveErr, http.ErrServerClosed) {
 		return fmt.Errorf("server stopped: %w", serveErr)
 	}
-	select {
-	case err := <-shutdownErr:
-		if err != nil {
-			return fmt.Errorf("shutdown server: %w", err)
-		}
-	default:
+	if err := <-shutdownErr; err != nil {
+		return fmt.Errorf("shutdown server: %w", err)
 	}
 	return nil
 }

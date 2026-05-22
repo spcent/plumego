@@ -1,109 +1,46 @@
-// Example: non-canonical
+// Example: with-ops
 //
-// This demo mounts protected x/observability/ops routes and stable request observability
-// middleware without mounting x/observability/devtools.
+// This demo mounts protected x/observability/ops routes alongside stable request
+// observability middleware. It follows the canonical 4-step bootstrap pattern:
+// load config → build deps → register routes → start server.
 package main
 
 import (
 	"context"
-	"errors"
 	"log"
-	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
-	"github.com/spcent/plumego/contract"
-	plumelog "github.com/spcent/plumego/log"
-	"github.com/spcent/plumego/metrics"
-	"github.com/spcent/plumego/middleware"
-	"github.com/spcent/plumego/middleware/accesslog"
-	"github.com/spcent/plumego/middleware/httpmetrics"
-	"github.com/spcent/plumego/middleware/recovery"
-	"github.com/spcent/plumego/middleware/requestid"
-	"github.com/spcent/plumego/router"
-	"github.com/spcent/plumego/x/observability/ops"
+	"with-ops/internal/app"
+	"with-ops/internal/config"
 )
 
 func main() {
-	addr := envString("APP_ADDR", ":8087")
-	token := envString("OPS_TOKEN", "local-admin-token")
-	logger := plumelog.NewLogger()
-	collector := metrics.NewBaseMetricsCollector()
-	r := router.NewRouter()
+	if err := run(); err != nil {
+		log.Printf("server stopped: %v", err)
+		os.Exit(1)
+	}
+}
 
-	if err := r.AddRoute(http.MethodGet, "/", http.HandlerFunc(root)); err != nil {
-		log.Fatalf("register root route: %v", err)
-	}
-	if err := r.AddRoute(http.MethodGet, "/metrics", http.HandlerFunc(metricStats(collector))); err != nil {
-		log.Fatalf("register metrics route: %v", err)
-	}
-
-	opsHandler := ops.New(ops.Options{
-		Enabled: true,
-		Auth: ops.AuthConfig{
-			Token: token,
-		},
-		Hooks: ops.Hooks{
-			QueueStats: func(ctx context.Context, queue string) (ops.QueueStats, error) {
-				return ops.QueueStats{Queue: queue, Queued: 3, UpdatedAt: time.Now().UTC()}, nil
-			},
-		},
-		Logger: logger,
-	})
-	if err := opsHandler.RegisterRoutes(r); err != nil {
-		log.Fatalf("register ops routes: %v", err)
-	}
-
-	recoveryMw, err := recovery.Middleware(recovery.Config{Logger: logger})
-	if err != nil {
-		log.Fatalf("configure recovery middleware: %v", err)
-	}
-	accesslogMw, err := accesslog.Middleware(accesslog.Config{Logger: logger})
-	if err != nil {
-		log.Fatalf("configure access log middleware: %v", err)
-	}
-	handler := middleware.NewChain(
-		requestid.Middleware(),
-		recoveryMw,
-		httpmetrics.Middleware(collector),
-		accesslogMw,
-	).Build(r)
-
+func run() error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	srv := &http.Server{Addr: addr, Handler: handler}
-	go func() {
-		<-ctx.Done()
-		_ = srv.Shutdown(context.Background())
-	}()
-
-	log.Printf("Starting with-ops demo on %s", addr)
-	if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-		log.Fatalf("server stopped: %v", err)
+	cfg, err := config.Load()
+	if err != nil {
+		return err
 	}
-}
 
-func root(w http.ResponseWriter, r *http.Request) {
-	_ = contract.WriteResponse(w, r, http.StatusOK, map[string]any{
-		"service":  "with-ops",
-		"ops":      "/ops",
-		"metrics":  "/metrics",
-		"devtools": "not_mounted",
-	}, nil)
-}
-
-func metricStats(collector *metrics.BaseMetricsCollector) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		_ = contract.WriteResponse(w, r, http.StatusOK, collector.GetStats(), nil)
+	a, err := app.New(cfg)
+	if err != nil {
+		return err
 	}
-}
 
-func envString(key, fallback string) string {
-	if value := os.Getenv(key); value != "" {
-		return value
+	if err := a.RegisterRoutes(); err != nil {
+		return err
 	}
-	return fallback
+
+	log.Printf("Starting with-ops demo on %s", cfg.Core.Addr)
+	return a.Start(ctx)
 }
