@@ -205,22 +205,6 @@ func readEnvFile(path string) (map[string]string, error) {
 	return values, scanner.Err()
 }
 
-func envString(lookupEnv func(string) (string, bool), key, fallback string) string {
-	if value, ok := lookupEnv(key); ok && value != "" {
-		return value
-	}
-	return fallback
-}
-
-func envInt64(lookupEnv func(string) (string, bool), key string, fallback int64) int64 {
-	if value, ok := lookupEnv(key); ok && value != "" {
-		if n, err := strconv.ParseInt(value, 10, 64); err == nil {
-			return n
-		}
-	}
-	return fallback
-}
-
 func parseEnvLine(line string) (key, value string, ok bool) {
 	line = strings.TrimSpace(line)
 	if line == "" || strings.HasPrefix(line, "#") {

@@ -37,12 +37,12 @@ func New(cfg config.Config) (*App, error) {
 		return nil, fmt.Errorf("configure access log middleware: %w", err)
 	}
 	timeoutMw := timeout.Middleware(timeout.Config{Timeout: 30 * time.Second})
-	// Middleware order (innermost to outermost):
-	// - requestid: stamps correlation ID on all requests
-	// - recovery: converts panics to 500 responses
-	// - accesslog: logs request/response at transport level
-	// - bodylimit: enforces max request body size, logged by accesslog
-	// - timeout: enforces per-request wall-clock limit
+	// Middleware order — outermost to innermost (first registered runs first on inbound requests):
+	//   requestid  → stamps correlation ID before any logging or error handling
+	//   recovery   → converts panics to 500 responses; runs inside requestid so ID is in the response
+	//   accesslog  → logs every request/response at transport level; runs after requestid and recovery
+	//   bodylimit  → rejects oversized bodies with 413; placed after accesslog so the 413 is logged
+	//   timeout    → enforces per-request wall-clock limit; innermost so only handler time is counted
 	if err := app.Use(
 		requestid.Middleware(),
 		recoveryMw,

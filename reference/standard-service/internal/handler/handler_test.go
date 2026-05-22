@@ -235,6 +235,19 @@ func TestAPIHandlerResponses(t *testing.T) {
 			},
 		},
 		{
+			name: "greet missing name",
+			path: "/api/v1/greet",
+			fn:   h.Greet,
+			assert: func(t *testing.T, rec *httptest.ResponseRecorder) {
+				if rec.Code != http.StatusBadRequest {
+					t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
+				}
+				if code := decodeErrorCode(t, rec); code != "greet.name.required" {
+					t.Fatalf("error code = %q, want %q", code, "greet.name.required")
+				}
+			},
+		},
+		{
 			name: "status",
 			path: "/api/status",
 			fn:   h.Status,
@@ -284,6 +297,9 @@ func TestItemHandlerCreate(t *testing.T) {
 		h.Create(rec, httptest.NewRequest(http.MethodPost, "/api/v1/items", body))
 		if rec.Code != http.StatusBadRequest {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
+		}
+		if code := decodeErrorCode(t, rec); code != "item.name.required" {
+			t.Fatalf("error code = %q, want %q", code, "item.name.required")
 		}
 	})
 
@@ -352,6 +368,30 @@ func TestItemHandlerList(t *testing.T) {
 		// First page must be the first 3 in creation order.
 		if resp.Items[0].Name != "a" || resp.Items[2].Name != "c" {
 			t.Fatalf("unexpected page items: %v", resp.Items)
+		}
+	})
+
+	t.Run("offset beyond total clamps and returns empty page", func(t *testing.T) {
+		store := item.NewMemoryStore()
+		store.Create("a")
+		store.Create("b")
+		store.Create("c")
+		h := ItemHandler{Repo: store}
+
+		rec := httptest.NewRecorder()
+		h.List(rec, httptest.NewRequest(http.MethodGet, "/api/v1/items?offset=10", nil))
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+		}
+		resp := decodeReferenceData[listResponse](t, rec)
+		if resp.Total != 3 {
+			t.Fatalf("total = %d, want 3", resp.Total)
+		}
+		if len(resp.Items) != 0 {
+			t.Fatalf("items = %v, want empty (offset beyond total)", resp.Items)
+		}
+		if resp.Offset != 3 {
+			t.Fatalf("offset = %d, want 3 (clamped to total)", resp.Offset)
 		}
 	})
 
@@ -596,6 +636,19 @@ func TestRequireWriteKey(t *testing.T) {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusUnauthorized)
 		}
 	})
+}
+
+func decodeErrorCode(t *testing.T, rec *httptest.ResponseRecorder) string {
+	t.Helper()
+	var env struct {
+		Error struct {
+			Code string `json:"code"`
+		} `json:"error"`
+	}
+	if err := json.NewDecoder(rec.Body).Decode(&env); err != nil {
+		t.Fatalf("decode error response: %v", err)
+	}
+	return env.Error.Code
 }
 
 func decodeReferenceData[T any](t *testing.T, rec *httptest.ResponseRecorder) T {
