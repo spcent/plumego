@@ -4,7 +4,7 @@ Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Context Package: implementation
 Priority: P1
-State: active
+State: done
 Primary Module: reference/workerfleet
 Owned Files:
 - reference/workerfleet/internal/app
@@ -51,9 +51,16 @@ Validation:
 - gofmt -l reference/workerfleet/internal/app reference/workerfleet/internal/platform
 
 Done Definition:
-- [ ] Acceptance Tests pass.
-- [ ] All Validation commands exit 0.
-- [ ] gofmt -l . produces no output.
-- [ ] Docs Sync targets updated (if applicable).
+- [x] Acceptance Tests pass.
+- [x] All Validation commands exit 0.
+- [x] gofmt -l . produces no output.
+- [x] Docs Sync targets updated (if applicable).
 
 Outcome:
+Added durable per-sink notification outbox support. Alert evaluation now persists alerts and enqueues one job per configured sink, while a notification delivery loop claims due jobs, dispatches by sink type, records delivered state, and retries transient failures with bounded backoff. Memory and Mongo stores implement the outbox contract, notifier errors now classify permanent versus transient failures, and alerts/notifier/design docs describe at-least-once delivery without exactly-once claims.
+
+Validation:
+- `cd reference/workerfleet && go test -timeout 30s ./internal/app ./internal/platform/store/mongo ./internal/platform/notifier`
+- `cd reference/workerfleet && go vet ./internal/app ./internal/platform/store/mongo ./internal/platform/notifier`
+- `gofmt -l reference/workerfleet/internal/app reference/workerfleet/internal/platform`
+- `git diff --check`

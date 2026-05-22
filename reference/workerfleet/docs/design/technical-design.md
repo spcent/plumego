@@ -386,10 +386,10 @@ Implemented runtime behavior:
 
 - Alert evaluation and notifier primitives are wired into the app runtime.
 - When `WORKERFLEET_ALERT_EVALUATION_ENABLED=true`, `internal/app` starts a periodic alert evaluation loop.
-- When `WORKERFLEET_NOTIFICATION_ENABLED=true`, emitted alert records are dispatched through configured notifiers with `WORKERFLEET_NOTIFIER_DELIVERY_TIMEOUT`.
+- When `WORKERFLEET_NOTIFICATION_ENABLED=true`, emitted alert records enqueue per-sink `notification_jobs`, and a delivery loop sends due jobs through configured notifiers with `WORKERFLEET_NOTIFIER_DELIVERY_TIMEOUT`.
 - Startup fails when notification delivery is enabled without a configured
   Feishu or generic webhook URL.
-- Alert evaluation uses the same guarded loop scheduler, including non-overlap, per-iteration timeout, and bounded failure backoff.
+- Alert evaluation and notification delivery use the same guarded loop scheduler, including non-overlap, per-iteration timeout, bounded failure backoff, and Mongo-backed loop leases when Mongo storage is enabled.
 - Evaluation and notification errors are reported through the runtime error observer and exported through low-cardinality metrics instead of being silently discarded.
 - The alert loop is stopped during graceful shutdown before the runtime store is closed.
 
@@ -465,7 +465,7 @@ Operational risks:
 - simultaneous heartbeat bursts can create write pressure.
 - full active-task replacement requires workers to report complete state correctly.
 - stale pod inventory can delay pod failure visibility until sync recovers.
-- notification delivery failures can delay external visibility while persisted alert records remain queryable.
+- notification delivery failures can delay external visibility while persisted alert records and durable outbox jobs remain queryable.
 
 Mitigations:
 

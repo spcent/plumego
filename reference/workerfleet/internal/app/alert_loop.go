@@ -2,13 +2,21 @@ package app
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"strings"
 	"sync"
+	"time"
 
 	"workerfleet/internal/domain"
 	workerfleetmetrics "workerfleet/internal/platform/metrics"
 	"workerfleet/internal/platform/notifier"
+	platformstore "workerfleet/internal/platform/store"
+)
+
+const (
+	defaultNotificationBatchSize = 25
+	maxNotificationAttempts      = 5
 )
 
 func NewAlertRunner(store runtimeStore, policy domain.StatusPolicy, alertPolicy domain.AlertPolicy, metrics *workerfleetmetrics.Observer, errors RuntimeErrorObserver) *AlertRunner {
@@ -55,6 +63,13 @@ func (a *AlertRunner) Start(ctx context.Context, cfg Config) (func(), error) {
 		_, err := a.EvaluateAndNotifyAlerts(ctx, cfg)
 		return err
 	})
+	if cfg.Runtime.NotificationEnabled {
+		deliverySettings := cfg.Runtime.notificationDeliveryLoopSettings()
+		deliverySettings.Lease = a.lease
+		startManagedLoop(loopCtx, &wg, deliverySettings, a.reportRuntimeError, func(ctx context.Context) error {
+			return a.DeliverNotificationOutbox(ctx, cfg, defaultNotificationBatchSize)
+		})
+	}
 	return func() {
 		cancel()
 		wg.Wait()
@@ -80,15 +95,62 @@ func (a *AlertRunner) EvaluateAndNotifyAlerts(ctx context.Context, cfg Config) (
 	if !cfg.Runtime.NotificationEnabled || len(emitted) == 0 {
 		return emitted, nil
 	}
-	dispatcher := a.dispatcherFn(cfg)
-	for _, alert := range emitted {
-		deliveryCtx, cancel := context.WithTimeout(ctx, cfg.Runtime.NotifierDeliveryTimeout)
-		if err := dispatcher.Notify(deliveryCtx, alert); err != nil {
-			a.reportRuntimeError("alert_notify", err)
-		}
-		cancel()
+	if err := a.store.EnqueueNotificationJobs(ctx, notificationJobsForAlerts(cfg, emitted, time.Now().UTC())); err != nil {
+		return nil, err
 	}
 	return emitted, nil
+}
+
+func (a *AlertRunner) DeliverNotificationOutbox(ctx context.Context, cfg Config, limit int) error {
+	if a == nil || a.store == nil {
+		return errWorkerfleetStoreNotConfigured
+	}
+	jobs, err := a.store.ClaimNotificationJobs(ctx, time.Now().UTC(), limit)
+	if err != nil {
+		return err
+	}
+	if len(jobs) == 0 {
+		return nil
+	}
+
+	dispatcher := a.dispatcherFn(cfg)
+	bindings := dispatcher.Bindings()
+	for _, job := range jobs {
+		binding, ok := findNotificationSink(bindings, job.SinkType)
+		if !ok {
+			if err := a.markNotificationFailed(ctx, job, notifier.ErrNoSinks); err != nil {
+				return err
+			}
+			continue
+		}
+		deliveryCtx, cancel := context.WithTimeout(ctx, cfg.Runtime.NotifierDeliveryTimeout)
+		err := binding.Sink.Notify(deliveryCtx, job.Alert)
+		cancel()
+		if err != nil {
+			a.reportRuntimeError("alert_notify", err)
+			if err := a.markNotificationFailed(ctx, job, err); err != nil {
+				return err
+			}
+			continue
+		}
+		if err := a.store.MarkNotificationDelivered(ctx, job.JobID, time.Now().UTC()); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (a *AlertRunner) markNotificationFailed(ctx context.Context, job platformstore.NotificationJob, err error) error {
+	errorClass, permanent := notifier.ClassifyError(err)
+	if job.Attempts >= maxNotificationAttempts {
+		permanent = true
+	}
+	return a.store.MarkNotificationFailed(ctx, job.JobID, platformstore.NotificationFailure{
+		ErrorClass:    errorClass,
+		ErrorMessage:  err.Error(),
+		Permanent:     permanent,
+		NextAttemptAt: time.Now().UTC().Add(notificationRetryDelay(job.Attempts)),
+	})
 }
 
 func (a *AlertRunner) reportRuntimeError(operation string, err error) {
@@ -100,19 +162,83 @@ func (a *AlertRunner) reportRuntimeError(operation string, err error) {
 
 func newAlertDispatcher(cfg Config) *notifier.Dispatcher {
 	client := &http.Client{Timeout: cfg.Runtime.NotifierDeliveryTimeout}
-	var sinks []notifier.Sink
+	var sinks []notifier.SinkBinding
 	if strings.TrimSpace(cfg.Notifier.FeishuWebhookURL) != "" {
-		sinks = append(sinks, notifier.NewFeishuNotifier(notifier.FeishuConfig{
-			WebhookURL: cfg.Notifier.FeishuWebhookURL,
-			HTTPClient: client,
-		}))
+		sinks = append(sinks, notifier.SinkBinding{
+			Type: platformstore.NotificationSinkFeishu,
+			Sink: notifier.NewFeishuNotifier(notifier.FeishuConfig{
+				WebhookURL: cfg.Notifier.FeishuWebhookURL,
+				HTTPClient: client,
+			}),
+		})
 	}
 	if strings.TrimSpace(cfg.Notifier.WebhookURL) != "" {
-		sinks = append(sinks, notifier.NewWebhookNotifier(notifier.WebhookConfig{
-			URL:        cfg.Notifier.WebhookURL,
-			Headers:    cfg.Notifier.WebhookHeaders,
-			HTTPClient: client,
-		}))
+		sinks = append(sinks, notifier.SinkBinding{
+			Type: platformstore.NotificationSinkWebhook,
+			Sink: notifier.NewWebhookNotifier(notifier.WebhookConfig{
+				URL:        cfg.Notifier.WebhookURL,
+				Headers:    cfg.Notifier.WebhookHeaders,
+				HTTPClient: client,
+			}),
+		})
 	}
-	return notifier.NewDispatcher(sinks...)
+	return notifier.NewDispatcherWithBindings(sinks...)
+}
+
+func notificationJobsForAlerts(cfg Config, alerts []domain.AlertRecord, now time.Time) []platformstore.NotificationJob {
+	sinkTypes := configuredNotificationSinkTypes(cfg)
+	jobs := make([]platformstore.NotificationJob, 0, len(alerts)*len(sinkTypes))
+	for _, alert := range alerts {
+		for _, sinkType := range sinkTypes {
+			jobs = append(jobs, platformstore.NotificationJob{
+				JobID:         notificationJobID(alert.AlertID, sinkType),
+				AlertID:       alert.AlertID,
+				SinkType:      sinkType,
+				Alert:         alert,
+				Status:        platformstore.NotificationJobPending,
+				NextAttemptAt: now,
+				CreatedAt:     now,
+				UpdatedAt:     now,
+			})
+		}
+	}
+	return jobs
+}
+
+func configuredNotificationSinkTypes(cfg Config) []platformstore.NotificationSinkType {
+	var sinkTypes []platformstore.NotificationSinkType
+	if strings.TrimSpace(cfg.Notifier.FeishuWebhookURL) != "" {
+		sinkTypes = append(sinkTypes, platformstore.NotificationSinkFeishu)
+	}
+	if strings.TrimSpace(cfg.Notifier.WebhookURL) != "" {
+		sinkTypes = append(sinkTypes, platformstore.NotificationSinkWebhook)
+	}
+	return sinkTypes
+}
+
+func notificationJobID(alertID string, sinkType platformstore.NotificationSinkType) string {
+	return fmt.Sprintf("%s:%s", alertID, sinkType)
+}
+
+func findNotificationSink(bindings []notifier.SinkBinding, sinkType platformstore.NotificationSinkType) (notifier.SinkBinding, bool) {
+	for _, binding := range bindings {
+		if binding.Type == sinkType {
+			return binding, true
+		}
+	}
+	return notifier.SinkBinding{}, false
+}
+
+func notificationRetryDelay(attempts int) time.Duration {
+	if attempts < 1 {
+		attempts = 1
+	}
+	delay := 30 * time.Second
+	for i := 1; i < attempts; i++ {
+		delay *= 2
+		if delay >= 5*time.Minute {
+			return 5 * time.Minute
+		}
+	}
+	return delay
 }

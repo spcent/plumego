@@ -440,6 +440,10 @@ func (cfg RuntimeConfig) alertEvaluationLoopSettings() loopExecutionSettings {
 	return cfg.loopSettings("alert_evaluate", cfg.AlertEvaluationInterval)
 }
 
+func (cfg RuntimeConfig) notificationDeliveryLoopSettings() loopExecutionSettings {
+	return cfg.loopSettings("notification_deliver", cfg.AlertEvaluationInterval)
+}
+
 func (cfg RuntimeConfig) loopSettings(name string, interval time.Duration) loopExecutionSettings {
 	if interval <= 0 {
 		interval = 30 * time.Second

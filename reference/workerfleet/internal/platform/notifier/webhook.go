@@ -71,7 +71,7 @@ func (n *WebhookNotifier) Notify(ctx context.Context, alert domain.AlertRecord) 
 
 	if resp.StatusCode >= 300 {
 		payload, _ := io.ReadAll(io.LimitReader(resp.Body, 2048))
-		return fmt.Errorf("webhook notify failed: status %d: %s", resp.StatusCode, strings.TrimSpace(string(payload)))
+		return HTTPStatusError("webhook", resp.StatusCode, strings.TrimSpace(string(payload)))
 	}
 
 	return nil

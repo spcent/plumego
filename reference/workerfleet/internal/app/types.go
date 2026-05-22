@@ -7,6 +7,7 @@ import (
 
 	"workerfleet/internal/domain"
 	workerfleetmetrics "workerfleet/internal/platform/metrics"
+	"workerfleet/internal/platform/notifier"
 	platformstore "workerfleet/internal/platform/store"
 )
 
@@ -37,6 +38,7 @@ type RuntimeErrorObserver interface {
 
 type runtimeStore interface {
 	platformstore.QueryStore
+	platformstore.NotificationOutboxStore
 	platformstore.WorkerEventStore
 	domain.SnapshotStore
 	domain.TaskHistoryStore
@@ -93,6 +95,7 @@ type inventorySyncer interface {
 
 type alertDispatcher interface {
 	Notify(ctx context.Context, alert domain.AlertRecord) error
+	Bindings() []notifier.SinkBinding
 }
 
 type domainAlertEngine interface {

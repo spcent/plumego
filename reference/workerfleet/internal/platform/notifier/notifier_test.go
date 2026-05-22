@@ -161,3 +161,46 @@ func TestNotifierErrorDoesNotLeakHeaderSecret(t *testing.T) {
 	}
 	assertErrorDoesNotLeak(t, err, "super-secret-token")
 }
+
+func TestClassifyErrorSeparatesPermanentAndTransientFailures(t *testing.T) {
+	tests := []struct {
+		name          string
+		err           error
+		wantClass     string
+		wantPermanent bool
+	}{
+		{
+			name:          "permanent client error",
+			err:           HTTPStatusError("webhook", http.StatusBadRequest, "bad request"),
+			wantClass:     ErrorClassHTTP4xx,
+			wantPermanent: true,
+		},
+		{
+			name:          "rate limit",
+			err:           HTTPStatusError("webhook", http.StatusTooManyRequests, "slow down"),
+			wantClass:     ErrorClassHTTP429,
+			wantPermanent: false,
+		},
+		{
+			name:          "server error",
+			err:           HTTPStatusError("feishu", http.StatusInternalServerError, "boom"),
+			wantClass:     ErrorClassHTTP5xx,
+			wantPermanent: false,
+		},
+		{
+			name:          "configuration",
+			err:           ErrNoSinks,
+			wantClass:     ErrorClassConfiguration,
+			wantPermanent: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotClass, gotPermanent := ClassifyError(tt.err)
+			if gotClass != tt.wantClass || gotPermanent != tt.wantPermanent {
+				t.Fatalf("classify = %s/%v, want %s/%v", gotClass, gotPermanent, tt.wantClass, tt.wantPermanent)
+			}
+		})
+	}
+}

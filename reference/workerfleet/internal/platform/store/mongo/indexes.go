@@ -71,5 +71,10 @@ func CollectionIndexSpecs() map[string][]IndexSpec {
 			{Name: "owner_expires", Keys: bson.D{{Key: "owner_id", Value: 1}, {Key: "expires_at", Value: 1}}},
 			{Name: "expires_at_ttl", Keys: bson.D{{Key: "expires_at", Value: 1}}, ExpireAfterSeconds: &ttlZero},
 		},
+		CollectionNotificationJobs: {
+			{Name: "alert_sink_unique", Keys: bson.D{{Key: "alert_id", Value: 1}, {Key: "sink_type", Value: 1}}, Unique: true},
+			{Name: "status_next_attempt", Keys: bson.D{{Key: "status", Value: 1}, {Key: "next_attempt_at", Value: 1}}},
+			{Name: "status_locked_until", Keys: bson.D{{Key: "status", Value: 1}, {Key: "locked_until", Value: 1}}},
+		},
 	}
 }

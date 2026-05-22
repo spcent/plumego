@@ -20,6 +20,7 @@ type Store struct {
 	caseStepHistory   map[domain.TaskID][]platformstore.CaseStepHistoryRecord
 	workerEvents      []domain.DomainEvent
 	alerts            []platformstore.AlertRecord
+	notificationJobs  map[string]platformstore.NotificationJob
 }
 
 func NewStore() *Store {
@@ -31,6 +32,7 @@ func NewStore() *Store {
 		caseStepHistory:   make(map[domain.TaskID][]platformstore.CaseStepHistoryRecord),
 		workerEvents:      make([]domain.DomainEvent, 0, 64),
 		alerts:            make([]platformstore.AlertRecord, 0, 64),
+		notificationJobs:  make(map[string]platformstore.NotificationJob),
 	}
 }
 
@@ -653,6 +655,7 @@ func parseTime(value string) time.Time {
 var _ platformstore.QueryStore = (*Store)(nil)
 var _ platformstore.CaseStepHistoryStore = (*Store)(nil)
 var _ platformstore.WorkerEventStore = (*Store)(nil)
+var _ platformstore.NotificationOutboxStore = (*Store)(nil)
 var _ platformstore.RetentionStore = (*Store)(nil)
 var _ domain.SnapshotStore = (*Store)(nil)
 var _ domain.TaskHistoryStore = (*Store)(nil)

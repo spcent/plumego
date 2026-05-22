@@ -67,7 +67,7 @@ func (n *FeishuNotifier) Notify(ctx context.Context, alert domain.AlertRecord) e
 
 	if resp.StatusCode >= 300 {
 		payload, _ := io.ReadAll(io.LimitReader(resp.Body, 2048))
-		return fmt.Errorf("feishu notify failed: status %d: %s", resp.StatusCode, strings.TrimSpace(string(payload)))
+		return HTTPStatusError("feishu", resp.StatusCode, strings.TrimSpace(string(payload)))
 	}
 
 	return nil

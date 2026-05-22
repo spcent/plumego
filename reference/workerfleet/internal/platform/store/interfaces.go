@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"time"
 
 	"workerfleet/internal/domain"
 )
@@ -41,6 +42,13 @@ type AlertStore interface {
 	AppendAlert(ctx context.Context, record AlertRecord) error
 	ListAlerts(ctx context.Context, filter AlertFilter) ([]AlertRecord, error)
 	ListAlertRecords(ctx context.Context) ([]AlertRecord, error)
+}
+
+type NotificationOutboxStore interface {
+	EnqueueNotificationJobs(ctx context.Context, jobs []NotificationJob) error
+	ClaimNotificationJobs(ctx context.Context, now time.Time, limit int) ([]NotificationJob, error)
+	MarkNotificationDelivered(ctx context.Context, jobID string, deliveredAt time.Time) error
+	MarkNotificationFailed(ctx context.Context, jobID string, failure NotificationFailure) error
 }
 
 type QueryStore interface {

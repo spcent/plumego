@@ -67,3 +67,42 @@ type AlertFilter struct {
 }
 
 type AlertRecord = domain.AlertRecord
+
+type NotificationJobStatus string
+
+const (
+	NotificationJobPending    NotificationJobStatus = "pending"
+	NotificationJobProcessing NotificationJobStatus = "processing"
+	NotificationJobDelivered  NotificationJobStatus = "delivered"
+	NotificationJobFailed     NotificationJobStatus = "failed"
+)
+
+type NotificationSinkType string
+
+const (
+	NotificationSinkFeishu  NotificationSinkType = "feishu"
+	NotificationSinkWebhook NotificationSinkType = "webhook"
+)
+
+type NotificationJob struct {
+	JobID          string
+	AlertID        string
+	SinkType       NotificationSinkType
+	Alert          AlertRecord
+	Status         NotificationJobStatus
+	Attempts       int
+	NextAttemptAt  time.Time
+	LockedUntil    time.Time
+	LastErrorClass string
+	LastError      string
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+	DeliveredAt    time.Time
+}
+
+type NotificationFailure struct {
+	ErrorClass    string
+	ErrorMessage  string
+	Permanent     bool
+	NextAttemptAt time.Time
+}

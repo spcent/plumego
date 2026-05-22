@@ -37,6 +37,11 @@ func TestCollectionIndexSpecsIncludeTTLAndUniqueRules(t *testing.T) {
 	if !foundLeaseTTL {
 		t.Fatalf("loop leases missing expires_at TTL index")
 	}
+
+	notificationJobs := specs[CollectionNotificationJobs]
+	if len(notificationJobs) == 0 || !notificationJobs[0].Unique {
+		t.Fatalf("notification jobs first index should be unique, got %#v", notificationJobs)
+	}
 }
 
 func TestCollectionIndexSpecsAreStableAcrossCalls(t *testing.T) {
@@ -54,5 +59,8 @@ func TestCollectionIndexSpecsAreStableAcrossCalls(t *testing.T) {
 	}
 	if len(first[CollectionLoopLeases]) != len(second[CollectionLoopLeases]) {
 		t.Fatalf("loop lease index count mismatch")
+	}
+	if len(first[CollectionNotificationJobs]) != len(second[CollectionNotificationJobs]) {
+		t.Fatalf("notification job index count mismatch")
 	}
 }
