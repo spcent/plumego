@@ -78,23 +78,46 @@ These modules carry the v1 stable-root compatibility promise. They are the recom
 | base logging contracts and structured logger wiring | [Log Primer](/docs/modules/log) · **Stable** | `log` defines the logging surface that extensions and stable roots share |
 | base metrics contracts and collector registration | [Metrics Primer](/docs/modules/metrics) · **Stable** | `metrics` defines the metrics surface without owning exporter or adapter behavior |
 
-### Extension families — `Experimental` unless stated otherwise
+### Extension families
 
-API compatibility is not frozen. Evaluate before adopting. Start from the primary family entrypoint, not from subordinate packages.
+Start from the primary family entrypoint, not from subordinate packages. Use the maturity tier as your adoption signal.
 
-| If the question is mainly about | Open this primer next | Maturity | Subordinate packages |
+#### Beta
+
+API is frozen between consecutive minor release refs. Safe to adopt in production; check release notes before upgrading.
+
+| If the question is mainly about | Open this primer next | Promoted | Subordinate packages |
 | --- | --- | --- | --- |
-| AI provider adapters, session, streaming, or tool invocation | [x/ai Primer](/docs/modules/x-ai) | **Experimental** | `orchestration`, `semanticcache`, `distributed`, `resilience` (inner tiers) |
-| multi-tenant resolution, policy, quota, rate limiting, or session | [x/tenant Primer](/docs/modules/x-tenant) | **Experimental** | `resolve`, `policy`, `quota`, `ratelimit`, `session`, `store` |
-| reusable CRUD transport and resource route standardization | [x/rest Primer](/docs/modules/x-rest) | **Beta** | — |
-| real-time WebSocket connection lifecycle, hub management, or auth | [x/websocket Primer](/docs/modules/x-websocket) | **Beta** | — |
-| shared circuit breakers, retry wrappers, or resilience adapters across extensions | [x/resilience Primer](/docs/modules/x-resilience) | **Experimental** | — |
-| Prometheus exporters, OTel wiring, record buffering, or DB analytics | [x/observability Primer](/docs/modules/x-observability) | **Experimental** | [x/observability/ops](/docs/modules/x-ops) · [x/observability/devtools](/docs/modules/x-devtools) |
-| reverse proxying, gateway routing, load balancing, or edge transport | [x/gateway Primer](/docs/modules/x-gateway) | **Experimental** | [x/gateway/discovery](/docs/modules/x-discovery) · `x/gateway/ipc` |
-| HTTP transport for file upload, download, or streaming delivery | [x/fileapi Primer](/docs/modules/x-fileapi) | **Experimental** | — |
-| static asset serving, embedded FS, or SPA fallback routing | [x/frontend Primer](/docs/modules/x-frontend) | **Experimental** | — |
-| read-write splitting, sharding, durable KV, or idempotency topology | [x/data Primer](/docs/modules/x-data) | **Experimental** | [x/data/cache](/docs/modules/x-cache) |
-| app-facing queue, pubsub, scheduler, or webhook orchestration | [x/messaging Primer](/docs/modules/x-messaging) | **Experimental** | [x/messaging/scheduler](/docs/modules/x-scheduler) · [x/messaging/webhook](/docs/modules/x-webhook) · [x/messaging/pubsub · x/messaging/mq](/docs/modules/x-messaging-subordinates) |
+| reusable CRUD transport and resource route standardization | [x/rest Primer](/docs/modules/x-rest) | v0.2.0 | — |
+| real-time WebSocket connection lifecycle, hub management, or auth | [x/websocket Primer](/docs/modules/x-websocket) | v0.2.0 | — |
+| reverse proxying, gateway routing, load balancing, or edge transport | [x/gateway Primer](/docs/modules/x-gateway) | v0.2.0 | [x/gateway/discovery](/docs/modules/x-discovery) · `x/gateway/ipc` (experimental) |
+| Prometheus exporters, OTel wiring, record buffering, or DB analytics | [x/observability Primer](/docs/modules/x-observability) | v0.2.0 | [x/observability/ops](/docs/modules/x-ops) · [x/observability/devtools](/docs/modules/x-devtools) (experimental) |
+| multi-tenant resolution, policy, quota, rate limiting, or session | [x/tenant Primer](/docs/modules/x-tenant) | v1.1.0 | `resolve`, `policy`, `quota`, `ratelimit`, `session`, `store` |
+| static asset serving, embedded FS, or SPA fallback routing | [x/frontend Primer](/docs/modules/x-frontend) | v1.1.0 | — |
+| app-facing queue, pubsub, scheduler, or webhook orchestration | [x/messaging Primer](/docs/modules/x-messaging) | v1.1.0 (app-facing) | [scheduler](/docs/modules/x-scheduler) · [webhook · pubsub · mq](/docs/modules/x-messaging-subordinates) (subordinate primitives are experimental) |
+
+#### Beta surfaces in experimental families
+
+The parent family root is still experimental, but these subpackages have release-backed API stability at v1.1.0.
+
+| Beta surfaces | Parent family primer | Notes |
+| --- | --- | --- |
+| `x/ai/provider` · `x/ai/session` · `x/ai/streaming` · `x/ai/tool` | [x/ai Primer](/docs/modules/x-ai) | Use these subpackages for stable AI work; remaining subpackages and the root family are experimental |
+| `x/data/file` · `x/data/idempotency` | [x/data Primer](/docs/modules/x-data) | Use these subpackages for stable file and idempotency work; topology surfaces and `x/data/cache` remain experimental |
+
+#### Experimental
+
+API compatibility is not frozen. Evaluate before adopting; wrap behind an app-local interface in stable service paths.
+
+| If the question is mainly about | Open this primer next | Subordinate packages |
+| --- | --- | --- |
+| AI provider adapters, session, streaming, or tool invocation | [x/ai Primer](/docs/modules/x-ai) | `provider`, `session`, `streaming`, `tool` are beta surfaces — see above; `orchestration`, `semanticcache`, `distributed`, `resilience` remain experimental |
+| read-write splitting, sharding, durable KV, or idempotency topology | [x/data Primer](/docs/modules/x-data) | [x/data/cache](/docs/modules/x-cache); `file` and `idempotency` are beta surfaces — see above |
+| HTTP transport for file upload, download, or streaming delivery | [x/fileapi Primer](/docs/modules/x-fileapi) | — |
+| shared circuit breakers, retry wrappers, or resilience adapters across extensions | [x/resilience Primer](/docs/modules/x-resilience) | — |
+| gRPC + HTTP service hosting or outbound RPC client pooling | [x/rpc Primer](/docs/modules/x-rpc) | — |
+| OpenAPI 3.1 document generation from registered routes | [x/openapi Primer](/docs/modules/x-openapi) | — |
+| explicit JSON binding and caller-owned request validation | [x/validate Primer](/docs/modules/x-validate) | — |
 
 ## What this page should help you avoid
 

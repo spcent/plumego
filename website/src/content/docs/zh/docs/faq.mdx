@@ -10,6 +10,10 @@ sidebar:
 
 ## 快速上手
 
+## Plumego 适合我的团队吗？
+
+在进行技术评估之前，请先阅读[不适合使用 Plumego 的场景](/zh/docs/when-not-to-use)。该页面列出了 Plumego 刻意做出的取舍，以及在哪些情况下其他工具才是更好的选择。诚实的评估比功能列表更重要。
+
 ## 如何用 Plumego 构建 REST API？
 
 从 [开始使用](/zh/docs/getting-started) 的四步启动流程开始，然后用 `app.Get`、`app.Post`、`app.Put`、`app.Delete` 注册路由。成功响应使用 `contract.WriteResponse`，错误响应使用 `contract.NewErrorBuilder`。完整的 handler 示例见 [错误处理指南](/zh/docs/guides/handle-errors) 和 [参考应用](/zh/docs/reference-app)。
@@ -71,7 +75,7 @@ Plumego 在标准库之上额外提供了：基于 trie 树的路由器、显式
 可以——每个层级有一个对应的注意事项：
 
 - **稳定根**（`core`、`router`、`contract`、`middleware`、`security`、`store`、`health`、`log`、`metrics`）：今天即可用于生产。API 已冻结，v1 正式发布时兼容性承诺生效。
-- **Beta 扩展**（`x/rest`、`x/websocket`、`x/gateway`、`x/observability`）：可在生产中安全使用。API 在次版本 release ref 之间保持冻结；升级前查看发布说明。
+- **Beta 扩展**（`x/rest`、`x/websocket`、`x/gateway`、`x/observability`、`x/tenant`、`x/frontend`、`x/messaging`）：可在生产中安全使用。API 在次版本 release ref 之间保持冻结；升级前查看发布说明。`x/ai` 的部分子包（`provider`、`session`、`streaming`、`tool`）和 `x/data` 的部分子包（`file`、`idempotency`）在 v1.1.0 起也具备 Beta 表面稳定性。
 - **实验性扩展**（其余所有 `x/*`）：API 可能在无缓冲期的情况下发生变化。在稳定生产路径中引入之前，用 app-local 接口包装依赖。
 
 参见 [稳定性](/zh/stability) 了解四层分级概览，[发布](/zh/releases) 查看完整的逐模块支持矩阵。
@@ -152,3 +156,4 @@ Plumego 在标准库之上额外提供了：基于 trie 树的路由器、显式
 | 所有错误类型含 HTTP 状态和修复步骤 | [错误参考](/zh/docs/reference/errors) |
 | 参考服务长什么样？ | [参考应用](/zh/docs/reference-app) |
 | 哪些 API 是稳定的还是实验性的？ | [发布策略](/zh/docs/release-posture) |
+| 哪些情况下不该用 Plumego？ | [不适合使用的场景](/zh/docs/when-not-to-use) |

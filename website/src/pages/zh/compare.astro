@@ -238,6 +238,16 @@ const parallelRows = [
   { name: 'Echo',    nsOp: 231,  allocsOp: 4, bytesOp: 208, relative: '0.35×', isFaster: true },
 ];
 
+// ── stdlib 基准对比 ────────────────────────────────────────────────────────
+// 以 Go 1.22+ http.ServeMux + PathValue() 参数提取为对照。
+// 开销来源：per-request context 注入（480 B，5 次分配）、参数映射、中间件链接线。
+const stdlibRows = [
+  { scenario: '静态路由',            stdlibNs: 110, plumegoNs: 367,  ratio: '3.3×' },
+  { scenario: '单 :param + 读取',    stdlibNs: 186, plumegoNs: 807,  ratio: '4.3×' },
+  { scenario: '四 :param 深路径',    stdlibNs: 722, plumegoNs: 1036, ratio: '1.4×' },
+  { scenario: '70 条路由混合表',     stdlibNs: 247, plumegoNs: 660,  ratio: '2.7×' },
+];
+
 const journeySteps = [
   { label: '为什么选择', href: '/zh/why-plumego' },
   { label: '示例', href: '/zh/examples' },
@@ -715,6 +725,40 @@ contract.<span class="hc-fn">WriteError</span>(w, r,
       </p>
     </div>
 
+    <!-- stdlib 基准对比 -->
+    <div class="bench-table-block" style="max-width:64rem;margin-inline:auto;margin-bottom:2.5rem;">
+      <h3 class="bench-table-title">Plumego vs Go stdlib 基准（<code>http.ServeMux</code> + <code>PathValue()</code>）</h3>
+      <p style="font-size:0.82rem;color:var(--fg-soft);margin-block:0.4rem 0.75rem;line-height:1.5;">
+        开销来源：per-request context 注入（480 B，5 次分配）、参数映射构建以及中间件链接线。对于耗时 1 ms 的 I/O handler，路由开销低于请求总耗时的 0.1%。
+      </p>
+      <div class="bench-table-wrap">
+        <table class="bench-table">
+          <thead>
+            <tr>
+              <th>测试场景</th>
+              <th>stdlib ns/op</th>
+              <th>Plumego ns/op</th>
+              <th>倍数</th>
+            </tr>
+          </thead>
+          <tbody>
+            {stdlibRows.map((row) => (
+              <tr>
+                <td>{row.scenario}</td>
+                <td class="bench-td--num">{row.stdlibNs}</td>
+                <td class="bench-td--num bench-row--plumego">{row.plumegoNs}</td>
+                <td class="bench-td--relative">{row.ratio}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p class="bench-footnote">
+        四参数深路径场景（1.4×）说明：随着路径复杂度增加，开销收敛——trie 遍历摊销到了更多工作量上。
+        复现：<code>go test -bench=BenchmarkRouter -benchmem -count=3 ./reference/benchmark/...</code>
+      </p>
+    </div>
+
     <div class="bench-tables">
       <div class="bench-table-block">
         <h3 class="bench-table-title">顺序调度（ns/op）</h3>
@@ -779,8 +823,9 @@ contract.<span class="hc-fn">WriteError</span>(w, r,
           </table>
         </div>
         <p class="bench-footnote">
-          Gin 和 Echo 在并发负载下快 ~2.5–3×，因为 <code>sync.Pool</code> context
-          消除了每次请求的内存分配——代价是使用与标准库中间件不兼容的自定义 context 类型。
+          在同样兼容标准库的框架中（Chi 和 Plumego），Plumego 并发吞吐量领先 35%（663 vs 1,013 ns/op）。
+          Gin 和 Echo 在此测试中比 Plumego 快 ~2.5–3×，因为 <code>sync.Pool</code> context 消除了每次请求的内存分配——代价是使用与标准库中间件不兼容的自定义 context 类型。
+          如果 stdlib 兼容性对你的团队重要，最有意义的对比对象是 Chi，而不是 Gin 或 Echo。
         </p>
       </div>
     </div>
@@ -801,6 +846,10 @@ contract.<span class="hc-fn">WriteError</span>(w, r,
         <a class="button button--primary" href="/zh/docs/getting-started">开始使用 Plumego</a>
         <a class="button button--ghost" href="/zh/why-plumego">完整适配指南</a>
       </div>
+      <p class="cta-honest-note">
+        还不确定是否适合？
+        <a href="/zh/docs/when-not-to-use">阅读诚实的权衡评估 →</a>
+      </p>
     </div>
   </section>
 </MarketingLayout>
@@ -1281,4 +1330,20 @@ contract.<span class="hc-fn">WriteError</span>(w, r,
   }
   .bench-footnote { font-size: 0.8rem; color: var(--fg-soft); line-height: 1.55; }
   .bench-reproduce { font-size: 0.82rem; color: var(--fg-soft); margin-top: 1.25rem; max-width: 1100px; margin-inline: auto; }
+
+  .cta-honest-note {
+    margin-top: 1.1rem;
+    font-size: 0.86rem;
+    color: var(--fg-soft);
+  }
+
+  .cta-honest-note a {
+    color: var(--fg-soft);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+
+  .cta-honest-note a:hover {
+    color: var(--fg);
+  }
 </style>

@@ -10,6 +10,10 @@ sidebar:
 
 ## Getting Started
 
+## Is Plumego the right fit for my team?
+
+Read [When Not to Use Plumego](/docs/when-not-to-use) before committing to technical evaluation. That page lists the trade-offs Plumego makes deliberately — and the conditions under which a different tool is the better choice. The honest answer matters more than the feature list.
+
 ## How do I build a REST API with Plumego?
 
 Start with the four-step bootstrap from [Getting Started](/docs/getting-started), then register your routes using `app.Get`, `app.Post`, `app.Put`, and `app.Delete`. Use `contract.WriteResponse` for success responses and `contract.NewErrorBuilder` for error responses. The [Handle Errors guide](/docs/guides/handle-errors) and [Reference App](/docs/reference-app) show complete handler examples.
@@ -71,7 +75,7 @@ Because the request and handler shape should stay close to `net/http`. Plumego w
 Yes — with one caveat per tier:
 
 - **Stable roots** (`core`, `router`, `contract`, `middleware`, `security`, `store`, `health`, `log`, `metrics`): production-ready today. Their APIs are frozen and will carry a formal compatibility promise at v1 release.
-- **Beta extensions** (`x/rest`, `x/websocket`, `x/gateway`, `x/observability`): safe to adopt in production. APIs are frozen between minor release refs; check release notes before upgrading.
+- **Beta extensions** (`x/rest`, `x/websocket`, `x/gateway`, `x/observability`, `x/tenant`, `x/frontend`, `x/messaging`): safe to adopt in production. APIs are frozen between minor release refs; check release notes before upgrading. Selected subpackages of `x/ai` (`provider`, `session`, `streaming`, `tool`) and `x/data` (`file`, `idempotency`) also carry beta-surface stability at v1.1.0.
 - **Experimental extensions** (all other `x/*`): APIs may change without a deprecation period. Wrap them behind an app-local interface before using in stable production paths.
 
 See [Stability](/stability) for the four-tier overview and [Releases](/releases) for the full module-by-module support matrix.
@@ -152,3 +156,4 @@ Explicit constructor injection keeps dependencies visible at the call site and i
 | All error types with HTTP status and remediation | [Error Reference](/docs/reference/errors) |
 | What does the reference service look like? | [Reference App](/docs/reference-app) |
 | Which APIs are stable vs experimental? | [Release Posture](/docs/release-posture) |
+| When should I NOT use Plumego? | [When Not to Use](/docs/when-not-to-use) |
