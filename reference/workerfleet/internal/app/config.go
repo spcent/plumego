@@ -23,6 +23,7 @@ const (
 	defaultLoopTimeout         = 25 * time.Second
 	defaultLoopFailureBackoff  = 5 * time.Second
 	defaultLoopMaxBackoff      = 1 * time.Minute
+	defaultLoopLeaseTTL        = 90 * time.Second
 	minStatusStaleAfter        = 5 * time.Second
 	minStatusOfflineAfter      = 10 * time.Second
 	minStageStuckAfter         = 30 * time.Second
@@ -68,6 +69,8 @@ type RuntimeConfig struct {
 	StatusSweepInterval     time.Duration
 	AlertEvaluationInterval time.Duration
 	NotifierDeliveryTimeout time.Duration
+	LoopLeaseTTL            time.Duration
+	LoopLeaseOwner          string
 }
 
 type KubeConfig struct {
@@ -120,6 +123,8 @@ func DefaultConfigForProfile(profile string) Config {
 			StatusSweepInterval:     30 * time.Second,
 			AlertEvaluationInterval: 30 * time.Second,
 			NotifierDeliveryTimeout: 5 * time.Second,
+			LoopLeaseTTL:            defaultLoopLeaseTTL,
+			LoopLeaseOwner:          defaultLoopLeaseOwner(),
 		},
 		Kube: KubeConfig{
 			WorkerContainer: "worker",
@@ -246,6 +251,20 @@ func LoadConfig(lookup func(string) (string, bool)) (Config, error) {
 		}
 		cfg.Runtime.NotifierDeliveryTimeout = timeout
 	}
+	if value, ok := lookup("WORKERFLEET_LOOP_LEASE_TTL"); ok {
+		ttl, err := parseDurationEnv("WORKERFLEET_LOOP_LEASE_TTL", value)
+		if err != nil {
+			return Config{}, err
+		}
+		cfg.Runtime.LoopLeaseTTL = ttl
+	}
+	if value, ok := lookup("WORKERFLEET_LOOP_LEASE_OWNER"); ok {
+		owner := strings.TrimSpace(value)
+		if owner == "" {
+			return Config{}, errors.New("WORKERFLEET_LOOP_LEASE_OWNER must not be empty when set")
+		}
+		cfg.Runtime.LoopLeaseOwner = owner
+	}
 	if value, ok := lookup("WORKERFLEET_STATUS_STALE_AFTER"); ok {
 		duration, err := parseDurationEnv("WORKERFLEET_STATUS_STALE_AFTER", value)
 		if err != nil {
@@ -367,6 +386,12 @@ func ValidateConfig(cfg Config) error {
 	}
 	if cfg.Runtime.KubeSyncEnabled && strings.TrimSpace(cfg.Kube.WorkerContainer) == "" {
 		return errors.New("WORKERFLEET_KUBE_WORKER_CONTAINER is required when WORKERFLEET_KUBE_SYNC_ENABLED=true")
+	}
+	if cfg.Runtime.LoopLeaseTTL < defaultLoopTimeout {
+		return fmt.Errorf("WORKERFLEET_LOOP_LEASE_TTL must be at least %s", defaultLoopTimeout)
+	}
+	if strings.TrimSpace(cfg.Runtime.LoopLeaseOwner) == "" {
+		return errors.New("WORKERFLEET_LOOP_LEASE_OWNER is required")
 	}
 	if cfg.Profile == ProfileProduction && strings.TrimSpace(cfg.WorkerAuth.Token) == "" {
 		return errors.New("WORKERFLEET_WORKER_AUTH_TOKEN is required when WORKERFLEET_PROFILE=prod")
@@ -502,6 +527,14 @@ func normalizeProfile(profile string) string {
 		return ProfileDevelopment
 	}
 	return normalized
+}
+
+func defaultLoopLeaseOwner() string {
+	hostname, err := os.Hostname()
+	if err == nil && strings.TrimSpace(hostname) != "" {
+		return strings.TrimSpace(hostname)
+	}
+	return "workerfleet"
 }
 
 func defaultStatusPolicyForProfile(profile string) domain.StatusPolicy {

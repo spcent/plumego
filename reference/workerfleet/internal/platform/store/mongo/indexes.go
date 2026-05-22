@@ -67,5 +67,9 @@ func CollectionIndexSpecs() map[string][]IndexSpec {
 			{Name: "alert_type_status", Keys: bson.D{{Key: "alert_type", Value: 1}, {Key: "status", Value: 1}}},
 			{Name: "expire_at_ttl", Keys: bson.D{{Key: "expire_at", Value: 1}}, ExpireAfterSeconds: &ttlZero},
 		},
+		CollectionLoopLeases: {
+			{Name: "owner_expires", Keys: bson.D{{Key: "owner_id", Value: 1}, {Key: "expires_at", Value: 1}}},
+			{Name: "expires_at_ttl", Keys: bson.D{{Key: "expires_at", Value: 1}}, ExpireAfterSeconds: &ttlZero},
+		},
 	}
 }

@@ -242,6 +242,39 @@ func TestLoopRunnerPreventsOverlappingExecutions(t *testing.T) {
 	}
 }
 
+func TestLoopRunnerSkipsWorkWhenLeaseNotAcquired(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	var wg sync.WaitGroup
+	var calls int32
+	startManagedLoop(ctx, &wg, loopExecutionSettings{
+		Name:              "status_sweep",
+		Interval:          time.Millisecond,
+		Timeout:           20 * time.Millisecond,
+		FailureBackoff:    time.Millisecond,
+		MaxFailureBackoff: time.Millisecond,
+		Lease:             denyingLoopLease{},
+	}, func(string, error) {}, func(context.Context) error {
+		atomic.AddInt32(&calls, 1)
+		return nil
+	})
+
+	time.Sleep(20 * time.Millisecond)
+	cancel()
+	wg.Wait()
+
+	if got := atomic.LoadInt32(&calls); got != 0 {
+		t.Fatalf("loop calls = %d, want 0 when lease is not acquired", got)
+	}
+}
+
+type denyingLoopLease struct{}
+
+func (denyingLoopLease) TryAcquire(context.Context, string) (func(), bool, error) {
+	return nil, false, nil
+}
+
 func TestLoopRunnerCancelsSlowIterationOnTimeout(t *testing.T) {
 	observer := &recordingRuntimeErrorObserver{}
 	runner := &LoopRunner{errors: observer}

@@ -26,6 +26,12 @@ func Bootstrap(ctx context.Context, cfg Config) (*Runtime, error) {
 	if cfg.Policy.Alert == (domain.AlertPolicy{}) {
 		cfg.Policy.Alert = cfg.Policy.Status.AlertPolicy()
 	}
+	if cfg.Runtime.LoopLeaseTTL <= 0 {
+		cfg.Runtime.LoopLeaseTTL = defaultLoopLeaseTTL
+	}
+	if cfg.Runtime.LoopLeaseOwner == "" {
+		cfg.Runtime.LoopLeaseOwner = defaultLoopLeaseOwner()
+	}
 	if err := ValidateConfig(cfg); err != nil {
 		return nil, err
 	}
@@ -39,7 +45,7 @@ func Bootstrap(ctx context.Context, cfg Config) (*Runtime, error) {
 	switch cfg.StoreBackend {
 	case StoreBackendMemory:
 		store := memory.NewStore()
-		return buildRuntime(store, func(context.Context) error { return nil }, metrics, metricsObserver, statusPolicy, alertPolicy), nil
+		return buildRuntime(store, func(context.Context) error { return nil }, metrics, metricsObserver, statusPolicy, alertPolicy, nopLoopLease{}), nil
 	case StoreBackendMongo:
 		client, err := mongostore.Connect(ctx, mongostore.ClientConfig{
 			URI:              cfg.Mongo.URI,
@@ -53,7 +59,12 @@ func Bootstrap(ctx context.Context, cfg Config) (*Runtime, error) {
 			return nil, fmt.Errorf("bootstrap mongo store: %w", err)
 		}
 		store := client.Store()
-		return buildRuntime(store, client.Disconnect, metrics, metricsObserver, statusPolicy, alertPolicy), nil
+		lease, err := store.LoopLeaseCoordinator(cfg.Runtime.LoopLeaseOwner, cfg.Runtime.LoopLeaseTTL)
+		if err != nil {
+			_ = client.Disconnect(ctx)
+			return nil, fmt.Errorf("bootstrap mongo loop lease: %w", err)
+		}
+		return buildRuntime(store, client.Disconnect, metrics, metricsObserver, statusPolicy, alertPolicy, lease), nil
 	default:
 		return nil, fmt.Errorf("unsupported store backend %q", cfg.StoreBackend)
 	}
@@ -64,7 +75,7 @@ func newRuntime(store runtimeStore, close func(context.Context) error) *Runtime 
 	metricsObserver := workerfleetmetrics.NewObserver(metrics)
 	policy := domain.DefaultStatusPolicy()
 	alertPolicy := policy.AlertPolicy()
-	return buildRuntime(store, close, metrics, metricsObserver, policy, alertPolicy)
+	return buildRuntime(store, close, metrics, metricsObserver, policy, alertPolicy, nopLoopLease{})
 }
 
 func buildRuntime(
@@ -74,6 +85,7 @@ func buildRuntime(
 	metricsObserver *workerfleetmetrics.Observer,
 	policy domain.StatusPolicy,
 	alertPolicy domain.AlertPolicy,
+	lease LoopLeaseCoordinator,
 ) *Runtime {
 	ingest := domain.NewIngestService(
 		store,
@@ -86,6 +98,11 @@ func buildRuntime(
 	service := NewService(ingest, store)
 	loops := NewLoopRunner(store, policy, metricsObserver, metricsObserver)
 	alerts := NewAlertRunner(store, policy, alertPolicy, metricsObserver, metricsObserver)
+	if lease == nil {
+		lease = nopLoopLease{}
+	}
+	loops.lease = lease
+	alerts.lease = lease
 	return &Runtime{
 		Service: service,
 		Metrics: metrics,

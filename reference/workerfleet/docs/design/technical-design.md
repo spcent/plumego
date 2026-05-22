@@ -229,14 +229,14 @@ Implemented runtime behavior:
 - When `WORKERFLEET_KUBE_SYNC_ENABLED=true`, `internal/app` starts a periodic Kubernetes sync loop.
 - The runtime loop scheduler prevents same-process overlap, applies a default `25s` per-iteration timeout, and backs off from `5s` up to `1m` after failures.
 - Sync errors are reported through the runtime error observer and exported through low-cardinality metrics instead of being silently discarded.
-- Loop scheduling already routes through a no-op lease seam so future multi-replica ownership can be added without changing loop bodies.
+- Loop scheduling routes through `LoopLeaseCoordinator`; Mongo storage wires this to the `loop_leases` collection, while memory storage remains process-local.
 - The loop is stopped during graceful shutdown before the runtime store is closed.
 
 Current replica assumption:
 
-- Workerfleet should currently run with one active replica when Kubernetes sync, status sweep, or alert evaluation loops are enabled.
-- Multiple replicas are safe for HTTP serving only when all background loops remain disabled.
-- Without distributed lease ownership, extra replicas would duplicate Kubernetes sync, status sweep, alert evaluation, and notification delivery work.
+- With Mongo storage, Kubernetes sync, status sweep, and alert evaluation loops acquire one lease per loop family before doing work.
+- With memory storage, leases are process-local and enabled loops should still run as a single replica.
+- The reference deployment remains `replicas: 1` by default; operators may raise replicas only after confirming Mongo storage, unique lease owners, and external notification expectations.
 
 ## 8. Storage Design
 
@@ -421,6 +421,8 @@ Runtime loop configuration:
 - `WORKERFLEET_ALERT_EVALUATION_INTERVAL`, default `30s`.
 - Loop guardrail defaults: per-iteration timeout `25s`, initial failure backoff `5s`, max failure backoff `1m`.
 - `WORKERFLEET_NOTIFIER_DELIVERY_TIMEOUT`, default `5s`.
+- `WORKERFLEET_LOOP_LEASE_TTL`, default `90s`.
+- `WORKERFLEET_LOOP_LEASE_OWNER`, default host name.
 - `WORKERFLEET_KUBE_API_HOST`.
 - `WORKERFLEET_KUBE_BEARER_TOKEN`.
 - `WORKERFLEET_KUBE_NAMESPACE`.
@@ -473,18 +475,14 @@ Mitigations:
 - expose ingest and inventory sync duration metrics.
 - use Grafana aggregate panels before drilling into APIs.
 
-Multi-replica lease roadmap:
+Multi-replica lease implementation:
 
 - ownership unit: one lease per runtime loop family, at minimum `kube_sync`, `status_sweep`, and `alert_evaluate`.
-- lease backend direction: reuse the workerfleet Mongo backend when enabled so replicated deployments do not need a second coordination system.
-- lease document shape: `lease_name`, `holder_id`, `renewed_at`, `expire_at`, and a monotonic fencing token for future auditability.
+- lease backend: reuse the workerfleet Mongo backend when enabled so replicated deployments do not need a second coordination system.
+- lease document shape: `_id` loop name, `owner_id`, `created_at`, `updated_at`, and `expires_at`.
 - renewal model: the active holder renews on every loop interval; non-holders skip work and retry acquisition after the normal scheduler interval.
 - failure model: if the holder stops renewing before `expire_at`, another replica may acquire the lease and resume loop ownership.
-- rollout order:
-  1. add replica identity and a real lease coordinator implementation
-  2. back Mongo leases with TTL and compare-and-swap acquisition
-  3. gate each loop family independently so sync and alert ownership can roll out separately
-  4. expose lease state metrics and debug visibility before raising deployment replicas above one
+- remaining roadmap: expose lease state metrics and debug visibility before raising the reference deployment above one replica by default.
 
 ## 14. Security And Failure Policy
 

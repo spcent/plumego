@@ -45,6 +45,7 @@ The reference deployment uses:
 - `WORKERFLEET_STATUS_SWEEP_ENABLED=true`
 - `WORKERFLEET_ALERT_EVALUATION_ENABLED=true`
 - `WORKERFLEET_NOTIFICATION_ENABLED=false`
+- `WORKERFLEET_LOOP_LEASE_TTL=90s`
 
 Those defaults keep stable fleet metrics on while leaving experimental pod,
 `exec_plan_id`, and step-heavy metric families disabled unless explicitly
@@ -63,9 +64,10 @@ kubectl apply -f reference/workerfleet/deploy/prometheusrule.yaml
 
 ## Operational Notes
 
-- The deployment intentionally starts with `replicas: 1`. The runtime loop layer
-  already has a lease seam, but duplicate loop ownership is not implemented
-  yet.
+- The deployment intentionally starts with `replicas: 1`. With Mongo storage,
+  runtime loops use Mongo-backed `loop_leases`, so operators may raise replicas
+  only after confirming all enabled loop families use the Mongo backend and a
+  unique `WORKERFLEET_LOOP_LEASE_OWNER`.
 - `readinessProbe` uses `/readyz` so MongoDB and the runtime store must be
   initialized before the pod is considered ready.
 - `livenessProbe` uses `/healthz` and avoids external dependency checks.

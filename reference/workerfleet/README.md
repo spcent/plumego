@@ -65,6 +65,8 @@ Runtime loop configuration:
 - `WORKERFLEET_STATUS_SWEEP_INTERVAL`, default `30s`
 - `WORKERFLEET_ALERT_EVALUATION_INTERVAL`, default `30s`
 - `WORKERFLEET_NOTIFIER_DELIVERY_TIMEOUT`, default `5s`
+- `WORKERFLEET_LOOP_LEASE_TTL`, default `90s`
+- `WORKERFLEET_LOOP_LEASE_OWNER`, default host name
 - `WORKERFLEET_EXPERIMENTAL_METRICS_ENABLED`, default `true` in `dev` and `false` in `prod`
 - when `WORKERFLEET_NOTIFICATION_ENABLED=true`, at least one notifier URL must be configured
 - `WORKERFLEET_KUBE_API_HOST` optionally overrides in-cluster Kubernetes API discovery
@@ -74,8 +76,9 @@ Runtime loop configuration:
 - `WORKERFLEET_KUBE_WORKER_CONTAINER` selects the worker container, default `worker`
 - runtime loop errors are exported as `workerfleet_runtime_errors_total`
 - each runtime loop runs with built-in non-overlap, a default `25s` iteration timeout, a `5s` initial failure backoff, and a `1m` max failure backoff
-- a no-op lease seam is already present in the loop scheduler so future multi-replica ownership can be added without rewriting loop bodies
-- when Kubernetes sync, status sweep, or alert evaluation are enabled, keep the current deployment at `replicas: 1` until distributed lease ownership is implemented
+- when `WORKERFLEET_STORE_BACKEND=mongo`, Kubernetes sync, status sweep, and alert evaluation use MongoDB-backed distributed leases through the `loop_leases` collection
+- when `WORKERFLEET_STORE_BACKEND=memory`, loop lease behavior remains process-local and the deployment should stay single-replica for enabled loops
+- the reference Kubernetes deployment stays at `replicas: 1` by default even though Mongo-backed loop leases allow safe multi-replica ownership
 
 Status and alert policy configuration:
 
@@ -116,4 +119,5 @@ Storage backend configuration:
 - `mongo` requires `WORKERFLEET_MONGO_URI` and `WORKERFLEET_MONGO_DATABASE`
 - optional Mongo settings: `WORKERFLEET_MONGO_CONNECT_TIMEOUT`, `WORKERFLEET_MONGO_OPERATION_TIMEOUT`, `WORKERFLEET_MONGO_MAX_POOL_SIZE`
 - `WORKERFLEET_RETENTION_DAYS` controls Mongo `expire_at` generation for task history, worker events, and alerts; values must be greater than zero and no more than 106751 days
+- Mongo stores loop ownership in `loop_leases` with an `expires_at` lease expiry
 - MongoDB integration tests are intentionally outside default gates; set `WORKERFLEET_MONGO_TEST_URI` and run `make workerfleet-mongo-test` before changing Mongo store behavior

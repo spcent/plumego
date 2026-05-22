@@ -17,6 +17,7 @@ const (
 	CollectionCaseStepHistory = "case_step_history"
 	CollectionWorkerEvents    = "worker_events"
 	CollectionAlertEvents     = "alert_events"
+	CollectionLoopLeases      = "loop_leases"
 )
 
 type Collections struct {
@@ -26,6 +27,7 @@ type Collections struct {
 	CaseStepHistory *mongo.Collection
 	WorkerEvents    *mongo.Collection
 	AlertEvents     *mongo.Collection
+	LoopLeases      *mongo.Collection
 }
 
 func NewCollections(db *mongo.Database) (Collections, error) {
@@ -39,6 +41,7 @@ func NewCollections(db *mongo.Database) (Collections, error) {
 		CaseStepHistory: db.Collection(CollectionCaseStepHistory),
 		WorkerEvents:    db.Collection(CollectionWorkerEvents),
 		AlertEvents:     db.Collection(CollectionAlertEvents),
+		LoopLeases:      db.Collection(CollectionLoopLeases),
 	}, nil
 }
 
@@ -59,6 +62,7 @@ func EnsureIndexes(ctx context.Context, db *mongo.Database) error {
 		{name: CollectionCaseStepHistory, collection: collections.CaseStepHistory, specs: CollectionIndexSpecs()[CollectionCaseStepHistory]},
 		{name: CollectionWorkerEvents, collection: collections.WorkerEvents, specs: CollectionIndexSpecs()[CollectionWorkerEvents]},
 		{name: CollectionAlertEvents, collection: collections.AlertEvents, specs: CollectionIndexSpecs()[CollectionAlertEvents]},
+		{name: CollectionLoopLeases, collection: collections.LoopLeases, specs: CollectionIndexSpecs()[CollectionLoopLeases]},
 	}
 
 	for _, entry := range ordered {

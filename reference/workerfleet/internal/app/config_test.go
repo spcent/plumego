@@ -65,6 +65,8 @@ func TestLoadConfigParsesRuntimeSettings(t *testing.T) {
 		"WORKERFLEET_STATUS_SWEEP_INTERVAL":     "12s",
 		"WORKERFLEET_ALERT_EVALUATION_INTERVAL": "13s",
 		"WORKERFLEET_NOTIFIER_DELIVERY_TIMEOUT": "14s",
+		"WORKERFLEET_LOOP_LEASE_TTL":            "45s",
+		"WORKERFLEET_LOOP_LEASE_OWNER":          "workerfleet-test",
 		"WORKERFLEET_KUBE_API_HOST":             "https://kube.example",
 		"WORKERFLEET_KUBE_BEARER_TOKEN":         "token",
 		"WORKERFLEET_KUBE_NAMESPACE":            "sim",
@@ -94,6 +96,9 @@ func TestLoadConfigParsesRuntimeSettings(t *testing.T) {
 	}
 	if cfg.Runtime.NotifierDeliveryTimeout != 14*time.Second {
 		t.Fatalf("notifier delivery timeout = %v, want 14s", cfg.Runtime.NotifierDeliveryTimeout)
+	}
+	if cfg.Runtime.LoopLeaseTTL != 45*time.Second || cfg.Runtime.LoopLeaseOwner != "workerfleet-test" {
+		t.Fatalf("loop lease settings not parsed: ttl=%v owner=%q", cfg.Runtime.LoopLeaseTTL, cfg.Runtime.LoopLeaseOwner)
 	}
 	if cfg.Kube.APIHost != "https://kube.example" || cfg.Kube.Namespace != "sim" || cfg.Kube.LabelSelector != "app=worker" || cfg.Kube.WorkerContainer != "worker" {
 		t.Fatalf("kube settings not parsed: %#v", cfg.Kube)
@@ -193,6 +198,20 @@ func TestLoadConfigRejectsInvalidRuntimeFlag(t *testing.T) {
 		"WORKERFLEET_NOTIFICATION_ENABLED": "maybe",
 	}))
 	assertConfigErrorMentions(t, err, "WORKERFLEET_NOTIFICATION_ENABLED")
+}
+
+func TestLoadConfigRejectsUnsafeLoopLeaseTTL(t *testing.T) {
+	_, err := LoadConfig(testLookup(map[string]string{
+		"WORKERFLEET_LOOP_LEASE_TTL": "5s",
+	}))
+	assertConfigErrorMentions(t, err, "WORKERFLEET_LOOP_LEASE_TTL")
+}
+
+func TestLoadConfigRejectsEmptyLoopLeaseOwnerWhenSet(t *testing.T) {
+	_, err := LoadConfig(testLookup(map[string]string{
+		"WORKERFLEET_LOOP_LEASE_OWNER": " ",
+	}))
+	assertConfigErrorMentions(t, err, "WORKERFLEET_LOOP_LEASE_OWNER")
 }
 
 func TestLoadConfigRejectsEnabledKubeSyncWithoutWorkerContainer(t *testing.T) {

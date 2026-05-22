@@ -4,7 +4,7 @@ Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Context Package: implementation
 Priority: P0
-State: active
+State: done
 Primary Module: reference/workerfleet
 Owned Files:
 - reference/workerfleet/internal/app
@@ -51,9 +51,16 @@ Validation:
 - gofmt -l reference/workerfleet/internal/app reference/workerfleet/internal/platform/store/mongo
 
 Done Definition:
-- [ ] Acceptance Tests pass.
-- [ ] All Validation commands exit 0.
-- [ ] gofmt -l . produces no output.
-- [ ] Docs Sync targets updated (if applicable).
+- [x] Acceptance Tests pass.
+- [x] All Validation commands exit 0.
+- [x] gofmt -l . produces no output.
+- [x] Docs Sync targets updated (if applicable).
 
 Outcome:
+Added Mongo-backed loop leases for `kube_sync`, `status_sweep`, and `alert_evaluate` when workerfleet runs with Mongo storage. The implementation adds lease owner/TTL config, `loop_leases` collection/indexes, a Mongo `LoopLeaseCoordinator`, app bootstrap wiring, scheduler skip coverage, coordinator acquire/renew/steal coverage, deployment env wiring, and README/design/storage docs.
+
+Validation:
+- `cd reference/workerfleet && go test -timeout 30s ./internal/app ./internal/platform/store/mongo`
+- `cd reference/workerfleet && go vet ./internal/app ./internal/platform/store/mongo`
+- `gofmt -l reference/workerfleet/internal/app reference/workerfleet/internal/platform/store/mongo`
+- `git diff --check`

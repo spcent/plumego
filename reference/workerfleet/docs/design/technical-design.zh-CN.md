@@ -229,14 +229,14 @@ Pod 映射：
 - `WORKERFLEET_KUBE_SYNC_ENABLED=true` 时，`internal/app` 会启动周期性 Kubernetes sync loop。
 - 运行时 loop scheduler 会防止同进程重入，默认单次执行超时为 `25s`，失败后按 `5s` 起步、`1m` 封顶做退避。
 - sync 错误会通过 runtime error observer 上报，并以低基数指标导出，不再静默丢弃。
-- loop 调度已经预留 no-op lease seam，后续接多副本 owner 协调时不需要重写 loop body。
+- loop 调度统一经过 `LoopLeaseCoordinator`；Mongo 存储会接入 `loop_leases` 集合，memory 存储保持进程内语义。
 - 优雅关闭时会先停止该循环，再关闭 runtime store。
 
 当前副本约束：
 
-- 只要启用了 Kubernetes sync、status sweep 或 alert evaluation loop，workerfleet 当前就应以单活副本运行。
-- 如果所有后台 loop 都关闭，多副本只承载 HTTP 查询流量是安全的。
-- 在没有分布式 lease owner 之前，额外副本会重复执行 Kubernetes sync、status sweep、alert evaluation 和 notification delivery。
+- 使用 Mongo 存储时，Kubernetes sync、status sweep 和 alert evaluation loop 会按 loop family 获取 lease 后再执行。
+- 使用 memory 存储时，lease 仍是进程内语义，启用后台 loop 时仍应单副本运行。
+- reference deployment 默认仍保持 `replicas: 1`；只有确认 Mongo 存储、唯一 lease owner 和外部通知预期后，运维才应提高副本数。
 
 ## 8. 存储设计
 
@@ -427,6 +427,8 @@ HTTP：
 - `WORKERFLEET_ALERT_EVALUATION_INTERVAL`，默认 `30s`。
 - Loop guardrail 默认值：单次执行超时 `25s`，失败退避起点 `5s`，最大退避 `1m`。
 - `WORKERFLEET_NOTIFIER_DELIVERY_TIMEOUT`，默认 `5s`。
+- `WORKERFLEET_LOOP_LEASE_TTL`，默认 `90s`。
+- `WORKERFLEET_LOOP_LEASE_OWNER`，默认 hostname。
 - `WORKERFLEET_KUBE_API_HOST`。
 - `WORKERFLEET_KUBE_BEARER_TOKEN`。
 - `WORKERFLEET_KUBE_NAMESPACE`。
@@ -492,18 +494,14 @@ Query API 认证：
 - 暴露接入耗时和库存同步耗时指标。
 - Grafana 优先看聚合面板，再通过 API 下钻。
 
-多副本 lease 路线：
+多副本 lease 实现：
 
 - owner 粒度：至少按 `kube_sync`、`status_sweep`、`alert_evaluate` 三类 loop 分别持有 lease。
-- lease 后端方向：在启用 Mongo 后端时复用 workerfleet 自己的 Mongo，避免再引入第二套协调系统。
-- lease 文档建议字段：`lease_name`、`holder_id`、`renewed_at`、`expire_at`，以及后续审计可用的 fencing token。
+- lease 后端：在启用 Mongo 后端时复用 workerfleet 自己的 Mongo，避免再引入第二套协调系统。
+- lease 文档字段：`_id` loop name、`owner_id`、`created_at`、`updated_at` 和 `expires_at`。
 - 续约模型：当前 owner 在每次 loop 周期内续约；未持有 lease 的副本只跳过本轮工作，并按正常调度间隔继续尝试获取。
 - 失败转移模型：如果 owner 在 `expire_at` 前未续约，其他副本可以重新获取 lease 并接管 loop。
-- rollout 顺序：
-  1. 增加 replica identity 和真实 lease coordinator 实现
-  2. 用 Mongo 文档 + TTL + compare-and-swap 完成 lease 获取与续约
-  3. 按 loop family 独立接入 lease，避免一次性切换全部后台任务
-  4. 在把 Deployment 副本数调高到 1 以上前，先补 lease state metrics 和调试可见性
+- 剩余路线：在默认把 reference deployment 提高到 1 个以上副本前，补充 lease state metrics 和调试可见性。
 
 ## 14. 安全和失败策略
 

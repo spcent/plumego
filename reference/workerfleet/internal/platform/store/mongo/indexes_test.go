@@ -22,6 +22,21 @@ func TestCollectionIndexSpecsIncludeTTLAndUniqueRules(t *testing.T) {
 			t.Fatalf("%s missing expire_at TTL index", collection)
 		}
 	}
+
+	loopLeases := specs[CollectionLoopLeases]
+	if len(loopLeases) == 0 {
+		t.Fatalf("loop lease indexes missing")
+	}
+	foundLeaseTTL := false
+	for _, spec := range loopLeases {
+		if spec.Name == "expires_at_ttl" && spec.ExpireAfterSeconds != nil && *spec.ExpireAfterSeconds == 0 {
+			foundLeaseTTL = true
+			break
+		}
+	}
+	if !foundLeaseTTL {
+		t.Fatalf("loop leases missing expires_at TTL index")
+	}
 }
 
 func TestCollectionIndexSpecsAreStableAcrossCalls(t *testing.T) {
@@ -36,5 +51,8 @@ func TestCollectionIndexSpecsAreStableAcrossCalls(t *testing.T) {
 	}
 	if len(first[CollectionCaseStepHistory]) != len(second[CollectionCaseStepHistory]) {
 		t.Fatalf("case step history index count mismatch")
+	}
+	if len(first[CollectionLoopLeases]) != len(second[CollectionLoopLeases]) {
+		t.Fatalf("loop lease index count mismatch")
 	}
 }
