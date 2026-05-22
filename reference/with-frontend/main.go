@@ -1,8 +1,9 @@
-// Example: with-ops
+// Example: with-frontend
 //
-// This demo mounts protected x/observability/ops routes alongside stable request
-// observability middleware. It follows the canonical 4-step bootstrap pattern:
-// load config → build deps → register routes → start server.
+// This demo mounts a static SPA alongside a JSON API using x/frontend.
+// Assets can be served from a filesystem directory or an embedded fs.FS.
+// Follows the canonical 4-step bootstrap: load config → build deps →
+// register routes → start server.
 package main
 
 import (
@@ -12,8 +13,8 @@ import (
 	"os/signal"
 	"syscall"
 
-	"with-ops/internal/app"
-	"with-ops/internal/config"
+	"with-frontend/internal/app"
+	"with-frontend/internal/config"
 )
 
 func main() {
@@ -41,6 +42,6 @@ func run() error {
 		return err
 	}
 
-	log.Printf("Starting with-ops demo on %s", cfg.Core.Addr)
+	log.Printf("Starting with-frontend demo on %s", cfg.Core.Addr)
 	return a.Start(ctx)
 }

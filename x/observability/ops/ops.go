@@ -190,15 +190,21 @@ func New(opts Options) *Handler {
 	}
 }
 
-func (c *Handler) RegisterRoutes(r *router.Router) error {
+// RouteRegistrar is the minimal route-registration interface accepted by
+// RegisterRoutes. Both *router.Router and *core.App satisfy it, so callers
+// can pass either without exposing the router directly.
+type RouteRegistrar interface {
+	AddRoute(method, path string, handler http.Handler, opts ...router.RouteOption) error
+}
+
+func (c *Handler) RegisterRoutes(r RouteRegistrar) error {
 	if !c.cfg.Enabled {
 		return nil
 	}
 
 	base := normalizeBasePath(c.cfg.BasePath)
-	group := r.Group(base)
-	register := func(method, path string, handler http.Handler) error {
-		return group.AddRoute(method, path, c.withAuth(handler))
+	register := func(method, suffix string, handler http.Handler) error {
+		return r.AddRoute(method, base+suffix, c.withAuth(handler))
 	}
 
 	if err := register(http.MethodGet, "", http.HandlerFunc(c.handleSummary)); err != nil {

@@ -22,7 +22,7 @@ func (a *App) RegisterRoutes() error {
 	}
 
 	// Proxy all /proxy/* requests to the configured backend.
-	if err := a.Core.Any("/proxy/*", http.HandlerFunc(a.Proxy.ServeHTTP)); err != nil {
+	if err := a.Core.Any("/proxy/*path", http.HandlerFunc(a.Proxy.ServeHTTP)); err != nil {
 		return err
 	}
 

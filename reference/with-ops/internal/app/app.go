@@ -1,5 +1,5 @@
-// Package app wires the with-gateway demo dependencies.
-// Non-canonical: this demo extends the standard-service layout with x/gateway.
+// Package app wires together the with-ops demo dependencies and manages the
+// server lifecycle.
 package app
 
 import (
@@ -7,47 +7,48 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/spcent/plumego/core"
 	plumelog "github.com/spcent/plumego/log"
+	"github.com/spcent/plumego/metrics"
 	"github.com/spcent/plumego/middleware/accesslog"
+	"github.com/spcent/plumego/middleware/httpmetrics"
 	"github.com/spcent/plumego/middleware/recovery"
 	"github.com/spcent/plumego/middleware/requestid"
-	"github.com/spcent/plumego/x/gateway"
-	"with-gateway/internal/config"
+	"with-ops/internal/config"
 )
 
-// App holds application-wide dependencies including the reverse proxy.
+// App holds application-wide dependencies.
 type App struct {
-	Core  *core.App
-	Cfg   config.Config
-	Proxy *gateway.GatewayProxy
+	Core      *core.App
+	Cfg       config.Config
+	Collector *metrics.BaseMetricsCollector
 }
 
-// New constructs the App with a gateway reverse proxy.
+// New constructs the App with all stable-root middleware wired.
 func New(cfg config.Config) (*App, error) {
-	a := core.New(cfg.Core, core.AppDependencies{Logger: plumelog.NewLogger()})
-	recoveryMw, err := recovery.Middleware(recovery.Config{Logger: a.Logger()})
+	app := core.New(cfg.Core, core.AppDependencies{Logger: plumelog.NewLogger()})
+	collector := metrics.NewBaseMetricsCollector()
+
+	recoveryMw, err := recovery.Middleware(recovery.Config{Logger: app.Logger()})
 	if err != nil {
 		return nil, fmt.Errorf("configure recovery middleware: %w", err)
 	}
-	accesslogMw, err := accesslog.Middleware(accesslog.Config{Logger: a.Logger()})
+	accesslogMw, err := accesslog.Middleware(accesslog.Config{Logger: app.Logger()})
 	if err != nil {
 		return nil, fmt.Errorf("configure access log middleware: %w", err)
 	}
-	if err := a.Use(
+	if err := app.Use(
 		requestid.Middleware(),
 		recoveryMw,
+		httpmetrics.Middleware(collector),
 		accesslogMw,
 	); err != nil {
 		return nil, fmt.Errorf("register middleware: %w", err)
 	}
 
-	proxy := gateway.NewGateway(gateway.GatewayConfig{
-		Targets: []string{cfg.GatewayBackend},
-	})
-
-	return &App{Core: a, Cfg: cfg, Proxy: proxy}, nil
+	return &App{Core: app, Cfg: cfg, Collector: collector}, nil
 }
 
 // Start prepares the runtime and blocks while the HTTP server runs.
@@ -63,19 +64,16 @@ func (a *App) Start(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("get server: %w", err)
 	}
+
 	shutdownErr := make(chan error, 1)
 	go func() {
 		<-ctx.Done()
-		shutdownErr <- a.Core.Shutdown(context.Background())
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		defer cancel()
+		shutdownErr <- a.Core.Shutdown(shutdownCtx)
 	}()
 
-	var serveErr error
-	if a.Cfg.Core.TLS.Enabled {
-		serveErr = srv.ListenAndServeTLS("", "")
-	} else {
-		serveErr = srv.ListenAndServe()
-	}
-	if serveErr != nil && !errors.Is(serveErr, http.ErrServerClosed) {
+	if serveErr := srv.ListenAndServe(); serveErr != nil && !errors.Is(serveErr, http.ErrServerClosed) {
 		return fmt.Errorf("server stopped: %w", serveErr)
 	}
 	if err := <-shutdownErr; err != nil {
