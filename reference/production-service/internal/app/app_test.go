@@ -10,6 +10,8 @@ import (
 
 	"github.com/spcent/plumego/metrics"
 	"production-service/internal/config"
+	"production-service/internal/domain/tenant"
+	"production-service/internal/handler"
 )
 
 type responseEnvelope[T any] struct {
@@ -41,7 +43,7 @@ func TestProductionServiceSmoke(t *testing.T) {
 	assertStatus(t, production, http.MethodGet, "/readyz", nil, http.StatusOK)
 
 	statusRec := assertStatus(t, production, http.MethodGet, "/api/status", nil, http.StatusOK)
-	status := decodeData[statusResponse](t, statusRec)
+	status := decodeData[handler.StatusResponse](t, statusRec)
 	if status.Storage.ProfileStore != "app_local_json_file_reference" {
 		t.Fatalf("storage profile store = %q", status.Storage.ProfileStore)
 	}
@@ -57,7 +59,7 @@ func TestProductionServiceSmoke(t *testing.T) {
 		"Authorization": "Bearer api-token",
 		"X-Tenant-ID":   "tenant-a",
 	}, http.StatusOK)
-	profile := decodeData[tenantProfile](t, profileRec)
+	profile := decodeData[tenant.Profile](t, profileRec)
 	if profile.TenantID != "tenant-a" {
 		t.Fatalf("tenant id = %q", profile.TenantID)
 	}

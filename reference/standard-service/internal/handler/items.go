@@ -15,6 +15,7 @@ const (
 	codeItemNameRequired      = "item.name.required"
 	codeItemNotFound          = "item.not_found"
 	codeItemUpdateInvalidJSON = "item.update.invalid_json"
+	codeItemListInvalidParam  = "item.list.invalid_param"
 )
 
 // ItemRepository is the minimal persistence contract that ItemHandler depends on.
@@ -39,14 +40,6 @@ type createItemReq struct {
 
 type updateItemReq struct {
 	Name string `json:"name"`
-}
-
-// listResponse is the paginated list envelope returned by GET /api/v1/items.
-type listResponse struct {
-	Items  []item.Item `json:"items"`
-	Total  int         `json:"total"`
-	Limit  int         `json:"limit"`
-	Offset int         `json:"offset"`
 }
 
 // Create handles POST /api/v1/items.
@@ -80,16 +73,38 @@ func (h ItemHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 // List handles GET /api/v1/items with basic limit/offset pagination.
 // Items are returned in stable creation order.
+// Pagination metadata (total, limit, offset) is carried in the response meta field,
+// not embedded in the data payload, demonstrating the canonical meta parameter usage.
 //
-//	GET /api/v1/items                    → 200 {items:[…], total:N, limit:20, offset:0}
+//	GET /api/v1/items                    → 200 data:[…] meta:{total:N,limit:20,offset:0}
 //	GET /api/v1/items?limit=5            → first 5 items; limit capped at 100
 //	GET /api/v1/items?limit=5&offset=10  → items 11-15
+//	GET /api/v1/items?limit=abc          → 400 TypeBadRequest item.list.invalid_param
 func (h ItemHandler) List(w http.ResponseWriter, r *http.Request) {
 	const defaultLimit = 20
 	const maxLimit = 100
 
-	limit := listQueryInt(r, "limit", defaultLimit, 1, maxLimit)
-	offset := listQueryInt(r, "offset", 0, 0, 0) // 0 maxVal = uncapped
+	limit, ok := parseQueryInt(r, "limit", defaultLimit, 1, maxLimit)
+	if !ok {
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+			Type(contract.TypeBadRequest).
+			Code(codeItemListInvalidParam).
+			Detail("field", "limit").
+			Message("limit must be a positive integer").
+			Build())
+		return
+	}
+
+	offset, ok := parseQueryInt(r, "offset", 0, 0, 0)
+	if !ok {
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+			Type(contract.TypeBadRequest).
+			Code(codeItemListInvalidParam).
+			Detail("field", "offset").
+			Message("offset must be a non-negative integer").
+			Build())
+		return
+	}
 
 	all := h.Repo.List()
 	total := len(all)
@@ -101,27 +116,31 @@ func (h ItemHandler) List(w http.ResponseWriter, r *http.Request) {
 		page = page[:limit]
 	}
 
-	_ = contract.WriteResponse(w, r, http.StatusOK, listResponse{
-		Items: page, Total: total, Limit: limit, Offset: offset,
-	}, nil)
+	_ = contract.WriteResponse(w, r, http.StatusOK, page, map[string]any{
+		"total":  total,
+		"limit":  limit,
+		"offset": offset,
+	})
 }
 
-// listQueryInt parses a non-negative integer query parameter.
-// Falls back to defaultVal when absent, non-numeric, or below minVal.
-// Clamps to maxVal when maxVal > 0.
-func listQueryInt(r *http.Request, key string, defaultVal, minVal, maxVal int) int {
+// parseQueryInt parses a non-negative integer query parameter.
+// Returns (value, true) when the parameter is absent (uses defaultVal) or is valid.
+// Returns (0, false) when the parameter is present but not a valid integer or is below minVal —
+// the caller should return a 400 error in this case.
+// When maxVal > 0, values above maxVal are silently clamped.
+func parseQueryInt(r *http.Request, key string, defaultVal, minVal, maxVal int) (int, bool) {
 	raw := r.URL.Query().Get(key)
 	if raw == "" {
-		return defaultVal
+		return defaultVal, true
 	}
 	n, err := strconv.Atoi(raw)
 	if err != nil || n < minVal {
-		return defaultVal
+		return 0, false
 	}
 	if maxVal > 0 && n > maxVal {
-		return maxVal
+		return maxVal, true
 	}
-	return n
+	return n, true
 }
 
 // GetByID handles GET /api/v1/items/:id.

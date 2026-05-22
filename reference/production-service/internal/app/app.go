@@ -106,7 +106,10 @@ func (a *App) Start(ctx context.Context) error {
 	shutdownErr := make(chan error, 1)
 	go func() {
 		<-ctx.Done()
-		shutdownErr <- a.Core.Shutdown(context.Background())
+		// Allow up to 15 s for in-flight requests to complete before forcing close.
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		defer cancel()
+		shutdownErr <- a.Core.Shutdown(shutdownCtx)
 	}()
 
 	var serveErr error
@@ -137,7 +140,3 @@ type noopSpan struct{}
 func (noopSpan) End(status, bytes int, requestID string) {}
 func (noopSpan) TraceID() string                         { return "" }
 func (noopSpan) SpanID() string                          { return "" }
-
-func utcNow() string {
-	return time.Now().UTC().Format(time.RFC3339)
-}

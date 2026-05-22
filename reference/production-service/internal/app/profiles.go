@@ -7,23 +7,18 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+
+	"production-service/internal/domain/tenant"
 )
 
-type tenantProfile struct {
-	TenantID string   `json:"tenant_id"`
-	Name     string   `json:"name"`
-	Plan     string   `json:"plan"`
-	Features []string `json:"features"`
-}
-
 type profileStoreFile struct {
-	Profiles []tenantProfile `json:"profiles"`
+	Profiles []tenant.Profile `json:"profiles"`
 }
 
 type profileStore struct {
 	mu       sync.RWMutex
 	path     string
-	profiles map[string]tenantProfile
+	profiles map[string]tenant.Profile
 }
 
 func newProfileStore(path string) (*profileStore, error) {
@@ -38,15 +33,15 @@ func newProfileStore(path string) (*profileStore, error) {
 	return &profileStore{path: path, profiles: profiles}, nil
 }
 
-func defaultProfiles() map[string]tenantProfile {
-	profiles := make(map[string]tenantProfile)
-	profiles["tenant-a"] = tenantProfile{
+func defaultProfiles() map[string]tenant.Profile {
+	profiles := make(map[string]tenant.Profile)
+	profiles["tenant-a"] = tenant.Profile{
 		TenantID: "tenant-a",
 		Name:     "Tenant A",
 		Plan:     "production",
 		Features: []string{"api", "ops", "tenant_context"},
 	}
-	profiles["tenant-b"] = tenantProfile{
+	profiles["tenant-b"] = tenant.Profile{
 		TenantID: "tenant-b",
 		Name:     "Tenant B",
 		Plan:     "standard",
@@ -55,7 +50,7 @@ func defaultProfiles() map[string]tenantProfile {
 	return profiles
 }
 
-func loadProfileFile(path string, fallback map[string]tenantProfile) (map[string]tenantProfile, error) {
+func loadProfileFile(path string, fallback map[string]tenant.Profile) (map[string]tenant.Profile, error) {
 	content, err := os.ReadFile(path)
 	if errors.Is(err, os.ErrNotExist) {
 		if err := writeProfileFile(path, fallback); err != nil {
@@ -71,7 +66,7 @@ func loadProfileFile(path string, fallback map[string]tenantProfile) (map[string
 	if err := json.Unmarshal(content, &file); err != nil {
 		return nil, fmt.Errorf("decode profile store %s: %w", path, err)
 	}
-	profiles := make(map[string]tenantProfile, len(file.Profiles))
+	profiles := make(map[string]tenant.Profile, len(file.Profiles))
 	for _, profile := range file.Profiles {
 		if profile.TenantID == "" {
 			return nil, fmt.Errorf("decode profile store %s: tenant_id is required", path)
@@ -81,11 +76,11 @@ func loadProfileFile(path string, fallback map[string]tenantProfile) (map[string
 	return profiles, nil
 }
 
-func writeProfileFile(path string, profiles map[string]tenantProfile) error {
+func writeProfileFile(path string, profiles map[string]tenant.Profile) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return fmt.Errorf("create profile store directory: %w", err)
 	}
-	file := profileStoreFile{Profiles: make([]tenantProfile, 0, len(profiles))}
+	file := profileStoreFile{Profiles: make([]tenant.Profile, 0, len(profiles))}
 	for _, profile := range profiles {
 		file.Profiles = append(file.Profiles, profile)
 	}
@@ -99,9 +94,9 @@ func writeProfileFile(path string, profiles map[string]tenantProfile) error {
 	return nil
 }
 
-func (s *profileStore) Get(tenantID string) (tenantProfile, bool) {
+func (s *profileStore) Get(tenantID string) (tenant.Profile, bool) {
 	if s == nil {
-		return tenantProfile{}, false
+		return tenant.Profile{}, false
 	}
 	s.mu.RLock()
 	defer s.mu.RUnlock()

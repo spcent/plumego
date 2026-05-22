@@ -9,9 +9,9 @@ import (
 
 // Item is the canonical item resource in this reference application.
 type Item struct {
-	ID        string `json:"id"`
-	Name      string `json:"name"`
-	CreatedAt string `json:"created_at"`
+	ID        string    `json:"id"`
+	Name      string    `json:"name"`
+	CreatedAt time.Time `json:"created_at"`
 }
 
 // MemoryStore is a thread-safe in-memory item repository.
@@ -37,7 +37,7 @@ func (s *MemoryStore) Create(name string) Item {
 	item := Item{
 		ID:        fmt.Sprintf("item-%d", s.next),
 		Name:      name,
-		CreatedAt: time.Now().UTC().Format(time.RFC3339),
+		CreatedAt: time.Now().UTC(),
 	}
 	s.items[item.ID] = item
 	s.ids = append(s.ids, item.ID)
