@@ -93,7 +93,7 @@ Instrumentation points:
 - worker register and heartbeat paths accept an optional observer and split instrumentation into two sources:
 - worker snapshots drive state gauges such as worker status, accepting-task state, active-case gauges, and, when experimental metrics are enabled, pod-level heartbeat age, stuck-case gauges, and oldest active step age.
 - worker domain events drive counters and histograms such as task starts, finishes, phase transitions, case completion/failure totals, total case duration, and case step completion/duration.
-- Kubernetes inventory sync accepts an optional observer and records pod phase gauges plus sync duration histograms with `operation` and `result`.
+- Kubernetes inventory sync accepts an optional observer and records pod phase gauges plus sync duration histograms with `operation` and `result`; list/watch relist recovery stays behind the same low-cardinality operation labels.
 - alert evaluation accepts an optional observer and records emitted alert counters plus firing alert gauges.
 - runtime loops report Kubernetes sync, status sweep, alert evaluation, and notification delivery errors through `workerfleet_runtime_errors_total{operation,error_class}`.
 - nil observers are safe and leave business behavior unchanged.

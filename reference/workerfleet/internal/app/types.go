@@ -93,6 +93,10 @@ type inventorySyncer interface {
 	SyncOnce(ctx context.Context) (resourceVersion string, err error)
 }
 
+type inventoryWatcher interface {
+	SyncWatch(ctx context.Context) (resourceVersion string, err error)
+}
+
 type alertDispatcher interface {
 	Notify(ctx context.Context, alert domain.AlertRecord) error
 	Bindings() []notifier.SinkBinding

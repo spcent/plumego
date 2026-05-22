@@ -49,6 +49,10 @@ func (l *LoopRunner) Start(ctx context.Context, cfg Config) (func(), error) {
 		settings := cfg.Runtime.kubeSyncLoopSettings()
 		settings.Lease = l.lease
 		startManagedLoop(loopCtx, &wg, settings, l.reportRuntimeError, func(ctx context.Context) error {
+			if watcher, ok := syncer.(inventoryWatcher); ok {
+				_, err := watcher.SyncWatch(ctx)
+				return err
+			}
 			_, err := syncer.SyncOnce(ctx)
 			return err
 		})

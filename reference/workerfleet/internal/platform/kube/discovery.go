@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -114,8 +115,8 @@ func (c *Client) ListPods(ctx context.Context) (PodList, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
-		return PodList{}, fmt.Errorf("list pods: status %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
+		_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 4096))
+		return PodList{}, fmt.Errorf("list pods: status %d", resp.StatusCode)
 	}
 
 	var out PodList
@@ -170,24 +171,121 @@ func (s *InventorySync) SyncOnce(ctx context.Context) (resourceVersion string, e
 		return "", err
 	}
 	for _, pod := range list.Items {
-		identity, podSnapshot, ok := MapPod(pod, s.workerContainer)
-		if !ok {
-			continue
-		}
-		previous, found, err := s.snapshots.GetWorkerSnapshot(ctx, identity.WorkerID)
+		merged, ok, err := s.applyPod(ctx, pod)
 		if err != nil {
 			return "", err
 		}
-		if !found {
-			previous = domain.WorkerSnapshot{}
+		if ok {
+			observed = append(observed, merged)
 		}
-		merged, _ := domain.ReconcilePodSnapshot(previous, identity, podSnapshot, s.now(), s.policy)
-		if err := s.snapshots.UpsertWorkerSnapshot(ctx, merged); err != nil {
-			return "", err
-		}
-		observed = append(observed, merged)
 	}
 	return list.Metadata.ResourceVersion, nil
+}
+
+func (s *InventorySync) SyncWatch(ctx context.Context) (string, error) {
+	resourceVersion, err := s.SyncOnce(ctx)
+	if err != nil {
+		return "", err
+	}
+	nextResourceVersion, err := s.Watch(ctx, resourceVersion)
+	if errors.Is(err, ErrResourceVersionExpired) {
+		return s.SyncOnce(ctx)
+	}
+	if err != nil {
+		return "", err
+	}
+	return nextResourceVersion, nil
+}
+
+func (s *InventorySync) Watch(ctx context.Context, resourceVersion string) (string, error) {
+	if s.client == nil {
+		return "", fmt.Errorf("kubernetes client is required")
+	}
+	if s.snapshots == nil {
+		return "", fmt.Errorf("snapshot store is required")
+	}
+	latest := resourceVersion
+	err := s.client.WatchPods(ctx, resourceVersion, func(event WatchEvent) error {
+		switch strings.ToUpper(strings.TrimSpace(event.Type)) {
+		case "ADDED", "MODIFIED":
+			merged, ok, err := s.applyPod(ctx, event.Object)
+			if err != nil || !ok {
+				return err
+			}
+			if event.Object.Metadata.ResourceVersion != "" {
+				latest = event.Object.Metadata.ResourceVersion
+			}
+			_ = merged
+			return nil
+		case "DELETED":
+			if err := s.applyDeletedPod(ctx, event.Object); err != nil {
+				return err
+			}
+			if event.Object.Metadata.ResourceVersion != "" {
+				latest = event.Object.Metadata.ResourceVersion
+			}
+			return nil
+		case "BOOKMARK":
+			if event.Object.Metadata.ResourceVersion != "" {
+				latest = event.Object.Metadata.ResourceVersion
+			}
+			return nil
+		case "":
+			return nil
+		default:
+			return fmt.Errorf("unsupported kubernetes watch event type %q", event.Type)
+		}
+	})
+	if err != nil {
+		return "", err
+	}
+	return latest, nil
+}
+
+func (s *InventorySync) applyPod(ctx context.Context, pod Pod) (domain.WorkerSnapshot, bool, error) {
+	identity, podSnapshot, ok := MapPod(pod, s.workerContainer)
+	if !ok {
+		return domain.WorkerSnapshot{}, false, nil
+	}
+	previous, found, err := s.snapshots.GetWorkerSnapshot(ctx, identity.WorkerID)
+	if err != nil {
+		return domain.WorkerSnapshot{}, false, err
+	}
+	if !found {
+		previous = domain.WorkerSnapshot{}
+	}
+	merged, _ := domain.ReconcilePodSnapshot(previous, identity, podSnapshot, s.now(), s.policy)
+	if err := s.snapshots.UpsertWorkerSnapshot(ctx, merged); err != nil {
+		return domain.WorkerSnapshot{}, false, err
+	}
+	return merged, true, nil
+}
+
+func (s *InventorySync) applyDeletedPod(ctx context.Context, pod Pod) error {
+	workerID := domain.WorkerID(strings.TrimSpace(pod.Metadata.Name))
+	if workerID == "" {
+		return nil
+	}
+	previous, found, err := s.snapshots.GetWorkerSnapshot(ctx, workerID)
+	if err != nil {
+		return err
+	}
+	identity := previous.Identity
+	if !found {
+		identity.WorkerID = workerID
+		identity.PodName = strings.TrimSpace(pod.Metadata.Name)
+		identity.Namespace = strings.TrimSpace(pod.Metadata.Namespace)
+		identity.PodUID = domain.PodUID(strings.TrimSpace(pod.Metadata.UID))
+		identity.NodeName = strings.TrimSpace(pod.Spec.NodeName)
+	}
+	deletedAt := parseTime(pod.Metadata.DeletionTimestamp)
+	if deletedAt.IsZero() {
+		deletedAt = s.now()
+	}
+	podSnapshot := previous.Pod
+	podSnapshot.DeletedAt = deletedAt
+	merged, _ := domain.ReconcilePodSnapshot(previous, identity, podSnapshot, s.now(), s.policy)
+	return s.snapshots.UpsertWorkerSnapshot(ctx, merged)
 }
 
 func defaultAPIHost() string {

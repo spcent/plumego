@@ -218,6 +218,9 @@ Pod mapping:
 
 Reconciliation behavior:
 
+- each enabled kube loop iteration starts with a pod list and then watches from the returned `resourceVersion`.
+- watch events handle `ADDED`, `MODIFIED`, `DELETED`, `BOOKMARK`, and Kubernetes `ERROR`.
+- expired watch resource versions trigger a relist rather than surfacing as a permanent loop failure.
 - pod restart count increases emit pod restart events.
 - pod disappearance marks pod deletion.
 - failed or succeeded pods push worker status toward offline.
@@ -226,7 +229,7 @@ Reconciliation behavior:
 Implemented runtime behavior:
 
 - `internal/platform/kube` sync primitives are wired into the app runtime.
-- When `WORKERFLEET_KUBE_SYNC_ENABLED=true`, `internal/app` starts a periodic Kubernetes sync loop.
+- When `WORKERFLEET_KUBE_SYNC_ENABLED=true`, `internal/app` starts a periodic Kubernetes list/watch sync loop.
 - The runtime loop scheduler prevents same-process overlap, applies a default `25s` per-iteration timeout, and backs off from `5s` up to `1m` after failures.
 - Sync errors are reported through the runtime error observer and exported through low-cardinality metrics instead of being silently discarded.
 - Loop scheduling routes through `LoopLeaseCoordinator`; Mongo storage wires this to the `loop_leases` collection, while memory storage remains process-local.

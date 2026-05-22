@@ -4,7 +4,7 @@ Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Context Package: implementation
 Priority: P1
-State: active
+State: done
 Primary Module: reference/workerfleet
 Owned Files:
 - reference/workerfleet/internal/platform/kube
@@ -51,9 +51,16 @@ Validation:
 - gofmt -l reference/workerfleet/internal/platform/kube reference/workerfleet/internal/app
 
 Done Definition:
-- [ ] Acceptance Tests pass.
-- [ ] All Validation commands exit 0.
-- [ ] gofmt -l . produces no output.
-- [ ] Docs Sync targets updated (if applicable).
+- [x] Acceptance Tests pass.
+- [x] All Validation commands exit 0.
+- [x] gofmt -l . produces no output.
+- [x] Docs Sync targets updated (if applicable).
 
 Outcome:
+Upgraded the app-local Kubernetes adapter from list-only sync plus raw watch callback into an explicit list/watch lifecycle. The kube sync now lists first, watches from `resourceVersion`, handles `ADDED`, `MODIFIED`, `DELETED`, `BOOKMARK`, and Kubernetes `ERROR`, relists on expired resource versions, marks deleted pod snapshots, exits cleanly on cancellation, and avoids reflecting bearer tokens through list/watch HTTP errors.
+
+Validation:
+- `cd reference/workerfleet && go test -timeout 30s ./internal/platform/kube ./internal/app`
+- `cd reference/workerfleet && go vet ./internal/platform/kube ./internal/app`
+- `gofmt -l reference/workerfleet/internal/platform/kube reference/workerfleet/internal/app`
+- `git diff --check`

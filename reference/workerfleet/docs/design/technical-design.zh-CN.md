@@ -218,6 +218,9 @@ Pod 映射：
 
 对账行为：
 
+- 每次启用的 kube loop 会先 list Pod，再从返回的 `resourceVersion` 开始 watch。
+- watch 事件覆盖 `ADDED`、`MODIFIED`、`DELETED`、`BOOKMARK` 和 Kubernetes `ERROR`。
+- watch resourceVersion 过期会触发 relist，而不是作为永久 loop 失败暴露。
 - restart count 增加时产生 Pod 重启事件。
 - Pod 消失时标记删除时间。
 - Pod failed 或 succeeded 会推动 worker 状态进入离线。
@@ -226,7 +229,7 @@ Pod 映射：
 已实现运行时行为：
 
 - `internal/platform/kube` 中的 sync 基础能力已经接入应用运行时。
-- `WORKERFLEET_KUBE_SYNC_ENABLED=true` 时，`internal/app` 会启动周期性 Kubernetes sync loop。
+- `WORKERFLEET_KUBE_SYNC_ENABLED=true` 时，`internal/app` 会启动周期性 Kubernetes list/watch sync loop。
 - 运行时 loop scheduler 会防止同进程重入，默认单次执行超时为 `25s`，失败后按 `5s` 起步、`1m` 封顶做退避。
 - sync 错误会通过 runtime error observer 上报，并以低基数指标导出，不再静默丢弃。
 - loop 调度统一经过 `LoopLeaseCoordinator`；Mongo 存储会接入 `loop_leases` 集合，memory 存储保持进程内语义。
