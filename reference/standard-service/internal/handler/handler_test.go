@@ -10,48 +10,61 @@ import (
 	"testing"
 
 	"github.com/spcent/plumego/contract"
+	"github.com/spcent/plumego/health"
 	"standard-service/internal/domain/item"
 )
 
-// readinessCheckerFunc is a test helper that adapts a plain function to ReadinessChecker.
-type readinessCheckerFunc func(context.Context) error
+// componentChecker is a test helper that adapts a name and a function to
+// health.ComponentChecker. This mirrors what production code does: a small
+// struct wrapper that delegates Check() to an existing client method.
+type componentChecker struct {
+	name  string
+	check func(context.Context) error
+}
 
-func (f readinessCheckerFunc) Ready(ctx context.Context) error { return f(ctx) }
+func (c componentChecker) Name() string                    { return c.name }
+func (c componentChecker) Check(ctx context.Context) error { return c.check(ctx) }
 
-func TestHealthHandlerResponses(t *testing.T) {
+func TestHealthHandlerLive(t *testing.T) {
 	h := HealthHandler{ServiceName: "svc"}
+	rec := httptest.NewRecorder()
+	h.Live(rec, httptest.NewRequest(http.MethodGet, "/healthz", nil))
 
-	tests := []struct {
-		name    string
-		handler func(http.ResponseWriter, *http.Request)
-		status  string
-		check   string
-	}{
-		{name: "live", handler: h.Live, status: "ok", check: "liveness"},
-		{name: "ready_no_checkers", handler: h.Ready, status: "ready", check: "readiness"},
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
 	}
+	resp := decodeReferenceData[livenessResponse](t, rec)
+	if resp.Status != "ok" || resp.Service != "svc" || resp.Timestamp == "" {
+		t.Fatalf("unexpected liveness response: %+v", resp)
+	}
+}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			rec := httptest.NewRecorder()
-			tt.handler(rec, httptest.NewRequest(http.MethodGet, "/", nil))
-			if rec.Code != http.StatusOK {
-				t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
-			}
-			resp := decodeReferenceData[healthResponse](t, rec)
-			if resp.Status != tt.status || resp.Service != "svc" || resp.Check != tt.check || resp.Timestamp == "" {
-				t.Fatalf("unexpected health response: %+v", resp)
-			}
-		})
+func TestHealthHandlerReadyNoCheckers(t *testing.T) {
+	h := HealthHandler{ServiceName: "svc"}
+	rec := httptest.NewRecorder()
+	h.Ready(rec, httptest.NewRequest(http.MethodGet, "/readyz", nil))
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+	resp := decodeReferenceData[health.ReadinessStatus](t, rec)
+	if !resp.Ready {
+		t.Fatalf("Ready = false, want true (no checkers registered)")
+	}
+	if resp.Timestamp.IsZero() {
+		t.Fatal("Timestamp must not be zero")
+	}
+	if len(resp.Components) != 0 {
+		t.Fatalf("Components = %v, want empty (no checkers)", resp.Components)
 	}
 }
 
 func TestHealthHandlerReadyWithCheckers(t *testing.T) {
-	t.Run("passing checker returns 200", func(t *testing.T) {
+	t.Run("passing checker returns 200 with component map", func(t *testing.T) {
 		h := HealthHandler{
 			ServiceName: "svc",
-			Checkers: []ReadinessChecker{
-				readinessCheckerFunc(func(_ context.Context) error { return nil }),
+			Checkers: []health.ComponentChecker{
+				componentChecker{name: "database", check: func(_ context.Context) error { return nil }},
 			},
 		}
 		rec := httptest.NewRecorder()
@@ -59,19 +72,22 @@ func TestHealthHandlerReadyWithCheckers(t *testing.T) {
 		if rec.Code != http.StatusOK {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
 		}
-		resp := decodeReferenceData[healthResponse](t, rec)
-		if resp.Status != "ready" {
-			t.Fatalf("status = %q, want %q", resp.Status, "ready")
+		resp := decodeReferenceData[health.ReadinessStatus](t, rec)
+		if !resp.Ready {
+			t.Fatalf("Ready = false, want true")
+		}
+		if !resp.Components["database"] {
+			t.Fatalf("Components[database] = false, want true; got %v", resp.Components)
 		}
 	})
 
-	t.Run("failing checker returns 503", func(t *testing.T) {
+	t.Run("failing checker returns 503 naming the component", func(t *testing.T) {
 		h := HealthHandler{
 			ServiceName: "svc",
-			Checkers: []ReadinessChecker{
-				readinessCheckerFunc(func(_ context.Context) error {
-					return errors.New("db not connected")
-				}),
+			Checkers: []health.ComponentChecker{
+				componentChecker{name: "database", check: func(_ context.Context) error {
+					return errors.New("connection refused")
+				}},
 			},
 		}
 		rec := httptest.NewRecorder()
@@ -79,22 +95,70 @@ func TestHealthHandlerReadyWithCheckers(t *testing.T) {
 		if rec.Code != http.StatusServiceUnavailable {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusServiceUnavailable)
 		}
+		// Verify the error detail names the failing component so operators
+		// can diagnose without inspecting logs.
+		var errResp struct {
+			Error struct {
+				Details map[string]any `json:"details"`
+			} `json:"error"`
+		}
+		if err := json.NewDecoder(rec.Body).Decode(&errResp); err != nil {
+			t.Fatalf("decode error response: %v", err)
+		}
+		if errResp.Error.Details["component"] != "database" {
+			t.Fatalf("error detail component = %v, want database", errResp.Error.Details["component"])
+		}
 	})
 
-	t.Run("second checker failing returns 503", func(t *testing.T) {
+	t.Run("multiple checkers: first passing second failing returns 503", func(t *testing.T) {
 		h := HealthHandler{
 			ServiceName: "svc",
-			Checkers: []ReadinessChecker{
-				readinessCheckerFunc(func(_ context.Context) error { return nil }),
-				readinessCheckerFunc(func(_ context.Context) error {
-					return errors.New("cache not connected")
-				}),
+			Checkers: []health.ComponentChecker{
+				componentChecker{name: "database", check: func(_ context.Context) error { return nil }},
+				componentChecker{name: "cache", check: func(_ context.Context) error {
+					return errors.New("cache offline")
+				}},
 			},
 		}
 		rec := httptest.NewRecorder()
 		h.Ready(rec, httptest.NewRequest(http.MethodGet, "/readyz", nil))
 		if rec.Code != http.StatusServiceUnavailable {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusServiceUnavailable)
+		}
+		var errResp struct {
+			Error struct {
+				Details map[string]any `json:"details"`
+			} `json:"error"`
+		}
+		if err := json.NewDecoder(rec.Body).Decode(&errResp); err != nil {
+			t.Fatalf("decode error response: %v", err)
+		}
+		if errResp.Error.Details["component"] != "cache" {
+			t.Fatalf("error detail component = %v, want cache", errResp.Error.Details["component"])
+		}
+	})
+
+	t.Run("all checkers passing returns component map with all true", func(t *testing.T) {
+		h := HealthHandler{
+			ServiceName: "svc",
+			Checkers: []health.ComponentChecker{
+				componentChecker{name: "database", check: func(_ context.Context) error { return nil }},
+				componentChecker{name: "cache", check: func(_ context.Context) error { return nil }},
+			},
+		}
+		rec := httptest.NewRecorder()
+		h.Ready(rec, httptest.NewRequest(http.MethodGet, "/readyz", nil))
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+		}
+		resp := decodeReferenceData[health.ReadinessStatus](t, rec)
+		if !resp.Ready {
+			t.Fatalf("Ready = false, want true")
+		}
+		for _, name := range []string{"database", "cache"} {
+			if !resp.Components[name] {
+				t.Fatalf("Components[%s] = false, want true; full map: %v", name, resp.Components)
+			}
 		}
 	})
 }
