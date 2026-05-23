@@ -22,17 +22,15 @@ export const SITE_COPY: Record<Locale, { footerTagline: string }> = {
 
 export const NAV_LINKS: Record<Locale, Array<{ label: string; href: string }>> = {
   en: [
-    { label: 'Why Plumego', href: '/why-plumego' },
     { label: 'Docs', href: '/docs' },
+    { label: 'Compare', href: '/compare' },
     { label: 'Examples', href: '/examples' },
-    { label: 'Architecture', href: '/architecture' },
     { label: 'Releases', href: '/releases' },
   ],
   zh: [
-    { label: '为什么选择', href: '/zh/why-plumego' },
     { label: '文档', href: '/zh/docs' },
+    { label: '框架对比', href: '/zh/compare' },
     { label: '示例', href: '/zh/examples' },
-    { label: '架构', href: '/zh/architecture' },
     { label: '发布', href: '/zh/releases' },
   ],
 };
@@ -73,6 +71,7 @@ export const FOOTER_GROUPS: Record<Locale, Array<{ title: string; links: Array<{
         { label: 'Changelog', href: `${SITE.githubUrl}/releases` },
         { label: 'GitHub', href: SITE.githubUrl },
         { label: 'Issues', href: `${SITE.githubUrl}/issues` },
+        { label: 'Discussions', href: `${SITE.githubUrl}/discussions` },
       ],
     },
   ],
@@ -111,6 +110,7 @@ export const FOOTER_GROUPS: Record<Locale, Array<{ title: string; links: Array<{
         { label: 'Changelog', href: `${SITE.githubUrl}/releases` },
         { label: 'GitHub', href: SITE.githubUrl },
         { label: 'Issues', href: `${SITE.githubUrl}/issues` },
+        { label: 'Discussions', href: `${SITE.githubUrl}/discussions` },
       ],
     },
   ],
@@ -118,12 +118,12 @@ export const FOOTER_GROUPS: Record<Locale, Array<{ title: string; links: Array<{
 
 export const HOME_COPY = {
   en: {
-    eyebrow: 'stdlib-only · explicit routing · machine-readable specs · v1.1.0',
-    headline: 'Explicit Go HTTP. Built for humans and agents.',
+    eyebrow: 'stdlib-only · zero external deps · v1.1.0',
+    headline: 'Explicit Go HTTP. Zero external dependencies.',
     summary:
-      'Explicit routing that survives code review. Machine-readable route specs and per-module manifests let AI coding agents and human reviewers share the same code model — no LLM integration needed. Zero external dependencies. 9 stable modules with the v1 stable-root compatibility promise.',
+      'Route registration, middleware order, and dependency wiring stay in one explicit file — readable in every code review. No external dependencies in the stable core. <code>net/http</code> compatible: existing handlers work without changes.',
     primaryCta: { label: 'Get Started', href: '/docs/getting-started' },
-    secondaryCta: { label: 'See the difference', href: '#contrast' },
+    secondaryCta: { label: 'Compare frameworks', href: '/compare' },
     scenarioCards: [
       {
         kicker: 'REST API',
@@ -198,7 +198,7 @@ api.Get("/data", data.List)
     extensionReleasesHref: '/releases',
     adoptionTitle: 'Where to go next.',
     adoptionBody:
-      'Start with Why if the question is fit. Browse x/* extension families on Architecture. Read the agent-first workflow to see how the control plane works.',
+      'Evaluate fit before the technical details. Browse the modules overview to find the right x/* family. See how Plumego compares to Gin, Echo, and Chi.',
     adoptionCards: [
       {
         kicker: 'fit',
@@ -210,23 +210,23 @@ api.Get("/data", data.List)
       {
         kicker: 'extensions',
         title: 'x/* Extension Families',
-        body: 'Browse all x/* capability families grouped by maturity on the Architecture page. Each card shows the scenario, a concrete use case, and links to the module primer.',
-        href: '/architecture#extensions',
+        body: 'Browse all x/* capability families by maturity tier in the modules overview. 7 beta families with frozen APIs, plus experimental families for capability work.',
+        href: '/docs/modules/overview',
         label: 'Browse extensions',
       },
       {
-        kicker: 'agents',
-        title: 'Agent-First Workflow',
-        body: 'See how machine-readable specs give AI coding assistants a clear operating model — task routing, boundary enforcement, per-module manifests, and standardized check commands.',
-        href: '/docs/concepts/agent-first-workflow',
-        label: 'Read agent workflow',
+        kicker: 'comparison',
+        title: 'Compare Frameworks',
+        body: 'Gin, Echo, Fiber, Chi, and Plumego — handler signatures, response contracts, stdlib compatibility, migration cost, and honest benchmarks side by side.',
+        href: '/compare',
+        label: 'See comparison',
       },
     ],
     finalTitle: 'Start from the reference app. Pick the right x/* family. Keep boundaries clear.',
     finalBody:
-      'Clone reference/standard-service for the stable kernel path. See the Architecture page to find the right capability family. Let the control plane guide coding assistants and reviewers alike.',
+      'Clone reference/standard-service for the stable kernel path. Browse the modules overview to find the right capability family. Let the control plane guide coding assistants and reviewers alike.',
     finalPrimary: { label: 'Read Docs', href: '/docs' },
-    finalSecondary: { label: 'Browse Extensions', href: '/architecture#extensions' },
+    finalSecondary: { label: 'Browse Extensions', href: '/docs/modules/overview' },
     contrastTitle: 'The difference shows in code review.',
     contrastLead:
       'When routes are spread across packages, a reviewer has to open each one to understand what paths exist and what middleware runs. Plumego keeps the full route map in one explicit file — and adds a structured <code>contract</code> layer so error and success responses stay consistent across all handlers.',
@@ -234,12 +234,12 @@ api.Get("/data", data.List)
     contrastAfterLabel: 'plumego: one file, one contract',
   },
   zh: {
-    eyebrow: 'stdlib only · 显式路由 · 机器可读规范 · v1.1.0',
-    headline: '显式 Go HTTP。为人类和 Agent 而生。',
+    eyebrow: 'stdlib only · 零外部依赖 · v1.1.0',
+    headline: '显式 Go HTTP。零外部依赖。',
     summary:
-      '在代码评审中清晰可见的显式路由。机器可读的路由规范与模块清单，让 AI 编程代理和人工评审者共享同一份代码模型——无需 LLM 集成。零外部依赖。9 个稳定模块承载 v1 稳定根兼容性承诺。',
+      '路由注册、中间件顺序和依赖装配全在一个显式文件里——每次代码评审都能直接看到。稳定内核无外部依赖。兼容 <code>net/http</code>：现有 handler 无需修改即可接入。',
     primaryCta: { label: '开始使用', href: '/zh/docs/getting-started' },
-    secondaryCta: { label: '看看有什么不同', href: '#contrast' },
+    secondaryCta: { label: '框架横向对比', href: '/zh/compare' },
     scenarioCards: [
       {
         kicker: 'REST API',
@@ -314,7 +314,7 @@ api.Get("/data", data.List)
     extensionReleasesHref: '/zh/releases',
     adoptionTitle: '下一步去哪里。',
     adoptionBody:
-      '如果问题是适用性，先看「为什么选择 Plumego」。在架构页浏览 x/* 扩展家族。阅读 Agent 工作流了解控制平面如何运作。',
+      '先评估适用性，再深入技术细节。在模块总览中找到合适的 x/* 家族。看看 Plumego 与 Gin、Echo、Chi 的横向对比。',
     adoptionCards: [
       {
         kicker: 'fit',
@@ -326,22 +326,22 @@ api.Get("/data", data.List)
       {
         kicker: 'extensions',
         title: 'x/* 扩展家族',
-        body: '在架构页按成熟度分组浏览所有 x/* 能力家族。每张卡片展示场景、具体用例和模块链接——帮你明确应该用哪个包。',
-        href: '/zh/architecture#extensions',
+        body: '在模块总览中按成熟度层级浏览所有 x/* 能力家族。7 个 API 冻结的 beta 家族，加上实验性能力家族。',
+        href: '/zh/docs/modules/overview',
         label: '浏览扩展家族',
       },
       {
-        kicker: 'agents',
-        title: 'Agent 工作流',
-        body: '了解机器可读规范如何为 AI 编程助手提供清晰的操作模型——任务路由、边界执行、模块清单与标准化验证命令。',
-        href: '/zh/docs/concepts/agent-first-workflow',
-        label: '阅读 Agent 工作流',
+        kicker: 'comparison',
+        title: '框架横向对比',
+        body: 'Gin、Echo、Fiber、Chi 与 Plumego 的 handler 签名、响应 contract、stdlib 兼容性、迁移成本与基准数据，诚实并列呈现。',
+        href: '/zh/compare',
+        label: '查看对比',
       },
     ],
     finalTitle: '从 reference app 起步。选对 x/* 家族。保持边界清晰。',
-    finalBody: 'clone reference/standard-service 沿稳定内核路径出发。在架构页选择合适的能力家族。让控制平面同时引导编程助手和代码评审者。',
+    finalBody: 'clone reference/standard-service 沿稳定内核路径出发。在模块总览中找到合适的能力家族。让控制平面同时引导编程助手和代码评审者。',
     finalPrimary: { label: '阅读文档', href: '/zh/docs' },
-    finalSecondary: { label: '浏览扩展家族', href: '/zh/architecture#extensions' },
+    finalSecondary: { label: '浏览扩展家族', href: '/zh/docs/modules/overview' },
     contrastTitle: '差异在代码评审时最明显。',
     contrastLead:
       '当路由分散在各个包里时，评审者必须逐个打开才能知道有哪些路径和中间件在运行。Plumego 把完整路由表放在一个显式文件里——同时加入结构化的 <code>contract</code> 层，让所有 handler 的错误响应和成功响应保持一致。',

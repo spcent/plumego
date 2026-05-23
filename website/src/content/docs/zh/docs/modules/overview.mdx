@@ -13,6 +13,18 @@ import RequestFlowViz from '../../../../../components/marketing/RequestFlowViz.a
 
 Plumego 把长期稳定的公开包放在仓库根部，把可选能力与快速演进功能放在 `x/*`。这个拆分是有意的：它让稳定表面保持收敛，也让归属更容易判断，并避免默认学习路径被扩展能力重新定义。
 
+## 成熟度速查
+
+| 层级 | 数量 | 采用建议 |
+| --- | --- | --- |
+| **稳定**（GA） | 9 个包 | 生产可用。v1 兼容性承诺适用。 |
+| **Beta** | 7 个家族 | API 在连续次版本 release ref 之间冻结。可在生产中安全使用，升级前查看发布说明。 |
+| **实验性** | 7 个主入口家族 | API 可能在无缓冲期的情况下变更。在稳定服务路径中使用前，建议用 app-local 接口包装依赖。 |
+
+完整成熟度证据、扩展单包看板与发布矩阵：[状态总览 →](/zh/status)
+
+---
+
 ## 同步模块清单
 
 <GeneratedModuleFacts locale="zh" />
@@ -78,23 +90,46 @@ x/* families
 | 基础日志合约与结构化 logger 接线 | [Log Primer](/zh/docs/modules/log) · **稳定** | `log` 定义扩展包与稳定根共享的日志表面 |
 | 基础指标合约与 collector 注册 | [Metrics Primer](/zh/docs/modules/metrics) · **稳定** | `metrics` 定义指标表面，不拥有导出器或适配器行为 |
 
-### 扩展家族 — `实验性`（除非另有说明）
+### 扩展家族
 
-API 兼容性未冻结，采用前请先评估。先从主家族入口进入，不要直接下钻到下级包。
+先从主家族入口进入，不要直接下钻到下级包。以成熟度层级作为采用信号。
 
-| 如果问题主要围绕 | 下一步打开的 primer | 成熟度 | 下级包 |
+#### Beta
+
+API 在连续次版本 release ref 之间保持冻结。可在生产中安全使用；升级前查看发布说明。
+
+| 如果问题主要围绕 | 下一步打开的 primer | 晋升版本 | 下级包 |
 | --- | --- | --- | --- |
-| AI provider 适配器、session、流式传输或 tool 调用 | [x/ai Primer](/zh/docs/modules/x-ai) | **实验性** | `orchestration`、`semanticcache`、`distributed`、`resilience`（内部层级） |
-| 多租户解析、策略、配额、限流或 session | [x/tenant Primer](/zh/docs/modules/x-tenant) | **实验性** | `resolve`、`policy`、`quota`、`ratelimit`、`session`、`store` |
-| 可复用 CRUD 传输 与资源路由标准化 | [x/rest Primer](/zh/docs/modules/x-rest) | **Beta** | — |
-| 实时 WebSocket 连接生命周期、hub 管理或认证 | [x/websocket Primer](/zh/docs/modules/x-websocket) | **Beta** | — |
-| 跨扩展共享的熔断器、重试封装或弹性适配器 | [x/resilience Primer](/zh/docs/modules/x-resilience) | **实验性** | — |
-| Prometheus 导出器、OTel 接线、记录缓冲或 DB 分析 | [x/observability Primer](/zh/docs/modules/x-observability) | **实验性** | [x/observability/ops](/zh/docs/modules/x-ops) · [x/observability/devtools](/zh/docs/modules/x-devtools) |
-| 反向代理、gateway 路由、负载均衡或 边缘传输 | [x/gateway Primer](/zh/docs/modules/x-gateway) | **实验性** | [x/gateway/discovery](/zh/docs/modules/x-discovery) · `x/gateway/ipc` |
-| 文件上传、下载或流式传输的 HTTP传输层 | [x/fileapi Primer](/zh/docs/modules/x-fileapi) | **实验性** | — |
-| 静态资源服务、嵌入式 FS 或 SPA fallback 路由 | [x/frontend Primer](/zh/docs/modules/x-frontend) | **实验性** | — |
-| 读写分离、分片、持久化 KV 或幂等性拓扑 | [x/data Primer](/zh/docs/modules/x-data) | **实验性** | [x/data/cache](/zh/docs/modules/x-cache) |
-| 应用侧 queue、pubsub、scheduler 或 webhook 编排 | [x/messaging Primer](/zh/docs/modules/x-messaging) | **实验性** | [x/messaging/scheduler](/zh/docs/modules/x-scheduler) · [x/messaging/webhook](/zh/docs/modules/x-webhook) · [x/messaging/pubsub · x/messaging/mq](/zh/docs/modules/x-messaging-subordinates) |
+| 可复用 CRUD 传输与资源路由标准化 | [x/rest Primer](/zh/docs/modules/x-rest) | v0.2.0 | — |
+| 实时 WebSocket 连接生命周期、hub 管理或认证 | [x/websocket Primer](/zh/docs/modules/x-websocket) | v0.2.0 | — |
+| 反向代理、gateway 路由、负载均衡或边缘传输 | [x/gateway Primer](/zh/docs/modules/x-gateway) | v0.2.0 | [x/gateway/discovery](/zh/docs/modules/x-discovery) · `x/gateway/ipc`（实验性） |
+| Prometheus 导出器、OTel 接线、记录缓冲或 DB 分析 | [x/observability Primer](/zh/docs/modules/x-observability) | v0.2.0 | [x/observability/ops](/zh/docs/modules/x-ops) · [x/observability/devtools](/zh/docs/modules/x-devtools)（实验性） |
+| 多租户解析、策略、配额、限流或 session | [x/tenant Primer](/zh/docs/modules/x-tenant) | v1.1.0 | `resolve`、`policy`、`quota`、`ratelimit`、`session`、`store` |
+| 静态资源服务、嵌入式 FS 或 SPA fallback 路由 | [x/frontend Primer](/zh/docs/modules/x-frontend) | v1.1.0 | — |
+| 应用侧 queue、pubsub、scheduler 或 webhook 编排 | [x/messaging Primer](/zh/docs/modules/x-messaging) | v1.1.0（应用层） | [scheduler](/zh/docs/modules/x-scheduler) · [webhook · pubsub · mq](/zh/docs/modules/x-messaging-subordinates)（下级原语仍为实验性） |
+
+#### 实验性家族中的 Beta 表面
+
+父家族根仍为实验性，但这些子包在 v1.1.0 时获得了 release 背书的 API 稳定性。
+
+| Beta 表面 | 父家族 primer | 说明 |
+| --- | --- | --- |
+| `x/ai/provider` · `x/ai/session` · `x/ai/streaming` · `x/ai/tool` | [x/ai Primer](/zh/docs/modules/x-ai) | 用这些子包做稳定的 AI 工作；其余子包和根家族仍为实验性 |
+| `x/data/file` · `x/data/idempotency` | [x/data Primer](/zh/docs/modules/x-data) | 用这些子包做稳定的文件存储和幂等性工作；拓扑表面和 `x/data/cache` 仍为实验性 |
+
+#### 实验性
+
+API 兼容性未冻结。采用前请先评估；在稳定服务路径中使用时建议用 app-local 接口封装依赖。
+
+| 如果问题主要围绕 | 下一步打开的 primer | 下级包 |
+| --- | --- | --- |
+| AI provider 适配器、session、流式传输或 tool 调用 | [x/ai Primer](/zh/docs/modules/x-ai) | `provider`、`session`、`streaming`、`tool` 为 Beta 表面（见上方）；`orchestration`、`semanticcache`、`distributed`、`resilience` 仍为实验性 |
+| 读写分离、分片、持久化 KV 或幂等性拓扑 | [x/data Primer](/zh/docs/modules/x-data) | [x/data/cache](/zh/docs/modules/x-cache)；`file` 和 `idempotency` 为 Beta 表面（见上方） |
+| 文件上传、下载或流式传输的 HTTP 传输层 | [x/fileapi Primer](/zh/docs/modules/x-fileapi) | — |
+| 跨扩展共享的熔断器、重试封装或弹性适配器 | [x/resilience Primer](/zh/docs/modules/x-resilience) | — |
+| gRPC + HTTP 服务托管或出站 RPC 客户端池 | [x/rpc Primer](/zh/docs/modules/x-rpc) | — |
+| 从已注册路由生成 OpenAPI 3.1 文档 | [x/openapi Primer](/zh/docs/modules/x-openapi) | — |
+| 显式 JSON 绑定与调用方自有请求验证 | [x/validate Primer](/zh/docs/modules/x-validate) | — |
 
 ## 这页希望你避免什么
 

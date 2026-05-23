@@ -8,24 +8,27 @@ sidebar:
 
 # 开始使用
 
-## 无需安装，直接尝试
+## 两分钟跑起来
 
-在浏览器中打开参考服务 — 无需本地安装 Go：
-
-[![在 GitHub Codespaces 中打开](https://github.com/codespaces/badge.svg)](https://codespaces.new/spcent/plumego?quickstart=1)
-
-Codespace 内已预装 Go 工具链。运行：
+克隆仓库并运行参考服务，验证 Plumego 在你的环境中可以工作：
 
 ```bash
-go run ./reference/standard-service
+git clone https://github.com/spcent/plumego
+cd plumego/reference/standard-service
+go run .
 ```
 
-然后打开转发的端口并验证：
+验证：
 
 ```bash
 curl http://localhost:8080/healthz
 # {"data":{"status":"ok","service":"plumego-reference","check":"liveness"}}
+
+curl 'http://localhost:8080/api/v1/greet?name=Alice'
+# {"data":{"message":"hello, Alice"}}
 ```
+
+参考服务展示了完整的应用布局（详见[下方](#想看完整的-canonical-服务形态)）。
 
 ---
 
@@ -86,22 +89,7 @@ curl http://localhost:8080/ping
 
 ## 想看完整的 canonical 服务形态？
 
-克隆参考应用，看完整目录布局——包括配置加载、健康检查端点、handler 分层和 constructor-based 依赖注入。
-
-```bash
-git clone https://github.com/spcent/plumego
-go run ./reference/standard-service
-```
-
-验证：
-
-```bash
-curl http://localhost:8080/healthz
-# {"data":{"status":"ok","service":"plumego-reference","check":"liveness"}}
-
-curl 'http://localhost:8080/api/v1/greet?name=Alice'
-# {"data":{"message":"hello, Alice"}}
-```
+参考应用覆盖完整目录布局——包括配置加载、健康检查端点、handler 分层和 constructor-based 依赖注入。
 
 四个文件覆盖了完整的服务形态：
 
