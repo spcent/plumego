@@ -198,7 +198,7 @@ func TestHealthHandlerReadyWithCheckers(t *testing.T) {
 }
 
 func TestAPIHandlerResponses(t *testing.T) {
-	h := APIHandler{Version: "test-version"}
+	h := APIHandler{ServiceName: "test-service", Version: "test-version"}
 
 	tests := []struct {
 		name   string
@@ -215,7 +215,7 @@ func TestAPIHandlerResponses(t *testing.T) {
 					t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
 				}
 				got := decodeReferenceData[rootResponse](t, rec)
-				if got.Service != "plumego-reference" || got.Docs == "" || got.Version != "test-version" {
+				if got.Service != "test-service" || got.Docs == "" || got.Version != "test-version" {
 					t.Fatalf("unexpected root response: %+v", got)
 				}
 			},
@@ -229,7 +229,7 @@ func TestAPIHandlerResponses(t *testing.T) {
 					t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
 				}
 				got := decodeReferenceData[helloResponse](t, rec)
-				if got.Service != "plumego-reference" || got.Mode != "canonical" || got.Version != "test-version" {
+				if got.Service != "test-service" || got.Mode != "canonical" || got.Version != "test-version" {
 					t.Fatalf("unexpected hello response: %+v", got)
 				}
 				// Endpoints must be a non-empty slice with all required fields.
@@ -296,6 +296,9 @@ func TestAPIHandlerResponses(t *testing.T) {
 				if got.Version != "test-version" {
 					t.Fatalf("status.Version = %q, want %q", got.Version, "test-version")
 				}
+				if got.Service != "test-service" {
+					t.Fatalf("status.Service = %q, want %q", got.Service, "test-service")
+				}
 			},
 		},
 	}
@@ -337,12 +340,26 @@ func TestItemHandlerCreate(t *testing.T) {
 		}
 	})
 
+	t.Run("empty body returns 400 TypeRequired with body_required code", func(t *testing.T) {
+		rec := httptest.NewRecorder()
+		h.Create(rec, httptest.NewRequest(http.MethodPost, "/api/v1/items", http.NoBody))
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
+		}
+		if code := decodeErrorCode(t, rec); code != codeItemCreateBodyRequired {
+			t.Fatalf("error code = %q, want %q", code, codeItemCreateBodyRequired)
+		}
+	})
+
 	t.Run("invalid JSON returns 400 TypeBadRequest", func(t *testing.T) {
 		body := bytes.NewBufferString(`not-json`)
 		rec := httptest.NewRecorder()
 		h.Create(rec, httptest.NewRequest(http.MethodPost, "/api/v1/items", body))
 		if rec.Code != http.StatusBadRequest {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
+		}
+		if code := decodeErrorCode(t, rec); code != codeItemCreateInvalidJSON {
+			t.Fatalf("error code = %q, want %q", code, codeItemCreateInvalidJSON)
 		}
 	})
 }
@@ -368,8 +385,8 @@ func TestItemHandlerList(t *testing.T) {
 
 	t.Run("populated store returns items in creation order", func(t *testing.T) {
 		store := item.NewMemoryStore()
-		store.Create("alpha")
-		store.Create("beta")
+		store.Create(context.Background(), "alpha")
+		store.Create(context.Background(), "beta")
 		h := ItemHandler{Repo: store}
 
 		rec := httptest.NewRecorder()
@@ -396,7 +413,7 @@ func TestItemHandlerList(t *testing.T) {
 	t.Run("limit param restricts returned items and is reflected in meta", func(t *testing.T) {
 		store := item.NewMemoryStore()
 		for _, name := range []string{"a", "b", "c", "d", "e"} {
-			store.Create(name)
+			store.Create(context.Background(), name)
 		}
 		h := ItemHandler{Repo: store}
 
@@ -421,9 +438,9 @@ func TestItemHandlerList(t *testing.T) {
 
 	t.Run("offset beyond total clamps and returns empty page", func(t *testing.T) {
 		store := item.NewMemoryStore()
-		store.Create("a")
-		store.Create("b")
-		store.Create("c")
+		store.Create(context.Background(), "a")
+		store.Create(context.Background(), "b")
+		store.Create(context.Background(), "c")
 		h := ItemHandler{Repo: store}
 
 		rec := httptest.NewRecorder()
@@ -446,7 +463,7 @@ func TestItemHandlerList(t *testing.T) {
 	t.Run("offset param skips items in creation order", func(t *testing.T) {
 		store := item.NewMemoryStore()
 		for _, name := range []string{"a", "b", "c", "d", "e"} {
-			store.Create(name)
+			store.Create(context.Background(), name)
 		}
 		h := ItemHandler{Repo: store}
 
@@ -505,7 +522,7 @@ func TestItemHandlerList(t *testing.T) {
 
 func TestItemHandlerGetByID(t *testing.T) {
 	store := item.NewMemoryStore()
-	created := store.Create("gadget")
+	created := store.Create(context.Background(), "gadget")
 	h := ItemHandler{Repo: store}
 
 	t.Run("existing id returns 200 with item", func(t *testing.T) {
@@ -541,7 +558,7 @@ func TestItemHandlerGetByID(t *testing.T) {
 func TestItemHandlerUpdate(t *testing.T) {
 	t.Run("existing id returns 200 with updated item", func(t *testing.T) {
 		store := item.NewMemoryStore()
-		created := store.Create("original")
+		created := store.Create(context.Background(), "original")
 		h := ItemHandler{Repo: store}
 
 		body := bytes.NewBufferString(`{"name":"renamed"}`)
@@ -577,7 +594,7 @@ func TestItemHandlerUpdate(t *testing.T) {
 
 	t.Run("missing name returns 400 TypeRequired", func(t *testing.T) {
 		store := item.NewMemoryStore()
-		created := store.Create("original")
+		created := store.Create(context.Background(), "original")
 		h := ItemHandler{Repo: store}
 
 		body := bytes.NewBufferString(`{"name":""}`)
@@ -592,9 +609,28 @@ func TestItemHandlerUpdate(t *testing.T) {
 		}
 	})
 
+	t.Run("empty body returns 400 TypeRequired with body_required code", func(t *testing.T) {
+		store := item.NewMemoryStore()
+		created := store.Create(context.Background(), "original")
+		h := ItemHandler{Repo: store}
+
+		req := httptest.NewRequest(http.MethodPut, "/api/v1/items/"+created.ID, http.NoBody)
+		ctx := contract.WithRequestContext(req.Context(), contract.RequestContext{
+			Params: map[string]string{"id": created.ID},
+		})
+		rec := httptest.NewRecorder()
+		h.Update(rec, req.WithContext(ctx))
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
+		}
+		if code := decodeErrorCode(t, rec); code != codeItemUpdateBodyRequired {
+			t.Fatalf("error code = %q, want %q", code, codeItemUpdateBodyRequired)
+		}
+	})
+
 	t.Run("invalid JSON returns 400 TypeBadRequest", func(t *testing.T) {
 		store := item.NewMemoryStore()
-		created := store.Create("original")
+		created := store.Create(context.Background(), "original")
 		h := ItemHandler{Repo: store}
 
 		body := bytes.NewBufferString(`not-json`)
@@ -611,7 +647,7 @@ func TestItemHandlerUpdate(t *testing.T) {
 
 	t.Run("put is idempotent", func(t *testing.T) {
 		store := item.NewMemoryStore()
-		created := store.Create("original")
+		created := store.Create(context.Background(), "original")
 		h := ItemHandler{Repo: store}
 
 		for i := 0; i < 3; i++ {
@@ -635,7 +671,7 @@ func TestItemHandlerUpdate(t *testing.T) {
 
 func TestItemHandlerDelete(t *testing.T) {
 	store := item.NewMemoryStore()
-	created := store.Create("gadget")
+	created := store.Create(context.Background(), "gadget")
 	h := ItemHandler{Repo: store}
 
 	t.Run("missing id returns 404 TypeNotFound", func(t *testing.T) {

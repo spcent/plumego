@@ -27,10 +27,14 @@ func (a *App) RegisterRoutes() error {
 	// handlers that mutate state are wrapped; read-only routes are unaffected.
 	writeGuard := handler.RequireWriteKey(a.Cfg.App.WriteKey)
 
-	// APIHandler carries Logger for structured log demonstration and Version for
-	// build-time version propagation. Both are threaded in via constructor injection
-	// rather than read from package-level variables.
-	api := handler.APIHandler{Logger: a.Core.Logger(), Version: a.Cfg.App.Version}
+	// APIHandler carries Logger, ServiceName, and Version via constructor injection
+	// rather than reading from package-level variables. ServiceName is injected from
+	// config (not hardcoded) so every response reflects the configured identity.
+	api := handler.APIHandler{
+		Logger:      a.Core.Logger(),
+		ServiceName: a.Cfg.App.ServiceName,
+		Version:     a.Cfg.App.Version,
+	}
 
 	// Top-level routes registered directly on the app.
 	root := newRouteReg(a.Core)

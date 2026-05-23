@@ -23,7 +23,7 @@ type Config struct {
 // Add application-specific fields here; keep framework/kernel config in Config.Core.
 type AppConfig struct {
 	EnvFile      string
-	ServiceName  string // APP_SERVICE_NAME; used as the service identity in health responses.
+	ServiceName  string // APP_SERVICE_NAME; used as the service identity in health and API responses.
 	MaxBodyBytes int64  // APP_MAX_BODY_BYTES; maximum request body size. 0 disables the limit.
 	WriteKey     string // APP_WRITE_KEY; when non-empty, POST/PUT/DELETE /api/v1/items require X-Write-Key header. Empty disables the guard.
 	Version      string // Build version injected via -ldflags "-X main.version=…" in main.go; defaults to "dev".
@@ -75,6 +75,14 @@ func Validate(cfg Config) error {
 	if cfg.Core.Addr == "" {
 		return fmt.Errorf("addr is required")
 	}
+	if cfg.Core.TLS.Enabled {
+		if cfg.Core.TLS.CertFile == "" {
+			return fmt.Errorf("APP_TLS_CERT_FILE is required when TLS is enabled")
+		}
+		if cfg.Core.TLS.KeyFile == "" {
+			return fmt.Errorf("APP_TLS_KEY_FILE is required when TLS is enabled")
+		}
+	}
 	return nil
 }
 
@@ -100,11 +108,21 @@ func applyEnv(cfg *Config, lookupEnv func(string) (string, bool)) {
 			}
 		}
 	}
+	boolf := func(key string, dest *bool) {
+		if val, ok := lookupEnv(key); ok {
+			if b, err := strconv.ParseBool(strings.TrimSpace(val)); err == nil {
+				*dest = b
+			}
+		}
+	}
 	str("APP_ADDR", &cfg.Core.Addr)
 	str("APP_ENV_FILE", &cfg.App.EnvFile)
 	str("APP_SERVICE_NAME", &cfg.App.ServiceName)
 	int64f("APP_MAX_BODY_BYTES", &cfg.App.MaxBodyBytes)
 	str("APP_WRITE_KEY", &cfg.App.WriteKey)
+	boolf("APP_TLS_ENABLED", &cfg.Core.TLS.Enabled)
+	str("APP_TLS_CERT_FILE", &cfg.Core.TLS.CertFile)
+	str("APP_TLS_KEY_FILE", &cfg.Core.TLS.KeyFile)
 }
 
 // applyEnvMap applies a pre-parsed key-value map (e.g., from a .env file) to cfg.
