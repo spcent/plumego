@@ -28,7 +28,7 @@ func TestWriteHealthResponseShape(t *testing.T) {
 	if err := json.NewDecoder(rec.Body).Decode(&env); err != nil {
 		t.Fatalf("decode health response: %v", err)
 	}
-	if env.Data.Status != "ok" || env.Data.Service != "with-messaging" || env.Data.Timestamp == "" {
+	if env.Data.Status != "ok" || env.Data.Service != "with-messaging" || env.Data.Timestamp.IsZero() {
 		t.Fatalf("unexpected health response: %+v", env.Data)
 	}
 }
