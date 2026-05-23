@@ -48,8 +48,8 @@ type routeReg struct {
 
 func newRouteReg(adder routeAdder) *routeReg { return &routeReg{adder: adder} }
 
-func (r *routeReg) get(path string, h http.Handler)    { r.record(r.adder.Get(path, h)) }
-func (r *routeReg) post(path string, h http.Handler)   { r.record(r.adder.Post(path, h)) }
+func (r *routeReg) get(path string, h http.Handler)  { r.record(r.adder.Get(path, h)) }
+func (r *routeReg) post(path string, h http.Handler) { r.record(r.adder.Post(path, h)) }
 func (r *routeReg) record(err error) {
 	if r.err == nil {
 		r.err = err
