@@ -61,13 +61,13 @@ func (h APIHandler) MyEndpoint(w http.ResponseWriter, r *http.Request) {
 ```go
 // handler/widgets.go
 type WidgetRepository interface {
-    Get(id string) (Widget, bool)
+    Get(ctx context.Context, id string) (Widget, bool)
 }
 type WidgetHandler struct{ Repo WidgetRepository }
 
 func (h WidgetHandler) GetByID(w http.ResponseWriter, r *http.Request) {
     id := router.Param(r, "id")
-    widget, ok := h.Repo.Get(id)
+    widget, ok := h.Repo.Get(r.Context(), id)
     if !ok {
         _ = contract.WriteError(w, r, contract.NewErrorBuilder().
             Type(contract.TypeNotFound).Detail("id", id).Message("not found").Build())
@@ -133,23 +133,23 @@ interface and the domain store, then register the route.
 ```go
 // 1. Extend the interface in handler/widgets.go
 type WidgetRepository interface {
-    Get(id string) (Widget, bool)
-    List() []Widget
-    Delete(id string) bool
+    Get(ctx context.Context, id string) (Widget, bool)
+    List(ctx context.Context) []Widget
+    Delete(ctx context.Context, id string) bool
 }
 
 // 2. Implement in internal/domain/widget/store.go
-func (s *MemoryStore) List() []Widget { ... }
-func (s *MemoryStore) Delete(id string) bool { ... }
+func (s *MemoryStore) List(_ context.Context) []Widget { ... }
+func (s *MemoryStore) Delete(_ context.Context, id string) bool { ... }
 
 // 3. Add handler methods in handler/widgets.go
 func (h WidgetHandler) List(w http.ResponseWriter, r *http.Request) {
-    _ = contract.WriteResponse(w, r, http.StatusOK, h.Repo.List(), nil)
+    _ = contract.WriteResponse(w, r, http.StatusOK, h.Repo.List(r.Context()), nil)
 }
 
 func (h WidgetHandler) Delete(w http.ResponseWriter, r *http.Request) {
     id := router.Param(r, "id")
-    if !h.Repo.Delete(id) {
+    if !h.Repo.Delete(r.Context(), id) {
         _ = contract.WriteError(w, r, contract.NewErrorBuilder().
             Type(contract.TypeNotFound).Detail("id", id).Message("not found").Build())
         return

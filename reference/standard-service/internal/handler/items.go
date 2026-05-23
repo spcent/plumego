@@ -1,7 +1,10 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
+	"io"
 	"net/http"
 	"strconv"
 
@@ -11,21 +14,25 @@ import (
 )
 
 const (
-	codeItemCreateInvalidJSON = "item.create.invalid_json"
-	codeItemNameRequired      = "item.name.required"
-	codeItemNotFound          = "item.not_found"
-	codeItemUpdateInvalidJSON = "item.update.invalid_json"
-	codeItemListInvalidParam  = "item.list.invalid_param"
+	codeItemCreateInvalidJSON  = "item.create.invalid_json"
+	codeItemCreateBodyRequired = "item.create.body_required"
+	codeItemNameRequired       = "item.name.required"
+	codeItemNotFound           = "item.not_found"
+	codeItemUpdateInvalidJSON  = "item.update.invalid_json"
+	codeItemUpdateBodyRequired = "item.update.body_required"
+	codeItemListInvalidParam   = "item.list.invalid_param"
 )
 
 // ItemRepository is the minimal persistence contract that ItemHandler depends on.
-// Pass a concrete implementation from routes.go; pass a stub in tests.
+// All methods accept a context so callers can propagate request deadlines and
+// cancellation to real storage backends. Pass a concrete implementation from
+// routes.go; pass a stub in tests.
 type ItemRepository interface {
-	Create(name string) item.Item
-	Get(id string) (item.Item, bool)
-	List() []item.Item
-	Update(id, name string) (item.Item, bool)
-	Delete(id string) bool
+	Create(ctx context.Context, name string) item.Item
+	Get(ctx context.Context, id string) (item.Item, bool)
+	List(ctx context.Context) []item.Item
+	Update(ctx context.Context, id, name string) (item.Item, bool)
+	Delete(ctx context.Context, id string) bool
 }
 
 // ItemHandler demonstrates constructor injection: declare the dependency as an
@@ -46,11 +53,20 @@ type updateItemReq struct {
 // It demonstrates the canonical request body decode path and structured validation errors.
 //
 //	POST /api/v1/items {"name":"widget"}  → 201 {"id":"item-1","name":"widget",...}
-//	POST /api/v1/items {}                 → 400 TypeRequired
+//	POST /api/v1/items                    → 400 TypeRequired  (empty body)
+//	POST /api/v1/items {}                 → 400 TypeRequired  (name missing)
 //	POST /api/v1/items (bad JSON)         → 400 TypeBadRequest
 func (h ItemHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var req createItemReq
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		if errors.Is(err, io.EOF) {
+			_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+				Type(contract.TypeRequired).
+				Code(codeItemCreateBodyRequired).
+				Message("request body is required").
+				Build())
+			return
+		}
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeBadRequest).
 			Code(codeItemCreateInvalidJSON).
@@ -67,8 +83,8 @@ func (h ItemHandler) Create(w http.ResponseWriter, r *http.Request) {
 			Build())
 		return
 	}
-	item := h.Repo.Create(req.Name)
-	_ = contract.WriteResponse(w, r, http.StatusCreated, item, nil)
+	created := h.Repo.Create(r.Context(), req.Name)
+	_ = contract.WriteResponse(w, r, http.StatusCreated, created, nil)
 }
 
 // noLimit is the sentinel value for parseQueryInt's maxVal parameter.
@@ -110,7 +126,7 @@ func (h ItemHandler) List(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	all := h.Repo.List()
+	all := h.Repo.List(r.Context())
 	total := len(all)
 	if offset > len(all) {
 		offset = len(all)
@@ -155,7 +171,7 @@ func parseQueryInt(r *http.Request, key string, defaultVal, minVal, maxVal int) 
 //	GET /api/v1/items/missing → 404 TypeNotFound
 func (h ItemHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 	id := router.Param(r, "id")
-	item, ok := h.Repo.Get(id)
+	found, ok := h.Repo.Get(r.Context(), id)
 	if !ok {
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeNotFound).
@@ -165,7 +181,7 @@ func (h ItemHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 			Build())
 		return
 	}
-	_ = contract.WriteResponse(w, r, http.StatusOK, item, nil)
+	_ = contract.WriteResponse(w, r, http.StatusOK, found, nil)
 }
 
 // Update handles PUT /api/v1/items/:id.
@@ -173,13 +189,22 @@ func (h ItemHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 // Only the name field is replaceable; id and created_at are immutable.
 //
 //	PUT /api/v1/items/item-1 {"name":"renamed"} → 200 updated item
-//	PUT /api/v1/items/item-1 {}                 → 400 TypeRequired
+//	PUT /api/v1/items/item-1                    → 400 TypeRequired  (empty body)
+//	PUT /api/v1/items/item-1 {}                 → 400 TypeRequired  (name missing)
 //	PUT /api/v1/items/missing {"name":"x"}      → 404 TypeNotFound
 func (h ItemHandler) Update(w http.ResponseWriter, r *http.Request) {
 	id := router.Param(r, "id")
 
 	var req updateItemReq
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		if errors.Is(err, io.EOF) {
+			_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+				Type(contract.TypeRequired).
+				Code(codeItemUpdateBodyRequired).
+				Message("request body is required").
+				Build())
+			return
+		}
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeBadRequest).
 			Code(codeItemUpdateInvalidJSON).
@@ -197,7 +222,7 @@ func (h ItemHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	item, ok := h.Repo.Update(id, req.Name)
+	updated, ok := h.Repo.Update(r.Context(), id, req.Name)
 	if !ok {
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeNotFound).
@@ -207,7 +232,7 @@ func (h ItemHandler) Update(w http.ResponseWriter, r *http.Request) {
 			Build())
 		return
 	}
-	_ = contract.WriteResponse(w, r, http.StatusOK, item, nil)
+	_ = contract.WriteResponse(w, r, http.StatusOK, updated, nil)
 }
 
 // Delete handles DELETE /api/v1/items/:id.
@@ -217,7 +242,7 @@ func (h ItemHandler) Update(w http.ResponseWriter, r *http.Request) {
 //	DELETE /api/v1/items/missing → 404 TypeNotFound
 func (h ItemHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	id := router.Param(r, "id")
-	if !h.Repo.Delete(id) {
+	if !h.Repo.Delete(r.Context(), id) {
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeNotFound).
 			Code(codeItemNotFound).

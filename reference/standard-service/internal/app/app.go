@@ -64,11 +64,7 @@ func New(cfg config.Config) (*App, error) {
 
 // Start prepares the runtime and blocks while the HTTP server runs.
 // When ctx is canceled, it triggers a graceful shutdown.
-func (a *App) Start(ctx context.Context) (err error) {
-	if ctx == nil {
-		ctx = context.Background()
-	}
-
+func (a *App) Start(ctx context.Context) error {
 	if err := a.Core.Prepare(); err != nil {
 		return fmt.Errorf("prepare server: %w", err)
 	}
@@ -76,6 +72,11 @@ func (a *App) Start(ctx context.Context) (err error) {
 	if err != nil {
 		return fmt.Errorf("get server: %w", err)
 	}
+
+	a.Core.Logger().Info("starting server", plumelog.Fields{
+		"addr": a.Cfg.Core.Addr,
+		"tls":  a.Cfg.Core.TLS.Enabled,
+	})
 
 	shutdownErr := make(chan error, 1)
 	go func() {
@@ -88,11 +89,9 @@ func (a *App) Start(ctx context.Context) (err error) {
 
 	var serveErr error
 	if a.Cfg.Core.TLS.Enabled {
-		// Empty cert/key paths rely on core.Server() having already loaded
+		// Empty cert/key paths are valid here: core.Prepare() already loaded
 		// cfg.Core.TLS.CertFile and cfg.Core.TLS.KeyFile into srv.TLSConfig.
-		// Set those fields (and optionally cfg.Core.TLS.ClientAuth) in config.go
-		// before enabling TLS. In most deployments TLS is terminated by the
-		// proxy and this branch is not reached.
+		// Both paths are validated at startup by config.Validate before reaching here.
 		serveErr = srv.ListenAndServeTLS("", "")
 	} else {
 		serveErr = srv.ListenAndServe()

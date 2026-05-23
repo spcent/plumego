@@ -2,6 +2,7 @@
 package item
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"time"
@@ -29,7 +30,7 @@ func NewMemoryStore() *MemoryStore {
 }
 
 // Create stores an item with the provided name and returns the new item.
-func (s *MemoryStore) Create(name string) Item {
+func (s *MemoryStore) Create(_ context.Context, name string) Item {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -45,7 +46,7 @@ func (s *MemoryStore) Create(name string) Item {
 }
 
 // Get returns an item by id.
-func (s *MemoryStore) Get(id string) (Item, bool) {
+func (s *MemoryStore) Get(_ context.Context, id string) (Item, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -54,7 +55,7 @@ func (s *MemoryStore) Get(id string) (Item, bool) {
 }
 
 // List returns all stored items in creation order.
-func (s *MemoryStore) List() []Item {
+func (s *MemoryStore) List(_ context.Context) []Item {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -67,7 +68,7 @@ func (s *MemoryStore) List() []Item {
 
 // Update replaces the name of an existing item and returns the updated item.
 // It reports false when no item with that id exists.
-func (s *MemoryStore) Update(id, name string) (Item, bool) {
+func (s *MemoryStore) Update(_ context.Context, id, name string) (Item, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -81,7 +82,7 @@ func (s *MemoryStore) Update(id, name string) (Item, bool) {
 }
 
 // Delete removes an item by id and reports whether it existed.
-func (s *MemoryStore) Delete(id string) bool {
+func (s *MemoryStore) Delete(_ context.Context, id string) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 

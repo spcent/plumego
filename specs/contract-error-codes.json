@@ -164,6 +164,21 @@
       "path": "reference/production-service/internal/handler/profile.go",
       "symbol": "codeProfileNotFound",
       "type": "TypeNotFound"
+    },
+    {
+      "path": "reference/production-service/internal/handler/service.go",
+      "symbol": "codeComponentUnhealthy",
+      "type": "TypeUnavailable"
+    },
+    {
+      "path": "reference/standard-service/internal/handler/items.go",
+      "symbol": "codeItemCreateBodyRequired",
+      "type": "TypeRequired"
+    },
+    {
+      "path": "reference/standard-service/internal/handler/items.go",
+      "symbol": "codeItemUpdateBodyRequired",
+      "type": "TypeRequired"
     }
   ]
 }

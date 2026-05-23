@@ -41,6 +41,5 @@ func run() error {
 		return err
 	}
 
-	log.Printf("Starting Plumego Production Reference on %s", cfg.Core.Addr)
 	return a.Start(ctx)
 }

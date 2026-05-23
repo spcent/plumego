@@ -14,10 +14,13 @@ const codeGreetNameRequired = "greet.name.required"
 // APIHandler handles the core JSON API endpoints.
 // Logger is optional: when non-nil it emits structured log entries on each request.
 // Pass a.Core.Logger() from routes.go to demonstrate structured logging.
+// ServiceName carries the service identity string; set it from config so every
+// response reflects the actual service name rather than a hardcoded placeholder.
 // Version carries the build-time version string injected via main.go ldflags.
 type APIHandler struct {
-	Logger  plumelog.StructuredLogger
-	Version string
+	Logger      plumelog.StructuredLogger
+	ServiceName string
+	Version     string
 }
 
 type rootResponse struct {
@@ -67,7 +70,7 @@ type statusStructure struct {
 // Root responds with minimal service identity. For the full endpoint listing use GET /api/hello.
 func (h APIHandler) Root(w http.ResponseWriter, r *http.Request) {
 	_ = contract.WriteResponse(w, r, http.StatusOK, rootResponse{
-		Service: "plumego-reference",
+		Service: h.ServiceName,
 		Version: h.Version,
 		Docs:    "/api/hello",
 	}, nil)
@@ -85,7 +88,7 @@ func (h APIHandler) Root(w http.ResponseWriter, r *http.Request) {
 func (h APIHandler) Hello(w http.ResponseWriter, r *http.Request) {
 	_ = contract.WriteResponse(w, r, http.StatusOK, helloResponse{
 		Message:   "hello from plumego standard-service",
-		Service:   "plumego-reference",
+		Service:   h.ServiceName,
 		Mode:      "canonical",
 		Timestamp: time.Now().Format(time.RFC3339),
 		Version:   h.Version,
@@ -134,19 +137,21 @@ func (h APIHandler) Greet(w http.ResponseWriter, r *http.Request) {
 }
 
 // Status responds with a summary of system health and component state.
-// It demonstrates structured logging via logger.WithFields(): fields are
-// attached to the logger and emitted with every subsequent log call.
-// In production this pattern is used to annotate log lines with request ID,
-// tenant, or feature context without threading extra arguments through handlers.
+// It demonstrates two structured-logging patterns:
+//   - WithFields attaches fixed fields to every subsequent log call.
+//   - contract.RequestIDFromContext extracts the correlation ID stamped by
+//     the requestid middleware so log lines are linkable to the inbound request.
 func (h APIHandler) Status(w http.ResponseWriter, r *http.Request) {
 	if h.Logger != nil {
+		requestID := contract.RequestIDFromContext(r.Context())
 		h.Logger.WithFields(plumelog.Fields{
-			"endpoint": "status",
+			"endpoint":   "status",
+			"request_id": requestID,
 		}).Info("status request handled")
 	}
 	_ = contract.WriteResponse(w, r, http.StatusOK, statusResponse{
 		Status:    "healthy",
-		Service:   "plumego-reference",
+		Service:   h.ServiceName,
 		Version:   h.Version,
 		Timestamp: time.Now().Format(time.RFC3339),
 		Structure: statusStructure{

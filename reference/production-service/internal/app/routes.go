@@ -26,6 +26,9 @@ func (a *App) RegisterRoutes() error {
 			"protected_tenant_api",
 			"no_default_devtools",
 		},
+		// Checkers: nil — no external dependencies to probe in this reference.
+		// Wire real health.ComponentChecker implementations here (e.g. database ping)
+		// when this template is used as the base for a production service.
 	}
 
 	statusHandler := handler.StatusHandler{

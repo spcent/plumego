@@ -103,6 +103,9 @@ func (a *App) Start(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("get server: %w", err)
 	}
+	a.Logger.Info("starting server", plumelog.Fields{
+		"addr": a.Cfg.Addr,
+	})
 	shutdownErr := make(chan error, 1)
 	go func() {
 		<-ctx.Done()

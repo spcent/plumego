@@ -1,6 +1,7 @@
 package tenant
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -98,7 +99,7 @@ func writeStoreFile(path string, profiles map[string]Profile) error {
 }
 
 // Get returns the profile for tenantID and whether it was found.
-func (s *Store) Get(tenantID string) (Profile, bool) {
+func (s *Store) Get(_ context.Context, tenantID string) (Profile, bool) {
 	if s == nil {
 		return Profile{}, false
 	}

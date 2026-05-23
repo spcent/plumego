@@ -9,14 +9,20 @@ import (
 	"time"
 
 	"github.com/spcent/plumego/contract"
+	"github.com/spcent/plumego/health"
 )
 
+const codeComponentUnhealthy = "health.component.unhealthy"
+
 // ServiceHandler serves the root, liveness, and readiness endpoints.
-// These endpoints carry no dependency on external state; they need only
-// the service name and a static features list.
+// These endpoints need only the service name and a static features list.
+// Checkers is an optional list of dependency readiness probes for /readyz.
+// Each checker's Name() labels its result in the readiness response.
+// When nil or empty the readiness endpoint reports ready immediately.
 type ServiceHandler struct {
 	ServiceName string
 	Features    []string
+	Checkers    []health.ComponentChecker
 }
 
 type serviceResponse struct {
@@ -26,7 +32,7 @@ type serviceResponse struct {
 	Features  []string `json:"features"`
 }
 
-type healthResponse struct {
+type livenessResponse struct {
 	Status    string `json:"status"`
 	Service   string `json:"service"`
 	Check     string `json:"check"`
@@ -47,7 +53,7 @@ func (h ServiceHandler) Root(w http.ResponseWriter, r *http.Request) {
 // Kubernetes liveness probes call this endpoint; it must never be gated on
 // dependency health — if a dependency is down the process is still alive.
 func (h ServiceHandler) Live(w http.ResponseWriter, r *http.Request) {
-	_ = contract.WriteResponse(w, r, http.StatusOK, healthResponse{
+	_ = contract.WriteResponse(w, r, http.StatusOK, livenessResponse{
 		Status:    "ok",
 		Service:   h.ServiceName,
 		Check:     "liveness",
@@ -55,13 +61,32 @@ func (h ServiceHandler) Live(w http.ResponseWriter, r *http.Request) {
 	}, nil)
 }
 
-// Ready reports that the service is ready to handle traffic.
+// Ready probes each registered health.ComponentChecker in order.
+// On success it returns health.ReadinessStatus with a per-component map.
+// On the first failure it returns 503 TypeUnavailable naming the failing
+// component so operators can triage without log access.
+//
+//	GET /readyz (all pass)  → 200 health.ReadinessStatus{Ready:true, Components:{…}}
+//	GET /readyz (db fails)  → 503 TypeUnavailable detail.component="database"
 func (h ServiceHandler) Ready(w http.ResponseWriter, r *http.Request) {
-	_ = contract.WriteResponse(w, r, http.StatusOK, healthResponse{
-		Status:    "ready",
-		Service:   h.ServiceName,
-		Check:     "readiness",
-		Timestamp: utcNow(),
+	components := make(map[string]bool, len(h.Checkers))
+	for _, checker := range h.Checkers {
+		if err := checker.Check(r.Context()); err != nil {
+			_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+				Type(contract.TypeUnavailable).
+				Code(codeComponentUnhealthy).
+				Detail("component", checker.Name()).
+				Detail("reason", err.Error()).
+				Message("service not ready").
+				Build())
+			return
+		}
+		components[checker.Name()] = true
+	}
+	_ = contract.WriteResponse(w, r, http.StatusOK, health.ReadinessStatus{
+		Ready:      true,
+		Timestamp:  time.Now().UTC(),
+		Components: components,
 	}, nil)
 }
 
