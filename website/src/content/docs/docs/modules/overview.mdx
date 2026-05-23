@@ -13,6 +13,18 @@ import RequestFlowViz from '../../../../components/marketing/RequestFlowViz.astr
 
 Plumego keeps long-lived public packages at the repository root and places optional or fast-moving capabilities under `x/*`. This split is intentional: it keeps the stable surface small, keeps ownership easier to classify, and prevents the default learning path from being redefined by extension work.
 
+## Tier summary
+
+| Tier | Count | Adoption guidance |
+| --- | --- | --- |
+| **Stable** (GA) | 9 packages | Production-ready. v1 compatibility promise applies. |
+| **Beta** | 7 families | API frozen between consecutive minor release refs. Production-safe with release-note checks before upgrading. |
+| **Experimental** | 7 primary families | API may change without a deprecation period. Wrap behind an app-local interface in stable service paths. |
+
+Full maturity evidence, per-extension dashboard, and release matrix: [Status →](/status)
+
+---
+
 ## Synced module inventory
 
 <GeneratedModuleFacts />
