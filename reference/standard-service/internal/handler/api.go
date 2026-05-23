@@ -9,17 +9,15 @@ import (
 	plumelog "github.com/spcent/plumego/log"
 )
 
-// version is set at build time via -ldflags "-X standard-service/internal/handler.version=1.0.0"
-// During local development it defaults to "dev" to signal an unversioned build.
-var version = "dev"
-
 const codeGreetNameRequired = "greet.name.required"
 
 // APIHandler handles the core JSON API endpoints.
 // Logger is optional: when non-nil it emits structured log entries on each request.
 // Pass a.Core.Logger() from routes.go to demonstrate structured logging.
+// Version carries the build-time version string injected via main.go ldflags.
 type APIHandler struct {
-	Logger plumelog.StructuredLogger
+	Logger  plumelog.StructuredLogger
+	Version string
 }
 
 type rootResponse struct {
@@ -70,7 +68,7 @@ type statusStructure struct {
 func (h APIHandler) Root(w http.ResponseWriter, r *http.Request) {
 	_ = contract.WriteResponse(w, r, http.StatusOK, rootResponse{
 		Service: "plumego-reference",
-		Version: version,
+		Version: h.Version,
 		Docs:    "/api/hello",
 	}, nil)
 }
@@ -90,7 +88,7 @@ func (h APIHandler) Hello(w http.ResponseWriter, r *http.Request) {
 		Service:   "plumego-reference",
 		Mode:      "canonical",
 		Timestamp: time.Now().Format(time.RFC3339),
-		Version:   version,
+		Version:   h.Version,
 		Features: []string{
 			"stable_root_only",
 			"explicit_routes",
@@ -149,7 +147,7 @@ func (h APIHandler) Status(w http.ResponseWriter, r *http.Request) {
 	_ = contract.WriteResponse(w, r, http.StatusOK, statusResponse{
 		Status:    "healthy",
 		Service:   "plumego-reference",
-		Version:   version,
+		Version:   h.Version,
 		Timestamp: time.Now().Format(time.RFC3339),
 		Structure: statusStructure{
 			Bootstrap:  "explicit",

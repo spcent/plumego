@@ -154,6 +154,16 @@
       "path": "reference/standard-service/internal/handler/items.go",
       "symbol": "codeItemUpdateInvalidJSON",
       "type": "TypeBadRequest"
+    },
+    {
+      "path": "reference/standard-service/internal/handler/items.go",
+      "symbol": "codeItemListInvalidParam",
+      "type": "TypeBadRequest"
+    },
+    {
+      "path": "reference/production-service/internal/handler/profile.go",
+      "symbol": "codeProfileNotFound",
+      "type": "TypeNotFound"
     }
   ]
 }

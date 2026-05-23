@@ -25,6 +25,40 @@ type componentChecker struct {
 func (c componentChecker) Name() string                    { return c.name }
 func (c componentChecker) Check(ctx context.Context) error { return c.check(ctx) }
 
+// responseEnvelope holds the full success response structure for test decoding.
+type responseEnvelope struct {
+	Data      json.RawMessage `json:"data"`
+	Meta      map[string]any  `json:"meta"`
+	RequestID string          `json:"request_id"`
+}
+
+// decodeEnvelope decodes the full response envelope from rec and validates Content-Type.
+func decodeEnvelope(t *testing.T, rec *httptest.ResponseRecorder) responseEnvelope {
+	t.Helper()
+	if got := rec.Header().Get("Content-Type"); got != contract.ContentTypeJSON {
+		t.Fatalf("content type = %q, want %q", got, contract.ContentTypeJSON)
+	}
+	var env responseEnvelope
+	if err := json.NewDecoder(rec.Body).Decode(&env); err != nil {
+		t.Fatalf("decode response envelope: %v", err)
+	}
+	return env
+}
+
+// decodeReferenceData decodes the data field of a success envelope into T.
+func decodeReferenceData[T any](t *testing.T, rec *httptest.ResponseRecorder) T {
+	t.Helper()
+	env := decodeEnvelope(t, rec)
+	if len(env.Data) == 0 {
+		t.Fatal("success envelope missing data")
+	}
+	var body T
+	if err := json.Unmarshal(env.Data, &body); err != nil {
+		t.Fatalf("decode data field: %v", err)
+	}
+	return body
+}
+
 func TestHealthHandlerLive(t *testing.T) {
 	h := HealthHandler{ServiceName: "svc"}
 	rec := httptest.NewRecorder()
@@ -164,7 +198,7 @@ func TestHealthHandlerReadyWithCheckers(t *testing.T) {
 }
 
 func TestAPIHandlerResponses(t *testing.T) {
-	h := APIHandler{}
+	h := APIHandler{Version: "test-version"}
 
 	tests := []struct {
 		name   string
@@ -181,7 +215,7 @@ func TestAPIHandlerResponses(t *testing.T) {
 					t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
 				}
 				got := decodeReferenceData[rootResponse](t, rec)
-				if got.Service != "plumego-reference" || got.Docs == "" || got.Version != version {
+				if got.Service != "plumego-reference" || got.Docs == "" || got.Version != "test-version" {
 					t.Fatalf("unexpected root response: %+v", got)
 				}
 			},
@@ -195,7 +229,7 @@ func TestAPIHandlerResponses(t *testing.T) {
 					t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
 				}
 				got := decodeReferenceData[helloResponse](t, rec)
-				if got.Service != "plumego-reference" || got.Mode != "canonical" || got.Version != version {
+				if got.Service != "plumego-reference" || got.Mode != "canonical" || got.Version != "test-version" {
 					t.Fatalf("unexpected hello response: %+v", got)
 				}
 				// Endpoints must be a non-empty slice with all required fields.
@@ -259,8 +293,8 @@ func TestAPIHandlerResponses(t *testing.T) {
 				if got.Status != "healthy" || got.Structure.Routes != "one_method_one_path_one_handler" || len(got.Modules) == 0 {
 					t.Fatalf("unexpected status response: %+v", got)
 				}
-				if got.Version != version {
-					t.Fatalf("status.Version = %q, want %q", got.Version, version)
+				if got.Version != "test-version" {
+					t.Fatalf("status.Version = %q, want %q", got.Version, "test-version")
 				}
 			},
 		},
@@ -285,9 +319,9 @@ func TestItemHandlerCreate(t *testing.T) {
 		if rec.Code != http.StatusCreated {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusCreated)
 		}
-		item := decodeReferenceData[item.Item](t, rec)
-		if item.ID == "" || item.Name != "widget" || item.CreatedAt == "" {
-			t.Fatalf("unexpected item: %+v", item)
+		got := decodeReferenceData[item.Item](t, rec)
+		if got.ID == "" || got.Name != "widget" || got.CreatedAt.IsZero() {
+			t.Fatalf("unexpected item: %+v", got)
 		}
 	})
 
@@ -314,17 +348,22 @@ func TestItemHandlerCreate(t *testing.T) {
 }
 
 func TestItemHandlerList(t *testing.T) {
-	t.Run("empty store returns empty items with zero total", func(t *testing.T) {
+	t.Run("empty store returns empty data with zero total in meta", func(t *testing.T) {
 		h := ItemHandler{Repo: item.NewMemoryStore()}
 		rec := httptest.NewRecorder()
 		h.List(rec, httptest.NewRequest(http.MethodGet, "/api/v1/items", nil))
 		if rec.Code != http.StatusOK {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
 		}
-		resp := decodeReferenceData[listResponse](t, rec)
-		if len(resp.Items) != 0 || resp.Total != 0 || resp.Limit != 20 || resp.Offset != 0 {
-			t.Fatalf("unexpected list response: %+v", resp)
+		env := decodeEnvelope(t, rec)
+		var items []item.Item
+		if err := json.Unmarshal(env.Data, &items); err != nil {
+			t.Fatalf("decode items: %v", err)
 		}
+		if len(items) != 0 {
+			t.Fatalf("items = %v, want empty", items)
+		}
+		assertMeta(t, env.Meta, 0, 20, 0)
 	})
 
 	t.Run("populated store returns items in creation order", func(t *testing.T) {
@@ -338,18 +377,23 @@ func TestItemHandlerList(t *testing.T) {
 		if rec.Code != http.StatusOK {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
 		}
-		resp := decodeReferenceData[listResponse](t, rec)
-		if resp.Total != 2 || len(resp.Items) != 2 {
-			t.Fatalf("total=%d items=%d, want 2/2", resp.Total, len(resp.Items))
+		env := decodeEnvelope(t, rec)
+		var items []item.Item
+		if err := json.Unmarshal(env.Data, &items); err != nil {
+			t.Fatalf("decode items: %v", err)
 		}
+		if len(items) != 2 {
+			t.Fatalf("len(items) = %d, want 2", len(items))
+		}
+		assertMeta(t, env.Meta, 2, 20, 0)
 		// Verify stable creation order.
-		if resp.Items[0].Name != "alpha" || resp.Items[1].Name != "beta" {
+		if items[0].Name != "alpha" || items[1].Name != "beta" {
 			t.Fatalf("unexpected order: [%s, %s], want [alpha, beta]",
-				resp.Items[0].Name, resp.Items[1].Name)
+				items[0].Name, items[1].Name)
 		}
 	})
 
-	t.Run("limit param restricts returned items", func(t *testing.T) {
+	t.Run("limit param restricts returned items and is reflected in meta", func(t *testing.T) {
 		store := item.NewMemoryStore()
 		for _, name := range []string{"a", "b", "c", "d", "e"} {
 			store.Create(name)
@@ -361,13 +405,17 @@ func TestItemHandlerList(t *testing.T) {
 		if rec.Code != http.StatusOK {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
 		}
-		resp := decodeReferenceData[listResponse](t, rec)
-		if resp.Total != 5 || len(resp.Items) != 3 || resp.Limit != 3 {
-			t.Fatalf("total=%d items=%d limit=%d, want 5/3/3", resp.Total, len(resp.Items), resp.Limit)
+		env := decodeEnvelope(t, rec)
+		var items []item.Item
+		if err := json.Unmarshal(env.Data, &items); err != nil {
+			t.Fatalf("decode items: %v", err)
 		}
-		// First page must be the first 3 in creation order.
-		if resp.Items[0].Name != "a" || resp.Items[2].Name != "c" {
-			t.Fatalf("unexpected page items: %v", resp.Items)
+		if len(items) != 3 {
+			t.Fatalf("len(items) = %d, want 3", len(items))
+		}
+		assertMeta(t, env.Meta, 5, 3, 0)
+		if items[0].Name != "a" || items[2].Name != "c" {
+			t.Fatalf("unexpected page items: %v", items)
 		}
 	})
 
@@ -383,16 +431,16 @@ func TestItemHandlerList(t *testing.T) {
 		if rec.Code != http.StatusOK {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
 		}
-		resp := decodeReferenceData[listResponse](t, rec)
-		if resp.Total != 3 {
-			t.Fatalf("total = %d, want 3", resp.Total)
+		env := decodeEnvelope(t, rec)
+		var items []item.Item
+		if err := json.Unmarshal(env.Data, &items); err != nil {
+			t.Fatalf("decode items: %v", err)
 		}
-		if len(resp.Items) != 0 {
-			t.Fatalf("items = %v, want empty (offset beyond total)", resp.Items)
+		if len(items) != 0 {
+			t.Fatalf("items = %v, want empty (offset beyond total)", items)
 		}
-		if resp.Offset != 3 {
-			t.Fatalf("offset = %d, want 3 (clamped to total)", resp.Offset)
-		}
+		// total is 3; offset was clamped to 3.
+		assertMeta(t, env.Meta, 3, 20, 3)
 	})
 
 	t.Run("offset param skips items in creation order", func(t *testing.T) {
@@ -407,13 +455,50 @@ func TestItemHandlerList(t *testing.T) {
 		if rec.Code != http.StatusOK {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
 		}
-		resp := decodeReferenceData[listResponse](t, rec)
-		if resp.Total != 5 || len(resp.Items) != 2 || resp.Offset != 3 {
-			t.Fatalf("total=%d items=%d offset=%d, want 5/2/3", resp.Total, len(resp.Items), resp.Offset)
+		env := decodeEnvelope(t, rec)
+		var items []item.Item
+		if err := json.Unmarshal(env.Data, &items); err != nil {
+			t.Fatalf("decode items: %v", err)
 		}
-		// Items at offset 3 are "d" and "e".
-		if resp.Items[0].Name != "d" || resp.Items[1].Name != "e" {
-			t.Fatalf("unexpected offset items: %v", resp.Items)
+		if len(items) != 2 {
+			t.Fatalf("len(items) = %d, want 2", len(items))
+		}
+		assertMeta(t, env.Meta, 5, 20, 3)
+		if items[0].Name != "d" || items[1].Name != "e" {
+			t.Fatalf("unexpected offset items: %v", items)
+		}
+	})
+
+	t.Run("invalid limit returns 400 TypeBadRequest", func(t *testing.T) {
+		h := ItemHandler{Repo: item.NewMemoryStore()}
+		rec := httptest.NewRecorder()
+		h.List(rec, httptest.NewRequest(http.MethodGet, "/api/v1/items?limit=abc", nil))
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
+		}
+		if code := decodeErrorCode(t, rec); code != codeItemListInvalidParam {
+			t.Fatalf("error code = %q, want %q", code, codeItemListInvalidParam)
+		}
+	})
+
+	t.Run("invalid offset returns 400 TypeBadRequest", func(t *testing.T) {
+		h := ItemHandler{Repo: item.NewMemoryStore()}
+		rec := httptest.NewRecorder()
+		h.List(rec, httptest.NewRequest(http.MethodGet, "/api/v1/items?offset=xyz", nil))
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
+		}
+		if code := decodeErrorCode(t, rec); code != codeItemListInvalidParam {
+			t.Fatalf("error code = %q, want %q", code, codeItemListInvalidParam)
+		}
+	})
+
+	t.Run("negative limit returns 400 TypeBadRequest", func(t *testing.T) {
+		h := ItemHandler{Repo: item.NewMemoryStore()}
+		rec := httptest.NewRecorder()
+		h.List(rec, httptest.NewRequest(http.MethodGet, "/api/v1/items?limit=-1", nil))
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
 		}
 	})
 }
@@ -434,9 +519,9 @@ func TestItemHandlerGetByID(t *testing.T) {
 		if rec.Code != http.StatusOK {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
 		}
-		item := decodeReferenceData[item.Item](t, rec)
-		if item.ID != created.ID || item.Name != "gadget" {
-			t.Fatalf("unexpected item: %+v", item)
+		got := decodeReferenceData[item.Item](t, rec)
+		if got.ID != created.ID || got.Name != "gadget" {
+			t.Fatalf("unexpected item: %+v", got)
 		}
 	})
 
@@ -470,7 +555,8 @@ func TestItemHandlerUpdate(t *testing.T) {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
 		}
 		got := decodeReferenceData[item.Item](t, rec)
-		if got.ID != created.ID || got.Name != "renamed" || got.CreatedAt != created.CreatedAt {
+		// created_at is immutable: use Equal to ignore monotonic clock stripped by JSON.
+		if got.ID != created.ID || got.Name != "renamed" || !got.CreatedAt.Equal(created.CreatedAt) {
 			t.Fatalf("unexpected updated item: %+v", got)
 		}
 	})
@@ -638,6 +724,18 @@ func TestRequireWriteKey(t *testing.T) {
 	})
 }
 
+// assertMeta verifies pagination metadata from the response meta field.
+func assertMeta(t *testing.T, meta map[string]any, wantTotal, wantLimit, wantOffset int) {
+	t.Helper()
+	total := int(meta["total"].(float64))
+	limit := int(meta["limit"].(float64))
+	offset := int(meta["offset"].(float64))
+	if total != wantTotal || limit != wantLimit || offset != wantOffset {
+		t.Fatalf("meta total=%d limit=%d offset=%d, want %d/%d/%d",
+			total, limit, offset, wantTotal, wantLimit, wantOffset)
+	}
+}
+
 func decodeErrorCode(t *testing.T, rec *httptest.ResponseRecorder) string {
 	t.Helper()
 	var env struct {
@@ -649,27 +747,4 @@ func decodeErrorCode(t *testing.T, rec *httptest.ResponseRecorder) string {
 		t.Fatalf("decode error response: %v", err)
 	}
 	return env.Error.Code
-}
-
-func decodeReferenceData[T any](t *testing.T, rec *httptest.ResponseRecorder) T {
-	t.Helper()
-	if got := rec.Header().Get("Content-Type"); got != contract.ContentTypeJSON {
-		t.Fatalf("content type = %q, want %q", got, contract.ContentTypeJSON)
-	}
-
-	var env struct {
-		Data json.RawMessage `json:"data"`
-	}
-	if err := json.NewDecoder(rec.Body).Decode(&env); err != nil {
-		t.Fatalf("decode success envelope: %v", err)
-	}
-	if len(env.Data) == 0 {
-		t.Fatal("success envelope missing data")
-	}
-
-	var body T
-	if err := json.Unmarshal(env.Data, &body); err != nil {
-		t.Fatalf("decode success data: %v", err)
-	}
-	return body
 }

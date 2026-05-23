@@ -8,7 +8,7 @@ func TestMemoryStoreCreateAndGet(t *testing.T) {
 	s := NewMemoryStore()
 
 	got := s.Create("widget")
-	if got.ID == "" || got.Name != "widget" || got.CreatedAt == "" {
+	if got.ID == "" || got.Name != "widget" || got.CreatedAt.IsZero() {
 		t.Fatalf("Create: unexpected item: %+v", got)
 	}
 

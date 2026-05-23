@@ -8,9 +8,9 @@ import (
 )
 
 type healthResponse struct {
-	Status    string `json:"status"`
-	Service   string `json:"service"`
-	Timestamp string `json:"timestamp"`
+	Status    string    `json:"status"`
+	Service   string    `json:"service"`
+	Timestamp time.Time `json:"timestamp"`
 }
 
 // RegisterRoutes wires all HTTP routes for the with-gateway demo.
@@ -33,6 +33,6 @@ func writeHealthResponse(w http.ResponseWriter, r *http.Request, service string)
 	_ = contract.WriteResponse(w, r, http.StatusOK, healthResponse{
 		Status:    "ok",
 		Service:   service,
-		Timestamp: time.Now().Format(time.RFC3339),
+		Timestamp: time.Now().UTC(),
 	}, nil)
 }

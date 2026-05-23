@@ -26,6 +26,7 @@ type AppConfig struct {
 	ServiceName  string // APP_SERVICE_NAME; used as the service identity in health responses.
 	MaxBodyBytes int64  // APP_MAX_BODY_BYTES; maximum request body size. 0 disables the limit.
 	WriteKey     string // APP_WRITE_KEY; when non-empty, POST/PUT/DELETE /api/v1/items require X-Write-Key header. Empty disables the guard.
+	Version      string // Build version injected via -ldflags "-X main.version=…" in main.go; defaults to "dev".
 }
 
 // Defaults returns safe configuration values for local development.
@@ -38,6 +39,7 @@ func Defaults() Config {
 			EnvFile:      ".env",
 			ServiceName:  "plumego-reference",
 			MaxBodyBytes: 1 << 20, // 1 MiB
+			Version:      "dev",
 		},
 	}
 }

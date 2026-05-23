@@ -40,6 +40,12 @@ Each item is a conscious decision, not a default assumption.
   There is no default authentication. Every protected route must have an explicit
   auth middleware or handler guard.
 
+- [ ] **`APP_WRITE_KEY` is set** for services that use the write-key guard.
+  `RequireWriteKey` is a no-op when `APP_WRITE_KEY` is empty — it passes all
+  requests through without any header check. This is intentional for local
+  development but **must be disabled in production** by setting a non-empty key.
+  Deploy without this variable and every POST/PUT/DELETE is publicly writable.
+
 - [ ] **No debug endpoints are mounted** by default.
   `x/observability/devtools` is explicitly excluded from this service. Verify that no debug
   routes have been added to `routes.go`.
@@ -89,3 +95,13 @@ Each item is a conscious decision, not a default assumption.
   `/readyz` returns 200.
 - [ ] **Boundary checks pass**: `go run ./internal/checks/dependency-rules`.
   This service must not import `x/*`.
+
+---
+
+## Graduating to production
+
+For a production-hardened baseline that adds security headers, rate limiting,
+bearer-token auth, tenant context, and HTTP metrics — while preserving the same
+explicit wiring model — see `reference/production-service`. It extends this
+layout rather than replacing it; every middleware and route decision remains
+visible and app-owned.

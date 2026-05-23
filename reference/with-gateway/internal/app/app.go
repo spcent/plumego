@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/spcent/plumego/core"
 	plumelog "github.com/spcent/plumego/log"
@@ -66,7 +67,9 @@ func (a *App) Start(ctx context.Context) error {
 	shutdownErr := make(chan error, 1)
 	go func() {
 		<-ctx.Done()
-		shutdownErr <- a.Core.Shutdown(context.Background())
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		defer cancel()
+		shutdownErr <- a.Core.Shutdown(shutdownCtx)
 	}()
 
 	var serveErr error

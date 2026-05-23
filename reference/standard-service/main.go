@@ -19,6 +19,11 @@ import (
 	"standard-service/internal/config"
 )
 
+// version is set at build time via -ldflags "-X main.version=1.0.0".
+// It is threaded into config so handlers receive it through constructor injection
+// rather than reading a package-level variable directly.
+var version = "dev"
+
 func main() {
 	if err := run(); err != nil {
 		log.Printf("server stopped: %v", err)
@@ -34,6 +39,7 @@ func run() error {
 	if err != nil {
 		return err
 	}
+	cfg.App.Version = version
 
 	a, err := app.New(cfg)
 	if err != nil {
