@@ -1,0 +1,333 @@
+---
+import AgentFirstShowcase from '../components/home/AgentFirstShowcase.astro';
+import MarketingLayout from '../layouts/MarketingLayout.astro';
+import PageHero from '../components/marketing/PageHero.astro';
+import JourneyBar from '../components/marketing/JourneyBar.astro';
+
+const journeySteps = [
+  { label: 'Why Plumego', href: '/why-plumego' },
+  { label: 'Agent Workflow', href: '/agent-workflow' },
+  { label: 'Docs', href: '/docs' },
+];
+
+const controlPlaneFiles = [
+  {
+    path: 'specs/task-routing.yaml',
+    role: 'Task router',
+    desc: 'Maps every work intent (add middleware, change extension behavior, update boundary rules) to an owning module path and a start_with file list. An agent reads this before touching any Go file.',
+    example: 'task: "add rate limiting" → module: middleware/ → read: middleware/module.yaml',
+  },
+  {
+    path: 'specs/dependency-rules.yaml',
+    role: 'Boundary enforcer',
+    desc: 'Declares which packages may import which. Violations are caught mechanically by go run ./internal/checks/dependency-rules — not by reviewer memory.',
+    example: 'stable roots cannot import x/* — enforced in CI',
+  },
+  {
+    path: 'specs/change-recipes/',
+    role: 'Change templates',
+    desc: '15+ reusable recipes for standard task shapes: add-middleware, new-extension-family, promote-to-beta, and more. Each recipe has ordered steps and explicit stop conditions.',
+    example: '14 recipes covering every common change type',
+  },
+  {
+    path: '<module>/module.yaml',
+    role: 'Module scope',
+    desc: 'Each module declares its own ownership, risk level, test commands, and review checklist. Agents run only the checks relevant to the touched module.',
+    example: 'validation: go test -race ./middleware/... && go vet ./middleware/...',
+  },
+  {
+    path: 'make gates',
+    role: 'CI-equivalent loop',
+    desc: 'One command that mirrors CI: boundary checks, go vet, gofmt, race tests, and normal tests. Agents run this before every push — no surprises in CI.',
+    example: 'make gates → boundary + vet + fmt + race + tests',
+  },
+];
+
+const workflowSteps = [
+  {
+    n: '01',
+    title: 'Read task-routing.yaml',
+    body: 'Before opening any Go file, an agent reads specs/task-routing.yaml to find the owning module for the task type. This prevents misrouted changes before they happen.',
+  },
+  {
+    n: '02',
+    title: 'Read module.yaml',
+    body: 'The target module\'s module.yaml declares scope, risk, in-scope paths, out-of-scope paths, and the exact validation commands to run. The agent now has a bounded operating context.',
+  },
+  {
+    n: '03',
+    title: 'Make the change',
+    body: 'The agent edits only the files within the declared module scope. Boundary rules are machine-readable, so it knows which imports are allowed without reading every package.',
+  },
+  {
+    n: '04',
+    title: 'Run make gates',
+    body: 'One command runs the CI-equivalent validation loop locally. Boundary checks, vet, format check, race tests. Same result as CI — no surprises on push.',
+  },
+];
+---
+
+<MarketingLayout
+  locale="en"
+  title="Agent-First Workflow — Plumego"
+  description="How machine-readable specs give AI coding agents a deterministic operating model: task routing, boundary enforcement, per-module scope, and a CI-equivalent validation loop."
+  currentPath="/agent-workflow"
+>
+  <PageHero
+    eyebrow="agent-first"
+    title="Your AI agent needs a map, not a guess."
+    body="As AI coding assistants take on more execution work, the question becomes: does your repository give them a clear operating model — or do they guess? Plumego's control plane gives agents the same routing signals a senior reviewer uses."
+  />
+
+  <JourneyBar steps={journeySteps} current="/agent-workflow" />
+
+  <section class="section control-plane-section">
+    <div class="section__intro">
+      <p class="section__eyebrow">the control plane</p>
+      <h2>Five files that define the operating model.</h2>
+      <p>Agents read these files — in order — before making any change. The same files serve as the authoritative reference for human reviewers. One model, two audiences.</p>
+    </div>
+    <div class="cp-files">
+      {controlPlaneFiles.map((f) => (
+        <div class="cp-file">
+          <div class="cp-file__header">
+            <code class="cp-file__path">{f.path}</code>
+            <span class="cp-file__role">{f.role}</span>
+          </div>
+          <p class="cp-file__desc">{f.desc}</p>
+          <div class="cp-file__example">
+            <code>{f.example}</code>
+          </div>
+        </div>
+      ))}
+    </div>
+  </section>
+
+  <section class="section workflow-steps-section">
+    <div class="section__intro">
+      <p class="section__eyebrow">agent execution model</p>
+      <h2>How a change flows through the control plane.</h2>
+      <p>This is the ordered workflow every agent (and every contributor) follows. Each step has a deterministic output before moving to the next.</p>
+    </div>
+    <div class="workflow-steps">
+      {workflowSteps.map((step) => (
+        <div class="workflow-step">
+          <div class="workflow-step__num">{step.n}</div>
+          <div class="workflow-step__content">
+            <h3>{step.title}</h3>
+            <p>{step.body}</p>
+          </div>
+        </div>
+      ))}
+    </div>
+  </section>
+
+  <AgentFirstShowcase locale="en" />
+
+  <section class="section agent-cta-section">
+    <div class="agent-cta-inner">
+      <h2>Read the full agent workflow spec.</h2>
+      <p>The concept doc covers every stop condition, the full AGENTS.md authority order, context budget rules, and the complete list of change recipes.</p>
+      <div class="agent-cta-actions">
+        <a class="button button--primary" href="/docs/concepts/agent-first-workflow">Agent-First Workflow Docs →</a>
+        <a class="button button--ghost" href="/docs/concepts/repo-control-plane">Control Plane Reference →</a>
+      </div>
+    </div>
+  </section>
+</MarketingLayout>
+
+<style>
+  .section__eyebrow {
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 0.5rem;
+  }
+
+  .section__intro {
+    max-width: 48rem;
+    margin-bottom: 2.5rem;
+  }
+
+  .section__intro h2 {
+    font-size: 1.6rem;
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    margin: 0 0 0.75rem;
+    line-height: 1.25;
+    color: var(--fg);
+  }
+
+  .section__intro p {
+    font-size: 0.95rem;
+    color: var(--fg-soft);
+    line-height: 1.7;
+    margin: 0;
+  }
+
+  /* Control plane files */
+  .control-plane-section {
+    padding-block: 4rem;
+  }
+
+  .cp-files {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    max-width: 64rem;
+  }
+
+  .cp-file {
+    background: var(--bg-elevated);
+    border: 1px solid var(--line);
+    border-radius: 0.75rem;
+    padding: 1.4rem 1.6rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    transition: border-color 0.18s;
+  }
+
+  .cp-file:hover {
+    border-color: color-mix(in srgb, var(--accent) 30%, var(--line));
+  }
+
+  .cp-file__header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+
+  .cp-file__path {
+    font-family: var(--font-mono);
+    font-size: 0.82rem;
+    color: var(--accent);
+    background: var(--accent-soft);
+    padding: 0.18rem 0.55rem;
+    border-radius: 0.3rem;
+    white-space: nowrap;
+  }
+
+  .cp-file__role {
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--fg-soft);
+    border: 1px solid var(--line);
+    padding: 0.12rem 0.45rem;
+    border-radius: 0.25rem;
+  }
+
+  .cp-file__desc {
+    font-size: 0.88rem;
+    color: var(--fg-soft);
+    line-height: 1.65;
+    margin: 0;
+  }
+
+  .cp-file__example {
+    background: var(--bg-strong);
+    border: 1px solid var(--line);
+    border-radius: 0.4rem;
+    padding: 0.5rem 0.8rem;
+  }
+
+  .cp-file__example code {
+    font-family: var(--font-mono);
+    font-size: 0.76rem;
+    color: var(--fg-soft);
+  }
+
+  /* Workflow steps */
+  .workflow-steps-section {
+    padding-block: 4rem;
+    background: var(--bg-strong);
+  }
+
+  .workflow-steps {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1.25rem;
+    max-width: 64rem;
+  }
+
+  @media (min-width: 700px) {
+    .workflow-steps {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .workflow-steps {
+      grid-template-columns: repeat(4, 1fr);
+    }
+  }
+
+  .workflow-step {
+    background: var(--bg-elevated);
+    border: 1px solid var(--line);
+    border-radius: 0.75rem;
+    padding: 1.4rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .workflow-step__num {
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: var(--accent-soft);
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+  }
+
+  .workflow-step__content h3 {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--fg);
+    margin: 0 0 0.4rem;
+    line-height: 1.3;
+  }
+
+  .workflow-step__content p {
+    font-size: 0.85rem;
+    color: var(--fg-soft);
+    line-height: 1.6;
+    margin: 0;
+  }
+
+  /* CTA */
+  .agent-cta-section {
+    padding-block: 4rem;
+  }
+
+  .agent-cta-inner {
+    max-width: 48rem;
+  }
+
+  .agent-cta-inner h2 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    margin: 0 0 0.75rem;
+    color: var(--fg);
+  }
+
+  .agent-cta-inner p {
+    font-size: 0.95rem;
+    color: var(--fg-soft);
+    line-height: 1.65;
+    margin: 0 0 1.5rem;
+  }
+
+  .agent-cta-actions {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+  }
+</style>
