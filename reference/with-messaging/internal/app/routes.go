@@ -2,33 +2,18 @@ package app
 
 import (
 	"net/http"
-	"time"
 
-	"github.com/spcent/plumego/contract"
+	"with-messaging/internal/handler"
 )
-
-type healthResponse struct {
-	Status    string    `json:"status"`
-	Service   string    `json:"service"`
-	Timestamp time.Time `json:"timestamp"`
-}
 
 // RegisterRoutes wires all HTTP routes for the with-messaging demo.
 func (a *App) RegisterRoutes() error {
 	reg := newRouteReg(a.Core)
 	reg.get("/healthz", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		writeHealthResponse(w, r, "with-messaging")
+		handler.WriteHealthResponse(w, r, "with-messaging")
 	}))
 	reg.post("/events/publish", http.HandlerFunc(a.Handler.Publish))
 	return reg.err
-}
-
-func writeHealthResponse(w http.ResponseWriter, r *http.Request, service string) {
-	_ = contract.WriteResponse(w, r, http.StatusOK, healthResponse{
-		Status:    "ok",
-		Service:   service,
-		Timestamp: time.Now().UTC(),
-	}, nil)
 }
 
 // routeAdder is the minimal interface shared by *core.App and *core.RouteGroup.

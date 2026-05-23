@@ -5,15 +5,17 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/spcent/plumego/contract"
+	"with-messaging/internal/handler"
 )
 
 func TestWriteHealthResponseShape(t *testing.T) {
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/healthz", nil)
 
-	writeHealthResponse(rec, req, "with-messaging")
+	handler.WriteHealthResponse(rec, req, "with-messaging")
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
@@ -23,7 +25,11 @@ func TestWriteHealthResponseShape(t *testing.T) {
 	}
 
 	var env struct {
-		Data healthResponse `json:"data"`
+		Data struct {
+			Status    string    `json:"status"`
+			Service   string    `json:"service"`
+			Timestamp time.Time `json:"timestamp"`
+		} `json:"data"`
 	}
 	if err := json.NewDecoder(rec.Body).Decode(&env); err != nil {
 		t.Fatalf("decode health response: %v", err)

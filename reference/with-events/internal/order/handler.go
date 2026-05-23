@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/spcent/plumego/contract"
+	"github.com/spcent/plumego/router"
 )
 
 type CreateOrderRequest struct {
@@ -75,10 +76,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
-	id := contract.RequestContextFromContext(r.Context()).Params["id"]
-	if id == "" {
-		id = strings.TrimPrefix(r.URL.Path, "/orders/")
-	}
+	id := router.Param(r, "id")
 
 	h.mu.RLock()
 	order, ok := h.orders[id]

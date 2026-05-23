@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/spcent/plumego/contract"
 	"with-tenant-admin/internal/auth"
 	tenantadmin "with-tenant-admin/internal/tenant/admin"
 )
@@ -90,15 +91,33 @@ func newTestHandler(t *testing.T, tenantID string) *Handler {
 	return NewHandler(tenantStore, NewInMemoryUsageStore())
 }
 
+// serveUsageAdmin calls handler directly — bypassing the router — with the
+// tenantID path parameter injected via contract.WithRequestContext.
 func serveUsageAdmin(t *testing.T, handler http.HandlerFunc, method string, path string, body string, authenticated bool) *httptest.ResponseRecorder {
 	t.Helper()
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(method, path, strings.NewReader(body))
+	if tenantID := usagePathTenantID(path); tenantID != "" {
+		ctx := contract.WithRequestContext(req.Context(), contract.RequestContext{
+			Params: map[string]string{"tenantID": tenantID},
+		})
+		req = req.WithContext(ctx)
+	}
 	if authenticated {
 		req.Header.Set(auth.HeaderAdminToken, "secret")
 	}
 	auth.RequireAdminToken("secret")(handler).ServeHTTP(rec, req)
 	return rec
+}
+
+// usagePathTenantID extracts the :tenantID segment from /admin/usage/:tenantID paths.
+func usagePathTenantID(path string) string {
+	const prefix = "/admin/usage/"
+	after, ok := strings.CutPrefix(path, prefix)
+	if !ok {
+		return ""
+	}
+	return after
 }
 
 func decodeData[T any](t *testing.T, rec *httptest.ResponseRecorder) T {

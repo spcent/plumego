@@ -88,6 +88,11 @@ func (a *App) Start(ctx context.Context) (err error) {
 
 	var serveErr error
 	if a.Cfg.Core.TLS.Enabled {
+		// Empty cert/key paths rely on core.Server() having already loaded
+		// cfg.Core.TLS.CertFile and cfg.Core.TLS.KeyFile into srv.TLSConfig.
+		// Set those fields (and optionally cfg.Core.TLS.ClientAuth) in config.go
+		// before enabling TLS. In most deployments TLS is terminated by the
+		// proxy and this branch is not reached.
 		serveErr = srv.ListenAndServeTLS("", "")
 	} else {
 		serveErr = srv.ListenAndServe()

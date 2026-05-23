@@ -21,6 +21,7 @@ import (
 	"github.com/spcent/plumego/middleware/timeout"
 	"github.com/spcent/plumego/middleware/tracing"
 	"production-service/internal/config"
+	"production-service/internal/domain/tenant"
 )
 
 // App holds application-wide dependencies.
@@ -28,7 +29,7 @@ type App struct {
 	Core      *core.App
 	Cfg       config.Config
 	Metrics   *metrics.BaseMetricsCollector
-	Profiles  *profileStore
+	Profiles  *tenant.Store
 	RateLimit *ratelimit.AbuseGuardMiddleware
 }
 
@@ -36,7 +37,7 @@ type App struct {
 func New(cfg config.Config) (*App, error) {
 	logger := plumelog.NewLogger()
 	collector := metrics.NewBaseMetricsCollector()
-	profiles, err := newProfileStore(cfg.App.ProfileStorePath)
+	profiles, err := tenant.NewStore(cfg.App.ProfileStorePath)
 	if err != nil {
 		return nil, fmt.Errorf("load profile store: %w", err)
 	}
@@ -62,6 +63,16 @@ func New(cfg config.Config) (*App, error) {
 		return nil, fmt.Errorf("configure security middleware: %w", err)
 	}
 
+	// Middleware order — outermost to innermost (first registered runs first on inbound):
+	//   requestid    → stamps correlation ID before any logging or error handling
+	//   recovery     → converts panics to 500; inside requestid so ID appears in the response
+	//   bodylimit    → rejects oversized bodies before auth or rate-limit processing
+	//   timeout      → enforces per-request wall-clock limit on everything below
+	//   security     → adds security headers to all responses, including timed-out ones
+	//   ratelimit    → rejects abusive clients; after security so headers are always set
+	//   tracing      → hooks span lifecycle after rejection decisions are made
+	//   httpmetrics  → records request stats including rejected and timed-out requests
+	//   accesslog    → innermost: logs the final status with full middleware context
 	if err := app.Use(
 		requestid.Middleware(),
 		recoveryMw,
@@ -114,6 +125,10 @@ func (a *App) Start(ctx context.Context) error {
 
 	var serveErr error
 	if a.Cfg.Core.TLS.Enabled {
+		// Empty cert/key paths rely on core.Server() having loaded
+		// cfg.Core.TLS.CertFile and cfg.Core.TLS.KeyFile into srv.TLSConfig.
+		// In most deployments TLS is terminated by the proxy; set those fields
+		// in config.go before enabling self-terminating TLS.
 		serveErr = srv.ListenAndServeTLS("", "")
 	} else {
 		serveErr = srv.ListenAndServe()

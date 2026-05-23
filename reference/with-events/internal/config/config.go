@@ -37,12 +37,53 @@ func Load() (Config, error) {
 		cfg.WebhookTargetURL = value
 	}
 
-	flag.StringVar(&cfg.Addr, "addr", cfg.Addr, "listen address")
-	flag.StringVar(&cfg.LogLevel, "log-level", cfg.LogLevel, "log level")
-	flag.StringVar(&cfg.WebhookTargetURL, "webhook-target-url", cfg.WebhookTargetURL, "optional webhook target URL")
-	flag.Parse()
+	if err := applyFlags(&cfg, os.Args); err != nil {
+		return cfg, err
+	}
 
 	return cfg, Validate(cfg)
+}
+
+func applyFlags(cfg *Config, args []string) error {
+	fs := flag.NewFlagSet("with-events", flag.ContinueOnError)
+	fs.StringVar(&cfg.Addr, "addr", cfg.Addr, "listen address")
+	fs.StringVar(&cfg.LogLevel, "log-level", cfg.LogLevel, "log level")
+	fs.StringVar(&cfg.WebhookTargetURL, "webhook-target-url", cfg.WebhookTargetURL, "optional webhook target URL")
+	if len(args) == 0 {
+		return fs.Parse(nil)
+	}
+	return fs.Parse(configFlagArgs(args[1:]))
+}
+
+func configFlagArgs(args []string) []string {
+	out := make([]string, 0, len(args))
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		name, hasValue := flagName(arg)
+		switch name {
+		case "addr", "log-level", "webhook-target-url":
+			out = append(out, arg)
+			if !hasValue && i+1 < len(args) {
+				i++
+				out = append(out, args[i])
+			}
+		}
+	}
+	return out
+}
+
+func flagName(arg string) (name string, hasValue bool) {
+	if strings.HasPrefix(arg, "--") {
+		arg = strings.TrimPrefix(arg, "--")
+	} else if strings.HasPrefix(arg, "-") {
+		arg = strings.TrimPrefix(arg, "-")
+	} else {
+		return "", false
+	}
+	if idx := strings.IndexByte(arg, '='); idx >= 0 {
+		return arg[:idx], true
+	}
+	return arg, false
 }
 
 // Validate returns an error when cfg cannot start the app.

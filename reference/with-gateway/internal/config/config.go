@@ -50,7 +50,9 @@ func Load() (Config, error) {
 	if err := applyEnv(&cfg); err != nil {
 		return cfg, err
 	}
-	applyFlags(&cfg)
+	if err := applyFlags(&cfg, os.Args); err != nil {
+		return cfg, err
+	}
 
 	return cfg, Validate(cfg)
 }
@@ -74,12 +76,47 @@ func applyEnv(cfg *Config) error {
 	return nil
 }
 
-func applyFlags(cfg *Config) {
-	flag.StringVar(&cfg.Core.Addr, "addr", cfg.Core.Addr, "listen address")
-	flag.StringVar(&cfg.App.EnvFile, "env-file", cfg.App.EnvFile, "path to .env file")
-	flag.BoolVar(&cfg.App.Debug, "debug", cfg.App.Debug, "enable debug mode")
-	flag.StringVar(&cfg.GatewayBackend, "gateway-backend", cfg.GatewayBackend, "backend URL to proxy to")
-	flag.Parse()
+func applyFlags(cfg *Config, args []string) error {
+	fs := flag.NewFlagSet("with-gateway", flag.ContinueOnError)
+	fs.StringVar(&cfg.Core.Addr, "addr", cfg.Core.Addr, "listen address")
+	fs.StringVar(&cfg.App.EnvFile, "env-file", cfg.App.EnvFile, "path to .env file")
+	fs.BoolVar(&cfg.App.Debug, "debug", cfg.App.Debug, "enable debug mode")
+	fs.StringVar(&cfg.GatewayBackend, "gateway-backend", cfg.GatewayBackend, "backend URL to proxy to")
+	if len(args) == 0 {
+		return fs.Parse(nil)
+	}
+	return fs.Parse(configFlagArgs(args[1:]))
+}
+
+func configFlagArgs(args []string) []string {
+	out := make([]string, 0, len(args))
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		name, hasValue := flagName(arg)
+		switch name {
+		case "addr", "env-file", "debug", "gateway-backend":
+			out = append(out, arg)
+			if !hasValue && i+1 < len(args) {
+				i++
+				out = append(out, args[i])
+			}
+		}
+	}
+	return out
+}
+
+func flagName(arg string) (name string, hasValue bool) {
+	if strings.HasPrefix(arg, "--") {
+		arg = strings.TrimPrefix(arg, "--")
+	} else if strings.HasPrefix(arg, "-") {
+		arg = strings.TrimPrefix(arg, "-")
+	} else {
+		return "", false
+	}
+	if idx := strings.IndexByte(arg, '='); idx >= 0 {
+		return arg[:idx], true
+	}
+	return arg, false
 }
 
 func resolveEnvFile(args []string, defaultPath string) string {

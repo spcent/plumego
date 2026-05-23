@@ -71,6 +71,10 @@ func (h ItemHandler) Create(w http.ResponseWriter, r *http.Request) {
 	_ = contract.WriteResponse(w, r, http.StatusCreated, item, nil)
 }
 
+// noLimit is the sentinel value for parseQueryInt's maxVal parameter.
+// Pass noLimit to allow any value above minVal without capping.
+const noLimit = 0
+
 // List handles GET /api/v1/items with basic limit/offset pagination.
 // Items are returned in stable creation order.
 // Pagination metadata (total, limit, offset) is carried in the response meta field,
@@ -95,7 +99,7 @@ func (h ItemHandler) List(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	offset, ok := parseQueryInt(r, "offset", 0, 0, 0)
+	offset, ok := parseQueryInt(r, "offset", 0, 0, noLimit)
 	if !ok {
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeBadRequest).
@@ -123,11 +127,12 @@ func (h ItemHandler) List(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// parseQueryInt parses a non-negative integer query parameter.
-// Returns (value, true) when the parameter is absent (uses defaultVal) or is valid.
-// Returns (0, false) when the parameter is present but not a valid integer or is below minVal —
-// the caller should return a 400 error in this case.
-// When maxVal > 0, values above maxVal are silently clamped.
+// parseQueryInt parses an integer query parameter.
+// Returns (defaultVal, true) when the parameter is absent.
+// Returns (0, false) when the parameter is present but not a valid integer or is below minVal;
+// the caller should write a 400 error in that case.
+// When maxVal > 0, values above maxVal are silently clamped to maxVal.
+// Pass noLimit (0) for maxVal to allow any value above minVal without capping.
 func parseQueryInt(r *http.Request, key string, defaultVal, minVal, maxVal int) (int, bool) {
 	raw := r.URL.Query().Get(key)
 	if raw == "" {

@@ -15,7 +15,7 @@ It is the single source of truth for:
 
 Design constraints:
 
-- depends only on `core`, `router`, `contract`, `middleware`, `security`, `store`, `health`, `log`, and `metrics` plus the standard library
+- depends only on `core`, `router`, `contract`, `middleware`, `health`, and `log` plus the standard library
 - excludes `x/*` capabilities from the canonical learning path
 - keeps all route registration explicit in `internal/app/routes.go`
 - keeps app-local configuration in `internal/config`
