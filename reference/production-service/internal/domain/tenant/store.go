@@ -1,4 +1,4 @@
-package app
+package tenant
 
 import (
 	"encoding/json"
@@ -7,41 +7,44 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
-
-	"production-service/internal/domain/tenant"
 )
 
-type profileStoreFile struct {
-	Profiles []tenant.Profile `json:"profiles"`
+type storeFile struct {
+	Profiles []Profile `json:"profiles"`
 }
 
-type profileStore struct {
+// Store is a local JSON-backed repository of tenant profiles.
+// It is intentionally lightweight; replace it with an application-owned
+// repository backed by a real database in production use.
+type Store struct {
 	mu       sync.RWMutex
 	path     string
-	profiles map[string]tenant.Profile
+	profiles map[string]Profile
 }
 
-func newProfileStore(path string) (*profileStore, error) {
+// NewStore loads profiles from path. When path is empty the store starts with
+// the built-in development defaults and holds them in memory only.
+func NewStore(path string) (*Store, error) {
 	profiles := defaultProfiles()
 	if path != "" {
-		loaded, err := loadProfileFile(path, profiles)
+		loaded, err := loadStoreFile(path, profiles)
 		if err != nil {
 			return nil, err
 		}
 		profiles = loaded
 	}
-	return &profileStore{path: path, profiles: profiles}, nil
+	return &Store{path: path, profiles: profiles}, nil
 }
 
-func defaultProfiles() map[string]tenant.Profile {
-	profiles := make(map[string]tenant.Profile)
-	profiles["tenant-a"] = tenant.Profile{
+func defaultProfiles() map[string]Profile {
+	profiles := make(map[string]Profile)
+	profiles["tenant-a"] = Profile{
 		TenantID: "tenant-a",
 		Name:     "Tenant A",
 		Plan:     "production",
 		Features: []string{"api", "ops", "tenant_context"},
 	}
-	profiles["tenant-b"] = tenant.Profile{
+	profiles["tenant-b"] = Profile{
 		TenantID: "tenant-b",
 		Name:     "Tenant B",
 		Plan:     "standard",
@@ -50,10 +53,10 @@ func defaultProfiles() map[string]tenant.Profile {
 	return profiles
 }
 
-func loadProfileFile(path string, fallback map[string]tenant.Profile) (map[string]tenant.Profile, error) {
+func loadStoreFile(path string, fallback map[string]Profile) (map[string]Profile, error) {
 	content, err := os.ReadFile(path)
 	if errors.Is(err, os.ErrNotExist) {
-		if err := writeProfileFile(path, fallback); err != nil {
+		if err := writeStoreFile(path, fallback); err != nil {
 			return nil, err
 		}
 		return fallback, nil
@@ -62,11 +65,11 @@ func loadProfileFile(path string, fallback map[string]tenant.Profile) (map[strin
 		return nil, err
 	}
 
-	var file profileStoreFile
+	var file storeFile
 	if err := json.Unmarshal(content, &file); err != nil {
 		return nil, fmt.Errorf("decode profile store %s: %w", path, err)
 	}
-	profiles := make(map[string]tenant.Profile, len(file.Profiles))
+	profiles := make(map[string]Profile, len(file.Profiles))
 	for _, profile := range file.Profiles {
 		if profile.TenantID == "" {
 			return nil, fmt.Errorf("decode profile store %s: tenant_id is required", path)
@@ -76,11 +79,11 @@ func loadProfileFile(path string, fallback map[string]tenant.Profile) (map[strin
 	return profiles, nil
 }
 
-func writeProfileFile(path string, profiles map[string]tenant.Profile) error {
+func writeStoreFile(path string, profiles map[string]Profile) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return fmt.Errorf("create profile store directory: %w", err)
 	}
-	file := profileStoreFile{Profiles: make([]tenant.Profile, 0, len(profiles))}
+	file := storeFile{Profiles: make([]Profile, 0, len(profiles))}
 	for _, profile := range profiles {
 		file.Profiles = append(file.Profiles, profile)
 	}
@@ -94,9 +97,10 @@ func writeProfileFile(path string, profiles map[string]tenant.Profile) error {
 	return nil
 }
 
-func (s *profileStore) Get(tenantID string) (tenant.Profile, bool) {
+// Get returns the profile for tenantID and whether it was found.
+func (s *Store) Get(tenantID string) (Profile, bool) {
 	if s == nil {
-		return tenant.Profile{}, false
+		return Profile{}, false
 	}
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -104,21 +108,24 @@ func (s *profileStore) Get(tenantID string) (tenant.Profile, bool) {
 	return profile, ok
 }
 
-func (s *profileStore) Kind() string {
+// Kind returns a short label describing the storage backend.
+func (s *Store) Kind() string {
 	if s == nil || s.path == "" {
 		return "app_local_in_memory_reference"
 	}
 	return "app_local_json_file_reference"
 }
 
-func (s *profileStore) Replacement() string {
+// Replacement describes how to swap this store for a production-grade one.
+func (s *Store) Replacement() string {
 	if s == nil || s.path == "" {
-		return "set APP_PROFILE_STORE_PATH or replace profileStore behind App.Profiles in internal/app"
+		return "set APP_PROFILE_STORE_PATH or replace Store behind App.Profiles in internal/app"
 	}
 	return "replace JSON loader behind App.Profiles with an application-owned repository"
 }
 
-func (s *profileStore) Path() string {
+// Path returns the file path backing this store, or empty string for in-memory.
+func (s *Store) Path() string {
 	if s == nil {
 		return ""
 	}

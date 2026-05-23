@@ -34,12 +34,53 @@ func Load() (Config, error) {
 		cfg.LogLevel = value
 	}
 
-	flag.StringVar(&cfg.Addr, "addr", cfg.Addr, "listen address")
-	flag.StringVar(&cfg.AdminToken, "admin-token", cfg.AdminToken, "static admin token")
-	flag.StringVar(&cfg.LogLevel, "log-level", cfg.LogLevel, "log level")
-	flag.Parse()
+	if err := applyFlags(&cfg, os.Args); err != nil {
+		return cfg, err
+	}
 
 	return cfg, Validate(cfg)
+}
+
+func applyFlags(cfg *Config, args []string) error {
+	fs := flag.NewFlagSet("with-tenant-admin", flag.ContinueOnError)
+	fs.StringVar(&cfg.Addr, "addr", cfg.Addr, "listen address")
+	fs.StringVar(&cfg.AdminToken, "admin-token", cfg.AdminToken, "static admin token")
+	fs.StringVar(&cfg.LogLevel, "log-level", cfg.LogLevel, "log level")
+	if len(args) == 0 {
+		return fs.Parse(nil)
+	}
+	return fs.Parse(configFlagArgs(args[1:]))
+}
+
+func configFlagArgs(args []string) []string {
+	out := make([]string, 0, len(args))
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		name, hasValue := flagName(arg)
+		switch name {
+		case "addr", "admin-token", "log-level":
+			out = append(out, arg)
+			if !hasValue && i+1 < len(args) {
+				i++
+				out = append(out, args[i])
+			}
+		}
+	}
+	return out
+}
+
+func flagName(arg string) (name string, hasValue bool) {
+	if strings.HasPrefix(arg, "--") {
+		arg = strings.TrimPrefix(arg, "--")
+	} else if strings.HasPrefix(arg, "-") {
+		arg = strings.TrimPrefix(arg, "-")
+	} else {
+		return "", false
+	}
+	if idx := strings.IndexByte(arg, '='); idx >= 0 {
+		return arg[:idx], true
+	}
+	return arg, false
 }
 
 func Validate(cfg Config) error {

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/spcent/plumego/core"
@@ -51,7 +52,9 @@ func Defaults() Config {
 func Load() (Config, error) {
 	cfg := Defaults()
 	applyEnv(&cfg)
-	applyFlags(&cfg)
+	if err := applyFlags(&cfg, os.Args); err != nil {
+		return cfg, err
+	}
 	return cfg, Validate(cfg)
 }
 
@@ -94,18 +97,54 @@ func applyEnv(cfg *Config) {
 	cfg.App.RateBurst = envInt("APP_RATE_BURST", cfg.App.RateBurst)
 }
 
-func applyFlags(cfg *Config) {
-	flag.StringVar(&cfg.Core.Addr, "addr", cfg.Core.Addr, "listen address")
-	flag.StringVar(&cfg.App.Environment, "env", cfg.App.Environment, "deployment environment")
-	flag.StringVar(&cfg.App.ServiceName, "service-name", cfg.App.ServiceName, "service name")
-	flag.StringVar(&cfg.App.APIToken, "api-token", cfg.App.APIToken, "bearer token for protected API routes")
-	flag.StringVar(&cfg.App.OpsToken, "ops-token", cfg.App.OpsToken, "bearer token for ops routes")
-	flag.StringVar(&cfg.App.ProfileStorePath, "profile-store-path", cfg.App.ProfileStorePath, "optional JSON profile store path")
-	flag.Int64Var(&cfg.App.BodyLimitBytes, "body-limit-bytes", cfg.App.BodyLimitBytes, "request body limit")
-	flag.DurationVar(&cfg.App.RequestTimeout, "request-timeout", cfg.App.RequestTimeout, "request timeout")
-	flag.Float64Var(&cfg.App.RateLimit, "rate-limit", cfg.App.RateLimit, "requests per second per client")
-	flag.IntVar(&cfg.App.RateBurst, "rate-burst", cfg.App.RateBurst, "rate-limit burst capacity")
-	flag.Parse()
+func applyFlags(cfg *Config, args []string) error {
+	fs := flag.NewFlagSet("production-service", flag.ContinueOnError)
+	fs.StringVar(&cfg.Core.Addr, "addr", cfg.Core.Addr, "listen address")
+	fs.StringVar(&cfg.App.Environment, "env", cfg.App.Environment, "deployment environment")
+	fs.StringVar(&cfg.App.ServiceName, "service-name", cfg.App.ServiceName, "service name")
+	fs.StringVar(&cfg.App.APIToken, "api-token", cfg.App.APIToken, "bearer token for protected API routes")
+	fs.StringVar(&cfg.App.OpsToken, "ops-token", cfg.App.OpsToken, "bearer token for ops routes")
+	fs.StringVar(&cfg.App.ProfileStorePath, "profile-store-path", cfg.App.ProfileStorePath, "optional JSON profile store path")
+	fs.Int64Var(&cfg.App.BodyLimitBytes, "body-limit-bytes", cfg.App.BodyLimitBytes, "request body limit")
+	fs.DurationVar(&cfg.App.RequestTimeout, "request-timeout", cfg.App.RequestTimeout, "request timeout")
+	fs.Float64Var(&cfg.App.RateLimit, "rate-limit", cfg.App.RateLimit, "requests per second per client")
+	fs.IntVar(&cfg.App.RateBurst, "rate-burst", cfg.App.RateBurst, "rate-limit burst capacity")
+	if len(args) == 0 {
+		return fs.Parse(nil)
+	}
+	return fs.Parse(configFlagArgs(args[1:]))
+}
+
+func configFlagArgs(args []string) []string {
+	out := make([]string, 0, len(args))
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		name, hasValue := flagName(arg)
+		switch name {
+		case "addr", "env", "service-name", "api-token", "ops-token", "profile-store-path",
+			"body-limit-bytes", "request-timeout", "rate-limit", "rate-burst":
+			out = append(out, arg)
+			if !hasValue && i+1 < len(args) {
+				i++
+				out = append(out, args[i])
+			}
+		}
+	}
+	return out
+}
+
+func flagName(arg string) (name string, hasValue bool) {
+	if strings.HasPrefix(arg, "--") {
+		arg = strings.TrimPrefix(arg, "--")
+	} else if strings.HasPrefix(arg, "-") {
+		arg = strings.TrimPrefix(arg, "-")
+	} else {
+		return "", false
+	}
+	if idx := strings.IndexByte(arg, '='); idx >= 0 {
+		return arg[:idx], true
+	}
+	return arg, false
 }
 
 func envString(key, fallback string) string {

@@ -21,6 +21,7 @@ import (
 	"github.com/spcent/plumego/middleware/timeout"
 	"github.com/spcent/plumego/middleware/tracing"
 	"production-service/internal/config"
+	"production-service/internal/domain/tenant"
 )
 
 // App holds application-wide dependencies.
@@ -28,7 +29,7 @@ type App struct {
 	Core      *core.App
 	Cfg       config.Config
 	Metrics   *metrics.BaseMetricsCollector
-	Profiles  *profileStore
+	Profiles  *tenant.Store
 	RateLimit *ratelimit.AbuseGuardMiddleware
 }
 
@@ -36,7 +37,7 @@ type App struct {
 func New(cfg config.Config) (*App, error) {
 	logger := plumelog.NewLogger()
 	collector := metrics.NewBaseMetricsCollector()
-	profiles, err := newProfileStore(cfg.App.ProfileStorePath)
+	profiles, err := tenant.NewStore(cfg.App.ProfileStorePath)
 	if err != nil {
 		return nil, fmt.Errorf("load profile store: %w", err)
 	}
