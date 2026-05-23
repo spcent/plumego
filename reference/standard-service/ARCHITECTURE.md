@@ -166,10 +166,11 @@ the prefix is declared once and never repeated:
 
 ```go
 v1 := a.Core.Group("/api/v1")
-v1.Get("/greet",     http.HandlerFunc(api.Greet))
-v1.Get("/items",     http.HandlerFunc(items.List))
-v1.Post("/items",    http.HandlerFunc(items.Create))
-v1.Get("/items/:id", http.HandlerFunc(items.GetByID))
+v1.Get("/greet",        http.HandlerFunc(api.Greet))
+v1.Get("/items",        http.HandlerFunc(items.List))
+v1.Post("/items",       http.HandlerFunc(items.Create))
+v1.Get("/items/:id",    http.HandlerFunc(items.GetByID))
+v1.Put("/items/:id",    writeGuard(http.HandlerFunc(items.Update)))
 v1.Delete("/items/:id", http.HandlerFunc(items.Delete))
 ```
 
@@ -180,16 +181,43 @@ nested (`api := app.Group("/api"); v1 := api.Group("/v1")`).
 REST resources follow a consistent two-path pattern:
 
 ```
-GET    /api/v1/items       → list all items
-POST   /api/v1/items       → create an item
+GET    /api/v1/items         → list all items
+POST   /api/v1/items         → create an item
 
-GET    /api/v1/items/:id   → fetch one item
-DELETE /api/v1/items/:id   → remove one item
+GET    /api/v1/items/:id     → fetch one item
+PUT    /api/v1/items/:id     → replace an item (idempotent full replacement)
+DELETE /api/v1/items/:id     → remove one item
 ```
 
 The same collection path and member path carry different verbs; the group
 prefix keeps the registration readable without any controller scanning or
 annotation-based magic.
+
+**PUT vs PATCH**: This reference uses PUT (full replacement). PATCH (partial
+update) is semantically more complex: it requires distinguishing "field not
+provided" from "field set to null/zero", which typically demands a custom
+merge strategy or JSON Merge Patch (RFC 7396). Use PUT when the client owns
+the full resource representation; reach for PATCH only when partial updates
+are a hard product requirement and the merge semantics are well-defined.
+
+### Error accumulation in route registration (`routeReg`)
+
+`routes.go` uses a small local helper (`routeReg`) to avoid per-call error
+checks when registering routes. It wraps `routeAdder` and records only the
+first error:
+
+```go
+v1 := newRouteReg(a.Core.Group("/api/v1"))
+v1.get("/items",     http.HandlerFunc(items.List))   // error captured internally
+v1.post("/items",    writeGuard(http.HandlerFunc(items.Create)))
+v1.get("/items/:id", http.HandlerFunc(items.GetByID))
+return v1.err                                         // single check at the end
+```
+
+This keeps the route table visually flat — one line per route — without
+sacrificing error propagation. The pattern is correct because route
+registration errors (duplicate path, nil handler) are always programming
+mistakes; there is at most one at a time and the first one is the one to fix.
 
 ---
 

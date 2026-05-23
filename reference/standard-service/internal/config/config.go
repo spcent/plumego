@@ -78,45 +78,46 @@ func Validate(cfg Config) error {
 	return nil
 }
 
-// applyEnvMap applies string key-value pairs from a map (e.g., from .env file).
-// It is the baseline implementation that all env-reading code uses.
-func applyEnvMap(cfg *Config, values map[string]string) {
-	if values == nil {
+// applyEnv is the single source of truth for mapping APP_* variables to config
+// fields. It accepts a lookupEnv function so it works identically with
+// os.LookupEnv, test stubs, and pre-parsed .env file maps.
+// Adding a new config field requires only one change here.
+func applyEnv(cfg *Config, lookupEnv func(string) (string, bool)) {
+	if lookupEnv == nil {
 		return
 	}
-	setEnvString := func(key, oldValue string) string {
-		if value := strings.TrimSpace(values[key]); value != "" {
-			return value
-		}
-		return oldValue
-	}
-	setEnvInt64 := func(key string, oldValue int64) int64 {
-		if value := strings.TrimSpace(values[key]); value != "" {
-			if n, err := strconv.ParseInt(value, 10, 64); err == nil {
-				return n
+	str := func(key string, dest *string) {
+		if val, ok := lookupEnv(key); ok {
+			if v := strings.TrimSpace(val); v != "" {
+				*dest = v
 			}
 		}
-		return oldValue
 	}
-
-	cfg.Core.Addr = setEnvString("APP_ADDR", cfg.Core.Addr)
-	cfg.App.EnvFile = setEnvString("APP_ENV_FILE", cfg.App.EnvFile)
-	cfg.App.ServiceName = setEnvString("APP_SERVICE_NAME", cfg.App.ServiceName)
-	cfg.App.MaxBodyBytes = setEnvInt64("APP_MAX_BODY_BYTES", cfg.App.MaxBodyBytes)
-	cfg.App.WriteKey = setEnvString("APP_WRITE_KEY", cfg.App.WriteKey)
-}
-
-// applyEnv applies environment variables by looking them up via lookupEnv.
-// It uses applyEnvMap internally to reduce duplication.
-func applyEnv(cfg *Config, lookupEnv func(string) (string, bool)) {
-	values := make(map[string]string)
-	keys := []string{"APP_ADDR", "APP_ENV_FILE", "APP_SERVICE_NAME", "APP_MAX_BODY_BYTES", "APP_WRITE_KEY"}
-	for _, key := range keys {
+	int64f := func(key string, dest *int64) {
 		if val, ok := lookupEnv(key); ok {
-			values[key] = val
+			if n, err := strconv.ParseInt(strings.TrimSpace(val), 10, 64); err == nil {
+				*dest = n
+			}
 		}
 	}
-	applyEnvMap(cfg, values)
+	str("APP_ADDR", &cfg.Core.Addr)
+	str("APP_ENV_FILE", &cfg.App.EnvFile)
+	str("APP_SERVICE_NAME", &cfg.App.ServiceName)
+	int64f("APP_MAX_BODY_BYTES", &cfg.App.MaxBodyBytes)
+	str("APP_WRITE_KEY", &cfg.App.WriteKey)
+}
+
+// applyEnvMap applies a pre-parsed key-value map (e.g., from a .env file) to cfg.
+// It adapts the map to a lookupEnv signature and delegates to applyEnv, so the
+// field mapping is defined in exactly one place.
+func applyEnvMap(cfg *Config, values map[string]string) {
+	if len(values) == 0 {
+		return
+	}
+	applyEnv(cfg, func(key string) (string, bool) {
+		v, ok := values[key]
+		return v, ok
+	})
 }
 
 func applyFlags(cfg *Config, args []string) error {

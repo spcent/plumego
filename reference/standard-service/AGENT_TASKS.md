@@ -166,6 +166,53 @@ if err := a.Core.Delete("/api/v1/widgets/:id", http.HandlerFunc(widgets.Delete))
 }
 ```
 
+### Validate multiple fields and return the first error
+
+`contract.WriteError` writes one error per response. The canonical pattern is
+fail-fast: validate fields in priority order and return on the first failure.
+This keeps error responses simple and predictable.
+
+```go
+func (h WidgetHandler) Create(w http.ResponseWriter, r *http.Request) {
+    var req struct {
+        Name  string `json:"name"`
+        Color string `json:"color"`
+    }
+    if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+        _ = contract.WriteError(w, r, contract.NewErrorBuilder().
+            Type(contract.TypeBadRequest).
+            Code("widget.create.invalid_json").
+            Message("request body must be valid JSON").
+            Build())
+        return
+    }
+    if req.Name == "" {
+        _ = contract.WriteError(w, r, contract.NewErrorBuilder().
+            Type(contract.TypeRequired).
+            Code("widget.name.required").
+            Detail("field", "name").
+            Message("name is required").
+            Build())
+        return
+    }
+    if req.Color == "" {
+        _ = contract.WriteError(w, r, contract.NewErrorBuilder().
+            Type(contract.TypeRequired).
+            Code("widget.color.required").
+            Detail("field", "color").
+            Message("color is required").
+            Build())
+        return
+    }
+    // all fields valid — proceed
+}
+```
+
+Each error carries a `Detail("field", "<name>")` annotation so clients know
+exactly which field to highlight. Error codes are namespaced
+(`<resource>.<field>.<reason>`) for machine-readable disambiguation. Write one
+constant per distinct error code at the top of the handler file.
+
 ### Add a config field
 
 1. Add the field to `AppConfig` in `internal/config/config.go`.
