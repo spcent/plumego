@@ -51,7 +51,7 @@ const expCount = extensionCards.filter(c => c.status === 'experimental').length;
   <PageHero
     eyebrow="扩展家族"
     title="x/* 生态系统。内核之外的能力。"
-    body={`${betaCount} 个 beta 家族，API 在发布 ref 间冻结。${expCount} 个实验性家族，用于产品能力工作。所有家族与零依赖稳定内核完全分离。`}
+    description={`${betaCount} 个 beta 家族，API 在发布 ref 间冻结。${expCount} 个实验性家族，用于产品能力工作。所有家族与零依赖稳定内核完全分离。`}
   />
 
   <JourneyBar steps={journeySteps} current="/zh/extensions" />
@@ -111,7 +111,7 @@ const expCount = extensionCards.filter(c => c.status === 'experimental').length;
     <div class="extensions-footer-cta">
       <a class="button button--primary" href="/zh/docs/x-family">X-Family 总览 →</a>
       <a class="button button--ghost" href="/zh/stability">稳定性与成熟度策略 →</a>
-      <a class="button button--ghost" href="/zh/architecture#extensions">架构图 →</a>
+      <a class="button button--ghost" href="/zh/architecture">架构图 →</a>
     </div>
   </section>
 </MarketingLayout>

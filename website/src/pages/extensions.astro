@@ -51,7 +51,7 @@ const expCount = extensionCards.filter(c => c.status === 'experimental').length;
   <PageHero
     eyebrow="extension families"
     title="The x/* ecosystem. Capability outside the kernel."
-    body={`${betaCount} beta families with APIs frozen between release refs. ${expCount} experimental families for product capability work. All separated cleanly from the zero-dependency stable core.`}
+    description={`${betaCount} beta families with APIs frozen between release refs. ${expCount} experimental families for product capability work. All separated cleanly from the zero-dependency stable core.`}
   />
 
   <JourneyBar steps={journeySteps} current="/extensions" />
@@ -111,7 +111,7 @@ const expCount = extensionCards.filter(c => c.status === 'experimental').length;
     <div class="extensions-footer-cta">
       <a class="button button--primary" href="/docs/x-family">X-Family Overview →</a>
       <a class="button button--ghost" href="/stability">Stability & Maturity Policy →</a>
-      <a class="button button--ghost" href="/architecture#extensions">Architecture Diagram →</a>
+      <a class="button button--ghost" href="/architecture">Architecture Diagram →</a>
     </div>
   </section>
 </MarketingLayout>

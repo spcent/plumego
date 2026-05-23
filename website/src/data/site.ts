@@ -241,7 +241,7 @@ api.Get("/data", data.List)
     finalBody:
       'Clone reference/standard-service for the stable kernel path. Browse the modules overview to find the right capability family. Let the control plane guide coding assistants and reviewers alike.',
     finalPrimary: { label: 'Read Docs', href: '/docs' },
-    finalSecondary: { label: 'Browse Extensions', href: '/docs/modules/overview' },
+    finalSecondary: { label: 'Browse Extensions', href: '/extensions' },
     contrastTitle: 'The difference shows in code review.',
     contrastLead:
       'When routes are spread across packages, a reviewer has to open each one to understand what paths exist and what middleware runs. Plumego keeps the full route map in one explicit file — and adds a structured <code>contract</code> layer so error and success responses stay consistent across all handlers.',
@@ -363,7 +363,7 @@ api.Get("/data", data.List)
     finalTitle: '从 reference app 起步。选对 x/* 家族。保持边界清晰。',
     finalBody: 'clone reference/standard-service 沿稳定内核路径出发。在模块总览中找到合适的能力家族。让控制平面同时引导编程助手和代码评审者。',
     finalPrimary: { label: '阅读文档', href: '/zh/docs' },
-    finalSecondary: { label: '浏览扩展家族', href: '/zh/docs/modules/overview' },
+    finalSecondary: { label: '浏览扩展家族', href: '/zh/extensions' },
     contrastTitle: '差异在代码评审时最明显。',
     contrastLead:
       '当路由分散在各个包里时，评审者必须逐个打开才能知道有哪些路径和中间件在运行。Plumego 把完整路由表放在一个显式文件里——同时加入结构化的 <code>contract</code> 层，让所有 handler 的错误响应和成功响应保持一致。',
