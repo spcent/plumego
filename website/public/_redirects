@@ -1,2 +1,8 @@
 /zh-cn /zh 301
 /zh-cn/* /zh/:splat 301
+/agent-workflow  /agent-workflow  200
+/extensions      /extensions      200
+/migrate         /migrate         200
+/zh/agent-workflow  /zh/agent-workflow  200
+/zh/extensions      /zh/extensions      200
+/zh/migrate         /zh/migrate         200
