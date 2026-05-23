@@ -100,9 +100,6 @@ func New(cfg config.Config) (*App, error) {
 // Start prepares the runtime and blocks while the HTTP server runs.
 // When ctx is canceled, it triggers a graceful shutdown.
 func (a *App) Start(ctx context.Context) error {
-	if ctx == nil {
-		ctx = context.Background()
-	}
 	if a.RateLimit != nil {
 		defer a.RateLimit.Stop()
 	}
@@ -114,6 +111,10 @@ func (a *App) Start(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("get server: %w", err)
 	}
+	a.Core.Logger().Info("starting server", plumelog.Fields{
+		"addr": a.Cfg.Core.Addr,
+		"tls":  a.Cfg.Core.TLS.Enabled,
+	})
 	shutdownErr := make(chan error, 1)
 	go func() {
 		<-ctx.Done()

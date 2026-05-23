@@ -35,6 +35,5 @@ func run() error {
 		return err
 	}
 
-	log.Printf("Starting with-tenant-admin on %s", cfg.Addr)
 	return a.Start(ctx)
 }

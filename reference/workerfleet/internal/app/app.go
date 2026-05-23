@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"net/http"
 	"os"
 	"os/signal"
@@ -78,9 +77,6 @@ func (a *App) Run(ctx context.Context) error {
 	if a == nil {
 		return fmt.Errorf("workerfleet app is required")
 	}
-	if ctx == nil {
-		ctx = context.Background()
-	}
 
 	stopLoops, err := a.runtime.StartLoops(ctx, a.config)
 	if err != nil {
@@ -108,9 +104,11 @@ func (a *App) Run(ctx context.Context) error {
 		return fmt.Errorf("get server: %w", err)
 	}
 
+	a.core.Logger().Info("starting server", plumelog.Fields{
+		"addr": a.server.Core.Addr,
+	})
 	serverErr := make(chan error, 1)
 	go func() {
-		log.Printf("starting workerfleet on %s", a.server.Core.Addr)
 		serverErr <- server.ListenAndServe()
 	}()
 

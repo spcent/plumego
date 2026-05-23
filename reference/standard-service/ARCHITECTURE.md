@@ -114,10 +114,10 @@ independently testable: tests pass a stub; production passes the real store.
 ```go
 // handler declares the interface it needs
 type ItemRepository interface {
-    Create(name string) item.Item
-    Get(id string) (item.Item, bool)
-    List() []item.Item
-    Delete(id string) bool
+    Create(ctx context.Context, name string) item.Item
+    Get(ctx context.Context, id string) (item.Item, bool)
+    List(ctx context.Context) []item.Item
+    Delete(ctx context.Context, id string) bool
 }
 
 type ItemHandler struct {

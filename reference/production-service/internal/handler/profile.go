@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/spcent/plumego/contract"
@@ -9,10 +10,11 @@ import (
 )
 
 // ProfileStore is the minimal persistence interface that ProfileHandler depends on.
-// The concrete implementation (internal/app/profileStore) satisfies this interface;
-// tests may pass a stub without constructing the full app.
+// All methods accept a context so callers can propagate request deadlines and
+// cancellation to real storage backends. Pass a concrete implementation from
+// routes.go; pass a stub in tests.
 type ProfileStore interface {
-	Get(tenantID string) (tenant.Profile, bool)
+	Get(ctx context.Context, tenantID string) (tenant.Profile, bool)
 }
 
 // ProfileHandler serves GET /api/profile.
@@ -30,7 +32,7 @@ const codeProfileNotFound = "profile.not_found"
 //	GET /api/profile (unknown tenant)              → 404 TypeNotFound
 func (h ProfileHandler) GetProfile(w http.ResponseWriter, r *http.Request) {
 	tenantID := tenantcore.TenantIDFromContext(r.Context())
-	profile, ok := h.Profiles.Get(tenantID)
+	profile, ok := h.Profiles.Get(r.Context(), tenantID)
 	if !ok {
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeNotFound).

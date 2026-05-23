@@ -58,9 +58,6 @@ func New(cfg config.Config) (*App, error) {
 // Start prepares the runtime and blocks while the HTTP server runs.
 // Shutdown is driven by ctx so the application owner controls process signals.
 func (a *App) Start(ctx context.Context) error {
-	if ctx == nil {
-		ctx = context.Background()
-	}
 	if err := a.Core.Prepare(); err != nil {
 		return fmt.Errorf("prepare server: %w", err)
 	}
@@ -68,6 +65,10 @@ func (a *App) Start(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("get server: %w", err)
 	}
+	a.Core.Logger().Info("starting server", plumelog.Fields{
+		"addr": a.Cfg.Core.Addr,
+		"tls":  a.Cfg.Core.TLS.Enabled,
+	})
 	shutdownErr := make(chan error, 1)
 	go func() {
 		<-ctx.Done()

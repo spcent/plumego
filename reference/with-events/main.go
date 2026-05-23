@@ -33,7 +33,6 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	log.Printf("Starting with-events demo on %s", cfg.Addr)
 	if err := a.Start(ctx); err != nil {
 		log.Fatalf("server stopped: %v", err)
 	}

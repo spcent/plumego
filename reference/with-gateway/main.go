@@ -42,6 +42,5 @@ func run() error {
 		return err
 	}
 
-	log.Printf("Starting with-gateway demo on %s (backend: %s)", cfg.Core.Addr, cfg.GatewayBackend)
 	return a.Start(ctx)
 }

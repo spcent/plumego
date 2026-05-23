@@ -50,9 +50,16 @@ func Defaults() Config {
 
 // Load reads environment variables and command-line flags.
 func Load() (Config, error) {
+	return load(os.Args, os.LookupEnv)
+}
+
+func load(args []string, lookupEnv func(string) (string, bool)) (Config, error) {
 	cfg := Defaults()
-	applyEnv(&cfg)
-	if err := applyFlags(&cfg, os.Args); err != nil {
+	if lookupEnv == nil {
+		lookupEnv = os.LookupEnv
+	}
+	applyEnv(&cfg, lookupEnv)
+	if err := applyFlags(&cfg, args); err != nil {
 		return cfg, err
 	}
 	return cfg, Validate(cfg)
@@ -81,20 +88,77 @@ func Validate(cfg Config) error {
 	if cfg.App.RateBurst <= 0 {
 		return fmt.Errorf("rate burst must be positive")
 	}
+	if cfg.Core.TLS.Enabled {
+		if cfg.Core.TLS.CertFile == "" {
+			return fmt.Errorf("APP_TLS_CERT_FILE is required when TLS is enabled")
+		}
+		if cfg.Core.TLS.KeyFile == "" {
+			return fmt.Errorf("APP_TLS_KEY_FILE is required when TLS is enabled")
+		}
+	}
 	return nil
 }
 
-func applyEnv(cfg *Config) {
-	cfg.Core.Addr = envString("APP_ADDR", cfg.Core.Addr)
-	cfg.App.Environment = envString("APP_ENV", cfg.App.Environment)
-	cfg.App.ServiceName = envString("APP_SERVICE_NAME", cfg.App.ServiceName)
-	cfg.App.APIToken = envString("APP_API_TOKEN", cfg.App.APIToken)
-	cfg.App.OpsToken = envString("OPS_TOKEN", cfg.App.OpsToken)
-	cfg.App.ProfileStorePath = envString("APP_PROFILE_STORE_PATH", cfg.App.ProfileStorePath)
-	cfg.App.BodyLimitBytes = envInt64("APP_BODY_LIMIT_BYTES", cfg.App.BodyLimitBytes)
-	cfg.App.RequestTimeout = envDuration("APP_REQUEST_TIMEOUT", cfg.App.RequestTimeout)
-	cfg.App.RateLimit = envFloat("APP_RATE_LIMIT", cfg.App.RateLimit)
-	cfg.App.RateBurst = envInt("APP_RATE_BURST", cfg.App.RateBurst)
+// applyEnv is the single source of truth for mapping APP_* variables to config
+// fields. It accepts a lookupEnv function so it works identically with
+// os.LookupEnv, test stubs, and t.Setenv in integration tests.
+func applyEnv(cfg *Config, lookupEnv func(string) (string, bool)) {
+	if lookupEnv == nil {
+		return
+	}
+	str := func(key string, dest *string) {
+		if val, ok := lookupEnv(key); ok && strings.TrimSpace(val) != "" {
+			*dest = strings.TrimSpace(val)
+		}
+	}
+	int64f := func(key string, dest *int64) {
+		if val, ok := lookupEnv(key); ok {
+			if n, err := strconv.ParseInt(strings.TrimSpace(val), 10, 64); err == nil {
+				*dest = n
+			}
+		}
+	}
+	intf := func(key string, dest *int) {
+		if val, ok := lookupEnv(key); ok {
+			if n, err := strconv.Atoi(strings.TrimSpace(val)); err == nil {
+				*dest = n
+			}
+		}
+	}
+	floatf := func(key string, dest *float64) {
+		if val, ok := lookupEnv(key); ok {
+			if f, err := strconv.ParseFloat(strings.TrimSpace(val), 64); err == nil {
+				*dest = f
+			}
+		}
+	}
+	durf := func(key string, dest *time.Duration) {
+		if val, ok := lookupEnv(key); ok {
+			if d, err := time.ParseDuration(strings.TrimSpace(val)); err == nil {
+				*dest = d
+			}
+		}
+	}
+	boolf := func(key string, dest *bool) {
+		if val, ok := lookupEnv(key); ok {
+			if b, err := strconv.ParseBool(strings.TrimSpace(val)); err == nil {
+				*dest = b
+			}
+		}
+	}
+	str("APP_ADDR", &cfg.Core.Addr)
+	str("APP_ENV", &cfg.App.Environment)
+	str("APP_SERVICE_NAME", &cfg.App.ServiceName)
+	str("APP_API_TOKEN", &cfg.App.APIToken)
+	str("OPS_TOKEN", &cfg.App.OpsToken)
+	str("APP_PROFILE_STORE_PATH", &cfg.App.ProfileStorePath)
+	int64f("APP_BODY_LIMIT_BYTES", &cfg.App.BodyLimitBytes)
+	durf("APP_REQUEST_TIMEOUT", &cfg.App.RequestTimeout)
+	floatf("APP_RATE_LIMIT", &cfg.App.RateLimit)
+	intf("APP_RATE_BURST", &cfg.App.RateBurst)
+	boolf("APP_TLS_ENABLED", &cfg.Core.TLS.Enabled)
+	str("APP_TLS_CERT_FILE", &cfg.Core.TLS.CertFile)
+	str("APP_TLS_KEY_FILE", &cfg.Core.TLS.KeyFile)
 }
 
 func applyFlags(cfg *Config, args []string) error {
@@ -145,43 +209,4 @@ func flagName(arg string) (name string, hasValue bool) {
 		return arg[:idx], true
 	}
 	return arg, false
-}
-
-func envString(key, fallback string) string {
-	if value := os.Getenv(key); value != "" {
-		return value
-	}
-	return fallback
-}
-
-func envInt64(key string, fallback int64) int64 {
-	value, err := strconv.ParseInt(os.Getenv(key), 10, 64)
-	if err != nil || value == 0 {
-		return fallback
-	}
-	return value
-}
-
-func envInt(key string, fallback int) int {
-	value, err := strconv.Atoi(os.Getenv(key))
-	if err != nil || value == 0 {
-		return fallback
-	}
-	return value
-}
-
-func envFloat(key string, fallback float64) float64 {
-	value, err := strconv.ParseFloat(os.Getenv(key), 64)
-	if err != nil || value == 0 {
-		return fallback
-	}
-	return value
-}
-
-func envDuration(key string, fallback time.Duration) time.Duration {
-	value, err := time.ParseDuration(os.Getenv(key))
-	if err != nil || value == 0 {
-		return fallback
-	}
-	return value
 }

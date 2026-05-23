@@ -42,6 +42,5 @@ func run() error {
 		return err
 	}
 
-	log.Printf("Starting with-tenant demo on %s", cfg.Core.Addr)
 	return a.Start(ctx)
 }
