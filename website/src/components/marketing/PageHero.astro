@@ -6,7 +6,7 @@ interface LinkItem {
   href: string;
 }
 
-type HeroVisual = 'decision' | 'architecture' | 'examples' | 'releases' | 'roadmap' | 'fit' | 'migration' | 'extensions';
+type HeroVisual = 'decision' | 'architecture' | 'examples' | 'releases' | 'roadmap' | 'fit' | 'migration' | 'extensions' | 'workflow';
 
 interface Props {
   eyebrow: string;
@@ -85,6 +85,14 @@ const visualCopy = {
       tertiary: 'experimental families',
       footer: 'Adopt from the outside in: stable kernel first, then the x/* family that matches the product need.',
     },
+    workflow: {
+      label: 'agent model',
+      title: 'Route the task first. Bound the scope. Run the same gates as CI.',
+      primary: 'task-routing',
+      secondary: 'module scope',
+      tertiary: 'gates',
+      footer: 'The agent follows the same deterministic sequence a reviewer expects: classify, constrain, change, verify.',
+    },
   },
   zh: {
     decision: {
@@ -151,11 +159,19 @@ const visualCopy = {
       tertiary: '实验性家族',
       footer: '采用顺序从内到外：先稳定内核，再接入匹配产品需求的 x/* 家族。',
     },
+    workflow: {
+      label: 'agent 模型',
+      title: '先路由任务，再收紧作用域，最后跑和 CI 一样的 gates。',
+      primary: '任务路由',
+      secondary: '模块作用域',
+      tertiary: 'gates',
+      footer: 'Agent 遵循与评审者一致的确定性顺序：分类、约束、变更、验证。',
+    },
   },
 } as const;
 
 const selectedVisual = visual ? visualCopy[locale][visual] : undefined;
-const useSvgVisual = visual === 'roadmap' || visual === 'fit' || visual === 'migration' || visual === 'extensions';
+const useSvgVisual = visual === 'roadmap' || visual === 'fit' || visual === 'migration' || visual === 'extensions' || visual === 'workflow';
 ---
 
 <section class={`page-hero ${selectedVisual ? 'page-hero--with-visual' : ''}`}>
@@ -267,6 +283,34 @@ const useSvgVisual = visual === 'roadmap' || visual === 'fit' || visual === 'mig
               <circle cx="165" cy="19" r="2.8" fill="currentColor" opacity="0.72"/>
               <circle cx="165" cy="44" r="2.8" fill="currentColor" opacity="0.54"/>
               <circle cx="165" cy="69" r="2.8" fill="currentColor" opacity="0.28"/>
+            </svg>
+          )}
+          {visual === 'workflow' && (
+            <svg class="phv-svg" viewBox="0 0 260 88" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect x="10" y="16" width="68" height="16" rx="8" fill="currentColor" opacity="0.1"/>
+              <text x="44" y="26.5" text-anchor="middle" font-size="8.2" font-family="monospace" opacity="0.82">task-routing</text>
+
+              <rect x="96" y="16" width="64" height="16" rx="8" fill="currentColor" opacity="0.085"/>
+              <text x="128" y="26.5" text-anchor="middle" font-size="8.2" font-family="monospace" opacity="0.78">module.yaml</text>
+
+              <rect x="178" y="16" width="56" height="16" rx="8" fill="currentColor" opacity="0.07"/>
+              <text x="206" y="26.5" text-anchor="middle" font-size="8.2" font-family="monospace" opacity="0.74">gates</text>
+
+              <path d="M78 24h18" stroke="currentColor" stroke-width="1.2" opacity="0.3" stroke-linecap="round"/>
+              <path d="M160 24h18" stroke="currentColor" stroke-width="1.2" opacity="0.26" stroke-linecap="round"/>
+
+              <rect x="22" y="46" width="96" height="24" rx="10" stroke="currentColor" stroke-width="1.1" opacity="0.22"/>
+              <text x="70" y="56.5" text-anchor="middle" font-size="7.5" font-family="monospace" opacity="0.5">read start_with</text>
+              <text x="70" y="65.5" text-anchor="middle" font-size="8.8" font-family="monospace" opacity="0.84">bounded context</text>
+
+              <circle cx="144" cy="58" r="10" stroke="currentColor" stroke-width="1.1" opacity="0.18"/>
+              <circle cx="144" cy="58" r="3.6" fill="currentColor" opacity="0.72"/>
+              <path d="M118 58h16" stroke="currentColor" stroke-width="1.2" opacity="0.24" stroke-linecap="round"/>
+              <path d="M154 58h12" stroke="currentColor" stroke-width="1.2" opacity="0.24" stroke-linecap="round"/>
+
+              <rect x="166" y="46" width="72" height="24" rx="10" stroke="currentColor" stroke-width="1.1" stroke-dasharray="3 2" opacity="0.28"/>
+              <text x="202" y="56.5" text-anchor="middle" font-size="7.5" font-family="monospace" opacity="0.46">same as CI</text>
+              <text x="202" y="65.5" text-anchor="middle" font-size="8.8" font-family="monospace" opacity="0.8">boundary + vet</text>
             </svg>
           )}
         </div>

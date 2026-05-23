@@ -12,7 +12,7 @@ const copy: Record<Locale, {
   extTitle: string; betaLabel: string; expLabel: string; expMore: string;
   expBadgeW: number; expBadgeCx: number;
   stableTitle: string; stableSub: string; cpTitle: string;
-  cpItems: { label: string; desc: string }[];
+  cpItems: { label: string; desc: string[] }[];
   arrow1: string; arrow2: string; blocked: string;
 }> = {
   en: {
@@ -30,10 +30,10 @@ const copy: Record<Locale, {
     stableSub: '9 modules · v1 GA · zero external deps · stdlib-only kernel',
     cpTitle: 'CONTROL PLANE',
     cpItems: [
-      { label: 'specs/', desc: 'dependency rules · task routing · change recipes' },
-      { label: 'docs/', desc: 'module primers · concept guides' },
-      { label: 'tasks/', desc: 'milestones · task cards' },
-      { label: 'module.yaml', desc: 'local scope · allowed imports · validation' },
+      { label: 'specs/', desc: ['dependency rules', 'task routing · change recipes'] },
+      { label: 'docs/', desc: ['module primers', 'concept guides'] },
+      { label: 'tasks/', desc: ['milestones', 'task cards'] },
+      { label: 'module.yaml', desc: ['local scope · allowed imports', 'validation'] },
     ],
     arrow1: 'app imports from extensions and stable roots',
     arrow2: 'x/* imports stable roots (not vice versa)',
@@ -49,15 +49,15 @@ const copy: Record<Locale, {
     expLabel: '实验性',
     expBadgeW: 70,
     expBadgeCx: 65,
-    expMore: '+ 10 个更多',
+    expMore: '+ 10 更多家族',
     stableTitle: '稳定根',
     stableSub: '9 个模块 · v1 GA · 零外部依赖 · stdlib-only 内核',
     cpTitle: '控制面',
     cpItems: [
-      { label: 'specs/', desc: '依赖规则 · 任务路由 · 变更配方' },
-      { label: 'docs/', desc: '模块手册 · 概念指南' },
-      { label: 'tasks/', desc: '里程碑 · 任务卡片' },
-      { label: 'module.yaml', desc: '本地作用域 · 允许导入 · 验证规则' },
+      { label: 'specs/', desc: ['依赖规则 · 任务路由', '变更配方'] },
+      { label: 'docs/', desc: ['模块手册', '概念指南'] },
+      { label: 'tasks/', desc: ['里程碑', '任务卡片'] },
+      { label: 'module.yaml', desc: ['本地作用域 · 允许导入', '验证规则'] },
     ],
     arrow1: '应用层可导入扩展与稳定根',
     arrow2: 'x/* 可导入稳定根',
@@ -71,6 +71,9 @@ const betaModules = ['x/rest', 'x/gateway', 'x/websocket', 'x/observability'];
 const expModules = ['x/ai', 'x/tenant', 'x/data', 'x/resilience', 'x/messaging', 'x/frontend'];
 const stableRow1 = ['core', 'router', 'contract', 'middleware', 'security'];
 const stableRow2 = ['store', 'health', 'log', 'metrics'];
+const DIAGRAM_W = 724;
+const CP_X = DIAGRAM_W + 31;
+const CP_W = 194;
 
 // Chip layout helpers
 const CHIP_H = 24;
@@ -81,6 +84,10 @@ const CHIP_PX = 12; // horizontal padding per side
 function chipWidth(text: string): number {
   // approximate: ~7.2px per char at 11px mono + 2*CHIP_PX
   return Math.max(52, Math.round(text.length * 7.2) + CHIP_PX * 2);
+}
+
+function textWidth(text: string, pxPerChar = 7): number {
+  return Math.round(text.length * pxPerChar);
 }
 
 interface Chip { x: number; w: number; label: string }
@@ -95,10 +102,28 @@ function chipRow(modules: string[], startX: number): Chip[] {
   return chips;
 }
 
+interface WrappedChip extends Chip { row: number }
+function wrappedChipRows(modules: string[], startX: number, rowStartX: number, maxX: number): WrappedChip[] {
+  const chips: WrappedChip[] = [];
+  let x = startX;
+  let row = 0;
+  for (const m of modules) {
+    const w = chipWidth(m);
+    if (x + w > maxX && x !== rowStartX) {
+      row += 1;
+      x = rowStartX;
+    }
+    chips.push({ x, w, label: m, row });
+    x += w + CHIP_GAP;
+  }
+  return chips;
+}
+
 const betaChips = chipRow(betaModules, 92);
-const expChips  = chipRow(expModules,  30);
+const expChips = wrappedChipRows(expModules, 30 + labels.expBadgeW + 12, 30, DIAGRAM_W - 22);
 const stableChips1 = chipRow(stableRow1, 30);
 const stableChips2 = chipRow(stableRow2, 30);
+const expMoreWidth = textWidth(labels.expMore, 6.6);
 
 // Zone Y coordinates
 const APP_Y     = 15;
@@ -109,9 +134,6 @@ const EXT_H     = 168;
 const ARROW2_Y  = EXT_Y + EXT_H;       // 311
 const STABLE_Y  = ARROW2_Y + 42;       // 353
 const STABLE_H  = 138;
-const DIAGRAM_W = 724;
-const CP_X      = DIAGRAM_W + 31;      // 755
-const CP_W      = 194;
 const CP_H      = STABLE_Y + STABLE_H - APP_Y; // total height match
 const SVG_H     = STABLE_Y + STABLE_H + 15;    // 506
 ---
@@ -150,9 +172,9 @@ const SVG_H     = STABLE_Y + STABLE_H + 15;    // 506
       letter-spacing="0.10em" fill="var(--fg)" opacity="0.7">{labels.appTitle}</text>
     <text x="32" y={APP_Y + 46} font-family="var(--font-mono)" font-size="10.5" fill="var(--fg-soft)">{labels.appSub}</text>
     <!-- hint badge on right -->
-    <rect x={DIAGRAM_W - 226} y={APP_Y + 58} width="218" height="20" rx="4"
+    <rect x={DIAGRAM_W - 236} y={APP_Y + 56} width="226" height="22" rx="4"
       fill="var(--accent-soft)" />
-    <text x={DIAGRAM_W - 218} y={APP_Y + 72} font-family="var(--font-mono)" font-size="10"
+    <text x={DIAGRAM_W - 226} y={APP_Y + 70} font-family="var(--font-mono)" font-size="9.6"
       fill="var(--accent)" font-weight="500">{labels.appHint}</text>
 
     <!-- ── ARROW 1: App → Extensions ────────────────────────────────── -->
@@ -200,9 +222,9 @@ const SVG_H     = STABLE_Y + STABLE_H + 15;    // 506
     <!-- Exp chips -->
     {expChips.map((c) => (
       <>
-        <rect x={c.x} y={EXT_Y + 70} width={c.w} height={CHIP_H} rx={CHIP_R}
+        <rect x={c.x} y={EXT_Y + 70 + c.row * 34} width={c.w} height={CHIP_H} rx={CHIP_R}
           fill="var(--bg-elevated)" stroke="var(--fg-soft)" stroke-width="1" stroke-opacity="0.3" opacity="0.85"/>
-        <text x={c.x + c.w / 2} y={EXT_Y + 70 + 12}
+        <text x={c.x + c.w / 2} y={EXT_Y + 82 + c.row * 34}
           font-family="var(--font-mono)" font-size="10.5" fill="var(--fg)" opacity="0.8"
           text-anchor="middle" dominant-baseline="middle">{c.label}</text>
       </>
@@ -210,9 +232,12 @@ const SVG_H     = STABLE_Y + STABLE_H + 15;    // 506
     <!-- "+ more" label -->
     {(() => {
       const last = expChips[expChips.length - 1];
-      const moreX = last ? last.x + last.w + CHIP_GAP : 30;
+      const baseX = last ? last.x + last.w + CHIP_GAP : 30;
+      const wrapped = baseX + expMoreWidth > DIAGRAM_W - 22;
+      const moreX = wrapped ? 30 : baseX;
+      const moreRow = (last?.row ?? 0) + (wrapped ? 1 : 0);
       return (
-        <text x={moreX} y={EXT_Y + 70 + 13} font-family="var(--font-mono)" font-size="10"
+        <text x={moreX} y={EXT_Y + 83 + moreRow * 34} font-family="var(--font-mono)" font-size="9.8"
           fill="var(--fg-soft)" dominant-baseline="middle">{labels.expMore}</text>
       );
     })()}
@@ -246,8 +271,8 @@ const SVG_H     = STABLE_Y + STABLE_H + 15;    // 506
       stroke="var(--fg-soft)" stroke-width="1.5" opacity="0.4"/>
     <line x1="299" y1={ARROW2_Y + 18} x2="285" y2={ARROW2_Y + 30}
       stroke="var(--fg-soft)" stroke-width="1.5" opacity="0.4"/>
-    <text x="306" y={ARROW2_Y + 28}
-      font-family="var(--font-sans)" font-size="9.5" fill="var(--fg-soft)" opacity="0.55">{labels.blocked}</text>
+    <text x="214" y={ARROW2_Y + 24}
+      font-family="var(--font-sans)" font-size="9.2" fill="var(--fg-soft)" opacity="0.55">{labels.blocked}</text>
 
     <!-- ── STABLE ROOTS ZONE ──────────────────────────────────────────── -->
     <rect
@@ -316,9 +341,12 @@ const SVG_H     = STABLE_Y + STABLE_H + 15;    // 506
           <text x={CP_X + 34} y={iy + 12}
             font-family="var(--font-mono)" font-size="11" font-weight="600"
             fill="var(--fg)">{item.label}</text>
-          <text x={CP_X + 16} y={iy + 30}
-            font-family="var(--font-sans)" font-size="10" fill="var(--fg-soft)"
-            style={`word-spacing: 0.02em`}>{item.desc}</text>
+          <text x={CP_X + 34} y={iy + 26}
+            font-family="var(--font-sans)" font-size="9.25" fill="var(--fg-soft)">
+            {item.desc.map((line, lineIndex) => (
+              <tspan x={CP_X + 34} dy={lineIndex === 0 ? 0 : 12}>{line}</tspan>
+            ))}
+          </text>
           {i < labels.cpItems.length - 1 && (
             <line
               x1={CP_X + 12} y1={iy + 80}
