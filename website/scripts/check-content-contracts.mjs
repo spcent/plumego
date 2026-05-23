@@ -9,11 +9,13 @@ const ASTRO_CONFIG_FILE = path.join(WEBSITE_ROOT, 'astro.config.mjs');
 const expectedJourney = {
   en: [
     { label: 'Why Plumego', href: '/why-plumego' },
+    { label: 'Extensions', href: '/extensions' },
     { label: 'Examples', href: '/examples' },
     { label: 'Releases', href: '/releases' },
   ],
   zh: [
     { label: '为什么选择', href: '/zh/why-plumego' },
+    { label: '扩展', href: '/zh/extensions' },
     { label: '示例', href: '/zh/examples' },
     { label: '发布', href: '/zh/releases' },
   ],

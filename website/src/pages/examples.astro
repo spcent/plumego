@@ -9,6 +9,7 @@ const copy = EXAMPLES_COPY.en;
 
 const journeySteps = [
   { label: 'Why Plumego', href: '/why-plumego' },
+  { label: 'Extensions', href: '/extensions' },
   { label: 'Examples', href: '/examples' },
   { label: 'Releases', href: '/releases' },
 ];
@@ -35,7 +36,7 @@ r.<span class="hc-fn">Get</span>(<span class="hc-str">"/api/orders"</span>, a.or
     title: 'Module-fit recipe',
     body: 'Use this when the real question is whether your work belongs in stable roots, app-local wiring, or an extension module.',
     checks: ['classify the change before opening packages', 'protect stable-root compatibility promises', 'push optional capability work outward'],
-    href: '/docs/modules/overview',
+    href: '/extensions',
     cta: 'Classify the change',
     filename: 'import path check',
     code: `<span class="hc-cm">// stable root — stable-root candidate, evaluate first</span>

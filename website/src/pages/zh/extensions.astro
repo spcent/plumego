@@ -1,0 +1,148 @@
+---
+import MarketingLayout from '../../layouts/MarketingLayout.astro';
+import PageHero from '../../components/marketing/PageHero.astro';
+import JourneyBar from '../../components/marketing/JourneyBar.astro';
+import { MODULE_FACTS } from '../../generated/modules';
+
+const journeySteps = [
+  { label: '为什么选择', href: '/zh/why-plumego' },
+  { label: '扩展', href: '/zh/extensions' },
+  { label: '示例', href: '/zh/examples' },
+  { label: '发布', href: '/zh/releases' },
+];
+
+interface ExtCard {
+  name: string;
+  status: 'beta' | 'experimental';
+  description: string;
+  entrypoint: string;
+  docHref: string;
+  tags: string[];
+}
+
+const extensionCards: ExtCard[] = [
+  // Beta families
+  { name: 'x/rest', status: 'beta', description: 'CRUD 资源规范、类型化 handler 和基于稳定 HTTP 内核的 REST 响应 contract。', entrypoint: 'x/rest', docHref: '/zh/docs/modules/x-rest', tags: ['api', 'rest', 'crud'] },
+  { name: 'x/gateway', status: 'beta', description: '反向代理、上游健康检查、负载均衡以及服务边缘的路由组合。', entrypoint: 'x/gateway', docHref: '/zh/docs/modules/x-gateway', tags: ['proxy', 'edge', 'lb'] },
+  { name: 'x/websocket', status: 'beta', description: '由 hub 管理的全双工 WebSocket 连接，与标准 HTTP 路由共存。', entrypoint: 'x/websocket', docHref: '/zh/docs/modules/x-websocket', tags: ['realtime', 'ws'] },
+  { name: 'x/observability', status: 'beta', description: 'Prometheus 指标、OpenTelemetry 链路追踪和结构化日志导出，接入服务边界。', entrypoint: 'x/observability', docHref: '/zh/docs/modules/x-observability', tags: ['metrics', 'traces', 'otel'] },
+  { name: 'x/tenant', status: 'beta', description: '在传输层进行 per-tenant JWT 身份识别、配额执行和策略评估。', entrypoint: 'x/tenant', docHref: '/zh/docs/modules/x-tenant', tags: ['saas', 'multi-tenant', 'jwt'] },
+  { name: 'x/frontend', status: 'beta', description: '静态资产服务、SPA fallback 路由和嵌入式文件系统支持，用于前端集成。', entrypoint: 'x/frontend', docHref: '/zh/docs/modules/x-frontend', tags: ['static', 'spa', 'assets'] },
+  { name: 'x/messaging', status: 'beta', description: '基于可插拔 transport 的事件发布、webhook 分发和消息服务层 API。', entrypoint: 'x/messaging', docHref: '/zh/docs/modules/x-messaging', tags: ['events', 'pubsub', 'webhooks'] },
+  // Experimental families
+  { name: 'x/ai', status: 'experimental', description: '多 provider AI 抽象、session 生命周期、streaming SSE 响应以及 tool-call 路由。', entrypoint: 'x/ai/provider', docHref: '/zh/docs/modules/x-ai', tags: ['ai', 'llm', 'streaming'] },
+  { name: 'x/data', status: 'experimental', description: '基于稳定 store 接口之上的文件存储、幂等键和数据访问原语。', entrypoint: 'x/data', docHref: '/zh/docs/modules/x-data', tags: ['storage', 'data', 'files'] },
+  { name: 'x/resilience', status: 'experimental', description: '用于出站 HTTP 和服务调用的熔断器、重试策略和超时包装器。', entrypoint: 'x/resilience', docHref: '/zh/docs/modules/x-resilience', tags: ['resilience', 'circuit-breaker', 'retry'] },
+  { name: 'x/rpc', status: 'experimental', description: 'gRPC + HTTP 双协议服务装配，共享同一条稳定中间件链。', entrypoint: 'x/rpc', docHref: '/zh/docs/modules/x-rpc', tags: ['grpc', 'rpc', 'protocol'] },
+  { name: 'x/openapi', status: 'experimental', description: '从路由定义生成 OpenAPI 3 规范，支持 schema 推断和文档服务器。', entrypoint: 'x/openapi', docHref: '/zh/docs/modules/x-openapi', tags: ['openapi', 'swagger', 'docs'] },
+  { name: 'x/validate', status: 'experimental', description: '带 struct tag 规则和结构化错误响应的请求体验证中间件。', entrypoint: 'x/validate', docHref: '/zh/docs/modules/x-validate', tags: ['validation', 'input'] },
+  { name: 'x/fileapi', status: 'experimental', description: '基于稳定 HTTP 内核的 multipart 上传 handler、分片续传和文件元数据管理。', entrypoint: 'x/fileapi', docHref: '/zh/docs/modules/x-fileapi', tags: ['upload', 'files', 'multipart'] },
+];
+
+const betaCount = extensionCards.filter(c => c.status === 'beta').length;
+const expCount = extensionCards.filter(c => c.status === 'experimental').length;
+---
+
+<MarketingLayout
+  locale="zh"
+  title="x/* 扩展家族 — Plumego"
+  description="按成熟度层级浏览所有 Plumego x/* 能力家族。7 个 API 冻结的 beta 家族，加上用于产品能力工作的实验性家族。"
+  currentPath="/zh/extensions"
+>
+  <PageHero
+    eyebrow="扩展家族"
+    title="x/* 生态系统。内核之外的能力。"
+    description={`${betaCount} 个 beta 家族，API 在发布 ref 间冻结。${expCount} 个实验性家族，用于产品能力工作。所有家族与零依赖稳定内核完全分离。`}
+  />
+
+  <JourneyBar steps={journeySteps} current="/zh/extensions" />
+
+  <section class="section extensions-section">
+    <div class="extensions-meta">
+      <div class="meta-pill meta-pill--stable">
+        <span class="meta-dot meta-dot--stable"></span>
+        9 个稳定根 — 零外部依赖
+      </div>
+      <div class="meta-pill meta-pill--beta">
+        <span class="meta-dot meta-dot--beta"></span>
+        {betaCount} 个 beta 家族 — ref 间 API 冻结
+      </div>
+      <div class="meta-pill meta-pill--exp">
+        <span class="meta-dot meta-dot--exp"></span>
+        {expCount} 个实验性家族 — 采用前请先评估
+      </div>
+    </div>
+
+    <h2 class="extensions-group-title">Beta</h2>
+    <p class="extensions-group-desc">在发布 ref 间 API 冻结。在了解 beta 稳定性语义的前提下可以安全采用。</p>
+    <div class="ext-grid">
+      {extensionCards.filter(c => c.status === 'beta').map((card) => (
+        <a class="ext-card ext-card--beta" href={card.docHref}>
+          <div class="ext-card__header">
+            <code class="ext-card__name">{card.name}</code>
+            <span class="ext-badge ext-badge--beta">beta</span>
+          </div>
+          <p class="ext-card__desc">{card.description}</p>
+          <div class="ext-card__tags">
+            {card.tags.map(t => <span class="ext-tag">{t}</span>)}
+          </div>
+          <span class="ext-card__link">阅读模块手册 →</span>
+        </a>
+      ))}
+    </div>
+
+    <h2 class="extensions-group-title">实验性</h2>
+    <p class="extensions-group-desc">API 可能在版本间变化。在生产环境采用前，请先评估模块手册中的成熟度证据。</p>
+    <div class="ext-grid">
+      {extensionCards.filter(c => c.status === 'experimental').map((card) => (
+        <a class="ext-card ext-card--exp" href={card.docHref}>
+          <div class="ext-card__header">
+            <code class="ext-card__name">{card.name}</code>
+            <span class="ext-badge ext-badge--exp">experimental</span>
+          </div>
+          <p class="ext-card__desc">{card.description}</p>
+          <div class="ext-card__tags">
+            {card.tags.map(t => <span class="ext-tag">{t}</span>)}
+          </div>
+          <span class="ext-card__link">阅读模块手册 →</span>
+        </a>
+      ))}
+    </div>
+
+    <div class="extensions-footer-cta">
+      <a class="button button--primary" href="/zh/docs/x-family">X-Family 总览 →</a>
+      <a class="button button--ghost" href="/zh/stability">稳定性与成熟度策略 →</a>
+      <a class="button button--ghost" href="/zh/architecture">架构图 →</a>
+    </div>
+  </section>
+</MarketingLayout>
+
+<style>
+  .extensions-section { padding-block: 3rem 5rem; max-width: 72rem; margin-inline: auto; }
+  .extensions-meta { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 3rem; }
+  .meta-pill { display: flex; align-items: center; gap: 0.5rem; font-size: 0.8rem; font-weight: 500; color: var(--fg-soft); background: var(--bg-elevated); border: 1px solid var(--line); border-radius: 2rem; padding: 0.35rem 0.9rem; }
+  .meta-dot { width: 0.5rem; height: 0.5rem; border-radius: 50%; flex-shrink: 0; }
+  .meta-dot--stable { background: var(--status-stable, #22c55e); }
+  .meta-dot--beta   { background: var(--status-beta, #3b82f6); }
+  .meta-dot--exp    { background: var(--status-exp, #f59e0b); }
+  .extensions-group-title { font-size: 1.25rem; font-weight: 700; color: var(--fg); margin: 2.5rem 0 0.4rem; letter-spacing: -0.02em; }
+  .extensions-group-desc { font-size: 0.88rem; color: var(--fg-soft); margin: 0 0 1.25rem; line-height: 1.6; }
+  .ext-grid { display: grid; grid-template-columns: 1fr; gap: 1rem; margin-bottom: 1rem; }
+  @media (min-width: 560px) { .ext-grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (min-width: 900px) { .ext-grid { grid-template-columns: repeat(3, 1fr); } }
+  .ext-card { background: var(--bg-elevated); border: 1px solid var(--line); border-radius: 0.75rem; padding: 1.25rem; display: flex; flex-direction: column; gap: 0.55rem; text-decoration: none; transition: border-color 0.18s, box-shadow 0.18s; }
+  .ext-card--beta:hover { border-color: color-mix(in srgb, #3b82f6 35%, var(--line)); box-shadow: 0 0 0 3px color-mix(in srgb, #3b82f6 10%, transparent); }
+  .ext-card--exp:hover { border-color: color-mix(in srgb, #f59e0b 35%, var(--line)); box-shadow: 0 0 0 3px color-mix(in srgb, #f59e0b 10%, transparent); }
+  .ext-card__header { display: flex; align-items: center; gap: 0.65rem; flex-wrap: wrap; }
+  .ext-card__name { font-family: var(--font-mono); font-size: 0.88rem; font-weight: 600; color: var(--accent); background: var(--accent-soft); padding: 0.15rem 0.5rem; border-radius: 0.3rem; }
+  .ext-badge { font-size: 0.65rem; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; padding: 0.1rem 0.4rem; border-radius: 0.25rem; }
+  .ext-badge--beta { background: color-mix(in srgb, #3b82f6 15%, transparent); color: #3b82f6; border: 1px solid color-mix(in srgb, #3b82f6 30%, transparent); }
+  .ext-badge--exp { background: color-mix(in srgb, #f59e0b 15%, transparent); color: #b45309; border: 1px solid color-mix(in srgb, #f59e0b 30%, transparent); }
+  :root[data-theme="dark"] .ext-badge--exp { color: #fbbf24; }
+  .ext-card__desc { font-size: 0.85rem; color: var(--fg-soft); line-height: 1.6; margin: 0; flex: 1; }
+  .ext-card__tags { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+  .ext-tag { font-size: 0.65rem; font-weight: 600; color: var(--fg-muted, var(--fg-soft)); background: var(--bg-strong); border: 1px solid var(--line); border-radius: 0.25rem; padding: 0.1rem 0.4rem; letter-spacing: 0.04em; }
+  .ext-card__link { font-size: 0.8rem; font-weight: 500; color: var(--accent); margin-top: 0.15rem; transition: color 0.15s; }
+  .ext-card:hover .ext-card__link { color: var(--accent-strong); text-decoration: underline; }
+  .extensions-footer-cta { display: flex; gap: 0.75rem; flex-wrap: wrap; margin-top: 3rem; padding-top: 2rem; border-top: 1px solid var(--line); }
+</style>

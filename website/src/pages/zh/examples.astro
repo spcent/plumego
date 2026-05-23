@@ -9,6 +9,7 @@ const copy = EXAMPLES_COPY.zh;
 
 const journeySteps = [
   { label: '为什么选择', href: '/zh/why-plumego' },
+  { label: '扩展', href: '/zh/extensions' },
   { label: '示例', href: '/zh/examples' },
   { label: '发布', href: '/zh/releases' },
 ];
@@ -35,7 +36,7 @@ r.<span class="hc-fn">Get</span>(<span class="hc-str">"/api/orders"</span>, a.or
     title: '模块归属 recipe',
     body: '当真正的问题是这项工作应该落在稳定根、应用本地 wiring 还是扩展模块时，用这条路径。',
     checks: ['在翻包前先判断归属', '保护稳定根的兼容性承诺', '把可选能力继续向外分层'],
-    href: '/zh/docs/modules/overview',
+    href: '/zh/extensions',
     cta: '判断改动归属',
     filename: 'import path check',
     code: `<span class="hc-cm">// stable root — 稳定根候选，可先进入生产评估</span>

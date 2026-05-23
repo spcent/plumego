@@ -1,4 +1,5 @@
 ---
+import AgentFirstShowcase from '../../components/home/AgentFirstShowcase.astro';
 import CoreDifferentiators from '../../components/home/CoreDifferentiators.astro';
 import FinalCta from '../../components/home/FinalCta.astro';
 import Hero from '../../components/home/Hero.astro';
@@ -12,13 +13,15 @@ const copy = HOME_COPY.zh;
 
 <MarketingLayout
   locale="zh"
-  title="标准库 Go HTTP 工具包——显式路由、零依赖、机器可读规范"
+  title="面向团队与 AI Agent 的 Go HTTP 工具包——显式路由、零依赖、机器可读规范"
   description="Plumego 是一个 Go 1.26+ 的 stdlib-first HTTP 工具包。路由、中间件与服务装配在代码中清晰可见——AI 编程代理与人工评审者共享同一份路由模型。"
   currentPath="/zh"
 >
   <Hero copy={copy} />
 
   <CoreDifferentiators locale="zh" />
+
+  <AgentFirstShowcase locale="zh" />
 
   <MinimalExample locale="zh" />
 
@@ -28,47 +31,21 @@ const copy = HOME_COPY.zh;
     cta={copy.stabilityBandCta}
   />
 
-  <section class="section entry-points-section">
+  <section class="section decision-paths-section">
     <div class="section__intro section__intro--center">
+      <p class="decision-paths__eyebrow">从哪里开始</p>
       <h2>{copy.adoptionTitle}</h2>
       <p>{copy.adoptionBody}</p>
     </div>
-    <div class="entry-points-grid reveal-stagger">
+    <div class="decision-paths-grid reveal-stagger">
       {copy.adoptionCards.map((card: { kicker: string; title: string; body: string; href: string; label: string }) => (
-        <article class="entry-point-card">
-          <p class="entry-point-card__kicker">{card.kicker}</p>
+        <article class="decision-card">
+          <p class="decision-card__kicker">{card.kicker}</p>
           <h3>{card.title}</h3>
           <p>{card.body}</p>
-          <a class="entry-point-card__cta" href={card.href}>{card.label} →</a>
+          <a class="decision-card__cta" href={card.href}>{card.label} →</a>
         </article>
       ))}
-    </div>
-  </section>
-
-  <!-- 使用场景信任展示 -->
-  <section class="section use-case-strip">
-    <p class="use-case-strip__eyebrow">常见使用场景</p>
-    <div class="use-case-grid">
-      <div class="use-case-card">
-        <p class="use-case-card__label">内部 HTTP API</p>
-        <p class="use-case-card__desc">路由归属和中间件顺序在每次代码评审中清晰可见。没有隐藏的装配逻辑。</p>
-        <a class="use-case-card__link" href="/zh/examples">查看示例 →</a>
-      </div>
-      <div class="use-case-card">
-        <p class="use-case-card__label">平台服务</p>
-        <p class="use-case-card__desc">多个团队从同一个 reference shape 出发。随服务增长，结构漂移保持在低水平。</p>
-        <a class="use-case-card__link" href="/zh/docs/reference-app">查看参考应用 →</a>
-      </div>
-      <div class="use-case-card">
-        <p class="use-case-card__label">AI 增强服务</p>
-        <p class="use-case-card__desc">x/ai 提供 provider 抽象和 streaming，与稳定 HTTP 内核彻底解耦。</p>
-        <a class="use-case-card__link" href="/zh/docs/modules/x-ai">查看 x/ai 手册 →</a>
-      </div>
-      <div class="use-case-card">
-        <p class="use-case-card__label">Agent 维护的代码仓库</p>
-        <p class="use-case-card__desc">机器可读规范在写下第一行代码前就把 AI 编程助手路由到正确模块。</p>
-        <a class="use-case-card__link" href="/zh/docs/concepts/agent-first-workflow">查看 Agent 工作流 →</a>
-      </div>
     </div>
   </section>
 
@@ -76,90 +53,16 @@ const copy = HOME_COPY.zh;
 </MarketingLayout>
 
 <style>
-  .entry-points-section {
-    padding-block: 4rem;
-  }
-
-  .entry-points-grid {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 1.25rem;
-    max-width: 56rem;
-    margin-inline: auto;
-  }
-
-  @media (min-width: 640px) {
-    .entry-points-grid {
-      grid-template-columns: repeat(3, 1fr);
-    }
-  }
-
-  .entry-point-card {
-    background: var(--bg-elevated);
-    border: 1px solid var(--line);
-    border-radius: 0.75rem;
-    padding: 1.5rem;
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-    box-shadow: var(--shadow);
-    transition: border-color 0.18s, box-shadow 0.18s;
-  }
-
-  .entry-point-card:hover {
-    border-color: var(--accent-soft);
-    box-shadow: var(--shadow), 0 0 0 3px var(--accent-soft);
-  }
-
-  .entry-point-card__kicker {
-    font-size: 0.72rem;
-    font-weight: 600;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--accent);
-    margin: 0;
-  }
-
-  .entry-point-card h3 {
-    font-size: 1.05rem;
-    font-weight: 600;
-    margin: 0;
-    color: var(--fg);
-    line-height: 1.3;
-  }
-
-  .entry-point-card p {
-    font-size: 0.88rem;
-    color: var(--fg-soft);
-    line-height: 1.6;
-    margin: 0;
-    flex: 1;
-  }
-
-  .entry-point-card__cta {
-    font-size: 0.85rem;
-    font-weight: 500;
-    color: var(--accent);
-    text-decoration: none;
-    margin-top: 0.25rem;
-    transition: color 0.15s;
-  }
-
-  .entry-point-card__cta:hover {
-    color: var(--accent-strong);
-    text-decoration: underline;
-  }
-
-  /* ── 使用场景信任展示 ─────────────────────────────────── */
-  .use-case-strip { padding-block: 3rem; background: var(--bg-strong); }
-  .use-case-strip__eyebrow { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent); text-align: center; margin-bottom: 1.5rem; }
-  .use-case-grid { display: grid; grid-template-columns: 1fr; gap: 1rem; max-width: 64rem; margin-inline: auto; }
-  @media (min-width: 640px) { .use-case-grid { grid-template-columns: repeat(2, 1fr); } }
-  @media (min-width: 960px) { .use-case-grid { grid-template-columns: repeat(4, 1fr); } }
-  .use-case-card { background: var(--bg-elevated); border: 1px solid var(--line); border-radius: 0.75rem; padding: 1.25rem; display: flex; flex-direction: column; gap: 0.45rem; transition: border-color 0.18s, box-shadow 0.18s; }
-  .use-case-card:hover { border-color: color-mix(in srgb, var(--accent) 25%, var(--line)); box-shadow: var(--shadow); }
-  .use-case-card__label { font-size: 0.9rem; font-weight: 600; color: var(--fg); margin: 0; line-height: 1.3; }
-  .use-case-card__desc { font-size: 0.84rem; color: var(--fg-soft); line-height: 1.6; margin: 0; flex: 1; }
-  .use-case-card__link { font-size: 0.82rem; font-weight: 500; color: var(--accent); text-decoration: none; margin-top: 0.2rem; transition: color 0.15s; }
-  .use-case-card__link:hover { color: var(--accent-strong); text-decoration: underline; }
+  .decision-paths-section { padding-block: 4rem; }
+  .decision-paths__eyebrow { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent); text-align: center; margin: 0 0 0.5rem; }
+  .decision-paths-grid { display: grid; grid-template-columns: 1fr; gap: 1.25rem; max-width: 64rem; margin-inline: auto; }
+  @media (min-width: 640px) { .decision-paths-grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (min-width: 960px) { .decision-paths-grid { grid-template-columns: repeat(4, 1fr); } }
+  .decision-card { background: var(--bg-elevated); border: 1px solid var(--line); border-radius: 0.75rem; padding: 1.5rem; display: flex; flex-direction: column; gap: 0.5rem; box-shadow: var(--shadow); transition: border-color 0.18s, box-shadow 0.18s; }
+  .decision-card:hover { border-color: color-mix(in srgb, var(--accent) 30%, var(--line)); box-shadow: var(--shadow), 0 0 0 3px var(--accent-soft); }
+  .decision-card__kicker { font-size: 0.72rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); margin: 0; }
+  .decision-card h3 { font-size: 1rem; font-weight: 600; margin: 0; color: var(--fg); line-height: 1.3; }
+  .decision-card p { font-size: 0.875rem; color: var(--fg-soft); line-height: 1.6; margin: 0; flex: 1; }
+  .decision-card__cta { font-size: 0.85rem; font-weight: 500; color: var(--accent); text-decoration: none; margin-top: 0.25rem; transition: color 0.15s; }
+  .decision-card__cta:hover { color: var(--accent-strong); text-decoration: underline; }
 </style>

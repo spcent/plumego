@@ -1,0 +1,168 @@
+---
+import AgentFirstShowcase from '../../components/home/AgentFirstShowcase.astro';
+import MarketingLayout from '../../layouts/MarketingLayout.astro';
+import PageHero from '../../components/marketing/PageHero.astro';
+import JourneyBar from '../../components/marketing/JourneyBar.astro';
+
+const journeySteps = [
+  { label: '为什么选择', href: '/zh/why-plumego' },
+  { label: '扩展', href: '/zh/extensions' },
+  { label: '示例', href: '/zh/examples' },
+  { label: '发布', href: '/zh/releases' },
+];
+
+const controlPlaneFiles = [
+  {
+    path: 'specs/task-routing.yaml',
+    role: '任务路由器',
+    desc: '把每种工作意图（添加中间件、修改扩展行为、更新边界规则）映射到归属模块路径和 start_with 文件列表。Agent 在接触任何 Go 文件之前先读这份文件。',
+    example: '任务: "添加限流" → 模块: middleware/ → 读取: middleware/module.yaml',
+  },
+  {
+    path: 'specs/dependency-rules.yaml',
+    role: '边界执行器',
+    desc: '声明哪些包可以 import 哪些包。违规由 go run ./internal/checks/dependency-rules 机械地捕获——不依赖评审者的记忆。',
+    example: '稳定根不得 import x/* — 在 CI 中强制执行',
+  },
+  {
+    path: 'specs/change-recipes/',
+    role: '变更模板',
+    desc: '15+ 个标准任务形态的可复用 recipe：add-middleware、new-extension-family、promote-to-beta 等。每个 recipe 都有有序步骤和明确的 stop condition。',
+    example: '14 个 recipe 覆盖所有常见变更类型',
+  },
+  {
+    path: '<module>/module.yaml',
+    role: '模块作用域',
+    desc: '每个模块自声明归属、风险等级、测试命令和评审清单。Agent 只运行与被改动模块相关的检查。',
+    example: 'validation: go test -race ./middleware/... && go vet ./middleware/...',
+  },
+  {
+    path: 'make gates',
+    role: 'CI 等效循环',
+    desc: '一条命令镜像 CI：边界检查、go vet、gofmt、竞态测试和普通测试。Agent 在每次 push 前运行——不会在 CI 中遇到意外。',
+    example: 'make gates → boundary + vet + fmt + race + tests',
+  },
+];
+
+const workflowSteps = [
+  {
+    n: '01',
+    title: '读取 task-routing.yaml',
+    body: '在打开任何 Go 文件之前，Agent 先读 specs/task-routing.yaml，找到该任务类型的归属模块。这在变更发生前就阻止了误路由。',
+  },
+  {
+    n: '02',
+    title: '读取 module.yaml',
+    body: '目标模块的 module.yaml 声明了作用域、风险、in-scope 路径、out-of-scope 路径以及要运行的确切验证命令。Agent 现在有了有界的操作上下文。',
+  },
+  {
+    n: '03',
+    title: '执行变更',
+    body: 'Agent 只编辑声明模块作用域内的文件。边界规则是机器可读的，所以它无需逐包阅读就知道哪些 import 是允许的。',
+  },
+  {
+    n: '04',
+    title: '运行 make gates',
+    body: '一条命令在本地运行 CI 等效验证循环：边界检查、vet、格式检查、竞态测试。结果与 CI 相同——push 不会有意外。',
+  },
+];
+---
+
+<MarketingLayout
+  locale="zh"
+  title="Agent-First 工作流 — Plumego"
+  description="机器可读规范如何给 AI 编程 Agent 提供确定性操作模型：任务路由、边界执行、模块级作用域以及 CI 等效验证循环。"
+  currentPath="/zh/agent-workflow"
+>
+  <PageHero
+    eyebrow="agent-first"
+    title="你的 AI agent 需要的是地图，不是猜测。"
+    description="当 AI 编程助手承担越来越多的执行工作时，关键问题变成了：你的仓库是否给了它们清晰的操作模型——还是让它们猜测？Plumego 的控制平面给 Agent 提供了资深评审者同样的路由信号。"
+  />
+
+  <JourneyBar steps={journeySteps} current="/zh/agent-workflow" />
+
+  <section class="section control-plane-section">
+    <div class="section__intro">
+      <p class="section__eyebrow">控制平面</p>
+      <h2>五个文件定义操作模型。</h2>
+      <p>Agent 在做任何变更前按顺序读取这些文件。同样的文件也是人工评审者的权威参考。一套模型，两类受众。</p>
+    </div>
+    <div class="cp-files">
+      {controlPlaneFiles.map((f) => (
+        <div class="cp-file">
+          <div class="cp-file__header">
+            <code class="cp-file__path">{f.path}</code>
+            <span class="cp-file__role">{f.role}</span>
+          </div>
+          <p class="cp-file__desc">{f.desc}</p>
+          <div class="cp-file__example">
+            <code>{f.example}</code>
+          </div>
+        </div>
+      ))}
+    </div>
+  </section>
+
+  <section class="section workflow-steps-section">
+    <div class="section__intro">
+      <p class="section__eyebrow">Agent 执行模型</p>
+      <h2>变更如何流经控制平面。</h2>
+      <p>这是每个 Agent（以及每位贡献者）遵循的有序工作流。每个步骤都有确定性输出，然后再进入下一步。</p>
+    </div>
+    <div class="workflow-steps">
+      {workflowSteps.map((step) => (
+        <div class="workflow-step">
+          <div class="workflow-step__num">{step.n}</div>
+          <div class="workflow-step__content">
+            <h3>{step.title}</h3>
+            <p>{step.body}</p>
+          </div>
+        </div>
+      ))}
+    </div>
+  </section>
+
+  <AgentFirstShowcase locale="zh" />
+
+  <section class="section agent-cta-section">
+    <div class="agent-cta-inner">
+      <h2>阅读完整的 Agent 工作流规范。</h2>
+      <p>概念文档覆盖每个 stop condition、完整的 AGENTS.md 权威顺序、上下文预算规则以及完整的变更 recipe 列表。</p>
+      <div class="agent-cta-actions">
+        <a class="button button--primary" href="/zh/docs/concepts/agent-first-workflow">Agent-First 工作流文档 →</a>
+        <a class="button button--ghost" href="/zh/docs/concepts/repo-control-plane">控制平面参考 →</a>
+      </div>
+    </div>
+  </section>
+</MarketingLayout>
+
+<style>
+  .section__eyebrow { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent); margin: 0 0 0.5rem; }
+  .section__intro { max-width: 48rem; margin-bottom: 2.5rem; }
+  .section__intro h2 { font-size: 1.6rem; font-weight: 700; letter-spacing: -0.025em; margin: 0 0 0.75rem; line-height: 1.25; color: var(--fg); }
+  .section__intro p { font-size: 0.95rem; color: var(--fg-soft); line-height: 1.7; margin: 0; }
+  .control-plane-section { padding-block: 4rem; }
+  .cp-files { display: flex; flex-direction: column; gap: 1rem; max-width: 64rem; }
+  .cp-file { background: var(--bg-elevated); border: 1px solid var(--line); border-radius: 0.75rem; padding: 1.4rem 1.6rem; display: flex; flex-direction: column; gap: 0.6rem; transition: border-color 0.18s; }
+  .cp-file:hover { border-color: color-mix(in srgb, var(--accent) 30%, var(--line)); }
+  .cp-file__header { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
+  .cp-file__path { font-family: var(--font-mono); font-size: 0.82rem; color: var(--accent); background: var(--accent-soft); padding: 0.18rem 0.55rem; border-radius: 0.3rem; white-space: nowrap; }
+  .cp-file__role { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--fg-soft); border: 1px solid var(--line); padding: 0.12rem 0.45rem; border-radius: 0.25rem; }
+  .cp-file__desc { font-size: 0.88rem; color: var(--fg-soft); line-height: 1.65; margin: 0; }
+  .cp-file__example { background: var(--bg-strong); border: 1px solid var(--line); border-radius: 0.4rem; padding: 0.5rem 0.8rem; }
+  .cp-file__example code { font-family: var(--font-mono); font-size: 0.76rem; color: var(--fg-soft); }
+  .workflow-steps-section { padding-block: 4rem; background: var(--bg-strong); }
+  .workflow-steps { display: grid; grid-template-columns: 1fr; gap: 1.25rem; max-width: 64rem; }
+  @media (min-width: 700px) { .workflow-steps { grid-template-columns: repeat(2, 1fr); } }
+  @media (min-width: 1024px) { .workflow-steps { grid-template-columns: repeat(4, 1fr); } }
+  .workflow-step { background: var(--bg-elevated); border: 1px solid var(--line); border-radius: 0.75rem; padding: 1.4rem; display: flex; flex-direction: column; gap: 0.75rem; }
+  .workflow-step__num { font-size: 1.5rem; font-weight: 800; color: var(--accent-soft); line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+  .workflow-step__content h3 { font-size: 0.95rem; font-weight: 600; color: var(--fg); margin: 0 0 0.4rem; line-height: 1.3; }
+  .workflow-step__content p { font-size: 0.85rem; color: var(--fg-soft); line-height: 1.6; margin: 0; }
+  .agent-cta-section { padding-block: 4rem; }
+  .agent-cta-inner { max-width: 48rem; }
+  .agent-cta-inner h2 { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.025em; margin: 0 0 0.75rem; color: var(--fg); }
+  .agent-cta-inner p { font-size: 0.95rem; color: var(--fg-soft); line-height: 1.65; margin: 0 0 1.5rem; }
+  .agent-cta-actions { display: flex; gap: 0.75rem; flex-wrap: wrap; }
+</style>

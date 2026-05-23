@@ -27,7 +27,14 @@ Then run [Getting Started](/docs/getting-started) to verify the code shape feels
 Then copy from [Reference App](/docs/reference-app) for the full canonical directory layout.
 
 **Looking for a specific capability** (AI, multi-tenancy, WebSocket, gateway)?
-→ Go to [Modules Overview](/docs/modules/overview) — stable roots and `x/*` families grouped by work type.
+→ Browse [Extensions (x/*)](/extensions) — all families by maturity tier with tags and primer links.
+Or go to [Modules Overview](/docs/modules/overview) for the full reference view grouped by work type.
+
+**Using AI coding agents on this codebase?**
+→ Read [Agent-First Workflow](/agent-workflow) — how machine-readable specs route agents to the right module before a line is written.
+
+**Migrating from Gin, Echo, or Chi?**
+→ Go to [Migration Hub](/migrate) — handler diff, middleware adaption, cost estimate, and step-by-step guides.
 
 **Need to verify stability before committing a dependency?**
 → Read [Release Posture](/docs/release-posture) for the full support matrix.
@@ -58,6 +65,9 @@ Then copy from [Reference App](/docs/reference-app) for the full canonical direc
 | How does a request move through Plumego? | [Request Flow](/docs/concepts/request-flow) | A visible path from route registration to `contract.WriteResponse` |
 | Where should a change live? | [Repository Boundaries](/docs/concepts/repo-control-plane) | The docs/specs/tasks control-plane split |
 | Which module should I open? | [Modules Overview](/docs/modules/overview) | Stable-root and `x/*` entrypoints by work type |
+| Which x/* families exist and what maturity are they? | [Extensions](/extensions) | Card browser — all families with status badges and primer links |
+| How do AI agents navigate this codebase? | [Agent Workflow](/agent-workflow) | Control plane, task routing, CI-equivalent validation loop |
+| How do I migrate from Gin, Echo, or Chi? | [Migration Hub](/migrate) | Handler diff, cost estimate, and step-by-step guides per framework |
 | Can I depend on this package long term? | [Release Posture](/docs/release-posture) | The support posture before adoption |
 | How do I connect a database / add auth / compare with Gin? | [FAQ](/docs/faq) | Direct answers to common questions |
 | What is the exact function signature for `core.New` or `contract.WriteError`? | [API Quick Reference](/docs/reference) | Full signatures, types, and wire formats for stable modules |

@@ -22,13 +22,17 @@ export const SITE_COPY: Record<Locale, { footerTagline: string }> = {
 
 export const NAV_LINKS: Record<Locale, Array<{ label: string; href: string }>> = {
   en: [
+    { label: 'Why Plumego', href: '/why-plumego' },
     { label: 'Docs', href: '/docs' },
+    { label: 'Extensions', href: '/extensions' },
     { label: 'Compare', href: '/compare' },
     { label: 'Examples', href: '/examples' },
     { label: 'Releases', href: '/releases' },
   ],
   zh: [
+    { label: '为何选择', href: '/zh/why-plumego' },
     { label: '文档', href: '/zh/docs' },
+    { label: '扩展', href: '/zh/extensions' },
     { label: '框架对比', href: '/zh/compare' },
     { label: '示例', href: '/zh/examples' },
     { label: '发布', href: '/zh/releases' },
@@ -46,8 +50,9 @@ export const FOOTER_GROUPS: Record<Locale, Array<{ title: string; links: Array<{
         { label: 'Examples', href: '/examples' },
         { label: 'Architecture', href: '/architecture' },
         { label: 'Compare & Benchmarks', href: '/compare' },
-        { label: 'x/* Extensions', href: '/architecture#extensions' },
-        { label: 'Agent Workflow', href: '/docs/concepts/agent-first-workflow' },
+        { label: 'Extensions (x/*)', href: '/extensions' },
+        { label: 'Agent Workflow', href: '/agent-workflow' },
+        { label: 'Migrate', href: '/migrate' },
       ],
     },
     {
@@ -58,6 +63,7 @@ export const FOOTER_GROUPS: Record<Locale, Array<{ title: string; links: Array<{
         { label: 'Migrate from Gin', href: '/docs/guides/migrate-from-gin-echo' },
         { label: 'Migrate from Echo', href: '/docs/guides/migrate-from-gin-echo' },
         { label: 'Migrate from Chi', href: '/docs/guides/migrate-from-chi' },
+        { label: 'Migration Hub', href: '/migrate' },
         { label: 'FAQ', href: '/docs/faq' },
       ],
     },
@@ -85,8 +91,9 @@ export const FOOTER_GROUPS: Record<Locale, Array<{ title: string; links: Array<{
         { label: '示例', href: '/zh/examples' },
         { label: '架构', href: '/zh/architecture' },
         { label: '框架对比与性能', href: '/zh/compare' },
-        { label: 'x/* 扩展家族', href: '/zh/architecture#extensions' },
-        { label: 'Agent 工作流', href: '/zh/docs/concepts/agent-first-workflow' },
+        { label: '扩展 (x/*)', href: '/zh/extensions' },
+        { label: 'Agent 工作流', href: '/zh/agent-workflow' },
+        { label: '迁移指南', href: '/zh/migrate' },
       ],
     },
     {
@@ -97,6 +104,7 @@ export const FOOTER_GROUPS: Record<Locale, Array<{ title: string; links: Array<{
         { label: '从 Gin 迁移', href: '/zh/docs/guides/migrate-from-gin-echo' },
         { label: '从 Echo 迁移', href: '/zh/docs/guides/migrate-from-gin-echo' },
         { label: '从 Chi 迁移', href: '/zh/docs/guides/migrate-from-chi' },
+        { label: '迁移中心', href: '/zh/migrate' },
         { label: '常见问题', href: '/zh/docs/faq' },
       ],
     },
@@ -119,9 +127,9 @@ export const FOOTER_GROUPS: Record<Locale, Array<{ title: string; links: Array<{
 export const HOME_COPY = {
   en: {
     eyebrow: 'stdlib-only · zero external deps · v1.1.0',
-    headline: 'Explicit Go HTTP. Zero external dependencies.',
+    headline: 'Go HTTP your agent and your team can both read.',
     summary:
-      'Route registration, middleware order, and dependency wiring stay in one explicit file — readable in every code review. No external dependencies in the stable core. <code>net/http</code> compatible: existing handlers work without changes.',
+      'Route registration, middleware order, and dependency wiring stay in one explicit file — readable in every code review. Machine-readable specs give AI coding agents the same operating model as your senior reviewers. <code>net/http</code> compatible: existing handlers work without changes.',
     primaryCta: { label: 'Get Started', href: '/docs/getting-started' },
     secondaryCta: { label: 'Compare frameworks', href: '/compare' },
     scenarioCards: [
@@ -208,10 +216,17 @@ api.Get("/data", data.List)
         label: 'Evaluate fit',
       },
       {
+        kicker: 'agent-first',
+        title: 'Agent Workflow',
+        body: 'See how machine-readable specs route AI coding agents to the right module, enforce boundaries in CI, and share the same operating model as human reviewers.',
+        href: '/agent-workflow',
+        label: 'See agent model',
+      },
+      {
         kicker: 'extensions',
         title: 'x/* Extension Families',
-        body: 'Browse all x/* capability families by maturity tier in the modules overview. 7 beta families with frozen APIs, plus experimental families for capability work.',
-        href: '/docs/modules/overview',
+        body: 'Browse all x/* capability families by maturity tier. 7 beta families with frozen APIs, plus experimental families for product-specific capability work.',
+        href: '/extensions',
         label: 'Browse extensions',
       },
       {
@@ -226,7 +241,7 @@ api.Get("/data", data.List)
     finalBody:
       'Clone reference/standard-service for the stable kernel path. Browse the modules overview to find the right capability family. Let the control plane guide coding assistants and reviewers alike.',
     finalPrimary: { label: 'Read Docs', href: '/docs' },
-    finalSecondary: { label: 'Browse Extensions', href: '/docs/modules/overview' },
+    finalSecondary: { label: 'Browse Extensions', href: '/extensions' },
     contrastTitle: 'The difference shows in code review.',
     contrastLead:
       'When routes are spread across packages, a reviewer has to open each one to understand what paths exist and what middleware runs. Plumego keeps the full route map in one explicit file — and adds a structured <code>contract</code> layer so error and success responses stay consistent across all handlers.',
@@ -235,9 +250,9 @@ api.Get("/data", data.List)
   },
   zh: {
     eyebrow: 'stdlib only · 零外部依赖 · v1.1.0',
-    headline: '显式 Go HTTP。零外部依赖。',
+    headline: 'AI agent 和你的团队都能读懂的 Go HTTP 框架。',
     summary:
-      '路由注册、中间件顺序和依赖装配全在一个显式文件里——每次代码评审都能直接看到。稳定内核无外部依赖。兼容 <code>net/http</code>：现有 handler 无需修改即可接入。',
+      '路由注册、中间件顺序和依赖装配全在一个显式文件里——每次代码评审都能直接看到。机器可读规范给 AI 编程助手和资深评审者提供同一套操作模型。兼容 <code>net/http</code>：现有 handler 无需修改即可接入。',
     primaryCta: { label: '开始使用', href: '/zh/docs/getting-started' },
     secondaryCta: { label: '框架横向对比', href: '/zh/compare' },
     scenarioCards: [
@@ -319,15 +334,22 @@ api.Get("/data", data.List)
       {
         kicker: 'fit',
         title: '为什么选择 Plumego',
-        body: '当问题是 Plumego 是否适合你的团队、服务形态和评审预期——而不是技术细节如何使用时，从这里开始。',
+        body: '当问题是 Plumego 是否适合你的团队、服务形态和评审预期——而不是技术细节时，从这里开始。',
         href: '/zh/why-plumego',
         label: '判断是否适合',
       },
       {
+        kicker: 'agent-first',
+        title: 'Agent 工作流',
+        body: '了解机器可读规范如何在写代码前就把 AI 助手路由到正确模块，在 CI 中执行边界约束，与人工评审者共享同一套操作模型。',
+        href: '/zh/agent-workflow',
+        label: '查看 Agent 模型',
+      },
+      {
         kicker: 'extensions',
         title: 'x/* 扩展家族',
-        body: '在模块总览中按成熟度层级浏览所有 x/* 能力家族。7 个 API 冻结的 beta 家族，加上实验性能力家族。',
-        href: '/zh/docs/modules/overview',
+        body: '按成熟度层级浏览所有 x/* 能力家族。7 个 API 冻结的 beta 家族，加上用于产品能力工作的实验性家族。',
+        href: '/zh/extensions',
         label: '浏览扩展家族',
       },
       {
@@ -341,7 +363,7 @@ api.Get("/data", data.List)
     finalTitle: '从 reference app 起步。选对 x/* 家族。保持边界清晰。',
     finalBody: 'clone reference/standard-service 沿稳定内核路径出发。在模块总览中找到合适的能力家族。让控制平面同时引导编程助手和代码评审者。',
     finalPrimary: { label: '阅读文档', href: '/zh/docs' },
-    finalSecondary: { label: '浏览扩展家族', href: '/zh/docs/modules/overview' },
+    finalSecondary: { label: '浏览扩展家族', href: '/zh/extensions' },
     contrastTitle: '差异在代码评审时最明显。',
     contrastLead:
       '当路由分散在各个包里时，评审者必须逐个打开才能知道有哪些路径和中间件在运行。Plumego 把完整路由表放在一个显式文件里——同时加入结构化的 <code>contract</code> 层，让所有 handler 的错误响应和成功响应保持一致。',
