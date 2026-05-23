@@ -113,14 +113,14 @@ func TestDefaultsAreValid(t *testing.T) {
 
 func TestLoadEnvOverridesDefaults(t *testing.T) {
 	env := map[string]string{
-		"APP_ADDR":         ":9090",
-		"APP_ENV":          "staging",
-		"APP_SERVICE_NAME": "my-service",
-		"APP_API_TOKEN":    "tok-abc",
-		"OPS_TOKEN":        "ops-xyz",
-		"APP_RATE_LIMIT":   "50",
-		"APP_RATE_BURST":   "100",
-		"APP_REQUEST_TIMEOUT": "10s",
+		"APP_ADDR":             ":9090",
+		"APP_ENV":              "staging",
+		"APP_SERVICE_NAME":     "my-service",
+		"APP_API_TOKEN":        "tok-abc",
+		"OPS_TOKEN":            "ops-xyz",
+		"APP_RATE_LIMIT":       "50",
+		"APP_RATE_BURST":       "100",
+		"APP_REQUEST_TIMEOUT":  "10s",
 		"APP_BODY_LIMIT_BYTES": "2097152",
 	}
 	cfg, err := load(nil, func(key string) (string, bool) {
@@ -186,8 +186,8 @@ func TestLoadEnvTLSFields(t *testing.T) {
 func TestLoadEnvIgnoresMalformedNumerics(t *testing.T) {
 	// Malformed values must not corrupt the config; default falls through.
 	env := map[string]string{
-		"APP_RATE_LIMIT":   "not-a-number",
-		"APP_RATE_BURST":   "not-a-number",
+		"APP_RATE_LIMIT":       "not-a-number",
+		"APP_RATE_BURST":       "not-a-number",
 		"APP_BODY_LIMIT_BYTES": "not-a-number",
 	}
 	defaults := Defaults()

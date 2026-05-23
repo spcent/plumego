@@ -159,7 +159,7 @@ func TestLoadEnvTLSEnabled(t *testing.T) {
 		cfg, err := load(
 			[]string{"standard-service"},
 			mapLookup(map[string]string{
-				"APP_TLS_ENABLED":  "true",
+				"APP_TLS_ENABLED":   "true",
 				"APP_TLS_CERT_FILE": "/c.pem",
 				"APP_TLS_KEY_FILE":  "/k.pem",
 			}),
