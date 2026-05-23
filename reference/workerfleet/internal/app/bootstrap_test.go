@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/spcent/plumego/core"
+	"workerfleet/internal/platform/store/memory"
 )
 
 func TestBootstrapMemoryBackend(t *testing.T) {
@@ -121,6 +122,40 @@ func TestBootstrapUsesConfiguredMetricOptions(t *testing.T) {
 	}
 	if runtime.shell.loops.metrics.ExperimentalMetricsEnabled() {
 		t.Fatalf("experimental metrics should be disabled")
+	}
+}
+
+func TestNewRuntime(t *testing.T) {
+	store := memory.NewStore()
+	nopClose := func(context.Context) error { return nil }
+	runtime := newRuntime(store, nopClose)
+
+	if runtime.Service == nil {
+		t.Fatal("service is nil")
+	}
+	if runtime.Metrics == nil {
+		t.Fatal("metrics collector is nil")
+	}
+	if runtime.shell.ingest == nil {
+		t.Fatal("ingest component is nil")
+	}
+	if runtime.shell.loops == nil {
+		t.Fatal("loop runner is nil")
+	}
+	if runtime.shell.alerts == nil {
+		t.Fatal("alert runner is nil")
+	}
+	if runtime.shell.loops.store != store {
+		t.Fatal("loop runner store does not match injected store")
+	}
+	if runtime.shell.alerts.store != store {
+		t.Fatal("alert runner store does not match injected store")
+	}
+	if err := runtime.Ready(context.Background()); err != nil {
+		t.Fatalf("ready check: %v", err)
+	}
+	if err := runtime.Close(context.Background()); err != nil {
+		t.Fatalf("close: %v", err)
 	}
 }
 

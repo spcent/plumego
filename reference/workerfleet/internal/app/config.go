@@ -61,16 +61,17 @@ type MongoConfig struct {
 }
 
 type RuntimeConfig struct {
-	KubeSyncEnabled         bool
-	StatusSweepEnabled      bool
-	AlertEvaluationEnabled  bool
-	NotificationEnabled     bool
-	KubeSyncInterval        time.Duration
-	StatusSweepInterval     time.Duration
-	AlertEvaluationInterval time.Duration
-	NotifierDeliveryTimeout time.Duration
-	LoopLeaseTTL            time.Duration
-	LoopLeaseOwner          string
+	KubeSyncEnabled              bool
+	StatusSweepEnabled           bool
+	AlertEvaluationEnabled       bool
+	NotificationEnabled          bool
+	KubeSyncInterval             time.Duration
+	StatusSweepInterval          time.Duration
+	AlertEvaluationInterval      time.Duration
+	NotificationDeliveryInterval time.Duration
+	NotifierDeliveryTimeout      time.Duration
+	LoopLeaseTTL                 time.Duration
+	LoopLeaseOwner               string
 }
 
 type KubeConfig struct {
@@ -119,12 +120,13 @@ func DefaultConfigForProfile(profile string) Config {
 		},
 		Retention: store.DefaultRetention,
 		Runtime: RuntimeConfig{
-			KubeSyncInterval:        30 * time.Second,
-			StatusSweepInterval:     30 * time.Second,
-			AlertEvaluationInterval: 30 * time.Second,
-			NotifierDeliveryTimeout: 5 * time.Second,
-			LoopLeaseTTL:            defaultLoopLeaseTTL,
-			LoopLeaseOwner:          defaultLoopLeaseOwner(),
+			KubeSyncInterval:             30 * time.Second,
+			StatusSweepInterval:          30 * time.Second,
+			AlertEvaluationInterval:      30 * time.Second,
+			NotificationDeliveryInterval: 30 * time.Second,
+			NotifierDeliveryTimeout:      5 * time.Second,
+			LoopLeaseTTL:                 defaultLoopLeaseTTL,
+			LoopLeaseOwner:               defaultLoopLeaseOwner(),
 		},
 		Kube: KubeConfig{
 			WorkerContainer: "worker",
@@ -243,6 +245,13 @@ func LoadConfig(lookup func(string) (string, bool)) (Config, error) {
 			return Config{}, err
 		}
 		cfg.Runtime.AlertEvaluationInterval = interval
+	}
+	if value, ok := lookup("WORKERFLEET_NOTIFICATION_DELIVERY_INTERVAL"); ok {
+		interval, err := parseDurationEnv("WORKERFLEET_NOTIFICATION_DELIVERY_INTERVAL", value)
+		if err != nil {
+			return Config{}, err
+		}
+		cfg.Runtime.NotificationDeliveryInterval = interval
 	}
 	if value, ok := lookup("WORKERFLEET_NOTIFIER_DELIVERY_TIMEOUT"); ok {
 		timeout, err := parseDurationEnv("WORKERFLEET_NOTIFIER_DELIVERY_TIMEOUT", value)
@@ -441,7 +450,7 @@ func (cfg RuntimeConfig) alertEvaluationLoopSettings() loopExecutionSettings {
 }
 
 func (cfg RuntimeConfig) notificationDeliveryLoopSettings() loopExecutionSettings {
-	return cfg.loopSettings("notification_deliver", cfg.AlertEvaluationInterval)
+	return cfg.loopSettings("notification_deliver", cfg.NotificationDeliveryInterval)
 }
 
 func (cfg RuntimeConfig) loopSettings(name string, interval time.Duration) loopExecutionSettings {

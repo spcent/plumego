@@ -524,7 +524,9 @@ func TestConsumerGroup_TriggerRebalanceNoGenIncrementOnCancel(t *testing.T) {
 	group.cancel()
 
 	// Trigger a rebalance - it should fail since group ctx is cancelled
-	group.rebalancing.Store(false) // Reset rebalancing flag
+	group.rebalanceMu.Lock() // Reset rebalancing flag
+	group.rebalanceRunning = false
+	group.rebalanceMu.Unlock()
 	group.triggerRebalance()
 
 	time.Sleep(50 * time.Millisecond)

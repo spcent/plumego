@@ -96,8 +96,11 @@ type consumerGroup struct {
 	offsets      map[string]map[int]uint64 // topic -> partition -> offset
 	assignmentMu sync.RWMutex
 
-	rebalancing atomic.Bool
-	generation  atomic.Uint64
+	rebalanceMu      sync.Mutex
+	rebalanceRunning bool
+	rebalancePending bool
+
+	generation atomic.Uint64
 
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -333,22 +336,42 @@ func (cgm *ConsumerGroupManager) DeleteGroup(groupID string) error {
 	return nil
 }
 
-// triggerRebalance triggers a rebalance for the group
+// triggerRebalance triggers a rebalance for the group.
+// If a rebalance is already running the request is marked pending and the
+// running goroutine will re-run after it finishes, guaranteeing that every
+// join/leave is eventually reflected in the assignments.
 func (cg *consumerGroup) triggerRebalance() {
-	if cg.rebalancing.Swap(true) {
-		return // Already rebalancing
-	}
-
-	defer cg.rebalancing.Store(false)
-
-	ctx, cancel := context.WithTimeout(cg.ctx, cg.config.RebalanceTimeout)
-	defer cancel()
-
-	if err := cg.rebalance(ctx); err != nil {
+	cg.rebalanceMu.Lock()
+	if cg.rebalanceRunning {
+		cg.rebalancePending = true
+		cg.rebalanceMu.Unlock()
 		return
 	}
+	cg.rebalanceRunning = true
+	cg.rebalanceMu.Unlock()
 
-	cg.generation.Add(1)
+	for {
+		cg.rebalanceMu.Lock()
+		cg.rebalancePending = false
+		cg.rebalanceMu.Unlock()
+
+		ctx, cancel := context.WithTimeout(cg.ctx, cg.config.RebalanceTimeout)
+		if err := cg.rebalance(ctx); err == nil {
+			cg.generation.Add(1)
+		}
+		cancel()
+
+		cg.rebalanceMu.Lock()
+		pending := cg.rebalancePending
+		if !pending {
+			cg.rebalanceRunning = false
+		}
+		cg.rebalanceMu.Unlock()
+
+		if !pending {
+			return
+		}
+	}
 }
 
 // rebalance performs the actual rebalancing
@@ -831,11 +854,15 @@ func (cgm *ConsumerGroupManager) Stats(groupID string) (ConsumerGroupStats, erro
 	consumerCount := len(group.consumers)
 	group.consumersMu.RUnlock()
 
+	group.rebalanceMu.Lock()
+	rebalancing := group.rebalanceRunning
+	group.rebalanceMu.Unlock()
+
 	return ConsumerGroupStats{
 		GroupID:         groupID,
 		Consumers:       consumerCount,
 		Generation:      group.generation.Load(),
-		Rebalancing:     group.rebalancing.Load(),
+		Rebalancing:     rebalancing,
 		TotalRebalances: cgm.rebalances.Load(),
 		TotalCommits:    cgm.commits.Load(),
 		Errors:          cgm.errors.Load(),
