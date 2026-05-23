@@ -1,9 +1,9 @@
 package app
 
 import (
+	"fmt"
 	"net/http"
 
-	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/middleware"
 	"github.com/spcent/plumego/middleware/auth"
 	"github.com/spcent/plumego/security/authn"
@@ -61,53 +61,54 @@ func (a *App) RegisterRoutes() error {
 
 	// routeReg accumulates the first registration error so each route can be
 	// written on a single line without per-call error checks.
+	profileRoute, err := withTenantAPIAuth(a.Cfg.App.APIToken, http.HandlerFunc(profileHandler.GetProfile))
+	if err != nil {
+		return fmt.Errorf("configure tenant API route: %w", err)
+	}
+	opsRoute, err := withOpsAuth(a.Cfg.App.OpsToken, http.HandlerFunc(opsHandler.MetricStats))
+	if err != nil {
+		return fmt.Errorf("configure ops metrics route: %w", err)
+	}
+
 	reg := newRouteReg(a.Core)
 	reg.get("/", http.HandlerFunc(svc.Root))
 	reg.get("/healthz", http.HandlerFunc(svc.Live))
 	reg.get("/readyz", http.HandlerFunc(svc.Ready))
 	reg.get("/api/status", http.HandlerFunc(statusHandler.Status))
-	reg.get("/api/profile", withTenantAPIAuth(a.Cfg.App.APIToken, http.HandlerFunc(profileHandler.GetProfile)))
-	reg.get("/ops/metrics", withOpsAuth(a.Cfg.App.OpsToken, http.HandlerFunc(opsHandler.MetricStats)))
+	reg.get("/api/profile", profileRoute)
+	reg.get("/ops/metrics", opsRoute)
 	return reg.err
 }
 
 // withTenantAPIAuth wraps a handler with bearer-token auth and tenant-ID resolution.
-// When token is empty the service fails closed with 401 on every request.
-func withTenantAPIAuth(token string, next http.Handler) http.Handler {
+// Returns an error at construction time so configuration problems surface at startup
+// rather than silently degrading to 500 on every request.
+// When token is empty, StaticToken accepts all calls; set APP_API_TOKEN in production.
+func withTenantAPIAuth(token string, next http.Handler) (http.Handler, error) {
 	authMw, err := auth.Authenticate(
 		authn.StaticToken(token),
 		auth.WithAuthRealm("production-api"),
 	)
 	if err != nil {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-				Type(contract.TypeInternal).
-				Message("auth middleware is not configured").
-				Build())
-		})
+		return nil, fmt.Errorf("auth.Authenticate: %w", err)
 	}
 	return middleware.NewChain(
 		authMw,
 		resolve.Middleware(resolve.Options{}),
-	).Build(next)
+	).Build(next), nil
 }
 
 // withOpsAuth wraps a handler with bearer-token auth for the ops surface.
-// When token is empty the service fails closed with 401 on every request.
-func withOpsAuth(token string, next http.Handler) http.Handler {
+// Returns an error at construction time so misconfiguration fails fast at startup.
+func withOpsAuth(token string, next http.Handler) (http.Handler, error) {
 	authMw, err := auth.Authenticate(
 		authn.StaticToken(token),
 		auth.WithAuthRealm("production-ops"),
 	)
 	if err != nil {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-				Type(contract.TypeInternal).
-				Message("ops auth middleware is not configured").
-				Build())
-		})
+		return nil, fmt.Errorf("auth.Authenticate: %w", err)
 	}
-	return authMw(next)
+	return authMw(next), nil
 }
 
 // routeAdder is the minimal interface shared by *core.App and *core.RouteGroup.

@@ -62,6 +62,16 @@ func New(cfg config.Config) (*App, error) {
 		return nil, fmt.Errorf("configure security middleware: %w", err)
 	}
 
+	// Middleware order — outermost to innermost (first registered runs first on inbound):
+	//   requestid    → stamps correlation ID before any logging or error handling
+	//   recovery     → converts panics to 500; inside requestid so ID appears in the response
+	//   bodylimit    → rejects oversized bodies before auth or rate-limit processing
+	//   timeout      → enforces per-request wall-clock limit on everything below
+	//   security     → adds security headers to all responses, including timed-out ones
+	//   ratelimit    → rejects abusive clients; after security so headers are always set
+	//   tracing      → hooks span lifecycle after rejection decisions are made
+	//   httpmetrics  → records request stats including rejected and timed-out requests
+	//   accesslog    → innermost: logs the final status with full middleware context
 	if err := app.Use(
 		requestid.Middleware(),
 		recoveryMw,
@@ -114,6 +124,10 @@ func (a *App) Start(ctx context.Context) error {
 
 	var serveErr error
 	if a.Cfg.Core.TLS.Enabled {
+		// Empty cert/key paths rely on core.Server() having loaded
+		// cfg.Core.TLS.CertFile and cfg.Core.TLS.KeyFile into srv.TLSConfig.
+		// In most deployments TLS is terminated by the proxy; set those fields
+		// in config.go before enabling self-terminating TLS.
 		serveErr = srv.ListenAndServeTLS("", "")
 	} else {
 		serveErr = srv.ListenAndServe()

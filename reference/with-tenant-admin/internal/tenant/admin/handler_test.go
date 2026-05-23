@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/spcent/plumego/contract"
 	"with-tenant-admin/internal/auth"
 )
 
@@ -31,7 +32,7 @@ func TestGetTenantExistingReturnsRecord(t *testing.T) {
 	record, _ := store.Create(t.Context(), TenantRecord{ID: "tenant-1", Name: "Acme"})
 	h := NewHandler(store)
 
-	rec := serveTenantAdmin(t, h.GetTenant, http.MethodGet, "/admin/tenants/"+record.ID, "", true)
+	rec := serveTenantAdmin(t, h.GetTenant, http.MethodGet, "/admin/tenants/"+record.ID, "", true, map[string]string{"id": record.ID})
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusOK, rec.Body.String())
@@ -44,7 +45,7 @@ func TestGetTenantExistingReturnsRecord(t *testing.T) {
 
 func TestGetTenantUnknownReturnsNotFound(t *testing.T) {
 	h := NewHandler(NewInMemoryStore())
-	rec := serveTenantAdmin(t, h.GetTenant, http.MethodGet, "/admin/tenants/missing", "", true)
+	rec := serveTenantAdmin(t, h.GetTenant, http.MethodGet, "/admin/tenants/missing", "", true, map[string]string{"id": "missing"})
 
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusNotFound)
@@ -56,7 +57,7 @@ func TestSuspendTenantTransitionsStatus(t *testing.T) {
 	record, _ := store.Create(t.Context(), TenantRecord{ID: "tenant-1", Name: "Acme"})
 	h := NewHandler(store)
 
-	rec := serveTenantAdmin(t, h.SuspendTenant, http.MethodPost, "/admin/tenants/"+record.ID+"/suspend", "", true)
+	rec := serveTenantAdmin(t, h.SuspendTenant, http.MethodPost, "/admin/tenants/"+record.ID+"/suspend", "", true, map[string]string{"id": record.ID})
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusOK, rec.Body.String())
@@ -72,12 +73,12 @@ func TestDeleteTenantRemovesRecord(t *testing.T) {
 	record, _ := store.Create(t.Context(), TenantRecord{ID: "tenant-1", Name: "Acme"})
 	h := NewHandler(store)
 
-	rec := serveTenantAdmin(t, h.DeleteTenant, http.MethodDelete, "/admin/tenants/"+record.ID, "", true)
+	rec := serveTenantAdmin(t, h.DeleteTenant, http.MethodDelete, "/admin/tenants/"+record.ID, "", true, map[string]string{"id": record.ID})
 	if rec.Code != http.StatusNoContent {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusNoContent)
 	}
 
-	rec = serveTenantAdmin(t, h.GetTenant, http.MethodGet, "/admin/tenants/"+record.ID, "", true)
+	rec = serveTenantAdmin(t, h.GetTenant, http.MethodGet, "/admin/tenants/"+record.ID, "", true, map[string]string{"id": record.ID})
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("status after delete = %d, want %d", rec.Code, http.StatusNotFound)
 	}
@@ -92,10 +93,17 @@ func TestUnauthenticatedTenantAdminReturnsUnauthorized(t *testing.T) {
 	}
 }
 
-func serveTenantAdmin(t *testing.T, handler http.HandlerFunc, method string, path string, body string, authenticated bool) *httptest.ResponseRecorder {
+// serveTenantAdmin calls handler directly — bypassing the router — with an optional
+// set of path parameters injected via contract.WithRequestContext. Pass the id param
+// for routes that declare :id (GetTenant, SuspendTenant, DeleteTenant).
+func serveTenantAdmin(t *testing.T, handler http.HandlerFunc, method, path, body string, authenticated bool, params ...map[string]string) *httptest.ResponseRecorder {
 	t.Helper()
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(method, path, strings.NewReader(body))
+	if len(params) > 0 && params[0] != nil {
+		ctx := contract.WithRequestContext(req.Context(), contract.RequestContext{Params: params[0]})
+		req = req.WithContext(ctx)
+	}
 	if authenticated {
 		req.Header.Set(auth.HeaderAdminToken, "secret")
 	}

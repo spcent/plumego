@@ -5,10 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/spcent/plumego/contract"
+	"github.com/spcent/plumego/router"
 	tenantcore "github.com/spcent/plumego/x/tenant/core"
 	tenantadmin "with-tenant-admin/internal/tenant/admin"
 )
@@ -51,7 +51,7 @@ func NewHandler(tenants TenantLookup, configs *tenantcore.InMemoryConfigManager,
 }
 
 func (h *Handler) GetQuota(w http.ResponseWriter, r *http.Request) {
-	tenantID := tenantIDFromRequest(r)
+	tenantID := router.Param(r, "tenantID")
 	if err := h.requireTenant(r.Context(), tenantID); err != nil {
 		writeError(w, r, contract.TypeNotFound, "tenant not found")
 		return
@@ -66,7 +66,7 @@ func (h *Handler) GetQuota(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) SetQuota(w http.ResponseWriter, r *http.Request) {
-	tenantID := tenantIDFromRequest(r)
+	tenantID := router.Param(r, "tenantID")
 	if err := h.requireTenant(r.Context(), tenantID); err != nil {
 		writeError(w, r, contract.TypeNotFound, "tenant not found")
 		return
@@ -104,7 +104,7 @@ func (h *Handler) SetQuota(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) ResetQuota(w http.ResponseWriter, r *http.Request) {
-	tenantID := tenantIDFromRequest(r)
+	tenantID := router.Param(r, "tenantID")
 	if err := h.requireTenant(r.Context(), tenantID); err != nil {
 		writeError(w, r, contract.TypeNotFound, "tenant not found")
 		return
@@ -197,20 +197,6 @@ func remaining(limit, used int64) int64 {
 		return 0
 	}
 	return limit - used
-}
-
-func tenantIDFromRequest(r *http.Request) string {
-	if rc := contract.RequestContextFromContext(r.Context()); rc.Params != nil {
-		if id := strings.TrimSpace(rc.Params["tenantID"]); id != "" {
-			return id
-		}
-	}
-	path := strings.TrimPrefix(r.URL.Path, "/admin/quota/")
-	path = strings.TrimSuffix(path, "/reset")
-	if path == r.URL.Path {
-		return ""
-	}
-	return strings.TrimSpace(path)
 }
 
 func writeError(w http.ResponseWriter, r *http.Request, typ contract.ErrorType, message string) {

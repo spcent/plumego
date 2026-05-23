@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/spcent/plumego/contract"
+	"github.com/spcent/plumego/router"
 )
 
 type Handler struct {
@@ -53,7 +54,7 @@ func (h *Handler) CreateTenant(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) GetTenant(w http.ResponseWriter, r *http.Request) {
-	record, err := h.store.Get(r.Context(), tenantIDFromRequest(r))
+	record, err := h.store.Get(r.Context(), router.Param(r, "id"))
 	if errors.Is(err, ErrNotFound) {
 		writeError(w, r, contract.TypeNotFound, "tenant not found")
 		return
@@ -66,7 +67,7 @@ func (h *Handler) GetTenant(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) SuspendTenant(w http.ResponseWriter, r *http.Request) {
-	record, err := h.store.Suspend(r.Context(), tenantIDFromRequest(r))
+	record, err := h.store.Suspend(r.Context(), router.Param(r, "id"))
 	if errors.Is(err, ErrNotFound) {
 		writeError(w, r, contract.TypeNotFound, "tenant not found")
 		return
@@ -79,7 +80,7 @@ func (h *Handler) SuspendTenant(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) DeleteTenant(w http.ResponseWriter, r *http.Request) {
-	err := h.store.Delete(r.Context(), tenantIDFromRequest(r))
+	err := h.store.Delete(r.Context(), router.Param(r, "id"))
 	if errors.Is(err, ErrNotFound) {
 		writeError(w, r, contract.TypeNotFound, "tenant not found")
 		return
@@ -89,20 +90,6 @@ func (h *Handler) DeleteTenant(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
-}
-
-func tenantIDFromRequest(r *http.Request) string {
-	if rc := contract.RequestContextFromContext(r.Context()); rc.Params != nil {
-		if id := strings.TrimSpace(rc.Params["id"]); id != "" {
-			return id
-		}
-	}
-	path := strings.TrimPrefix(r.URL.Path, "/admin/tenants/")
-	path = strings.TrimSuffix(path, "/suspend")
-	if path == r.URL.Path {
-		return ""
-	}
-	return strings.TrimSpace(path)
 }
 
 func writeError(w http.ResponseWriter, r *http.Request, typ contract.ErrorType, message string) {

@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/spcent/plumego/contract"
+	"github.com/spcent/plumego/router"
 	tenantadmin "with-tenant-admin/internal/tenant/admin"
 )
 
@@ -38,7 +39,7 @@ func NewHandler(tenants TenantLookup, store Store) *Handler {
 }
 
 func (h *Handler) RecordUsage(w http.ResponseWriter, r *http.Request) {
-	tenantID := tenantIDFromRequest(r)
+	tenantID := router.Param(r, "tenantID")
 	if err := h.requireTenant(r.Context(), tenantID); err != nil {
 		writeError(w, r, contract.TypeNotFound, "tenant not found")
 		return
@@ -67,7 +68,7 @@ func (h *Handler) RecordUsage(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) GetUsageReport(w http.ResponseWriter, r *http.Request) {
-	tenantID := tenantIDFromRequest(r)
+	tenantID := router.Param(r, "tenantID")
 	if err := h.requireTenant(r.Context(), tenantID); err != nil {
 		writeError(w, r, contract.TypeNotFound, "tenant not found")
 		return
@@ -92,19 +93,6 @@ func (h *Handler) requireTenant(ctx context.Context, tenantID string) error {
 	}
 	_, err := h.tenants.Get(ctx, tenantID)
 	return err
-}
-
-func tenantIDFromRequest(r *http.Request) string {
-	if rc := contract.RequestContextFromContext(r.Context()); rc.Params != nil {
-		if id := strings.TrimSpace(rc.Params["tenantID"]); id != "" {
-			return id
-		}
-	}
-	path := strings.TrimPrefix(r.URL.Path, "/admin/usage/")
-	if path == r.URL.Path {
-		return ""
-	}
-	return strings.TrimSpace(path)
 }
 
 func writeError(w http.ResponseWriter, r *http.Request, typ contract.ErrorType, message string) {

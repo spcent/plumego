@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/spcent/plumego/contract"
 	tenantcore "github.com/spcent/plumego/x/tenant/core"
 	"with-tenant-admin/internal/auth"
 	tenantadmin "with-tenant-admin/internal/tenant/admin"
@@ -132,15 +133,37 @@ func reserveQuotaUsage(t *testing.T, quotaStore *tenantcore.InMemoryQuotaStore, 
 	}
 }
 
-func serveQuotaAdmin(t *testing.T, handler http.HandlerFunc, method string, path string, body string, authenticated bool) *httptest.ResponseRecorder {
+// serveQuotaAdmin calls handler directly — bypassing the router — with the
+// tenantID path parameter injected via contract.WithRequestContext.
+// The tenantID is extracted from the path by stripping the /admin/quota/ prefix
+// and any trailing action segment, matching what the router would set at runtime.
+func serveQuotaAdmin(t *testing.T, handler http.HandlerFunc, method, path, body string, authenticated bool) *httptest.ResponseRecorder {
 	t.Helper()
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(method, path, strings.NewReader(body))
+	if tenantID := quotaPathTenantID(path); tenantID != "" {
+		ctx := contract.WithRequestContext(req.Context(), contract.RequestContext{
+			Params: map[string]string{"tenantID": tenantID},
+		})
+		req = req.WithContext(ctx)
+	}
 	if authenticated {
 		req.Header.Set(auth.HeaderAdminToken, "secret")
 	}
 	auth.RequireAdminToken("secret")(handler).ServeHTTP(rec, req)
 	return rec
+}
+
+// quotaPathTenantID extracts the :tenantID segment from paths of the form
+// /admin/quota/:tenantID or /admin/quota/:tenantID/reset.
+func quotaPathTenantID(path string) string {
+	const prefix = "/admin/quota/"
+	after, ok := strings.CutPrefix(path, prefix)
+	if !ok {
+		return ""
+	}
+	id, _, _ := strings.Cut(after, "/")
+	return id
 }
 
 func decodeData[T any](t *testing.T, rec *httptest.ResponseRecorder) T {
