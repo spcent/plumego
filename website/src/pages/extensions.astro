@@ -53,6 +53,7 @@ const expCount = extensionCards.filter(c => c.status === 'experimental').length;
     eyebrow="extension families"
     title="The x/* ecosystem. Capability outside the kernel."
     description={`${betaCount} beta families with APIs frozen between release refs. ${expCount} experimental families for product capability work. All separated cleanly from the zero-dependency stable core.`}
+    visual="extensions"
   />
 
   <JourneyBar steps={journeySteps} current="/extensions" />

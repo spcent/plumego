@@ -50,9 +50,11 @@ const expCount = extensionCards.filter(c => c.status === 'experimental').length;
   currentPath="/zh/extensions"
 >
   <PageHero
+    locale="zh"
     eyebrow="扩展家族"
     title="x/* 生态系统。内核之外的能力。"
     description={`${betaCount} 个 beta 家族，API 在发布 ref 间冻结。${expCount} 个实验性家族，用于产品能力工作。所有家族与零依赖稳定内核完全分离。`}
+    visual="extensions"
   />
 
   <JourneyBar steps={journeySteps} current="/zh/extensions" />

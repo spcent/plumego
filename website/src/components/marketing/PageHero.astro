@@ -6,7 +6,7 @@ interface LinkItem {
   href: string;
 }
 
-type HeroVisual = 'decision' | 'architecture' | 'examples' | 'releases' | 'roadmap' | 'fit';
+type HeroVisual = 'decision' | 'architecture' | 'examples' | 'releases' | 'roadmap' | 'fit' | 'migration' | 'extensions';
 
 interface Props {
   eyebrow: string;
@@ -69,6 +69,22 @@ const visualCopy = {
       tertiary: 'maturity evidence',
       footer: 'Fit precedes architecture. Evaluate shape, not features.',
     },
+    migration: {
+      label: 'migration path',
+      title: 'Converge on one stdlib handler shape, keep cost visible.',
+      primary: 'gin.Context',
+      secondary: 'echo.Context',
+      tertiary: 'chi -> func(w, r)',
+      footer: 'Choose the source framework first, then measure rewrite cost against the stable path.',
+    },
+    extensions: {
+      label: 'capability map',
+      title: 'Keep the kernel narrow. Add capability in explicit families.',
+      primary: 'stable roots',
+      secondary: 'beta families',
+      tertiary: 'experimental families',
+      footer: 'Adopt from the outside in: stable kernel first, then the x/* family that matches the product need.',
+    },
   },
   zh: {
     decision: {
@@ -119,11 +135,27 @@ const visualCopy = {
       tertiary: '成熟度证据',
       footer: '先判断适配，再看架构。从形态开始，不是功能。',
     },
+    migration: {
+      label: '迁移路径',
+      title: '收束到同一套 stdlib handler 形态，同时看清迁移成本。',
+      primary: 'gin.Context',
+      secondary: 'echo.Context',
+      tertiary: 'chi -> func(w, r)',
+      footer: '先确认来源框架，再对照稳定路径评估改写成本。',
+    },
+    extensions: {
+      label: '能力地图',
+      title: '保持内核收敛，把能力放进显式的家族边界里。',
+      primary: '稳定根',
+      secondary: 'beta 家族',
+      tertiary: '实验性家族',
+      footer: '采用顺序从内到外：先稳定内核，再接入匹配产品需求的 x/* 家族。',
+    },
   },
 } as const;
 
 const selectedVisual = visual ? visualCopy[locale][visual] : undefined;
-const useSvgVisual = visual === 'roadmap' || visual === 'fit';
+const useSvgVisual = visual === 'roadmap' || visual === 'fit' || visual === 'migration' || visual === 'extensions';
 ---
 
 <section class={`page-hero ${selectedVisual ? 'page-hero--with-visual' : ''}`}>
@@ -191,6 +223,50 @@ const useSvgVisual = visual === 'roadmap' || visual === 'fit';
               <line x1="12" y1="82" x2="108" y2="82" stroke="currentColor" stroke-width="0.75" opacity="0.3"/>
               <polygon points="108,78.5 115,82 108,85.5" fill="currentColor" opacity="0.3"/>
               <text x="119" y="85.5" font-size="8" font-family="monospace" opacity="0.45">evaluate fit</text>
+            </svg>
+          )}
+          {visual === 'migration' && (
+            <svg class="phv-svg" viewBox="0 0 260 88" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect x="10" y="12" width="58" height="18" rx="9" fill="currentColor" opacity="0.1"/>
+              <text x="39" y="23.5" text-anchor="middle" font-size="8.5" font-family="monospace" opacity="0.82">gin.Context</text>
+              <rect x="10" y="36" width="58" height="18" rx="9" fill="currentColor" opacity="0.08"/>
+              <text x="39" y="47.5" text-anchor="middle" font-size="8.5" font-family="monospace" opacity="0.78">echo.Context</text>
+              <rect x="10" y="60" width="58" height="18" rx="9" stroke="currentColor" stroke-width="1.1" stroke-dasharray="3 2" opacity="0.28"/>
+              <text x="39" y="71.5" text-anchor="middle" font-size="8.5" font-family="monospace" opacity="0.42">chi</text>
+
+              <path d="M68 21h22c10 0 15 8 22 16s12 16 22 16h22" stroke="currentColor" stroke-width="1.2" opacity="0.28" stroke-linecap="round"/>
+              <path d="M68 45h22c10 0 15 0 22 0s12 0 22 0h22" stroke="currentColor" stroke-width="1.2" opacity="0.22" stroke-linecap="round"/>
+              <path d="M68 69h22c10 0 15-8 22-16s12-16 22-16h22" stroke="currentColor" stroke-width="1.2" opacity="0.2" stroke-linecap="round"/>
+
+              <rect x="178" y="27" width="70" height="36" rx="12" fill="currentColor" opacity="0.08" stroke="currentColor" stroke-width="1.1" stroke-opacity="0.22"/>
+              <text x="213" y="42" text-anchor="middle" font-size="9" font-family="monospace" opacity="0.56">stable path</text>
+              <text x="213" y="55" text-anchor="middle" font-size="9" font-family="monospace" opacity="0.88">func(w, r)</text>
+
+              <circle cx="162" cy="45" r="4.5" fill="currentColor" opacity="0.72"/>
+              <circle cx="162" cy="45" r="11" stroke="currentColor" stroke-width="1.1" opacity="0.16"/>
+              <path d="M166.5 45h8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" opacity="0.48"/>
+            </svg>
+          )}
+          {visual === 'extensions' && (
+            <svg class="phv-svg" viewBox="0 0 260 88" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect x="16" y="30" width="56" height="28" rx="10" fill="currentColor" opacity="0.1" stroke="currentColor" stroke-width="1.1" stroke-opacity="0.22"/>
+              <text x="44" y="41.5" text-anchor="middle" font-size="7.5" font-family="monospace" opacity="0.55">kernel</text>
+              <text x="44" y="51.5" text-anchor="middle" font-size="9" font-family="monospace" opacity="0.88">stable roots</text>
+
+              <path d="M72 44h26c10 0 14-10 22-16s11-10 20-10h20" stroke="currentColor" stroke-width="1.2" opacity="0.28" stroke-linecap="round"/>
+              <path d="M72 44h32c10 0 14 0 22 0s11 0 20 0h14" stroke="currentColor" stroke-width="1.2" opacity="0.22" stroke-linecap="round"/>
+              <path d="M72 44h26c10 0 14 10 22 16s11 10 20 10h20" stroke="currentColor" stroke-width="1.2" opacity="0.18" stroke-linecap="round"/>
+
+              <rect x="180" y="10" width="58" height="18" rx="9" fill="currentColor" opacity="0.1"/>
+              <text x="209" y="21.5" text-anchor="middle" font-size="8.5" font-family="monospace" opacity="0.82">x/rest</text>
+              <rect x="180" y="35" width="58" height="18" rx="9" fill="currentColor" opacity="0.08"/>
+              <text x="209" y="46.5" text-anchor="middle" font-size="8.5" font-family="monospace" opacity="0.74">x/tenant</text>
+              <rect x="180" y="60" width="58" height="18" rx="9" stroke="currentColor" stroke-width="1.1" stroke-dasharray="3 2" opacity="0.28"/>
+              <text x="209" y="71.5" text-anchor="middle" font-size="8.5" font-family="monospace" opacity="0.42">x/ai</text>
+
+              <circle cx="165" cy="19" r="2.8" fill="currentColor" opacity="0.72"/>
+              <circle cx="165" cy="44" r="2.8" fill="currentColor" opacity="0.54"/>
+              <circle cx="165" cy="69" r="2.8" fill="currentColor" opacity="0.28"/>
             </svg>
           )}
         </div>
