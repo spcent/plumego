@@ -1,0 +1,321 @@
+---
+import MarketingLayout from '../layouts/MarketingLayout.astro';
+import PageHero from '../components/marketing/PageHero.astro';
+import JourneyBar from '../components/marketing/JourneyBar.astro';
+
+const journeySteps = [
+  { label: 'Why Plumego', href: '/why-plumego' },
+  { label: 'Migrate', href: '/migrate' },
+  { label: 'Getting Started', href: '/docs/getting-started' },
+];
+
+const migrations = [
+  {
+    from: 'Gin',
+    tagline: 'func(c *gin.Context) → func(w, r)',
+    cost: 'medium',
+    costNote: '1–3 days per service',
+    handlerDiff: 'All handlers rewritten from gin.Context. Route syntax stays the same.',
+    middlewareDiff: 'Middleware must be adapted from gin.HandlerFunc to func(http.Handler) http.Handler.',
+    routingDiff: '/foo/:id maps cleanly. Groups stay the same structure.',
+    wins: ['no custom context type', 'stdlib middleware works without adapters', 'zero transitive deps in kernel'],
+    guide: '/docs/guides/migrate-from-gin-echo',
+    compareHref: '/compare#gin',
+  },
+  {
+    from: 'Echo',
+    tagline: 'func(c echo.Context) error → func(w, r)',
+    cost: 'medium',
+    costNote: '1–3 days per service',
+    handlerDiff: 'All handlers rewritten from echo.Context. Error return idiom replaced with contract.WriteError.',
+    middlewareDiff: 'Echo middleware must be adapted. Logger, CORS, and recover all have Plumego equivalents.',
+    routingDiff: 'Route syntax is similar. Echo group API maps directly to router.Group.',
+    wins: ['no custom context type', 'explicit error model', 'zero transitive deps in kernel'],
+    guide: '/docs/guides/migrate-from-gin-echo',
+    compareHref: '/compare#echo',
+  },
+  {
+    from: 'Chi',
+    tagline: 'Same handler signature — minimal changes',
+    cost: 'low',
+    costNote: 'Hours to a day',
+    handlerDiff: 'Chi uses func(w, r) — same as Plumego. Handler code needs no changes.',
+    middlewareDiff: 'Chi middleware is func(http.Handler) http.Handler — compatible. Existing middleware often works as-is.',
+    routingDiff: 'Route syntax is similar. chi.URLParam(r, "id") replaced by router.PathParam(r, "id").',
+    wins: ['handler code unchanged', 'existing stdlib middleware reused', 'lower learning curve'],
+    guide: '/docs/guides/migrate-from-chi',
+    compareHref: '/compare#chi',
+  },
+];
+
+const costColors: Record<string, string> = {
+  low: '#22c55e',
+  medium: '#f59e0b',
+  high: '#ef4444',
+};
+---
+
+<MarketingLayout
+  locale="en"
+  title="Migrate to Plumego — From Gin, Echo, or Chi"
+  description="Migration guides and cost estimates for moving to Plumego from Gin, Echo, or Chi. Handler mapping, middleware adaption, route translation, and step-by-step guides."
+  currentPath="/migrate"
+>
+  <PageHero
+    eyebrow="migration"
+    title="Moving to Plumego. From Gin, Echo, or Chi."
+    body="Each migration has a different cost and pattern. Chi is the lowest-friction path; Gin and Echo require handler rewrites. Pick your source framework to see what changes and what stays the same."
+  />
+
+  <JourneyBar steps={journeySteps} current="/migrate" />
+
+  <section class="section migrate-section">
+    <div class="migrate-cards">
+      {migrations.map((m) => (
+        <div class="migrate-card">
+          <div class="migrate-card__header">
+            <div class="migrate-card__from">
+              <span class="migrate-from-label">from</span>
+              <span class="migrate-from-name">{m.from}</span>
+            </div>
+            <div class="migrate-card__cost" style={`--cost-color: ${costColors[m.cost]}`}>
+              <span class="migrate-cost-dot"></span>
+              <span class="migrate-cost-label">{m.cost} migration cost</span>
+              <span class="migrate-cost-note">{m.costNote}</span>
+            </div>
+          </div>
+
+          <p class="migrate-card__tagline">{m.tagline}</p>
+
+          <div class="migrate-diffs">
+            <div class="migrate-diff">
+              <span class="migrate-diff__label">handlers</span>
+              <p>{m.handlerDiff}</p>
+            </div>
+            <div class="migrate-diff">
+              <span class="migrate-diff__label">middleware</span>
+              <p>{m.middlewareDiff}</p>
+            </div>
+            <div class="migrate-diff">
+              <span class="migrate-diff__label">routing</span>
+              <p>{m.routingDiff}</p>
+            </div>
+          </div>
+
+          <div class="migrate-wins">
+            <span class="migrate-wins__label">what you gain</span>
+            <ul>
+              {m.wins.map(w => <li>{w}</li>)}
+            </ul>
+          </div>
+
+          <div class="migrate-card__actions">
+            <a class="button button--primary" href={m.guide}>Migration Guide →</a>
+            <a class="button button--ghost" href={m.compareHref}>Compare side-by-side →</a>
+          </div>
+        </div>
+      ))}
+    </div>
+
+    <div class="migrate-adoption-note">
+      <h3>Not ready to migrate everything at once?</h3>
+      <p>Read the <a href="/docs/guides/adoption-path">Adoption Path guide</a> for a phased approach — stable roots first, extensions only when needed, no big-bang rewrites.</p>
+    </div>
+  </section>
+</MarketingLayout>
+
+<style>
+  .migrate-section {
+    padding-block: 3rem 5rem;
+    max-width: 64rem;
+    margin-inline: auto;
+  }
+
+  .migrate-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+
+  .migrate-card {
+    background: var(--bg-elevated);
+    border: 1px solid var(--line);
+    border-radius: 0.875rem;
+    padding: 2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+  }
+
+  .migrate-card__header {
+    display: flex;
+    align-items: flex-start;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+    justify-content: space-between;
+  }
+
+  .migrate-card__from {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+  }
+
+  .migrate-from-label {
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--fg-soft);
+  }
+
+  .migrate-from-name {
+    font-size: 1.4rem;
+    font-weight: 800;
+    color: var(--fg);
+    letter-spacing: -0.02em;
+  }
+
+  .migrate-card__cost {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    flex-wrap: wrap;
+  }
+
+  .migrate-cost-dot {
+    width: 0.55rem;
+    height: 0.55rem;
+    border-radius: 50%;
+    background: var(--cost-color);
+    flex-shrink: 0;
+  }
+
+  .migrate-cost-label {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--cost-color);
+  }
+
+  .migrate-cost-note {
+    font-size: 0.72rem;
+    color: var(--fg-soft);
+    border-left: 1px solid var(--line);
+    padding-left: 0.5rem;
+    margin-left: 0.1rem;
+  }
+
+  .migrate-card__tagline {
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    color: var(--accent);
+    background: var(--accent-soft);
+    padding: 0.4rem 0.8rem;
+    border-radius: 0.4rem;
+    margin: 0;
+    display: inline-block;
+  }
+
+  .migrate-diffs {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+
+  @media (min-width: 640px) {
+    .migrate-diffs { grid-template-columns: repeat(3, 1fr); }
+  }
+
+  .migrate-diff {
+    background: var(--bg-strong);
+    border: 1px solid var(--line);
+    border-radius: 0.5rem;
+    padding: 0.85rem 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+
+  .migrate-diff__label {
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--fg-soft);
+  }
+
+  .migrate-diff p {
+    font-size: 0.83rem;
+    color: var(--fg-soft);
+    line-height: 1.55;
+    margin: 0;
+  }
+
+  .migrate-wins {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+
+  .migrate-wins__label {
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+
+  .migrate-wins ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+  }
+
+  .migrate-wins li {
+    font-size: 0.8rem;
+    color: var(--fg-soft);
+    background: var(--bg-strong);
+    border: 1px solid var(--line);
+    border-radius: 0.3rem;
+    padding: 0.18rem 0.55rem;
+  }
+
+  .migrate-card__actions {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    padding-top: 0.5rem;
+    border-top: 1px solid var(--line);
+  }
+
+  .migrate-adoption-note {
+    margin-top: 3rem;
+    padding: 1.5rem 2rem;
+    background: var(--bg-elevated);
+    border: 1px solid var(--line);
+    border-radius: 0.75rem;
+    border-left: 3px solid var(--accent);
+  }
+
+  .migrate-adoption-note h3 {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--fg);
+    margin: 0 0 0.5rem;
+  }
+
+  .migrate-adoption-note p {
+    font-size: 0.88rem;
+    color: var(--fg-soft);
+    line-height: 1.65;
+    margin: 0;
+  }
+
+  .migrate-adoption-note a {
+    color: var(--accent);
+    text-decoration: underline;
+  }
+</style>
