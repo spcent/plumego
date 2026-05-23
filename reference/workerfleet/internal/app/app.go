@@ -12,8 +12,10 @@ import (
 	"github.com/spcent/plumego/core"
 	plumelog "github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/middleware/accesslog"
+	"github.com/spcent/plumego/middleware/bodylimit"
 	"github.com/spcent/plumego/middleware/recovery"
 	"github.com/spcent/plumego/middleware/requestid"
+	"github.com/spcent/plumego/middleware/timeout"
 )
 
 type RouteRegistrar func(app *core.App, service *Service, ready func(context.Context) error, metrics http.Handler, workerAuth WorkerIngressAuthConfig, adminAuth AdminAuthConfig) error
@@ -67,6 +69,11 @@ func newCoreApp(server ServerConfig) (*core.App, error) {
 		requestid.Middleware(),
 		recoveryMw,
 		accesslogMw,
+		bodylimit.Middleware(bodylimit.Config{
+			MaxBytes: server.MaxBodyBytes,
+			Logger:   coreApp.Logger(),
+		}),
+		timeout.Middleware(timeout.Config{Timeout: server.HandlerTimeout}),
 	); err != nil {
 		return nil, fmt.Errorf("wire middleware: %w", err)
 	}

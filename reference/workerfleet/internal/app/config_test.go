@@ -57,14 +57,15 @@ func TestLoadConfigParsesMongoSettings(t *testing.T) {
 
 func TestLoadConfigParsesRuntimeSettings(t *testing.T) {
 	cfg, err := LoadConfig(testLookup(map[string]string{
-		"WORKERFLEET_KUBE_SYNC_ENABLED":         "true",
-		"WORKERFLEET_STATUS_SWEEP_ENABLED":      "true",
-		"WORKERFLEET_ALERT_EVALUATION_ENABLED":  "true",
-		"WORKERFLEET_NOTIFICATION_ENABLED":      "true",
-		"WORKERFLEET_KUBE_SYNC_INTERVAL":        "11s",
-		"WORKERFLEET_STATUS_SWEEP_INTERVAL":     "12s",
-		"WORKERFLEET_ALERT_EVALUATION_INTERVAL": "13s",
-		"WORKERFLEET_NOTIFIER_DELIVERY_TIMEOUT": "14s",
+		"WORKERFLEET_KUBE_SYNC_ENABLED":                "true",
+		"WORKERFLEET_STATUS_SWEEP_ENABLED":             "true",
+		"WORKERFLEET_ALERT_EVALUATION_ENABLED":         "true",
+		"WORKERFLEET_NOTIFICATION_ENABLED":             "true",
+		"WORKERFLEET_KUBE_SYNC_INTERVAL":               "11s",
+		"WORKERFLEET_STATUS_SWEEP_INTERVAL":            "12s",
+		"WORKERFLEET_ALERT_EVALUATION_INTERVAL":        "13s",
+		"WORKERFLEET_NOTIFICATION_DELIVERY_INTERVAL":   "14s",
+		"WORKERFLEET_NOTIFIER_DELIVERY_TIMEOUT":        "15s",
 		"WORKERFLEET_LOOP_LEASE_TTL":            "45s",
 		"WORKERFLEET_LOOP_LEASE_OWNER":          "workerfleet-test",
 		"WORKERFLEET_KUBE_API_HOST":             "https://kube.example",
@@ -94,8 +95,11 @@ func TestLoadConfigParsesRuntimeSettings(t *testing.T) {
 	if cfg.Runtime.AlertEvaluationInterval != 13*time.Second {
 		t.Fatalf("alert evaluation interval = %v, want 13s", cfg.Runtime.AlertEvaluationInterval)
 	}
-	if cfg.Runtime.NotifierDeliveryTimeout != 14*time.Second {
-		t.Fatalf("notifier delivery timeout = %v, want 14s", cfg.Runtime.NotifierDeliveryTimeout)
+	if cfg.Runtime.NotificationDeliveryInterval != 14*time.Second {
+		t.Fatalf("notification delivery interval = %v, want 14s", cfg.Runtime.NotificationDeliveryInterval)
+	}
+	if cfg.Runtime.NotifierDeliveryTimeout != 15*time.Second {
+		t.Fatalf("notifier delivery timeout = %v, want 15s", cfg.Runtime.NotifierDeliveryTimeout)
 	}
 	if cfg.Runtime.LoopLeaseTTL != 45*time.Second || cfg.Runtime.LoopLeaseOwner != "workerfleet-test" {
 		t.Fatalf("loop lease settings not parsed: ttl=%v owner=%q", cfg.Runtime.LoopLeaseTTL, cfg.Runtime.LoopLeaseOwner)

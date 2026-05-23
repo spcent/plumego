@@ -19,7 +19,7 @@ type Service interface {
 	RegisterWorker(ctx context.Context, input workerapp.RegisterWorkerInput) (workerapp.RegisterWorkerResult, error)
 	HeartbeatWorker(ctx context.Context, input workerapp.HeartbeatWorkerInput) (workerapp.HeartbeatWorkerResult, error)
 	ListWorkers(ctx context.Context, query workerapp.WorkerListQuery) (workerapp.WorkerListResult, error)
-	GetWorker(ctx context.Context, workerID domain.WorkerID) (workerapp.WorkerDetail, error)
+	GetWorker(ctx context.Context, workerID domain.WorkerID) (workerapp.WorkerView, error)
 	GetTask(ctx context.Context, taskID domain.TaskID) (workerapp.TaskDetail, error)
 	GetCaseTimeline(ctx context.Context, taskID domain.TaskID) (workerapp.CaseTimelineResult, error)
 	ListExecPlanCases(ctx context.Context, query workerapp.ExecPlanCaseDrilldownQuery) (workerapp.ExecPlanCaseDrilldownResult, error)

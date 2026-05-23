@@ -11,6 +11,7 @@ import (
 	"workerfleet/internal/domain"
 	"workerfleet/internal/platform/notifier"
 	platformstore "workerfleet/internal/platform/store"
+	"workerfleet/internal/platform/store/memory"
 )
 
 func TestEvaluateAndNotifyAlertsPersistsEnqueuesAndDelivers(t *testing.T) {
@@ -21,19 +22,14 @@ func TestEvaluateAndNotifyAlertsPersistsEnqueuesAndDelivers(t *testing.T) {
 	}))
 	defer server.Close()
 
-	runtime, err := Bootstrap(context.Background(), DefaultConfig())
-	if err != nil {
-		t.Fatalf("bootstrap: %v", err)
-	}
-	t.Cleanup(func() {
-		_ = runtime.Close(context.Background())
-	})
-	if err := runtime.shell.alerts.store.UpsertWorkerSnapshot(context.Background(), domain.WorkerSnapshot{
+	store := memory.NewStore()
+	if err := store.UpsertWorkerSnapshot(context.Background(), domain.WorkerSnapshot{
 		Identity: domain.WorkerIdentity{WorkerID: "worker-1"},
 		Status:   domain.WorkerStatusOffline,
 	}); err != nil {
 		t.Fatalf("upsert snapshot: %v", err)
 	}
+	runtime := newRuntime(store, func(context.Context) error { return nil })
 	cfg := DefaultConfig()
 	cfg.Runtime.NotificationEnabled = true
 	cfg.Runtime.NotifierDeliveryTimeout = time.Second
@@ -49,7 +45,7 @@ func TestEvaluateAndNotifyAlertsPersistsEnqueuesAndDelivers(t *testing.T) {
 	if calls != 0 {
 		t.Fatalf("webhook calls before delivery = %d, want 0", calls)
 	}
-	records, err := runtime.shell.alerts.store.ListAlertRecords(context.Background())
+	records, err := store.ListAlertRecords(context.Background())
 	if err != nil {
 		t.Fatalf("list alerts: %v", err)
 	}
@@ -112,21 +108,16 @@ func TestNotificationOutboxRetriesDeliveryFailure(t *testing.T) {
 	}))
 	defer server.Close()
 
-	runtime, err := Bootstrap(context.Background(), DefaultConfig())
-	if err != nil {
-		t.Fatalf("bootstrap: %v", err)
-	}
-	t.Cleanup(func() {
-		_ = runtime.Close(context.Background())
-	})
-	observer := &recordingRuntimeErrorObserver{}
-	runtime.shell.alerts.errors = observer
-	if err := runtime.shell.alerts.store.UpsertWorkerSnapshot(context.Background(), domain.WorkerSnapshot{
+	store := memory.NewStore()
+	if err := store.UpsertWorkerSnapshot(context.Background(), domain.WorkerSnapshot{
 		Identity: domain.WorkerIdentity{WorkerID: "worker-1"},
 		Status:   domain.WorkerStatusOffline,
 	}); err != nil {
 		t.Fatalf("upsert snapshot: %v", err)
 	}
+	runtime := newRuntime(store, func(context.Context) error { return nil })
+	observer := &recordingRuntimeErrorObserver{}
+	runtime.shell.alerts.errors = observer
 	cfg := DefaultConfig()
 	cfg.Runtime.NotificationEnabled = true
 	cfg.Runtime.NotifierDeliveryTimeout = time.Second

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"workerfleet/internal/domain"
+	"workerfleet/internal/platform/store/memory"
 )
 
 type recordingRuntimeErrorObserver struct {
@@ -32,14 +33,8 @@ func (o *recordingRuntimeErrorObserver) snapshot() ([]string, []error) {
 
 func TestSweepWorkerStatusesMarksExpiredHeartbeatOffline(t *testing.T) {
 	now := time.Date(2026, 4, 22, 10, 0, 0, 0, time.UTC)
-	runtime, err := Bootstrap(context.Background(), DefaultConfig())
-	if err != nil {
-		t.Fatalf("bootstrap: %v", err)
-	}
-	t.Cleanup(func() {
-		_ = runtime.Close(context.Background())
-	})
 
+	store := memory.NewStore()
 	previous := domain.WorkerSnapshot{
 		Identity: domain.WorkerIdentity{WorkerID: "worker-1", Namespace: "sim", NodeName: "node-a"},
 		Runtime: domain.WorkerRuntime{
@@ -52,15 +47,17 @@ func TestSweepWorkerStatusesMarksExpiredHeartbeatOffline(t *testing.T) {
 		StatusReason:        "ready",
 		LastStatusChangedAt: now.Add(-3 * time.Minute),
 	}
-	if err := runtime.shell.loops.store.UpsertWorkerSnapshot(context.Background(), previous); err != nil {
+	if err := store.UpsertWorkerSnapshot(context.Background(), previous); err != nil {
 		t.Fatalf("upsert snapshot: %v", err)
 	}
+
+	runtime := newRuntime(store, func(context.Context) error { return nil })
 
 	if err := runtime.SweepWorkerStatuses(context.Background(), now); err != nil {
 		t.Fatalf("sweep: %v", err)
 	}
 
-	current, ok, err := runtime.shell.loops.store.GetWorkerSnapshot(context.Background(), "worker-1")
+	current, ok, err := store.GetWorkerSnapshot(context.Background(), "worker-1")
 	if err != nil {
 		t.Fatalf("get snapshot: %v", err)
 	}
@@ -73,7 +70,7 @@ func TestSweepWorkerStatusesMarksExpiredHeartbeatOffline(t *testing.T) {
 	if current.StatusReason != "heartbeat_expired" {
 		t.Fatalf("status reason = %q, want heartbeat_expired", current.StatusReason)
 	}
-	events, err := runtime.shell.loops.store.ListWorkerEvents(context.Background(), "worker-1")
+	events, err := store.ListWorkerEvents(context.Background(), "worker-1")
 	if err != nil {
 		t.Fatalf("list events: %v", err)
 	}
@@ -368,10 +365,12 @@ func TestRuntimeLoopSettingsRemainIndependent(t *testing.T) {
 	cfg.Runtime.KubeSyncInterval = 11 * time.Second
 	cfg.Runtime.StatusSweepInterval = 12 * time.Second
 	cfg.Runtime.AlertEvaluationInterval = 13 * time.Second
+	cfg.Runtime.NotificationDeliveryInterval = 14 * time.Second
 
 	kubeSettings := cfg.Runtime.kubeSyncLoopSettings()
 	statusSettings := cfg.Runtime.statusSweepLoopSettings()
 	alertSettings := cfg.Runtime.alertEvaluationLoopSettings()
+	notifySettings := cfg.Runtime.notificationDeliveryLoopSettings()
 
 	if kubeSettings.Name != "kube_sync" || kubeSettings.Interval != 11*time.Second {
 		t.Fatalf("kube settings = %#v", kubeSettings)
@@ -381,6 +380,9 @@ func TestRuntimeLoopSettingsRemainIndependent(t *testing.T) {
 	}
 	if alertSettings.Name != "alert_evaluate" || alertSettings.Interval != 13*time.Second {
 		t.Fatalf("alert settings = %#v", alertSettings)
+	}
+	if notifySettings.Name != "notification_deliver" || notifySettings.Interval != 14*time.Second {
+		t.Fatalf("notification delivery settings = %#v", notifySettings)
 	}
 }
 

@@ -92,16 +92,16 @@ func (s *Service) ListWorkers(ctx context.Context, query WorkerListQuery) (Worke
 	}, nil
 }
 
-func (s *Service) GetWorker(ctx context.Context, workerID domain.WorkerID) (WorkerDetail, error) {
+func (s *Service) GetWorker(ctx context.Context, workerID domain.WorkerID) (WorkerView, error) {
 	if s.store == nil {
-		return WorkerDetail{}, ErrNotImplemented
+		return WorkerView{}, ErrNotImplemented
 	}
 	snapshot, ok, err := s.store.GetWorkerSnapshot(ctx, workerID)
 	if err != nil {
-		return WorkerDetail{}, err
+		return WorkerView{}, err
 	}
 	if !ok {
-		return WorkerDetail{}, ErrNotFound
+		return WorkerView{}, ErrNotFound
 	}
 	return workerViewFromSnapshot(snapshot), nil
 }

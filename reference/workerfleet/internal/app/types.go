@@ -175,8 +175,6 @@ type WorkerView struct {
 	ActiveTasks     []TaskView `json:"active_tasks,omitempty"`
 }
 
-type WorkerDetail = WorkerView
-
 type WorkerListQuery struct {
 	Status         domain.WorkerStatus
 	Namespace      string

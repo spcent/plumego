@@ -19,7 +19,7 @@ type stubService struct {
 	registerFn    func(ctx context.Context, input workerapp.RegisterWorkerInput) (workerapp.RegisterWorkerResult, error)
 	heartbeatFn   func(ctx context.Context, input workerapp.HeartbeatWorkerInput) (workerapp.HeartbeatWorkerResult, error)
 	listWorkersFn func(ctx context.Context, query workerapp.WorkerListQuery) (workerapp.WorkerListResult, error)
-	getWorkerFn   func(ctx context.Context, workerID domain.WorkerID) (workerapp.WorkerDetail, error)
+	getWorkerFn   func(ctx context.Context, workerID domain.WorkerID) (workerapp.WorkerView, error)
 	getTaskFn     func(ctx context.Context, taskID domain.TaskID) (workerapp.TaskDetail, error)
 	timelineFn    func(ctx context.Context, taskID domain.TaskID) (workerapp.CaseTimelineResult, error)
 	drilldownFn   func(ctx context.Context, query workerapp.ExecPlanCaseDrilldownQuery) (workerapp.ExecPlanCaseDrilldownResult, error)
@@ -43,7 +43,7 @@ func (s stubService) ListWorkers(ctx context.Context, query workerapp.WorkerList
 	return s.listWorkersFn(ctx, query)
 }
 
-func (s stubService) GetWorker(ctx context.Context, workerID domain.WorkerID) (workerapp.WorkerDetail, error) {
+func (s stubService) GetWorker(ctx context.Context, workerID domain.WorkerID) (workerapp.WorkerView, error) {
 	return s.getWorkerFn(ctx, workerID)
 }
 
@@ -293,8 +293,8 @@ func TestListWorkersRejectsInvalidAcceptingTasksQuery(t *testing.T) {
 }
 
 func TestGetWorkerReturnsNotFound(t *testing.T) {
-	h := New(stubService{getWorkerFn: func(ctx context.Context, workerID domain.WorkerID) (workerapp.WorkerDetail, error) {
-		return workerapp.WorkerDetail{}, workerapp.ErrNotFound
+	h := New(stubService{getWorkerFn: func(ctx context.Context, workerID domain.WorkerID) (workerapp.WorkerView, error) {
+		return workerapp.WorkerView{}, workerapp.ErrNotFound
 	}})
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/workers/worker-404", nil)
