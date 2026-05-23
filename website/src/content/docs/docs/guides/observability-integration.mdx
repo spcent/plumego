@@ -130,7 +130,7 @@ Run the service locally and check each signal:
 curl http://localhost:8080/metrics | grep myapp_http
 
 # Logs (structured JSON to stdout)
-go run ./reference/standard-service 2>&1 | head -5
+cd reference/standard-service && go run . 2>&1 | head -5
 
 # Trace context (check W3C traceparent in request or response)
 curl -v http://localhost:8080/api/hello 2>&1 | grep traceparent

@@ -130,7 +130,7 @@ func (h *Handler) Fetch(w http.ResponseWriter, r *http.Request) {
 curl http://localhost:8080/metrics | grep myapp_http
 
 # 日志（结构化 JSON 到 stdout）
-go run ./reference/standard-service 2>&1 | head -5
+cd reference/standard-service && go run . 2>&1 | head -5
 
 # 追踪上下文（检查请求或响应中的 W3C traceparent）
 curl -v http://localhost:8080/api/hello 2>&1 | grep traceparent
