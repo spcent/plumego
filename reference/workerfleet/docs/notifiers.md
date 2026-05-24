@@ -14,7 +14,7 @@ Delivery rules:
 - delivery claims due jobs from the outbox and sends them to the configured sink
 - transient failures retry with bounded backoff
 - permanent failures are recorded on the outbox job and are not retried
-- notifier errors must not include header secrets
+- notifier errors must not include header secrets or raw remote response bodies
 - delivery is at-least-once from the app perspective; exactly-once delivery is not claimed
 
 Runtime configuration:

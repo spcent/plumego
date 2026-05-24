@@ -4,7 +4,7 @@ Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Context Package: implementation
 Priority: P0
-State: active
+State: done
 Primary Module: reference/workerfleet
 Owned Files:
 - reference/workerfleet/internal/platform/notifier/dispatcher.go
@@ -47,9 +47,17 @@ Validation:
 - gofmt -l reference/workerfleet/internal/platform/notifier
 
 Done Definition:
-- [ ] Acceptance Tests pass.
-- [ ] All Validation commands exit 0.
-- [ ] gofmt -l . produces no output.
-- [ ] Docs Sync targets updated (if applicable).
+- [x] Acceptance Tests pass.
+- [x] All Validation commands exit 0.
+- [x] gofmt -l . produces no output.
+- [x] Docs Sync targets updated (if applicable).
 
 Outcome:
+- Sanitized HTTP notifier delivery errors so remote response bodies are drained but omitted from `Error()`.
+- Preserved sink, status code, error class, and permanence for retry classification.
+- Added `TestNotifierErrorDoesNotIncludeRemoteBody`.
+- Documented that notifier errors omit raw remote response bodies.
+- Validation:
+  - `cd reference/workerfleet && go test -timeout 30s ./internal/platform/notifier`
+  - `cd reference/workerfleet && go vet ./internal/platform/notifier`
+  - `gofmt -l reference/workerfleet/internal/platform/notifier`

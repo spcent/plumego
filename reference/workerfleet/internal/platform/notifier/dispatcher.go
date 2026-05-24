@@ -75,13 +75,18 @@ func (d *Dispatcher) Notify(ctx context.Context, alert domain.AlertRecord) error
 }
 
 type DeliveryError struct {
-	Class     string
-	Permanent bool
-	Err       error
+	Class      string
+	Permanent  bool
+	Sink       string
+	StatusCode int
+	Err        error
 }
 
 func (e DeliveryError) Error() string {
 	if e.Err == nil {
+		if e.Sink != "" && e.StatusCode > 0 {
+			return fmt.Sprintf("%s notify failed: status %d", e.Sink, e.StatusCode)
+		}
 		return e.Class
 	}
 	return e.Err.Error()
@@ -91,7 +96,7 @@ func (e DeliveryError) Unwrap() error {
 	return e.Err
 }
 
-func HTTPStatusError(sink string, statusCode int, payload string) error {
+func HTTPStatusError(sink string, statusCode int) error {
 	class := ErrorClassHTTP5xx
 	permanent := false
 	switch {
@@ -102,9 +107,10 @@ func HTTPStatusError(sink string, statusCode int, payload string) error {
 		permanent = true
 	}
 	return DeliveryError{
-		Class:     class,
-		Permanent: permanent,
-		Err:       fmt.Errorf("%s notify failed: status %d: %s", sink, statusCode, payload),
+		Class:      class,
+		Permanent:  permanent,
+		Sink:       sink,
+		StatusCode: statusCode,
 	}
 }
 

@@ -70,8 +70,8 @@ func (n *WebhookNotifier) Notify(ctx context.Context, alert domain.AlertRecord) 
 	defer resp.Body.Close()
 
 	if resp.StatusCode >= 300 {
-		payload, _ := io.ReadAll(io.LimitReader(resp.Body, 2048))
-		return HTTPStatusError("webhook", resp.StatusCode, strings.TrimSpace(string(payload)))
+		_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 2048))
+		return HTTPStatusError("webhook", resp.StatusCode)
 	}
 
 	return nil

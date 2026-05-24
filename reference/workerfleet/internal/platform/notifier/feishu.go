@@ -66,8 +66,8 @@ func (n *FeishuNotifier) Notify(ctx context.Context, alert domain.AlertRecord) e
 	defer resp.Body.Close()
 
 	if resp.StatusCode >= 300 {
-		payload, _ := io.ReadAll(io.LimitReader(resp.Body, 2048))
-		return HTTPStatusError("feishu", resp.StatusCode, strings.TrimSpace(string(payload)))
+		_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 2048))
+		return HTTPStatusError("feishu", resp.StatusCode)
 	}
 
 	return nil

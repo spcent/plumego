@@ -162,6 +162,37 @@ func TestNotifierErrorDoesNotLeakHeaderSecret(t *testing.T) {
 	assertErrorDoesNotLeak(t, err, "super-secret-token")
 }
 
+func TestNotifierErrorDoesNotIncludeRemoteBody(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte("remote echoed super-secret-token"))
+	}))
+	defer server.Close()
+
+	notifier := NewWebhookNotifier(WebhookConfig{
+		URL: server.URL,
+		Headers: map[string]string{
+			"X-Test-Token": "super-secret-token",
+		},
+		HTTPClient: server.Client(),
+	})
+
+	err := notifier.Notify(context.Background(), domain.AlertRecord{
+		AlertType: domain.AlertWorkerOffline,
+		Status:    domain.AlertStatusFiring,
+		WorkerID:  "worker-1",
+		Message:   "worker is offline",
+	})
+	if err == nil {
+		t.Fatalf("expected notify to fail")
+	}
+	if !strings.Contains(err.Error(), "status 500") {
+		t.Fatalf("error = %v, want status code", err)
+	}
+	assertErrorDoesNotLeak(t, err, "remote echoed")
+	assertErrorDoesNotLeak(t, err, "super-secret-token")
+}
+
 func TestClassifyErrorSeparatesPermanentAndTransientFailures(t *testing.T) {
 	tests := []struct {
 		name          string
@@ -171,19 +202,19 @@ func TestClassifyErrorSeparatesPermanentAndTransientFailures(t *testing.T) {
 	}{
 		{
 			name:          "permanent client error",
-			err:           HTTPStatusError("webhook", http.StatusBadRequest, "bad request"),
+			err:           HTTPStatusError("webhook", http.StatusBadRequest),
 			wantClass:     ErrorClassHTTP4xx,
 			wantPermanent: true,
 		},
 		{
 			name:          "rate limit",
-			err:           HTTPStatusError("webhook", http.StatusTooManyRequests, "slow down"),
+			err:           HTTPStatusError("webhook", http.StatusTooManyRequests),
 			wantClass:     ErrorClassHTTP429,
 			wantPermanent: false,
 		},
 		{
 			name:          "server error",
-			err:           HTTPStatusError("feishu", http.StatusInternalServerError, "boom"),
+			err:           HTTPStatusError("feishu", http.StatusInternalServerError),
 			wantClass:     ErrorClassHTTP5xx,
 			wantPermanent: false,
 		},
