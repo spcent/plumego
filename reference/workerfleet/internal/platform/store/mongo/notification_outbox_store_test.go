@@ -4,15 +4,47 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
 
+	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 	"workerfleet/internal/domain"
 	platformstore "workerfleet/internal/platform/store"
 )
+
+func TestNotificationOutboxClaimUsesDueConditionCAS(t *testing.T) {
+	now := time.Date(2026, 5, 22, 10, 0, 0, 0, time.UTC)
+
+	pending := NotificationJobDoc{
+		ID:     "job-pending",
+		Status: platformstore.NotificationJobPending,
+	}
+	wantPending := bson.D{
+		{Key: "_id", Value: "job-pending"},
+		{Key: "status", Value: platformstore.NotificationJobPending},
+		{Key: "next_attempt_at", Value: bson.D{{Key: "$lte", Value: now}}},
+	}
+	if got := notificationClaimUpdateFilter(pending, now); !reflect.DeepEqual(got, wantPending) {
+		t.Fatalf("pending claim filter = %#v, want %#v", got, wantPending)
+	}
+
+	processing := NotificationJobDoc{
+		ID:     "job-processing",
+		Status: platformstore.NotificationJobProcessing,
+	}
+	wantProcessing := bson.D{
+		{Key: "_id", Value: "job-processing"},
+		{Key: "status", Value: platformstore.NotificationJobProcessing},
+		{Key: "locked_until", Value: bson.D{{Key: "$lte", Value: now}}},
+	}
+	if got := notificationClaimUpdateFilter(processing, now); !reflect.DeepEqual(got, wantProcessing) {
+		t.Fatalf("processing claim filter = %#v, want %#v", got, wantProcessing)
+	}
+}
 
 func TestNotificationOutboxEnqueueClaimRetryDeliver(t *testing.T) {
 	uri := os.Getenv("WORKERFLEET_MONGO_TEST_URI")

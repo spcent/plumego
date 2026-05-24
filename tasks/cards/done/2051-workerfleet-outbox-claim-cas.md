@@ -4,7 +4,7 @@ Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Context Package: implementation
 Priority: P0
-State: active
+State: done
 Primary Module: reference/workerfleet
 Owned Files:
 - reference/workerfleet/internal/platform/store/mongo/notification_outbox_store.go
@@ -40,9 +40,15 @@ Validation:
 - gofmt -l reference/workerfleet/internal/platform/store/mongo
 
 Done Definition:
-- [ ] Acceptance Tests pass.
-- [ ] All Validation commands exit 0.
-- [ ] gofmt -l . produces no output.
-- [ ] Docs Sync targets updated (if applicable).
+- [x] Acceptance Tests pass.
+- [x] All Validation commands exit 0.
+- [x] gofmt -l . produces no output.
+- [x] Docs Sync targets updated (if applicable).
 
 Outcome:
+- Tightened Mongo notification job claim updates to include the exact due condition for both pending and expired processing jobs.
+- Added `TestNotificationOutboxClaimUsesDueConditionCAS` to lock the CAS filter shape without requiring a live MongoDB.
+- Validation:
+  - `cd reference/workerfleet && go test -timeout 30s ./internal/platform/store/mongo`
+  - `cd reference/workerfleet && go vet ./internal/platform/store/mongo`
+  - `gofmt -l reference/workerfleet/internal/platform/store/mongo`

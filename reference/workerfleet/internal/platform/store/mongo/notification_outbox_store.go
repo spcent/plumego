@@ -69,19 +69,9 @@ func (s *Store) ClaimNotificationJobs(ctx context.Context, now time.Time, limit 
 		limit = 25
 	}
 	now = now.UTC()
-	filter := bson.D{{Key: "$or", Value: bson.A{
-		bson.D{
-			{Key: "status", Value: platformstore.NotificationJobPending},
-			{Key: "next_attempt_at", Value: bson.D{{Key: "$lte", Value: now}}},
-		},
-		bson.D{
-			{Key: "status", Value: platformstore.NotificationJobProcessing},
-			{Key: "locked_until", Value: bson.D{{Key: "$lte", Value: now}}},
-		},
-	}}}
 	cursor, err := s.collections.NotificationJobs.Find(
 		ctx,
-		filter,
+		notificationClaimFindFilter(now),
 		options.Find().SetSort(bson.D{{Key: "next_attempt_at", Value: 1}, {Key: "_id", Value: 1}}).SetLimit(int64(limit)),
 	)
 	if err != nil {
@@ -104,10 +94,7 @@ func (s *Store) ClaimNotificationJobs(ctx context.Context, now time.Time, limit 
 			}},
 			{Key: "$inc", Value: bson.D{{Key: "attempts", Value: 1}}},
 		}
-		result, err := s.collections.NotificationJobs.UpdateOne(ctx, bson.D{
-			{Key: "_id", Value: doc.ID},
-			{Key: "status", Value: doc.Status},
-		}, update)
+		result, err := s.collections.NotificationJobs.UpdateOne(ctx, notificationClaimUpdateFilter(doc, now), update)
 		if err != nil {
 			return nil, err
 		}
@@ -121,6 +108,33 @@ func (s *Store) ClaimNotificationJobs(ctx context.Context, now time.Time, limit 
 		claimed = append(claimed, doc.Record())
 	}
 	return claimed, nil
+}
+
+func notificationClaimFindFilter(now time.Time) bson.D {
+	return bson.D{{Key: "$or", Value: bson.A{
+		bson.D{
+			{Key: "status", Value: platformstore.NotificationJobPending},
+			{Key: "next_attempt_at", Value: bson.D{{Key: "$lte", Value: now}}},
+		},
+		bson.D{
+			{Key: "status", Value: platformstore.NotificationJobProcessing},
+			{Key: "locked_until", Value: bson.D{{Key: "$lte", Value: now}}},
+		},
+	}}}
+}
+
+func notificationClaimUpdateFilter(doc NotificationJobDoc, now time.Time) bson.D {
+	filter := bson.D{
+		{Key: "_id", Value: doc.ID},
+		{Key: "status", Value: doc.Status},
+	}
+	switch doc.Status {
+	case platformstore.NotificationJobPending:
+		filter = append(filter, bson.E{Key: "next_attempt_at", Value: bson.D{{Key: "$lte", Value: now}}})
+	case platformstore.NotificationJobProcessing:
+		filter = append(filter, bson.E{Key: "locked_until", Value: bson.D{{Key: "$lte", Value: now}}})
+	}
+	return filter
 }
 
 func (s *Store) MarkNotificationDelivered(ctx context.Context, jobID string, deliveredAt time.Time) error {
