@@ -107,21 +107,23 @@ the migration guide for that major version.
 
 ---
 
-## Extension Packages (`x/*`) — No Compatibility Freeze
+## Extension Packages (`x/*`) — Tiered Compatibility
 
-Extension packages are `experimental`. They may:
+`x/*` packages do not all follow the same compatibility rule:
 
-- Change API signatures between minor releases.
-- Be renamed, split, merged, or removed without a major version bump.
-- Graduate to stable-root status (triggering the full deprecation process from
-  that point forward).
+- `experimental` extension roots and subordinate surfaces may change API,
+  config, package layout, or behavior between any releases.
+- `beta` extension roots and explicitly listed beta surfaces follow the freeze
+  rules in the table above and in `docs/EXTENSION_STABILITY_POLICY.md`.
+- `ga` extension roots would follow the same compatibility promise as stable
+  roots, but none exist yet.
 
-Users who depend on `x/*` packages should pin their dependency to a specific
-release and review release notes on every upgrade.
+Users who depend on `x/*` packages should read the current tier in
+`docs/EXTENSION_MATURITY.md`, pin to a release, and review release notes on
+every upgrade.
 
-When an `x/*` package graduates to a stable root, the old `x/*` path will
-follow the standard deprecation process (Step 1–4 above) from that release
-forward.
+When an `x/*` package graduates to a stable root, the old `x/*` path follows
+the standard deprecation process from that release forward.
 
 ---
 

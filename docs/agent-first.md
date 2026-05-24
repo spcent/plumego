@@ -99,9 +99,11 @@ Boundary checks:
 
 ```bash
 go run ./internal/checks/dependency-rules
+go run ./internal/checks/cross-extension-deps
 go run ./internal/checks/agent-workflow
 go run ./internal/checks/module-manifests
 go run ./internal/checks/reference-layout
+go run ./internal/checks/public-entrypoints-sync
 ```
 
 Repo-wide gate:
@@ -141,6 +143,10 @@ Available recipes:
 | `add-middleware.yaml` | Adding transport-level middleware |
 | `fix-bug.yaml` | Localizing and fixing an implementation bug |
 | `http-endpoint-bugfix.yaml` | Fixing a defect in route wiring or handler transport logic |
+| `add-acceptance-tests.yaml` | Writing task-card acceptance tests before implementation |
+| `add-websocket-room.yaml` | Adding a bounded websocket room capability |
+| `add-ai-tool.yaml` | Adding an AI tool surface under the existing AI family |
+| `add-grpc-method.yaml` | Adding a gRPC method through the RPC transport family |
 | `symbol-change.yaml` | Renaming, removing, or changing an exported symbol |
 | `new-extension-module.yaml` | Creating a new `x/*` capability family |
 | `new-stable-module.yaml` | Adding a new stable root package |
@@ -249,7 +255,7 @@ the corresponding docs or the checks will fail at CI time.
 9. Run boundary checks selected by the gate profile
 10. If cross-module or release-relevant: run make gates
 11. Update docs if behavior, API, config, security, lifecycle, or boundary changed
-11. Verify against Done Definition in task card
+12. Verify against Done Definition in task card
 ```
 
 Deviating from this sequence — especially skipping preflight or widening scope

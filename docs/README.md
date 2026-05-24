@@ -64,7 +64,7 @@ layout or promote experimental `x/*` APIs to stable status.
 
 ## Workflow
 
-- `CODEX_WORKFLOW.md` — milestone execution guide tied to the current `Makefile`
+- `CODEX_WORKFLOW.md` — default agent working loop, prompt shapes, and stop conditions
 - `AGENT_CODE_QUALITY_RULES.md` — agent preflight, review output, risk focus, and gate selection rules
 - `AGENT_CONTEXT_BUDGET.md` — token-bounded context packages, task-card limits, and validation output compression
 - `MILESTONE_PIPELINE.md` — artifact contract for milestone, plan, card, verify, and PR handoffs
@@ -127,8 +127,6 @@ When guidance overlaps, use this order:
 
 1. `AGENTS.md`
 2. `docs/CANONICAL_STYLE_GUIDE.md`
-3. `docs/AGENT_CONTEXT_BUDGET.md` for context package selection
-4. `docs/AGENT_CODE_QUALITY_RULES.md`
-5. `specs/*`
-6. the touched module's `module.yaml`
-7. existing local patterns in touched files
+3. `specs/*`
+4. the touched module's `module.yaml`
+5. existing local patterns in touched files
