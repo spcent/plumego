@@ -51,16 +51,16 @@ type greetResponse struct {
 	Message string `json:"message"`
 }
 
-type statusResponse struct {
-	Status    string          `json:"status"`
-	Service   string          `json:"service"`
-	Version   string          `json:"version"`
-	Timestamp string          `json:"timestamp"`
-	Structure statusStructure `json:"structure"`
-	Modules   []string        `json:"modules"`
+type infoResponse struct {
+	Mode      string        `json:"mode"`
+	Service   string        `json:"service"`
+	Version   string        `json:"version"`
+	Timestamp string        `json:"timestamp"`
+	Structure infoStructure `json:"structure"`
+	Modules   []string      `json:"modules"`
 }
 
-type statusStructure struct {
+type infoStructure struct {
 	Bootstrap  string `json:"bootstrap"`
 	Extensions string `json:"extensions"`
 	Handlers   string `json:"handlers"`
@@ -102,7 +102,7 @@ func (h APIHandler) Hello(w http.ResponseWriter, r *http.Request) {
 			{Name: "items_delete", Method: http.MethodDelete, Path: "/api/v1/items/:id", Description: "delete an item"},
 			{Name: "root", Method: http.MethodGet, Path: "/", Description: "service identity"},
 			{Name: "api_hello", Method: http.MethodGet, Path: "/api/hello", Description: "service discovery — this endpoint"},
-			{Name: "api_status", Method: http.MethodGet, Path: "/api/status", Description: "runtime status"},
+			{Name: "api_info", Method: http.MethodGet, Path: "/api/info", Description: "application wiring and module info"},
 			{Name: "api_greet", Method: http.MethodGet, Path: "/api/v1/greet", Description: "greeting (demonstrates TypeRequired error)"},
 			{Name: "items_list", Method: http.MethodGet, Path: "/api/v1/items", Description: "list items with limit/offset pagination"},
 			{Name: "items_get", Method: http.MethodGet, Path: "/api/v1/items/:id", Description: "get item by id"},
@@ -136,25 +136,28 @@ func (h APIHandler) Greet(w http.ResponseWriter, r *http.Request) {
 	_ = contract.WriteResponse(w, r, http.StatusOK, greetResponse{Message: "hello, " + name}, nil)
 }
 
-// Status responds with a summary of system health and component state.
+// Info responds with application wiring information and the list of active modules.
 // It demonstrates two structured-logging patterns:
 //   - WithFields attaches fixed fields to every subsequent log call.
 //   - contract.RequestIDFromContext extracts the correlation ID stamped by
 //     the requestid middleware so log lines are linkable to the inbound request.
-func (h APIHandler) Status(w http.ResponseWriter, r *http.Request) {
+//
+// This is an informational endpoint about how the service is assembled, not a
+// health probe. Use /healthz for liveness and /readyz for readiness.
+func (h APIHandler) Info(w http.ResponseWriter, r *http.Request) {
 	if h.Logger != nil {
 		requestID := contract.RequestIDFromContext(r.Context())
 		h.Logger.WithFields(plumelog.Fields{
-			"endpoint":   "status",
+			"endpoint":   "info",
 			"request_id": requestID,
-		}).Info("status request handled")
+		}).Info("info request handled")
 	}
-	_ = contract.WriteResponse(w, r, http.StatusOK, statusResponse{
-		Status:    "healthy",
+	_ = contract.WriteResponse(w, r, http.StatusOK, infoResponse{
+		Mode:      "canonical",
 		Service:   h.ServiceName,
 		Version:   h.Version,
 		Timestamp: time.Now().Format(time.RFC3339),
-		Structure: statusStructure{
+		Structure: infoStructure{
 			Bootstrap:  "explicit",
 			Extensions: "excluded_from_canonical_path",
 			Handlers:   "net/http",

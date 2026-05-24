@@ -59,6 +59,27 @@ func decodeReferenceData[T any](t *testing.T, rec *httptest.ResponseRecorder) T 
 	return body
 }
 
+// errorFields holds the code and details from an error response.
+// Use decodeErrorPayload to read both in a single pass.
+type errorFields struct {
+	Code    string         `json:"code"`
+	Details map[string]any `json:"details"`
+}
+
+// decodeErrorPayload decodes the error envelope's code and details map.
+// It reads rec.Body.Bytes() directly so it is safe to call even after
+// decodeErrorCode has already advanced the reader.
+func decodeErrorPayload(t *testing.T, rec *httptest.ResponseRecorder) errorFields {
+	t.Helper()
+	var env struct {
+		Error errorFields `json:"error"`
+	}
+	if err := json.NewDecoder(bytes.NewReader(rec.Body.Bytes())).Decode(&env); err != nil {
+		t.Fatalf("decode error payload: %v", err)
+	}
+	return env.Error
+}
+
 func TestHealthHandlerLive(t *testing.T) {
 	h := HealthHandler{ServiceName: "svc"}
 	rec := httptest.NewRecorder()
@@ -131,16 +152,9 @@ func TestHealthHandlerReadyWithCheckers(t *testing.T) {
 		}
 		// Verify the error detail names the failing component so operators
 		// can diagnose without inspecting logs.
-		var errResp struct {
-			Error struct {
-				Details map[string]any `json:"details"`
-			} `json:"error"`
-		}
-		if err := json.NewDecoder(rec.Body).Decode(&errResp); err != nil {
-			t.Fatalf("decode error response: %v", err)
-		}
-		if errResp.Error.Details["component"] != "database" {
-			t.Fatalf("error detail component = %v, want database", errResp.Error.Details["component"])
+		ef := decodeErrorPayload(t, rec)
+		if ef.Details["component"] != "database" {
+			t.Fatalf("error detail component = %v, want database", ef.Details["component"])
 		}
 	})
 
@@ -159,16 +173,9 @@ func TestHealthHandlerReadyWithCheckers(t *testing.T) {
 		if rec.Code != http.StatusServiceUnavailable {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusServiceUnavailable)
 		}
-		var errResp struct {
-			Error struct {
-				Details map[string]any `json:"details"`
-			} `json:"error"`
-		}
-		if err := json.NewDecoder(rec.Body).Decode(&errResp); err != nil {
-			t.Fatalf("decode error response: %v", err)
-		}
-		if errResp.Error.Details["component"] != "cache" {
-			t.Fatalf("error detail component = %v, want cache", errResp.Error.Details["component"])
+		ef := decodeErrorPayload(t, rec)
+		if ef.Details["component"] != "cache" {
+			t.Fatalf("error detail component = %v, want cache", ef.Details["component"])
 		}
 	})
 
@@ -276,28 +283,28 @@ func TestAPIHandlerResponses(t *testing.T) {
 				if rec.Code != http.StatusBadRequest {
 					t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
 				}
-				if code := decodeErrorCode(t, rec); code != "greet.name.required" {
+				if code := decodeErrorPayload(t, rec).Code; code != "greet.name.required" {
 					t.Fatalf("error code = %q, want %q", code, "greet.name.required")
 				}
 			},
 		},
 		{
-			name: "status",
-			path: "/api/status",
-			fn:   h.Status,
+			name: "info",
+			path: "/api/info",
+			fn:   h.Info,
 			assert: func(t *testing.T, rec *httptest.ResponseRecorder) {
 				if rec.Code != http.StatusOK {
 					t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
 				}
-				got := decodeReferenceData[statusResponse](t, rec)
-				if got.Status != "healthy" || got.Structure.Routes != "one_method_one_path_one_handler" || len(got.Modules) == 0 {
-					t.Fatalf("unexpected status response: %+v", got)
+				got := decodeReferenceData[infoResponse](t, rec)
+				if got.Mode != "canonical" || got.Structure.Routes != "one_method_one_path_one_handler" || len(got.Modules) == 0 {
+					t.Fatalf("unexpected info response: %+v", got)
 				}
 				if got.Version != "test-version" {
-					t.Fatalf("status.Version = %q, want %q", got.Version, "test-version")
+					t.Fatalf("info.Version = %q, want %q", got.Version, "test-version")
 				}
 				if got.Service != "test-service" {
-					t.Fatalf("status.Service = %q, want %q", got.Service, "test-service")
+					t.Fatalf("info.Service = %q, want %q", got.Service, "test-service")
 				}
 			},
 		},
@@ -316,27 +323,73 @@ func TestItemHandlerCreate(t *testing.T) {
 	h := ItemHandler{Repo: item.NewMemoryStore()}
 
 	t.Run("valid body returns 201 with item", func(t *testing.T) {
-		body := bytes.NewBufferString(`{"name":"widget"}`)
+		body := bytes.NewBufferString(`{"name":"widget","description":"a widget"}`)
 		rec := httptest.NewRecorder()
 		h.Create(rec, httptest.NewRequest(http.MethodPost, "/api/v1/items", body))
 		if rec.Code != http.StatusCreated {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusCreated)
 		}
 		got := decodeReferenceData[item.Item](t, rec)
-		if got.ID == "" || got.Name != "widget" || got.CreatedAt.IsZero() {
+		if got.ID == "" || got.Name != "widget" || got.Description != "a widget" || got.CreatedAt.IsZero() {
 			t.Fatalf("unexpected item: %+v", got)
 		}
 	})
 
-	t.Run("missing name returns 400 TypeRequired", func(t *testing.T) {
-		body := bytes.NewBufferString(`{"name":""}`)
+	t.Run("both name and description missing returns 400 with both field details", func(t *testing.T) {
+		body := bytes.NewBufferString(`{}`)
 		rec := httptest.NewRecorder()
 		h.Create(rec, httptest.NewRequest(http.MethodPost, "/api/v1/items", body))
 		if rec.Code != http.StatusBadRequest {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
 		}
-		if code := decodeErrorCode(t, rec); code != "item.name.required" {
-			t.Fatalf("error code = %q, want %q", code, "item.name.required")
+		ef := decodeErrorPayload(t, rec)
+		if ef.Code != codeItemFieldsRequired {
+			t.Fatalf("error code = %q, want %q", ef.Code, codeItemFieldsRequired)
+		}
+		// Both field names must appear as keys in the details map.
+		if _, ok := ef.Details["name"]; !ok {
+			t.Error("error details missing 'name' key")
+		}
+		if _, ok := ef.Details["description"]; !ok {
+			t.Error("error details missing 'description' key")
+		}
+	})
+
+	t.Run("missing name only returns 400 with name detail", func(t *testing.T) {
+		body := bytes.NewBufferString(`{"name":"","description":"a widget"}`)
+		rec := httptest.NewRecorder()
+		h.Create(rec, httptest.NewRequest(http.MethodPost, "/api/v1/items", body))
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
+		}
+		ef := decodeErrorPayload(t, rec)
+		if ef.Code != codeItemFieldsRequired {
+			t.Fatalf("error code = %q, want %q", ef.Code, codeItemFieldsRequired)
+		}
+		if _, ok := ef.Details["name"]; !ok {
+			t.Error("error details missing 'name' key")
+		}
+		if _, ok := ef.Details["description"]; ok {
+			t.Error("error details should not contain 'description' when description is present")
+		}
+	})
+
+	t.Run("missing description only returns 400 with description detail", func(t *testing.T) {
+		body := bytes.NewBufferString(`{"name":"widget"}`)
+		rec := httptest.NewRecorder()
+		h.Create(rec, httptest.NewRequest(http.MethodPost, "/api/v1/items", body))
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
+		}
+		ef := decodeErrorPayload(t, rec)
+		if ef.Code != codeItemFieldsRequired {
+			t.Fatalf("error code = %q, want %q", ef.Code, codeItemFieldsRequired)
+		}
+		if _, ok := ef.Details["description"]; !ok {
+			t.Error("error details missing 'description' key")
+		}
+		if _, ok := ef.Details["name"]; ok {
+			t.Error("error details should not contain 'name' when name is present")
 		}
 	})
 
@@ -346,7 +399,7 @@ func TestItemHandlerCreate(t *testing.T) {
 		if rec.Code != http.StatusBadRequest {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
 		}
-		if code := decodeErrorCode(t, rec); code != codeItemCreateBodyRequired {
+		if code := decodeErrorPayload(t, rec).Code; code != codeItemCreateBodyRequired {
 			t.Fatalf("error code = %q, want %q", code, codeItemCreateBodyRequired)
 		}
 	})
@@ -358,7 +411,7 @@ func TestItemHandlerCreate(t *testing.T) {
 		if rec.Code != http.StatusBadRequest {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
 		}
-		if code := decodeErrorCode(t, rec); code != codeItemCreateInvalidJSON {
+		if code := decodeErrorPayload(t, rec).Code; code != codeItemCreateInvalidJSON {
 			t.Fatalf("error code = %q, want %q", code, codeItemCreateInvalidJSON)
 		}
 	})
@@ -385,8 +438,8 @@ func TestItemHandlerList(t *testing.T) {
 
 	t.Run("populated store returns items in creation order", func(t *testing.T) {
 		store := item.NewMemoryStore()
-		store.Create(context.Background(), "alpha")
-		store.Create(context.Background(), "beta")
+		store.Create(context.Background(), "alpha", "alpha item")
+		store.Create(context.Background(), "beta", "beta item")
 		h := ItemHandler{Repo: store}
 
 		rec := httptest.NewRecorder()
@@ -413,7 +466,7 @@ func TestItemHandlerList(t *testing.T) {
 	t.Run("limit param restricts returned items and is reflected in meta", func(t *testing.T) {
 		store := item.NewMemoryStore()
 		for _, name := range []string{"a", "b", "c", "d", "e"} {
-			store.Create(context.Background(), name)
+			store.Create(context.Background(), name, name+" item")
 		}
 		h := ItemHandler{Repo: store}
 
@@ -438,9 +491,9 @@ func TestItemHandlerList(t *testing.T) {
 
 	t.Run("offset beyond total clamps and returns empty page", func(t *testing.T) {
 		store := item.NewMemoryStore()
-		store.Create(context.Background(), "a")
-		store.Create(context.Background(), "b")
-		store.Create(context.Background(), "c")
+		store.Create(context.Background(), "a", "a item")
+		store.Create(context.Background(), "b", "b item")
+		store.Create(context.Background(), "c", "c item")
 		h := ItemHandler{Repo: store}
 
 		rec := httptest.NewRecorder()
@@ -463,7 +516,7 @@ func TestItemHandlerList(t *testing.T) {
 	t.Run("offset param skips items in creation order", func(t *testing.T) {
 		store := item.NewMemoryStore()
 		for _, name := range []string{"a", "b", "c", "d", "e"} {
-			store.Create(context.Background(), name)
+			store.Create(context.Background(), name, name+" item")
 		}
 		h := ItemHandler{Repo: store}
 
@@ -493,7 +546,7 @@ func TestItemHandlerList(t *testing.T) {
 		if rec.Code != http.StatusBadRequest {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
 		}
-		if code := decodeErrorCode(t, rec); code != codeItemListInvalidParam {
+		if code := decodeErrorPayload(t, rec).Code; code != codeItemListInvalidParam {
 			t.Fatalf("error code = %q, want %q", code, codeItemListInvalidParam)
 		}
 	})
@@ -505,7 +558,7 @@ func TestItemHandlerList(t *testing.T) {
 		if rec.Code != http.StatusBadRequest {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
 		}
-		if code := decodeErrorCode(t, rec); code != codeItemListInvalidParam {
+		if code := decodeErrorPayload(t, rec).Code; code != codeItemListInvalidParam {
 			t.Fatalf("error code = %q, want %q", code, codeItemListInvalidParam)
 		}
 	})
@@ -522,7 +575,7 @@ func TestItemHandlerList(t *testing.T) {
 
 func TestItemHandlerGetByID(t *testing.T) {
 	store := item.NewMemoryStore()
-	created := store.Create(context.Background(), "gadget")
+	created := store.Create(context.Background(), "gadget", "a gadget")
 	h := ItemHandler{Repo: store}
 
 	t.Run("existing id returns 200 with item", func(t *testing.T) {
@@ -537,7 +590,7 @@ func TestItemHandlerGetByID(t *testing.T) {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
 		}
 		got := decodeReferenceData[item.Item](t, rec)
-		if got.ID != created.ID || got.Name != "gadget" {
+		if got.ID != created.ID || got.Name != "gadget" || got.Description != "a gadget" {
 			t.Fatalf("unexpected item: %+v", got)
 		}
 	})
@@ -558,7 +611,7 @@ func TestItemHandlerGetByID(t *testing.T) {
 func TestItemHandlerUpdate(t *testing.T) {
 	t.Run("existing id returns 200 with updated item", func(t *testing.T) {
 		store := item.NewMemoryStore()
-		created := store.Create(context.Background(), "original")
+		created := store.Create(context.Background(), "original", "an original item")
 		h := ItemHandler{Repo: store}
 
 		body := bytes.NewBufferString(`{"name":"renamed"}`)
@@ -573,7 +626,9 @@ func TestItemHandlerUpdate(t *testing.T) {
 		}
 		got := decodeReferenceData[item.Item](t, rec)
 		// created_at is immutable: use Equal to ignore monotonic clock stripped by JSON.
-		if got.ID != created.ID || got.Name != "renamed" || !got.CreatedAt.Equal(created.CreatedAt) {
+		// description is immutable: verify it is preserved after name update.
+		if got.ID != created.ID || got.Name != "renamed" ||
+			got.Description != "an original item" || !got.CreatedAt.Equal(created.CreatedAt) {
 			t.Fatalf("unexpected updated item: %+v", got)
 		}
 	})
@@ -594,7 +649,7 @@ func TestItemHandlerUpdate(t *testing.T) {
 
 	t.Run("missing name returns 400 TypeRequired", func(t *testing.T) {
 		store := item.NewMemoryStore()
-		created := store.Create(context.Background(), "original")
+		created := store.Create(context.Background(), "original", "an original item")
 		h := ItemHandler{Repo: store}
 
 		body := bytes.NewBufferString(`{"name":""}`)
@@ -607,11 +662,14 @@ func TestItemHandlerUpdate(t *testing.T) {
 		if rec.Code != http.StatusBadRequest {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
 		}
+		if code := decodeErrorPayload(t, rec).Code; code != codeItemNameRequired {
+			t.Fatalf("error code = %q, want %q", code, codeItemNameRequired)
+		}
 	})
 
 	t.Run("empty body returns 400 TypeRequired with body_required code", func(t *testing.T) {
 		store := item.NewMemoryStore()
-		created := store.Create(context.Background(), "original")
+		created := store.Create(context.Background(), "original", "an original item")
 		h := ItemHandler{Repo: store}
 
 		req := httptest.NewRequest(http.MethodPut, "/api/v1/items/"+created.ID, http.NoBody)
@@ -623,14 +681,14 @@ func TestItemHandlerUpdate(t *testing.T) {
 		if rec.Code != http.StatusBadRequest {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
 		}
-		if code := decodeErrorCode(t, rec); code != codeItemUpdateBodyRequired {
+		if code := decodeErrorPayload(t, rec).Code; code != codeItemUpdateBodyRequired {
 			t.Fatalf("error code = %q, want %q", code, codeItemUpdateBodyRequired)
 		}
 	})
 
 	t.Run("invalid JSON returns 400 TypeBadRequest", func(t *testing.T) {
 		store := item.NewMemoryStore()
-		created := store.Create(context.Background(), "original")
+		created := store.Create(context.Background(), "original", "an original item")
 		h := ItemHandler{Repo: store}
 
 		body := bytes.NewBufferString(`not-json`)
@@ -647,7 +705,7 @@ func TestItemHandlerUpdate(t *testing.T) {
 
 	t.Run("put is idempotent", func(t *testing.T) {
 		store := item.NewMemoryStore()
-		created := store.Create(context.Background(), "original")
+		created := store.Create(context.Background(), "original", "an original item")
 		h := ItemHandler{Repo: store}
 
 		for i := 0; i < 3; i++ {
@@ -671,7 +729,7 @@ func TestItemHandlerUpdate(t *testing.T) {
 
 func TestItemHandlerDelete(t *testing.T) {
 	store := item.NewMemoryStore()
-	created := store.Create(context.Background(), "gadget")
+	created := store.Create(context.Background(), "gadget", "a gadget")
 	h := ItemHandler{Repo: store}
 
 	t.Run("missing id returns 404 TypeNotFound", func(t *testing.T) {
@@ -774,13 +832,5 @@ func assertMeta(t *testing.T, meta map[string]any, wantTotal, wantLimit, wantOff
 
 func decodeErrorCode(t *testing.T, rec *httptest.ResponseRecorder) string {
 	t.Helper()
-	var env struct {
-		Error struct {
-			Code string `json:"code"`
-		} `json:"error"`
-	}
-	if err := json.NewDecoder(rec.Body).Decode(&env); err != nil {
-		t.Fatalf("decode error response: %v", err)
-	}
-	return env.Error.Code
+	return decodeErrorPayload(t, rec).Code
 }
