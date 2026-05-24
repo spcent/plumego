@@ -4,7 +4,7 @@ Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Context Package: implementation
 Priority: P1
-State: active
+State: done
 Primary Module: reference/workerfleet
 Owned Files:
 - reference/workerfleet/internal/platform/kube/watch.go
@@ -46,9 +46,17 @@ Validation:
 - gofmt -l reference/workerfleet/internal/platform/kube
 
 Done Definition:
-- [ ] Acceptance Tests pass.
-- [ ] All Validation commands exit 0.
-- [ ] gofmt -l . produces no output.
-- [ ] Docs Sync targets updated (if applicable).
+- [x] Acceptance Tests pass.
+- [x] All Validation commands exit 0.
+- [x] gofmt -l . produces no output.
+- [x] Docs Sync targets updated (if applicable).
 
 Outcome:
+- Changed Kubernetes watch ERROR handling to return only status code and reason for non-expired errors.
+- Preserved resource-version expiry relist behavior.
+- Added `TestClientWatchErrorDoesNotIncludeStatusMessage`.
+- Documented the sanitized watch error contract in English and Chinese technical design docs.
+- Validation:
+  - `cd reference/workerfleet && go test -timeout 30s ./internal/platform/kube`
+  - `cd reference/workerfleet && go vet ./internal/platform/kube`
+  - `gofmt -l reference/workerfleet/internal/platform/kube`

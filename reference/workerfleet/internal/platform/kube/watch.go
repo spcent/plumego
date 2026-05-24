@@ -85,7 +85,7 @@ func (c *Client) WatchPods(ctx context.Context, resourceVersion string, onEvent 
 			if event.Status.Code == http.StatusGone || strings.EqualFold(event.Status.Reason, "Expired") {
 				return ErrResourceVersionExpired
 			}
-			return fmt.Errorf("watch pods: kubernetes error %d %s", event.Status.Code, sanitizeKubernetesStatus(event.Status.Message))
+			return fmt.Errorf("watch pods: kubernetes error %d %s", event.Status.Code, kubernetesStatusReason(event.Status))
 		}
 		if err := onEvent(event); err != nil {
 			return err
@@ -93,6 +93,10 @@ func (c *Client) WatchPods(ctx context.Context, resourceVersion string, onEvent 
 	}
 }
 
-func sanitizeKubernetesStatus(message string) string {
-	return strings.TrimSpace(message)
+func kubernetesStatusReason(status KubernetesStatus) string {
+	reason := strings.TrimSpace(status.Reason)
+	if reason == "" {
+		return "unknown"
+	}
+	return reason
 }

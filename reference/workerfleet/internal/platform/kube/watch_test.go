@@ -132,6 +132,36 @@ func TestClientWatchPods(t *testing.T) {
 	}
 }
 
+func TestClientWatchErrorDoesNotIncludeStatusMessage(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = fmt.Fprintln(w, `{"type":"ERROR","object":{"code":500,"reason":"InternalError","message":"secret-token"}}`)
+	}))
+	defer server.Close()
+
+	client, err := NewClient(Config{
+		APIHost:    server.URL,
+		Namespace:  "sim",
+		HTTPClient: server.Client(),
+	})
+	if err != nil {
+		t.Fatalf("new client: %v", err)
+	}
+
+	err = client.WatchPods(context.Background(), "10", func(WatchEvent) error {
+		t.Fatalf("watch callback should not be called for ERROR events")
+		return nil
+	})
+	if err == nil {
+		t.Fatalf("expected watch error")
+	}
+	if !strings.Contains(err.Error(), "500") || !strings.Contains(err.Error(), "InternalError") {
+		t.Fatalf("error = %v, want code and reason", err)
+	}
+	if strings.Contains(err.Error(), "secret-token") {
+		t.Fatalf("error leaked status message: %v", err)
+	}
+}
+
 func TestInventoryWatchRelistsAfterExpiredResourceVersion(t *testing.T) {
 	listCalls := 0
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

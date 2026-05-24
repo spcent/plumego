@@ -221,6 +221,7 @@ Reconciliation behavior:
 - each enabled kube loop iteration starts with a pod list and then watches from the returned `resourceVersion`.
 - watch events handle `ADDED`, `MODIFIED`, `DELETED`, `BOOKMARK`, and Kubernetes `ERROR`.
 - expired watch resource versions trigger a relist rather than surfacing as a permanent loop failure.
+- non-expired Kubernetes watch `ERROR` events surface only status code and reason; raw status messages are not propagated to runtime errors or metrics.
 - pod restart count increases emit pod restart events.
 - pod disappearance marks pod deletion.
 - failed or succeeded pods push worker status toward offline.

@@ -221,6 +221,7 @@ Pod 映射：
 - 每次启用的 kube loop 会先 list Pod，再从返回的 `resourceVersion` 开始 watch。
 - watch 事件覆盖 `ADDED`、`MODIFIED`、`DELETED`、`BOOKMARK` 和 Kubernetes `ERROR`。
 - watch resourceVersion 过期会触发 relist，而不是作为永久 loop 失败暴露。
+- 非 resourceVersion 过期的 Kubernetes watch `ERROR` 事件只暴露 status code 和 reason；原始 status message 不会进入 runtime error 或 metrics。
 - restart count 增加时产生 Pod 重启事件。
 - Pod 消失时标记删除时间。
 - Pod failed 或 succeeded 会推动 worker 状态进入离线。
