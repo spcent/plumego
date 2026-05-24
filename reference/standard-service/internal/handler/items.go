@@ -16,6 +16,7 @@ import (
 const (
 	codeItemCreateInvalidJSON  = "item.create.invalid_json"
 	codeItemCreateBodyRequired = "item.create.body_required"
+	codeItemFieldsRequired     = "item.fields.required"
 	codeItemNameRequired       = "item.name.required"
 	codeItemNotFound           = "item.not_found"
 	codeItemUpdateInvalidJSON  = "item.update.invalid_json"
@@ -28,7 +29,7 @@ const (
 // cancellation to real storage backends. Pass a concrete implementation from
 // routes.go; pass a stub in tests.
 type ItemRepository interface {
-	Create(ctx context.Context, name string) item.Item
+	Create(ctx context.Context, name, description string) item.Item
 	Get(ctx context.Context, id string) (item.Item, bool)
 	List(ctx context.Context) []item.Item
 	Update(ctx context.Context, id, name string) (item.Item, bool)
@@ -42,7 +43,8 @@ type ItemHandler struct {
 }
 
 type createItemReq struct {
-	Name string `json:"name"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
 }
 
 type updateItemReq struct {
@@ -50,12 +52,19 @@ type updateItemReq struct {
 }
 
 // Create handles POST /api/v1/items.
-// It demonstrates the canonical request body decode path and structured validation errors.
+// It demonstrates two canonical error patterns:
+//   - body/JSON errors are caught first and returned immediately
+//   - field validation collects ALL missing required fields before writing an
+//     error response, so clients receive a single actionable reply that names
+//     every field they need to fix rather than discovering failures one at a time
 //
-//	POST /api/v1/items {"name":"widget"}  → 201 {"id":"item-1","name":"widget",...}
-//	POST /api/v1/items                    → 400 TypeRequired  (empty body)
-//	POST /api/v1/items {}                 → 400 TypeRequired  (name missing)
-//	POST /api/v1/items (bad JSON)         → 400 TypeBadRequest
+// Examples:
+//
+//	POST /api/v1/items {"name":"widget","description":"a widget"}  → 201 item
+//	POST /api/v1/items                                             → 400 TypeRequired  (empty body)
+//	POST /api/v1/items (bad JSON)                                  → 400 TypeBadRequest
+//	POST /api/v1/items {}                                          → 400 TypeRequired  details: name + description
+//	POST /api/v1/items {"name":"widget"}                           → 400 TypeRequired  detail: description
 func (h ItemHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var req createItemReq
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -74,16 +83,29 @@ func (h ItemHandler) Create(w http.ResponseWriter, r *http.Request) {
 			Build())
 		return
 	}
+
+	// Collect all missing required fields before writing any error response.
+	// Each field gets its own key in the details map so clients can fix
+	// every problem in a single round trip.
+	eb := contract.NewErrorBuilder().
+		Type(contract.TypeRequired).
+		Code(codeItemFieldsRequired).
+		Message("one or more required fields are missing")
+	valid := true
 	if req.Name == "" {
-		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-			Type(contract.TypeRequired).
-			Code(codeItemNameRequired).
-			Detail("field", "name").
-			Message("name is required").
-			Build())
+		eb = eb.Detail("name", "field is required")
+		valid = false
+	}
+	if req.Description == "" {
+		eb = eb.Detail("description", "field is required")
+		valid = false
+	}
+	if !valid {
+		_ = contract.WriteError(w, r, eb.Build())
 		return
 	}
-	created := h.Repo.Create(r.Context(), req.Name)
+
+	created := h.Repo.Create(r.Context(), req.Name, req.Description)
 	_ = contract.WriteResponse(w, r, http.StatusCreated, created, nil)
 }
 
@@ -186,7 +208,7 @@ func (h ItemHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 
 // Update handles PUT /api/v1/items/:id.
 // PUT is idempotent: repeated calls with the same body yield the same result.
-// Only the name field is replaceable; id and created_at are immutable.
+// Only the name field is replaceable; id, description, and created_at are immutable.
 //
 //	PUT /api/v1/items/item-1 {"name":"renamed"} → 200 updated item
 //	PUT /api/v1/items/item-1                    → 400 TypeRequired  (empty body)

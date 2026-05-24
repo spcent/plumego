@@ -148,6 +148,11 @@ func applyFlags(cfg *Config, args []string) error {
 	return fs.Parse(configFlagArgs(args[1:]))
 }
 
+// configFlagArgs filters args to pass only the flag names that applyFlags registers.
+// flag.FlagSet returns an error for unrecognized flags, so this filter lets the
+// process accept arbitrary positional arguments without breaking the FlagSet parse.
+// When adding a new flag to applyFlags, add its name to the case list here too —
+// omitting it causes the flag to be silently dropped at startup.
 func configFlagArgs(args []string) []string {
 	out := make([]string, 0, len(args))
 	for i := 0; i < len(args); i++ {

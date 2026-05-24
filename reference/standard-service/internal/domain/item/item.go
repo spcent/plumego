@@ -10,9 +10,10 @@ import (
 
 // Item is the canonical item resource in this reference application.
 type Item struct {
-	ID        string    `json:"id"`
-	Name      string    `json:"name"`
-	CreatedAt time.Time `json:"created_at"`
+	ID          string    `json:"id"`
+	Name        string    `json:"name"`
+	Description string    `json:"description"`
+	CreatedAt   time.Time `json:"created_at"`
 }
 
 // MemoryStore is a thread-safe in-memory item repository.
@@ -29,16 +30,19 @@ func NewMemoryStore() *MemoryStore {
 	return &MemoryStore{items: make(map[string]Item)}
 }
 
-// Create stores an item with the provided name and returns the new item.
-func (s *MemoryStore) Create(_ context.Context, name string) Item {
+// Create stores an item with the provided name and description and returns the new item.
+// context.Context is accepted so callers can propagate deadlines to real storage backends;
+// the in-memory implementation does not block and therefore does not inspect it.
+func (s *MemoryStore) Create(_ context.Context, name, description string) Item {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	s.next++
 	item := Item{
-		ID:        fmt.Sprintf("item-%d", s.next),
-		Name:      name,
-		CreatedAt: time.Now().UTC(),
+		ID:          fmt.Sprintf("item-%d", s.next),
+		Name:        name,
+		Description: description,
+		CreatedAt:   time.Now().UTC(),
 	}
 	s.items[item.ID] = item
 	s.ids = append(s.ids, item.ID)
@@ -46,6 +50,7 @@ func (s *MemoryStore) Create(_ context.Context, name string) Item {
 }
 
 // Get returns an item by id.
+// context.Context is accepted so callers can propagate deadlines to real storage backends.
 func (s *MemoryStore) Get(_ context.Context, id string) (Item, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -55,6 +60,7 @@ func (s *MemoryStore) Get(_ context.Context, id string) (Item, bool) {
 }
 
 // List returns all stored items in creation order.
+// context.Context is accepted so callers can propagate deadlines to real storage backends.
 func (s *MemoryStore) List(_ context.Context) []Item {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -67,7 +73,9 @@ func (s *MemoryStore) List(_ context.Context) []Item {
 }
 
 // Update replaces the name of an existing item and returns the updated item.
+// Description is immutable after creation; only name is replaced by this operation.
 // It reports false when no item with that id exists.
+// context.Context is accepted so callers can propagate deadlines to real storage backends.
 func (s *MemoryStore) Update(_ context.Context, id, name string) (Item, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -77,11 +85,12 @@ func (s *MemoryStore) Update(_ context.Context, id, name string) (Item, bool) {
 		return Item{}, false
 	}
 	item.Name = name
-	s.items[id] = item
+	s.items[item.ID] = item
 	return item, true
 }
 
 // Delete removes an item by id and reports whether it existed.
+// context.Context is accepted so callers can propagate deadlines to real storage backends.
 func (s *MemoryStore) Delete(_ context.Context, id string) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -90,7 +99,8 @@ func (s *MemoryStore) Delete(_ context.Context, id string) bool {
 		return false
 	}
 	delete(s.items, id)
-	// Remove id from the ordered slice while preserving relative order.
+	// Linear scan to remove the id while preserving insertion order; acceptable at
+	// the small scale of a reference implementation.
 	for i, v := range s.ids {
 		if v == id {
 			s.ids = append(s.ids[:i], s.ids[i+1:]...)

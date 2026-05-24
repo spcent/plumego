@@ -10,13 +10,13 @@ var ctx = context.Background()
 func TestMemoryStoreCreateAndGet(t *testing.T) {
 	s := NewMemoryStore()
 
-	got := s.Create(ctx, "widget")
-	if got.ID == "" || got.Name != "widget" || got.CreatedAt.IsZero() {
+	got := s.Create(ctx, "widget", "a widget")
+	if got.ID == "" || got.Name != "widget" || got.Description != "a widget" || got.CreatedAt.IsZero() {
 		t.Fatalf("Create: unexpected item: %+v", got)
 	}
 
 	found, ok := s.Get(ctx, got.ID)
-	if !ok || found.ID != got.ID || found.Name != "widget" {
+	if !ok || found.ID != got.ID || found.Name != "widget" || found.Description != "a widget" {
 		t.Fatalf("Get existing: unexpected result ok=%v item=%+v", ok, found)
 	}
 
@@ -28,8 +28,8 @@ func TestMemoryStoreCreateAndGet(t *testing.T) {
 
 func TestMemoryStoreIDsAreUnique(t *testing.T) {
 	s := NewMemoryStore()
-	a := s.Create(ctx, "alpha")
-	b := s.Create(ctx, "beta")
+	a := s.Create(ctx, "alpha", "alpha item")
+	b := s.Create(ctx, "beta", "beta item")
 	if a.ID == b.ID {
 		t.Fatalf("Create: expected unique IDs, both got %q", a.ID)
 	}
@@ -46,8 +46,8 @@ func TestMemoryStoreList(t *testing.T) {
 
 	t.Run("populated store returns all items", func(t *testing.T) {
 		s := NewMemoryStore()
-		s.Create(ctx, "alpha")
-		s.Create(ctx, "beta")
+		s.Create(ctx, "alpha", "alpha item")
+		s.Create(ctx, "beta", "beta item")
 		items := s.List(ctx)
 		if len(items) != 2 {
 			t.Fatalf("want 2 items, got %d", len(items))
@@ -58,7 +58,7 @@ func TestMemoryStoreList(t *testing.T) {
 		s := NewMemoryStore()
 		names := []string{"first", "second", "third"}
 		for _, n := range names {
-			s.Create(ctx, n)
+			s.Create(ctx, n, n+" item")
 		}
 		items := s.List(ctx)
 		if len(items) != len(names) {
@@ -73,7 +73,7 @@ func TestMemoryStoreList(t *testing.T) {
 
 	t.Run("returned slice is a copy not internal storage", func(t *testing.T) {
 		s := NewMemoryStore()
-		s.Create(ctx, "alpha")
+		s.Create(ctx, "alpha", "alpha item")
 		items := s.List(ctx)
 		// Mutate the returned slice; the store must be unaffected.
 		items[0].Name = "tampered"
@@ -85,9 +85,9 @@ func TestMemoryStoreList(t *testing.T) {
 
 	t.Run("list excludes deleted items in stable order", func(t *testing.T) {
 		s := NewMemoryStore()
-		s.Create(ctx, "alpha")
-		b := s.Create(ctx, "beta")
-		s.Create(ctx, "gamma")
+		s.Create(ctx, "alpha", "alpha item")
+		b := s.Create(ctx, "beta", "beta item")
+		s.Create(ctx, "gamma", "gamma item")
 		s.Delete(ctx, b.ID)
 		items := s.List(ctx)
 		if len(items) != 2 {
@@ -102,13 +102,15 @@ func TestMemoryStoreList(t *testing.T) {
 func TestMemoryStoreUpdate(t *testing.T) {
 	t.Run("existing item is updated and returned", func(t *testing.T) {
 		s := NewMemoryStore()
-		created := s.Create(ctx, "original")
+		created := s.Create(ctx, "original", "an original item")
 
 		updated, ok := s.Update(ctx, created.ID, "renamed")
 		if !ok {
 			t.Fatal("Update: want true for existing id")
 		}
-		if updated.ID != created.ID || updated.Name != "renamed" || updated.CreatedAt != created.CreatedAt {
+		// Description is immutable: verify it is preserved after name update.
+		if updated.ID != created.ID || updated.Name != "renamed" ||
+			updated.Description != created.Description || updated.CreatedAt != created.CreatedAt {
 			t.Fatalf("Update: unexpected result: %+v", updated)
 		}
 
@@ -129,9 +131,9 @@ func TestMemoryStoreUpdate(t *testing.T) {
 
 	t.Run("update does not change list order", func(t *testing.T) {
 		s := NewMemoryStore()
-		s.Create(ctx, "alpha")
-		b := s.Create(ctx, "beta")
-		s.Create(ctx, "gamma")
+		s.Create(ctx, "alpha", "alpha item")
+		b := s.Create(ctx, "beta", "beta item")
+		s.Create(ctx, "gamma", "gamma item")
 		s.Update(ctx, b.ID, "BETA")
 		items := s.List(ctx)
 		if items[1].Name != "BETA" {
@@ -142,7 +144,7 @@ func TestMemoryStoreUpdate(t *testing.T) {
 
 func TestMemoryStoreDelete(t *testing.T) {
 	s := NewMemoryStore()
-	it := s.Create(ctx, "gadget")
+	it := s.Create(ctx, "gadget", "a gadget")
 
 	if deleted := s.Delete(ctx, it.ID); !deleted {
 		t.Fatalf("Delete existing: want true, got false")
@@ -157,8 +159,8 @@ func TestMemoryStoreDelete(t *testing.T) {
 
 func TestMemoryStoreDeleteDoesNotAffectOthers(t *testing.T) {
 	s := NewMemoryStore()
-	keep := s.Create(ctx, "keeper")
-	remove := s.Create(ctx, "removable")
+	keep := s.Create(ctx, "keeper", "a keeper item")
+	remove := s.Create(ctx, "removable", "a removable item")
 
 	if !s.Delete(ctx, remove.ID) {
 		t.Fatal("Delete: want true")
