@@ -238,7 +238,7 @@ Pod 映射：
 
 当前副本约束：
 
-- 使用 Mongo 存储时，Kubernetes sync、status sweep 和 alert evaluation loop 会按 loop family 获取 lease 后再执行。
+- 使用 Mongo 存储时，Kubernetes sync、status sweep、alert evaluation 和 notification delivery loop 会按 loop family 获取 lease 后再执行。
 - 使用 memory 存储时，lease 仍是进程内语义，启用后台 loop 时仍应单副本运行。
 - reference deployment 默认仍保持 `replicas: 1`；只有确认 Mongo 存储、唯一 lease owner 和外部通知预期后，运维才应提高副本数。
 
@@ -501,7 +501,7 @@ Query API 认证：
 
 多副本 lease 实现：
 
-- owner 粒度：至少按 `kube_sync`、`status_sweep`、`alert_evaluate` 三类 loop 分别持有 lease。
+- owner 粒度：按 `kube_sync`、`status_sweep`、`alert_evaluate` 和 `notification_deliver` 四类 loop 分别持有 lease。
 - lease 后端：在启用 Mongo 后端时复用 workerfleet 自己的 Mongo，避免再引入第二套协调系统。
 - lease 文档字段：`_id` loop name、`owner_id`、`created_at`、`updated_at` 和 `expires_at`。
 - 续约模型：当前 owner 在每次 loop 周期内续约；未持有 lease 的副本只跳过本轮工作，并按正常调度间隔继续尝试获取。

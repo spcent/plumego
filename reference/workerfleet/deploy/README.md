@@ -65,9 +65,11 @@ kubectl apply -f reference/workerfleet/deploy/prometheusrule.yaml
 ## Operational Notes
 
 - The deployment intentionally starts with `replicas: 1`. With Mongo storage,
-  runtime loops use Mongo-backed `loop_leases`, so operators may raise replicas
-  only after confirming all enabled loop families use the Mongo backend and a
-  unique `WORKERFLEET_LOOP_LEASE_OWNER`.
+  Kubernetes sync, status sweep, alert evaluation, and notification delivery use
+  Mongo-backed `loop_leases`, so operators may raise replicas only after
+  confirming all enabled loop families use the Mongo backend, each replica has a
+  unique `WORKERFLEET_LOOP_LEASE_OWNER`, and external notification expectations
+  have been reviewed.
 - `readinessProbe` uses `/readyz` so MongoDB and the runtime store must be
   initialized before the pod is considered ready.
 - `livenessProbe` uses `/healthz` and avoids external dependency checks.

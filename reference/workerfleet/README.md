@@ -76,7 +76,7 @@ Runtime loop configuration:
 - `WORKERFLEET_KUBE_WORKER_CONTAINER` selects the worker container, default `worker`
 - runtime loop errors are exported as `workerfleet_runtime_errors_total`
 - each runtime loop runs with built-in non-overlap, a default `25s` iteration timeout, a `5s` initial failure backoff, and a `1m` max failure backoff
-- when `WORKERFLEET_STORE_BACKEND=mongo`, Kubernetes sync, status sweep, and alert evaluation use MongoDB-backed distributed leases through the `loop_leases` collection
+- when `WORKERFLEET_STORE_BACKEND=mongo`, Kubernetes sync, status sweep, alert evaluation, and notification delivery use MongoDB-backed distributed leases through the `loop_leases` collection
 - when `WORKERFLEET_STORE_BACKEND=memory`, loop lease behavior remains process-local and the deployment should stay single-replica for enabled loops
 - the reference Kubernetes deployment stays at `replicas: 1` by default even though Mongo-backed loop leases allow safe multi-replica ownership
 

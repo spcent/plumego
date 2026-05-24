@@ -4,7 +4,7 @@ Milestone:
 Recipe: specs/change-recipes/analysis-only.yaml
 Context Package: implementation
 Priority: P1
-State: active
+State: done
 Primary Module: reference/workerfleet
 Owned Files:
 - reference/workerfleet/README.md
@@ -50,9 +50,14 @@ Validation:
 - rg -n "kube_sync|status_sweep|alert_evaluate|notification_deliver|notification delivery" reference/workerfleet/README.md reference/workerfleet/deploy/README.md reference/workerfleet/docs/storage.md reference/workerfleet/docs/design/technical-design.md reference/workerfleet/docs/design/technical-design.zh-CN.md
 
 Done Definition:
-- [ ] Acceptance Tests pass.
-- [ ] All Validation commands exit 0.
-- [ ] gofmt -l . produces no output.
-- [ ] Docs Sync targets updated (if applicable).
+- [x] Acceptance Tests pass.
+- [x] All Validation commands exit 0.
+- [x] gofmt -l . produces no output.
+- [x] Docs Sync targets updated (if applicable).
 
 Outcome:
+- Synchronized README, deployment notes, storage docs, and English/Chinese technical design docs with the implemented `notification_deliver` lease family.
+- Kept deployment guidance conservative: `replicas: 1` remains the default, with multi-replica operation requiring Mongo leases, unique owners, and reviewed notification expectations.
+- Validation:
+  - `git diff --check`
+  - `rg -n "kube_sync|status_sweep|alert_evaluate|notification_deliver|notification delivery" reference/workerfleet/README.md reference/workerfleet/deploy/README.md reference/workerfleet/docs/storage.md reference/workerfleet/docs/design/technical-design.md reference/workerfleet/docs/design/technical-design.zh-CN.md`

@@ -238,7 +238,7 @@ Implemented runtime behavior:
 
 Current replica assumption:
 
-- With Mongo storage, Kubernetes sync, status sweep, and alert evaluation loops acquire one lease per loop family before doing work.
+- With Mongo storage, Kubernetes sync, status sweep, alert evaluation, and notification delivery loops acquire one lease per loop family before doing work.
 - With memory storage, leases are process-local and enabled loops should still run as a single replica.
 - The reference deployment remains `replicas: 1` by default; operators may raise replicas only after confirming Mongo storage, unique lease owners, and external notification expectations.
 
@@ -482,7 +482,7 @@ Mitigations:
 
 Multi-replica lease implementation:
 
-- ownership unit: one lease per runtime loop family, at minimum `kube_sync`, `status_sweep`, and `alert_evaluate`.
+- ownership unit: one lease per runtime loop family: `kube_sync`, `status_sweep`, `alert_evaluate`, and `notification_deliver`.
 - lease backend: reuse the workerfleet Mongo backend when enabled so replicated deployments do not need a second coordination system.
 - lease document shape: `_id` loop name, `owner_id`, `created_at`, `updated_at`, and `expires_at`.
 - renewal model: the active holder renews on every loop interval; non-holders skip work and retry acquisition after the normal scheduler interval.

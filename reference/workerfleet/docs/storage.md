@@ -44,7 +44,7 @@ MongoDB layout:
 - `task_history`, `case_step_history`, `worker_events`, and `alert_events` are append-only from the app perspective; task history records include the latest `exec_plan_id` and `current_step` snapshot. Duplicate generated document IDs are ignored to keep retries idempotent.
 - MongoDB document structs and index bootstrap live under `internal/platform/store/mongo` and remain separate from `internal/domain`.
 - `case_step_history` is append-only with `expire_at` TTL and indexes for `task_id + observed_at`, `exec_plan_id + observed_at`, `node_name + observed_at`, `pod_name + observed_at`, and `step + observed_at`.
-- `loop_leases` stores Mongo-backed runtime loop ownership by loop name, owner ID, and `expires_at` so kube sync, status sweep, and alert evaluation can coordinate across replicas.
+- `loop_leases` stores Mongo-backed runtime loop ownership by loop name, owner ID, and `expires_at` so kube sync, status sweep, alert evaluation, and notification delivery can coordinate across replicas.
 
 Startup behavior:
 
