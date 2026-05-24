@@ -18,7 +18,15 @@ import (
 	"github.com/spcent/plumego/middleware/timeout"
 )
 
-type RouteRegistrar func(app *core.App, service *Service, ready func(context.Context) error, metrics http.Handler, workerAuth WorkerIngressAuthConfig, adminAuth AdminAuthConfig) error
+type RouteDependencies struct {
+	Service    *Service
+	Ready      func(context.Context) error
+	Metrics    http.Handler
+	WorkerAuth WorkerIngressAuthConfig
+	AdminAuth  AdminAuthConfig
+}
+
+type RouteRegistrar func(app *core.App, deps RouteDependencies) error
 
 type App struct {
 	core    *core.App
@@ -41,7 +49,14 @@ func New(ctx context.Context, cfg Config, server ServerConfig, registerRoutes Ro
 		_ = runtime.Close(context.Background())
 		return nil, err
 	}
-	if err := registerRoutes(coreApp, runtime.Service, runtime.Ready, runtime.Metrics.Handler(), cfg.WorkerAuth, cfg.AdminAuth); err != nil {
+	routeDeps := RouteDependencies{
+		Service:    runtime.Service,
+		Ready:      runtime.Ready,
+		Metrics:    runtime.Metrics.Handler(),
+		WorkerAuth: cfg.WorkerAuth,
+		AdminAuth:  cfg.AdminAuth,
+	}
+	if err := registerRoutes(coreApp, routeDeps); err != nil {
 		_ = runtime.Close(context.Background())
 		return nil, fmt.Errorf("register routes: %w", err)
 	}

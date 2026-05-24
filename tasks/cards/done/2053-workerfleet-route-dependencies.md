@@ -4,7 +4,7 @@ Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Context Package: implementation
 Priority: P1
-State: active
+State: done
 Primary Module: reference/workerfleet
 Owned Files:
 - reference/workerfleet/internal/app/app.go
@@ -45,9 +45,16 @@ Validation:
 - gofmt -l reference/workerfleet/internal/app reference/workerfleet/internal/handler
 
 Done Definition:
-- [ ] Acceptance Tests pass.
-- [ ] All Validation commands exit 0.
-- [ ] gofmt -l . produces no output.
-- [ ] Docs Sync targets updated (if applicable).
+- [x] Acceptance Tests pass.
+- [x] All Validation commands exit 0.
+- [x] gofmt -l . produces no output.
+- [x] Docs Sync targets updated (if applicable).
 
 Outcome:
+- Replaced the app route registrar positional parameter list with `RouteDependencies`.
+- Replaced handler route registration positional dependencies with `handler.RouteDependencies`.
+- Preserved explicit route registration and existing auth behavior.
+- Validation:
+  - `cd reference/workerfleet && go test -timeout 30s ./internal/app ./internal/handler`
+  - `cd reference/workerfleet && go vet ./internal/app ./internal/handler`
+  - `gofmt -l reference/workerfleet/internal/app reference/workerfleet/internal/handler`

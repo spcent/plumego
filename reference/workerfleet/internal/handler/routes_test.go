@@ -20,7 +20,11 @@ func TestRegisterRoutesWiresMetricsWhenProvided(t *testing.T) {
 		t.Fatalf("set gauge: %v", err)
 	}
 
-	if err := RegisterRoutes(app, New(nil), NewHealthHandler(nil), metrics.Handler()); err != nil {
+	if err := RegisterRoutes(app, RouteDependencies{
+		Workers: New(nil),
+		Health:  NewHealthHandler(nil),
+		Metrics: metrics.Handler(),
+	}); err != nil {
 		t.Fatalf("register routes: %v", err)
 	}
 
@@ -38,7 +42,7 @@ func TestRegisterRoutesWiresMetricsWhenProvided(t *testing.T) {
 
 func TestRegisterRoutesWiresHealthAndReadiness(t *testing.T) {
 	app := core.New(core.DefaultConfig(), core.AppDependencies{})
-	if err := RegisterRoutes(app, New(nil), NewHealthHandler(nil), nil); err != nil {
+	if err := RegisterRoutes(app, RouteDependencies{Workers: New(nil), Health: NewHealthHandler(nil)}); err != nil {
 		t.Fatalf("register routes: %v", err)
 	}
 
@@ -54,7 +58,7 @@ func TestRegisterRoutesWiresHealthAndReadiness(t *testing.T) {
 
 func TestRegisterRoutesWiresDrilldownRoutes(t *testing.T) {
 	app := core.New(core.DefaultConfig(), core.AppDependencies{})
-	if err := RegisterRoutes(app, New(nil), NewHealthHandler(nil), nil); err != nil {
+	if err := RegisterRoutes(app, RouteDependencies{Workers: New(nil), Health: NewHealthHandler(nil)}); err != nil {
 		t.Fatalf("register routes: %v", err)
 	}
 
@@ -74,7 +78,7 @@ func TestQueryRoutesRequireAdminAuthWhenConfigured(t *testing.T) {
 		Token:    "admin-secret",
 		Required: true,
 	}))
-	if err := RegisterRoutes(app, workers, NewHealthHandler(nil), nil); err != nil {
+	if err := RegisterRoutes(app, RouteDependencies{Workers: workers, Health: NewHealthHandler(nil)}); err != nil {
 		t.Fatalf("register routes: %v", err)
 	}
 

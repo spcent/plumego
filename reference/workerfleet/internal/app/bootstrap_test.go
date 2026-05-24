@@ -164,21 +164,21 @@ func TestNewAppWiresCoreMiddlewareAndRoutes(t *testing.T) {
 	serverCfg := DefaultServerConfig()
 	called := false
 
-	app, err := New(context.Background(), cfg, serverCfg, func(coreApp *core.App, service *Service, ready func(context.Context) error, metrics http.Handler, workerAuth WorkerIngressAuthConfig, adminAuth AdminAuthConfig) error {
+	app, err := New(context.Background(), cfg, serverCfg, func(coreApp *core.App, deps RouteDependencies) error {
 		called = true
-		if service == nil {
+		if deps.Service == nil {
 			t.Fatalf("service is nil")
 		}
-		if workerAuth.Token != "" {
-			t.Fatalf("worker auth token = %q, want empty", workerAuth.Token)
+		if deps.WorkerAuth.Token != "" {
+			t.Fatalf("worker auth token = %q, want empty", deps.WorkerAuth.Token)
 		}
-		if adminAuth.Required || adminAuth.Token != "" {
-			t.Fatalf("admin auth = %#v, want disabled", adminAuth)
+		if deps.AdminAuth.Required || deps.AdminAuth.Token != "" {
+			t.Fatalf("admin auth = %#v, want disabled", deps.AdminAuth)
 		}
-		if ready == nil {
+		if deps.Ready == nil {
 			t.Fatalf("ready is nil")
 		}
-		if metrics == nil {
+		if deps.Metrics == nil {
 			t.Fatalf("metrics is nil")
 		}
 		return coreApp.Get("/probe", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
