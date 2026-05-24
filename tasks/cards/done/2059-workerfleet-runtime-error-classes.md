@@ -4,7 +4,7 @@ Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Context Package: implementation
 Priority: P2
-State: active
+State: done
 Primary Module: reference/workerfleet
 Owned Files:
 - reference/workerfleet/internal/platform/metrics/instrumentation.go
@@ -48,9 +48,17 @@ Validation:
 - gofmt -l reference/workerfleet/internal/platform/metrics reference/workerfleet/internal/platform/notifier
 
 Done Definition:
-- [ ] Acceptance Tests pass.
-- [ ] All Validation commands exit 0.
-- [ ] gofmt -l . produces no output.
-- [ ] Docs Sync targets updated (if applicable).
+- [x] Acceptance Tests pass.
+- [x] All Validation commands exit 0.
+- [x] gofmt -l . produces no output.
+- [x] Docs Sync targets updated (if applicable).
 
 Outcome:
+- Added a small `RuntimeErrorClass` contract to notifier delivery errors.
+- Updated runtime error metrics to use bounded notifier classes without adding raw messages or high-cardinality labels.
+- Added `TestRuntimeErrorObserverUsesNotifierErrorClass`.
+- Documented notifier error classes in metrics and notifier docs.
+- Validation:
+  - `cd reference/workerfleet && go test -timeout 30s ./internal/platform/metrics ./internal/platform/notifier`
+  - `cd reference/workerfleet && go vet ./internal/platform/metrics ./internal/platform/notifier`
+  - `gofmt -l reference/workerfleet/internal/platform/metrics reference/workerfleet/internal/platform/notifier`

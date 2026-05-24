@@ -218,6 +218,15 @@ func runtimeErrorClass(err error) string {
 	case errors.Is(err, context.DeadlineExceeded):
 		return "deadline_exceeded"
 	default:
+		var classified interface {
+			RuntimeErrorClass() string
+		}
+		if errors.As(err, &classified) {
+			class := safeLabel(classified.RuntimeErrorClass())
+			if class != "" && class != unknownLabel {
+				return class
+			}
+		}
 		return "operation_failed"
 	}
 }

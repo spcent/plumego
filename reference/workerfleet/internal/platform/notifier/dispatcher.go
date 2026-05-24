@@ -96,6 +96,13 @@ func (e DeliveryError) Unwrap() error {
 	return e.Err
 }
 
+func (e DeliveryError) RuntimeErrorClass() string {
+	if e.Class == "" {
+		return ErrorClassUnknown
+	}
+	return e.Class
+}
+
 func HTTPStatusError(sink string, statusCode int) error {
 	class := ErrorClassHTTP5xx
 	permanent := false

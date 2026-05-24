@@ -15,6 +15,7 @@ Delivery rules:
 - transient failures retry with bounded backoff
 - permanent failures are recorded on the outbox job and are not retried
 - notifier errors must not include header secrets or raw remote response bodies
+- notifier delivery failures are classified with low-cardinality classes such as `http_4xx`, `http_429`, `http_5xx`, `network`, and `configuration` for retry decisions and runtime metrics
 - delivery is at-least-once from the app perspective; exactly-once delivery is not claimed
 
 Runtime configuration:

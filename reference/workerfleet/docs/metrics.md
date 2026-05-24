@@ -96,6 +96,7 @@ Instrumentation points:
 - Kubernetes inventory sync accepts an optional observer and records pod phase gauges plus sync duration histograms with `operation` and `result`; list/watch relist recovery stays behind the same low-cardinality operation labels.
 - alert evaluation accepts an optional observer and records emitted alert counters plus firing alert gauges.
 - runtime loops report Kubernetes sync, status sweep, alert evaluation, and notification delivery errors through `workerfleet_runtime_errors_total{operation,error_class}`.
+- notification delivery uses bounded notifier classes such as `http_4xx`, `http_429`, `http_5xx`, `network`, and `configuration`; raw status text, URLs, response bodies, and secret values stay out of metric labels.
 - nil observers are safe and leave business behavior unchanged.
 - stable aggregate gauges are labeled only by approved low-cardinality labels. Worker IDs, task IDs, case IDs, pod names, pod UIDs, and raw error messages stay out of Prometheus labels.
 

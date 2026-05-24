@@ -2,11 +2,13 @@ package metrics
 
 import (
 	"context"
+	"net/http"
 	"strings"
 	"testing"
 	"time"
 
 	"workerfleet/internal/domain"
+	"workerfleet/internal/platform/notifier"
 )
 
 func TestObserverRecordsWorkerTaskMetrics(t *testing.T) {
@@ -400,6 +402,19 @@ func TestObserverRecordsRuntimeErrors(t *testing.T) {
 		`workerfleet_runtime_errors_total{error_class="deadline_exceeded",operation="alert_notify"} 1.000000000`,
 	)
 	assertMetricsTextOmits(t, text, "raw_error", "error_message")
+}
+
+func TestRuntimeErrorObserverUsesNotifierErrorClass(t *testing.T) {
+	collector := NewCollector()
+	observer := NewObserver(collector)
+
+	observer.ObserveRuntimeError("alert_notify", notifier.HTTPStatusError("webhook", http.StatusTooManyRequests))
+
+	text := collector.PrometheusText()
+	assertMetricsTextContains(t, text,
+		`workerfleet_runtime_errors_total{error_class="http_429",operation="alert_notify"} 1.000000000`,
+	)
+	assertMetricsTextOmits(t, text, "webhook", "status 429", "error_message")
 }
 
 func TestObserverNilCollectorIsSafe(t *testing.T) {
