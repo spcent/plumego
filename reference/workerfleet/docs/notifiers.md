@@ -10,6 +10,7 @@ Delivery rules:
 - firing alerts enqueue delivery jobs as they are created
 - resolved alerts enqueue recovery notification jobs
 - one outbox job is stored per alert and sink type
+- delivery repairs missing jobs from persisted alert records before it claims work, so transient enqueue failures do not permanently suppress notification attempts
 - delivery claims due jobs from the outbox and sends them to the configured sink
 - transient failures retry with bounded backoff
 - permanent failures are recorded on the outbox job and are not retried

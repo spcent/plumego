@@ -60,6 +60,45 @@ func TestEvaluateAndNotifyAlertsPersistsEnqueuesAndDelivers(t *testing.T) {
 	}
 }
 
+func TestDeliverNotificationOutboxRepairsMissingJobs(t *testing.T) {
+	calls := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	store := memory.NewStore()
+	alert := platformstore.AlertRecord{
+		AlertID:     "alert-1",
+		AlertType:   domain.AlertWorkerOffline,
+		Status:      domain.AlertStatusFiring,
+		WorkerID:    "worker-1",
+		TriggeredAt: time.Now().UTC(),
+	}
+	if err := store.AppendAlert(context.Background(), alert); err != nil {
+		t.Fatalf("append alert: %v", err)
+	}
+	runtime := newRuntime(store, func(context.Context) error { return nil })
+	cfg := DefaultConfig()
+	cfg.Runtime.NotificationEnabled = true
+	cfg.Runtime.NotifierDeliveryTimeout = time.Second
+	cfg.Notifier.WebhookURL = server.URL
+
+	if err := runtime.shell.alerts.DeliverNotificationOutbox(context.Background(), cfg, 10); err != nil {
+		t.Fatalf("deliver notification outbox: %v", err)
+	}
+	if calls != 1 {
+		t.Fatalf("webhook calls = %d, want 1", calls)
+	}
+	if err := runtime.shell.alerts.DeliverNotificationOutbox(context.Background(), cfg, 10); err != nil {
+		t.Fatalf("deliver notification outbox again: %v", err)
+	}
+	if calls != 1 {
+		t.Fatalf("webhook calls after second delivery = %d, want 1", calls)
+	}
+}
+
 func TestEvaluateAndNotifyAlertsEnqueuesOutbox(t *testing.T) {
 	runtime, err := Bootstrap(context.Background(), DefaultConfig())
 	if err != nil {

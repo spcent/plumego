@@ -4,7 +4,7 @@ Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Context Package: implementation
 Priority: P0
-State: active
+State: done
 Primary Module: reference/workerfleet
 Owned Files:
 - reference/workerfleet/internal/app/alert_loop.go
@@ -47,9 +47,16 @@ Validation:
 - gofmt -l reference/workerfleet/internal/app
 
 Done Definition:
-- [ ] Acceptance Tests pass.
-- [ ] All Validation commands exit 0.
-- [ ] gofmt -l . produces no output.
-- [ ] Docs Sync targets updated (if applicable).
+- [x] Acceptance Tests pass.
+- [x] All Validation commands exit 0.
+- [x] gofmt -l . produces no output.
+- [x] Docs Sync targets updated (if applicable).
 
 Outcome:
+- Added an idempotent notification outbox repair pass before delivery claims.
+- Added `TestDeliverNotificationOutboxRepairsMissingJobs` to cover missing-job repair and repeat delivery idempotence.
+- Documented repair behavior in `reference/workerfleet/docs/alerts.md` and `reference/workerfleet/docs/notifiers.md`.
+- Validation:
+  - `cd reference/workerfleet && go test -timeout 30s ./internal/app`
+  - `cd reference/workerfleet && go vet ./internal/app`
+  - `gofmt -l reference/workerfleet/internal/app`

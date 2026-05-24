@@ -105,6 +105,9 @@ func (a *AlertRunner) DeliverNotificationOutbox(ctx context.Context, cfg Config,
 	if a == nil || a.store == nil {
 		return errWorkerfleetStoreNotConfigured
 	}
+	if err := a.repairNotificationOutbox(ctx, cfg); err != nil {
+		return err
+	}
 	jobs, err := a.store.ClaimNotificationJobs(ctx, time.Now().UTC(), limit)
 	if err != nil {
 		return err
@@ -138,6 +141,20 @@ func (a *AlertRunner) DeliverNotificationOutbox(ctx context.Context, cfg Config,
 		}
 	}
 	return nil
+}
+
+func (a *AlertRunner) repairNotificationOutbox(ctx context.Context, cfg Config) error {
+	if !cfg.Runtime.NotificationEnabled {
+		return nil
+	}
+	alerts, err := a.store.ListAlertRecords(ctx)
+	if err != nil {
+		return err
+	}
+	if len(alerts) == 0 {
+		return nil
+	}
+	return a.store.EnqueueNotificationJobs(ctx, notificationJobsForAlerts(cfg, alerts, time.Now().UTC()))
 }
 
 func (a *AlertRunner) markNotificationFailed(ctx context.Context, job platformstore.NotificationJob, err error) error {

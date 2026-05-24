@@ -36,6 +36,7 @@ Runtime behavior:
 - `WORKERFLEET_NOTIFIER_DELIVERY_TIMEOUT` controls per-dispatch delivery timeout.
 - emitted firing and resolved alert records are persisted before notification jobs are enqueued.
 - notification delivery runs from an app-local outbox, with one job per alert and sink type.
+- before claiming due notification jobs, the delivery pass idempotently repairs the outbox by creating any missing per-sink jobs for persisted alert records.
 - transient notification failures are retried with bounded backoff; permanent failures are marked failed and do not block alert evaluation.
 - notification delivery errors do not crash the service or roll back persisted alert records.
 - alert evaluation and notification delivery errors are observed through `workerfleet_runtime_errors_total` with low-cardinality `operation` and `error_class` labels.
