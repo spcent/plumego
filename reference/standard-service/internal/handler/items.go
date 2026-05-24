@@ -17,7 +17,7 @@ const (
 	codeItemCreateInvalidJSON  = "item.create.invalid_json"
 	codeItemCreateBodyRequired = "item.create.body_required"
 	codeItemFieldsRequired     = "item.fields.required"
-	codeItemNameRequired       = "item.name.required"
+	codeItemUpdateFieldsRequired = "item.update.fields.required"
 	codeItemNotFound           = "item.not_found"
 	codeItemUpdateInvalidJSON  = "item.update.invalid_json"
 	codeItemUpdateBodyRequired = "item.update.body_required"
@@ -32,7 +32,7 @@ type ItemRepository interface {
 	Create(ctx context.Context, name, description string) item.Item
 	Get(ctx context.Context, id string) (item.Item, bool)
 	List(ctx context.Context) []item.Item
-	Update(ctx context.Context, id, name string) (item.Item, bool)
+	Update(ctx context.Context, id, name, description string) (item.Item, bool)
 	Delete(ctx context.Context, id string) bool
 }
 
@@ -48,7 +48,8 @@ type createItemReq struct {
 }
 
 type updateItemReq struct {
-	Name string `json:"name"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
 }
 
 // Create handles POST /api/v1/items.
@@ -110,8 +111,8 @@ func (h ItemHandler) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 // noLimit is the sentinel value for parseQueryInt's maxVal parameter.
-// Pass noLimit to allow any value above minVal without capping.
-const noLimit = 0
+// Pass noLimit (-1) to allow any value above minVal without capping.
+const noLimit = -1
 
 // List handles GET /api/v1/items with basic limit/offset pagination.
 // Items are returned in stable creation order.
@@ -169,8 +170,8 @@ func (h ItemHandler) List(w http.ResponseWriter, r *http.Request) {
 // Returns (defaultVal, true) when the parameter is absent.
 // Returns (0, false) when the parameter is present but not a valid integer or is below minVal;
 // the caller should write a 400 error in that case.
-// When maxVal > 0, values above maxVal are silently clamped to maxVal.
-// Pass noLimit (0) for maxVal to allow any value above minVal without capping.
+// When maxVal >= 0, values above maxVal are silently clamped to maxVal.
+// Pass noLimit (-1) for maxVal to allow any value above minVal without capping.
 func parseQueryInt(r *http.Request, key string, defaultVal, minVal, maxVal int) (int, bool) {
 	raw := r.URL.Query().Get(key)
 	if raw == "" {
@@ -180,7 +181,7 @@ func parseQueryInt(r *http.Request, key string, defaultVal, minVal, maxVal int) 
 	if err != nil || n < minVal {
 		return 0, false
 	}
-	if maxVal > 0 && n > maxVal {
+	if maxVal >= 0 && n > maxVal {
 		return maxVal, true
 	}
 	return n, true
@@ -207,13 +208,15 @@ func (h ItemHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 }
 
 // Update handles PUT /api/v1/items/:id.
-// PUT is idempotent: repeated calls with the same body yield the same result.
-// Only the name field is replaceable; id, description, and created_at are immutable.
+// PUT is idempotent and replaces all mutable fields (name, description).
+// id and created_at are immutable and are never replaced.
+// Collect all missing required fields before writing an error response,
+// matching the same pattern as Create so clients fix everything in one round trip.
 //
-//	PUT /api/v1/items/item-1 {"name":"renamed"} → 200 updated item
-//	PUT /api/v1/items/item-1                    → 400 TypeRequired  (empty body)
-//	PUT /api/v1/items/item-1 {}                 → 400 TypeRequired  (name missing)
-//	PUT /api/v1/items/missing {"name":"x"}      → 404 TypeNotFound
+//	PUT /api/v1/items/item-1 {"name":"renamed","description":"new"}  → 200 updated item
+//	PUT /api/v1/items/item-1                                         → 400 TypeRequired (empty body)
+//	PUT /api/v1/items/item-1 {}                                      → 400 TypeRequired (name + description)
+//	PUT /api/v1/items/missing {"name":"x","description":"y"}         → 404 TypeNotFound
 func (h ItemHandler) Update(w http.ResponseWriter, r *http.Request) {
 	id := router.Param(r, "id")
 
@@ -234,17 +237,26 @@ func (h ItemHandler) Update(w http.ResponseWriter, r *http.Request) {
 			Build())
 		return
 	}
+
+	eb := contract.NewErrorBuilder().
+		Type(contract.TypeRequired).
+		Code(codeItemUpdateFieldsRequired).
+		Message("one or more required fields are missing")
+	valid := true
 	if req.Name == "" {
-		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-			Type(contract.TypeRequired).
-			Code(codeItemNameRequired).
-			Detail("field", "name").
-			Message("name is required").
-			Build())
+		eb = eb.Detail("name", "field is required")
+		valid = false
+	}
+	if req.Description == "" {
+		eb = eb.Detail("description", "field is required")
+		valid = false
+	}
+	if !valid {
+		_ = contract.WriteError(w, r, eb.Build())
 		return
 	}
 
-	updated, ok := h.Repo.Update(r.Context(), id, req.Name)
+	updated, ok := h.Repo.Update(r.Context(), id, req.Name, req.Description)
 	if !ok {
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeNotFound).

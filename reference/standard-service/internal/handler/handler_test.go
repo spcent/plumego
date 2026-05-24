@@ -11,8 +11,15 @@ import (
 
 	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/health"
+	plumelog "github.com/spcent/plumego/log"
 	"standard-service/internal/domain/item"
 )
+
+// discardLogger returns a StructuredLogger that silently discards all output.
+// Use it in tests that construct an APIHandler to satisfy the non-nil Logger requirement.
+func discardLogger() plumelog.StructuredLogger {
+	return plumelog.NewLogger(plumelog.LoggerConfig{Format: plumelog.LoggerFormatDiscard})
+}
 
 // componentChecker is a test helper that adapts a name and a function to
 // health.ComponentChecker. This mirrors what production code does: a small
@@ -136,7 +143,7 @@ func TestHealthHandlerReadyWithCheckers(t *testing.T) {
 		}
 	})
 
-	t.Run("failing checker returns 503 naming the component", func(t *testing.T) {
+	t.Run("failing checker returns 503 with component name as detail key", func(t *testing.T) {
 		h := HealthHandler{
 			ServiceName: "svc",
 			Checkers: []health.ComponentChecker{
@@ -150,15 +157,15 @@ func TestHealthHandlerReadyWithCheckers(t *testing.T) {
 		if rec.Code != http.StatusServiceUnavailable {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusServiceUnavailable)
 		}
-		// Verify the error detail names the failing component so operators
-		// can diagnose without inspecting logs.
+		// The failing component name is the detail key; its error message is the value.
+		// This lets operators see exactly which component failed without inspecting logs.
 		ef := decodeErrorPayload(t, rec)
-		if ef.Details["component"] != "database" {
-			t.Fatalf("error detail component = %v, want database", ef.Details["component"])
+		if ef.Details["database"] != "connection refused" {
+			t.Fatalf("error detail database = %v, want connection refused", ef.Details["database"])
 		}
 	})
 
-	t.Run("multiple checkers: first passing second failing returns 503", func(t *testing.T) {
+	t.Run("all checkers are probed even if an earlier one fails", func(t *testing.T) {
 		h := HealthHandler{
 			ServiceName: "svc",
 			Checkers: []health.ComponentChecker{
@@ -174,8 +181,39 @@ func TestHealthHandlerReadyWithCheckers(t *testing.T) {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusServiceUnavailable)
 		}
 		ef := decodeErrorPayload(t, rec)
-		if ef.Details["component"] != "cache" {
-			t.Fatalf("error detail component = %v, want cache", ef.Details["component"])
+		// "cache" failed — its detail must appear.
+		if ef.Details["cache"] != "cache offline" {
+			t.Fatalf("error detail cache = %v, want cache offline", ef.Details["cache"])
+		}
+		// "database" passed — it must not appear as a failure detail.
+		if _, ok := ef.Details["database"]; ok {
+			t.Fatalf("error details should not include passing component database: %v", ef.Details)
+		}
+	})
+
+	t.Run("multiple failing checkers all appear in error details", func(t *testing.T) {
+		h := HealthHandler{
+			ServiceName: "svc",
+			Checkers: []health.ComponentChecker{
+				componentChecker{name: "database", check: func(_ context.Context) error {
+					return errors.New("connection refused")
+				}},
+				componentChecker{name: "cache", check: func(_ context.Context) error {
+					return errors.New("cache offline")
+				}},
+			},
+		}
+		rec := httptest.NewRecorder()
+		h.Ready(rec, httptest.NewRequest(http.MethodGet, "/readyz", nil))
+		if rec.Code != http.StatusServiceUnavailable {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusServiceUnavailable)
+		}
+		ef := decodeErrorPayload(t, rec)
+		if ef.Details["database"] != "connection refused" {
+			t.Fatalf("error detail database = %v, want connection refused", ef.Details["database"])
+		}
+		if ef.Details["cache"] != "cache offline" {
+			t.Fatalf("error detail cache = %v, want cache offline", ef.Details["cache"])
 		}
 	})
 
@@ -205,7 +243,7 @@ func TestHealthHandlerReadyWithCheckers(t *testing.T) {
 }
 
 func TestAPIHandlerResponses(t *testing.T) {
-	h := APIHandler{ServiceName: "test-service", Version: "test-version"}
+	h := APIHandler{Logger: discardLogger(), ServiceName: "test-service", Version: "test-version"}
 
 	tests := []struct {
 		name   string
@@ -297,7 +335,7 @@ func TestAPIHandlerResponses(t *testing.T) {
 					t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
 				}
 				got := decodeReferenceData[infoResponse](t, rec)
-				if got.Mode != "canonical" || got.Structure.Routes != "one_method_one_path_one_handler" || len(got.Modules) == 0 {
+				if got.Mode != "canonical" || len(got.Modules) == 0 {
 					t.Fatalf("unexpected info response: %+v", got)
 				}
 				if got.Version != "test-version" {
@@ -609,12 +647,12 @@ func TestItemHandlerGetByID(t *testing.T) {
 }
 
 func TestItemHandlerUpdate(t *testing.T) {
-	t.Run("existing id returns 200 with updated item", func(t *testing.T) {
+	t.Run("existing id returns 200 with fully updated item", func(t *testing.T) {
 		store := item.NewMemoryStore()
 		created := store.Create(context.Background(), "original", "an original item")
 		h := ItemHandler{Repo: store}
 
-		body := bytes.NewBufferString(`{"name":"renamed"}`)
+		body := bytes.NewBufferString(`{"name":"renamed","description":"updated description"}`)
 		req := httptest.NewRequest(http.MethodPut, "/api/v1/items/"+created.ID, body)
 		ctx := contract.WithRequestContext(req.Context(), contract.RequestContext{
 			Params: map[string]string{"id": created.ID},
@@ -625,17 +663,37 @@ func TestItemHandlerUpdate(t *testing.T) {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
 		}
 		got := decodeReferenceData[item.Item](t, rec)
-		// created_at is immutable: use Equal to ignore monotonic clock stripped by JSON.
-		// description is immutable: verify it is preserved after name update.
+		// id and created_at are immutable; name and description are replaced.
 		if got.ID != created.ID || got.Name != "renamed" ||
-			got.Description != "an original item" || !got.CreatedAt.Equal(created.CreatedAt) {
+			got.Description != "updated description" || !got.CreatedAt.Equal(created.CreatedAt) {
 			t.Fatalf("unexpected updated item: %+v", got)
+		}
+	})
+
+	t.Run("description is replaced by put", func(t *testing.T) {
+		store := item.NewMemoryStore()
+		created := store.Create(context.Background(), "widget", "old description")
+		h := ItemHandler{Repo: store}
+
+		body := bytes.NewBufferString(`{"name":"widget","description":"new description"}`)
+		req := httptest.NewRequest(http.MethodPut, "/api/v1/items/"+created.ID, body)
+		ctx := contract.WithRequestContext(req.Context(), contract.RequestContext{
+			Params: map[string]string{"id": created.ID},
+		})
+		rec := httptest.NewRecorder()
+		h.Update(rec, req.WithContext(ctx))
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+		}
+		got := decodeReferenceData[item.Item](t, rec)
+		if got.Description != "new description" {
+			t.Fatalf("Description = %q, want new description", got.Description)
 		}
 	})
 
 	t.Run("missing id returns 404 TypeNotFound", func(t *testing.T) {
 		h := ItemHandler{Repo: item.NewMemoryStore()}
-		body := bytes.NewBufferString(`{"name":"anything"}`)
+		body := bytes.NewBufferString(`{"name":"anything","description":"anything"}`)
 		req := httptest.NewRequest(http.MethodPut, "/api/v1/items/no-such-item", body)
 		ctx := contract.WithRequestContext(req.Context(), contract.RequestContext{
 			Params: map[string]string{"id": "no-such-item"},
@@ -647,12 +705,12 @@ func TestItemHandlerUpdate(t *testing.T) {
 		}
 	})
 
-	t.Run("missing name returns 400 TypeRequired", func(t *testing.T) {
+	t.Run("both name and description missing returns 400 with both field details", func(t *testing.T) {
 		store := item.NewMemoryStore()
 		created := store.Create(context.Background(), "original", "an original item")
 		h := ItemHandler{Repo: store}
 
-		body := bytes.NewBufferString(`{"name":""}`)
+		body := bytes.NewBufferString(`{}`)
 		req := httptest.NewRequest(http.MethodPut, "/api/v1/items/"+created.ID, body)
 		ctx := contract.WithRequestContext(req.Context(), contract.RequestContext{
 			Params: map[string]string{"id": created.ID},
@@ -662,8 +720,42 @@ func TestItemHandlerUpdate(t *testing.T) {
 		if rec.Code != http.StatusBadRequest {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
 		}
-		if code := decodeErrorPayload(t, rec).Code; code != codeItemNameRequired {
-			t.Fatalf("error code = %q, want %q", code, codeItemNameRequired)
+		ef := decodeErrorPayload(t, rec)
+		if ef.Code != codeItemUpdateFieldsRequired {
+			t.Fatalf("error code = %q, want %q", ef.Code, codeItemUpdateFieldsRequired)
+		}
+		if _, ok := ef.Details["name"]; !ok {
+			t.Error("error details missing 'name' key")
+		}
+		if _, ok := ef.Details["description"]; !ok {
+			t.Error("error details missing 'description' key")
+		}
+	})
+
+	t.Run("missing name only returns 400 with name detail", func(t *testing.T) {
+		store := item.NewMemoryStore()
+		created := store.Create(context.Background(), "original", "an original item")
+		h := ItemHandler{Repo: store}
+
+		body := bytes.NewBufferString(`{"name":"","description":"some desc"}`)
+		req := httptest.NewRequest(http.MethodPut, "/api/v1/items/"+created.ID, body)
+		ctx := contract.WithRequestContext(req.Context(), contract.RequestContext{
+			Params: map[string]string{"id": created.ID},
+		})
+		rec := httptest.NewRecorder()
+		h.Update(rec, req.WithContext(ctx))
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
+		}
+		ef := decodeErrorPayload(t, rec)
+		if ef.Code != codeItemUpdateFieldsRequired {
+			t.Fatalf("error code = %q, want %q", ef.Code, codeItemUpdateFieldsRequired)
+		}
+		if _, ok := ef.Details["name"]; !ok {
+			t.Error("error details missing 'name' key")
+		}
+		if _, ok := ef.Details["description"]; ok {
+			t.Error("error details should not contain 'description' when description is present")
 		}
 	})
 
@@ -709,7 +801,7 @@ func TestItemHandlerUpdate(t *testing.T) {
 		h := ItemHandler{Repo: store}
 
 		for i := 0; i < 3; i++ {
-			body := bytes.NewBufferString(`{"name":"stable"}`)
+			body := bytes.NewBufferString(`{"name":"stable","description":"stable desc"}`)
 			req := httptest.NewRequest(http.MethodPut, "/api/v1/items/"+created.ID, body)
 			ctx := contract.WithRequestContext(req.Context(), contract.RequestContext{
 				Params: map[string]string{"id": created.ID},
@@ -720,8 +812,8 @@ func TestItemHandlerUpdate(t *testing.T) {
 				t.Fatalf("attempt %d: status = %d, want %d", i+1, rec.Code, http.StatusOK)
 			}
 			got := decodeReferenceData[item.Item](t, rec)
-			if got.Name != "stable" {
-				t.Fatalf("attempt %d: name = %q, want stable", i+1, got.Name)
+			if got.Name != "stable" || got.Description != "stable desc" {
+				t.Fatalf("attempt %d: name=%q desc=%q, want stable/stable desc", i+1, got.Name, got.Description)
 			}
 		}
 	})

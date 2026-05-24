@@ -12,8 +12,8 @@ import (
 const codeGreetNameRequired = "greet.name.required"
 
 // APIHandler handles the core JSON API endpoints.
-// Logger is optional: when non-nil it emits structured log entries on each request.
-// Pass a.Core.Logger() from routes.go to demonstrate structured logging.
+// Logger must not be nil; pass a.Core.Logger() from routes.go.
+// Use plumelog.NewLogger(plumelog.LoggerConfig{Format: plumelog.LoggerFormatDiscard}) in tests.
 // ServiceName carries the service identity string; set it from config so every
 // response reflects the actual service name rather than a hardcoded placeholder.
 // Version carries the build-time version string injected via main.go ldflags.
@@ -43,7 +43,6 @@ type helloResponse struct {
 	Mode      string         `json:"mode"`
 	Timestamp string         `json:"timestamp"`
 	Version   string         `json:"version"`
-	Features  []string       `json:"features"`
 	Endpoints []endpointInfo `json:"endpoints"`
 }
 
@@ -52,19 +51,11 @@ type greetResponse struct {
 }
 
 type infoResponse struct {
-	Mode      string        `json:"mode"`
-	Service   string        `json:"service"`
-	Version   string        `json:"version"`
-	Timestamp string        `json:"timestamp"`
-	Structure infoStructure `json:"structure"`
-	Modules   []string      `json:"modules"`
-}
-
-type infoStructure struct {
-	Bootstrap  string `json:"bootstrap"`
-	Extensions string `json:"extensions"`
-	Handlers   string `json:"handlers"`
-	Routes     string `json:"routes"`
+	Mode      string   `json:"mode"`
+	Service   string   `json:"service"`
+	Version   string   `json:"version"`
+	Timestamp string   `json:"timestamp"`
+	Modules   []string `json:"modules"`
 }
 
 // Root responds with minimal service identity. For the full endpoint listing use GET /api/hello.
@@ -92,12 +83,6 @@ func (h APIHandler) Hello(w http.ResponseWriter, r *http.Request) {
 		Mode:      "canonical",
 		Timestamp: time.Now().Format(time.RFC3339),
 		Version:   h.Version,
-		Features: []string{
-			"stable_root_only",
-			"explicit_routes",
-			"stdlib_handlers",
-			"minimal_bootstrap",
-		},
 		Endpoints: []endpointInfo{
 			{Name: "items_delete", Method: http.MethodDelete, Path: "/api/v1/items/:id", Description: "delete an item"},
 			{Name: "root", Method: http.MethodGet, Path: "/", Description: "service identity"},
@@ -145,24 +130,16 @@ func (h APIHandler) Greet(w http.ResponseWriter, r *http.Request) {
 // This is an informational endpoint about how the service is assembled, not a
 // health probe. Use /healthz for liveness and /readyz for readiness.
 func (h APIHandler) Info(w http.ResponseWriter, r *http.Request) {
-	if h.Logger != nil {
-		requestID := contract.RequestIDFromContext(r.Context())
-		h.Logger.WithFields(plumelog.Fields{
-			"endpoint":   "info",
-			"request_id": requestID,
-		}).Info("info request handled")
-	}
+	requestID := contract.RequestIDFromContext(r.Context())
+	h.Logger.WithFields(plumelog.Fields{
+		"endpoint":   "info",
+		"request_id": requestID,
+	}).Info("info request handled")
 	_ = contract.WriteResponse(w, r, http.StatusOK, infoResponse{
 		Mode:      "canonical",
 		Service:   h.ServiceName,
 		Version:   h.Version,
 		Timestamp: time.Now().Format(time.RFC3339),
-		Structure: infoStructure{
-			Bootstrap:  "explicit",
-			Extensions: "excluded_from_canonical_path",
-			Handlers:   "net/http",
-			Routes:     "one_method_one_path_one_handler",
-		},
 		Modules: []string{
 			"core",
 			"router",
