@@ -65,7 +65,7 @@ layout or promote experimental `x/*` APIs to stable status.
 ## Workflow
 
 - `CODEX_WORKFLOW.md` — default agent working loop, prompt shapes, and stop conditions
-- `AGENT_CODE_QUALITY_RULES.md` — agent preflight, review output, risk focus, and gate selection rules
+- `docs/AGENT_CODE_QUALITY_RULES.md` — agent preflight, review output, risk focus, and gate selection rules
 - `AGENT_CONTEXT_BUDGET.md` — token-bounded context packages, task-card limits, and validation output compression
 - `MILESTONE_PIPELINE.md` — artifact contract for milestone, plan, card, verify, and PR handoffs
 - `DEPRECATION.md` — compatibility and deprecation policy
