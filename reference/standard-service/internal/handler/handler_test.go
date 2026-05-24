@@ -74,8 +74,8 @@ type errorFields struct {
 }
 
 // decodeErrorPayload decodes the error envelope's code and details map.
-// It reads rec.Body.Bytes() directly so it is safe to call even after
-// decodeErrorCode has already advanced the reader.
+// It reads rec.Body.Bytes() directly so it is safe to call multiple times
+// on the same recorder without the reader position advancing.
 func decodeErrorPayload(t *testing.T, rec *httptest.ResponseRecorder) errorFields {
 	t.Helper()
 	var env struct {
@@ -920,9 +920,4 @@ func assertMeta(t *testing.T, meta map[string]any, wantTotal, wantLimit, wantOff
 		t.Fatalf("meta total=%d limit=%d offset=%d, want %d/%d/%d",
 			total, limit, offset, wantTotal, wantLimit, wantOffset)
 	}
-}
-
-func decodeErrorCode(t *testing.T, rec *httptest.ResponseRecorder) string {
-	t.Helper()
-	return decodeErrorPayload(t, rec).Code
 }

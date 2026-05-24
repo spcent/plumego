@@ -14,14 +14,14 @@ import (
 )
 
 const (
-	codeItemCreateInvalidJSON  = "item.create.invalid_json"
-	codeItemCreateBodyRequired = "item.create.body_required"
-	codeItemFieldsRequired     = "item.fields.required"
+	codeItemCreateInvalidJSON    = "item.create.invalid_json"
+	codeItemCreateBodyRequired   = "item.create.body_required"
+	codeItemFieldsRequired       = "item.fields.required"
 	codeItemUpdateFieldsRequired = "item.update.fields.required"
-	codeItemNotFound           = "item.not_found"
-	codeItemUpdateInvalidJSON  = "item.update.invalid_json"
-	codeItemUpdateBodyRequired = "item.update.body_required"
-	codeItemListInvalidParam   = "item.list.invalid_param"
+	codeItemNotFound             = "item.not_found"
+	codeItemUpdateInvalidJSON    = "item.update.invalid_json"
+	codeItemUpdateBodyRequired   = "item.update.body_required"
+	codeItemListInvalidParam     = "item.list.invalid_param"
 )
 
 // ItemRepository is the minimal persistence contract that ItemHandler depends on.

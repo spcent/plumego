@@ -50,11 +50,11 @@ func (a *App) RegisterRoutes() error {
 	// Versioned API — all routes under /api/v1 share this group prefix.
 	// Query-param binding: GET /api/v1/greet?name=Alice → 200
 	//                      GET /api/v1/greet            → 400 TypeRequired
-	// Collection:          GET  /api/v1/items                                      → 200 {items:[…],total:N,…}
-	//                      POST /api/v1/items {"name":"…","description":"…"}       → 201 item (guarded)
-	// Member:              GET    /api/v1/items/:id              → 200 item or 404
-	//                      PUT    /api/v1/items/:id {"name":"…"} → 200 item or 404 (guarded)
-	//                      DELETE /api/v1/items/:id              → 204      or 404 (guarded)
+	// Collection:          GET  /api/v1/items                                                     → 200 {items:[…],total:N,…}
+	//                      POST /api/v1/items {"name":"…","description":"…"}                      → 201 item (guarded)
+	// Member:              GET    /api/v1/items/:id                                               → 200 item or 404
+	//                      PUT    /api/v1/items/:id {"name":"…","description":"…"}               → 200 item or 404 (guarded)
+	//                      DELETE /api/v1/items/:id                                               → 204      or 404 (guarded)
 	v1 := newRouteReg(a.Core.Group("/api/v1"))
 	v1.get("/greet", http.HandlerFunc(api.Greet))
 	v1.get("/items", http.HandlerFunc(items.List))

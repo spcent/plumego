@@ -114,9 +114,10 @@ independently testable: tests pass a stub; production passes the real store.
 ```go
 // handler declares the interface it needs
 type ItemRepository interface {
-    Create(ctx context.Context, name string) item.Item
+    Create(ctx context.Context, name, description string) item.Item
     Get(ctx context.Context, id string) (item.Item, bool)
     List(ctx context.Context) []item.Item
+    Update(ctx context.Context, id, name, description string) (item.Item, bool)
     Delete(ctx context.Context, id string) bool
 }
 
@@ -128,14 +129,20 @@ type ItemHandler struct {
 items := handler.ItemHandler{Repo: item.NewMemoryStore()}
 ```
 
-Handlers with no external dependencies use a zero-field struct (`APIHandler{}`).
-Both shapes are valid; choose based on whether the handler needs injected state.
+Handlers that depend on lifecycle dependencies (logger, config strings) rather than domain
+repositories use struct fields without a repository interface — see `APIHandler`.
+Logger must always be set; use `plumelog.LoggerFormatDiscard` in tests.
+Both shapes use struct-field injection; choose the interface approach when the
+dependency has multiple implementations (real store vs. test stub).
 
 ### Readiness checking
 
 `HealthHandler` supports an optional list of `health.ComponentChecker` implementations.
 Each checker represents one dependency (database, cache, downstream service).
-`GET /readyz` probes them in order; the first failure returns 503 TypeUnavailable.
+`GET /readyz` probes **all** checkers regardless of prior failures, so operators
+see every unhealthy component in a single response. Each failing component name
+becomes a detail key in the 503 TypeUnavailable error, with the error message as
+the value: `detail.database="connection refused"`, `detail.cache="cache offline"`.
 
 ```go
 // Implement health.ComponentChecker for your dependency.
