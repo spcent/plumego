@@ -4,7 +4,7 @@ Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Context Package: implementation
 Priority: P1
-State: active
+State: done
 Primary Module: reference/workerfleet
 Owned Files:
 - reference/workerfleet/internal/app/alert_loop.go
@@ -46,9 +46,17 @@ Validation:
 - gofmt -l reference/workerfleet/internal/app reference/workerfleet/internal/platform/store
 
 Done Definition:
-- [ ] Acceptance Tests pass.
-- [ ] All Validation commands exit 0.
-- [ ] gofmt -l . produces no output.
-- [ ] Docs Sync targets updated (if applicable).
+- [x] Acceptance Tests pass.
+- [x] All Validation commands exit 0.
+- [x] gofmt -l . produces no output.
+- [x] Docs Sync targets updated (if applicable).
 
 Outcome:
+- Added a bounded store-level query for alerts missing configured notification jobs.
+- Updated notification repair to use the missing-job query instead of scanning all alert records.
+- Implemented memory and Mongo store support for the bounded repair path.
+- Added `TestDeliverNotificationOutboxRepairsOnlyMissingJobs`.
+- Validation:
+  - `cd reference/workerfleet && go test -timeout 30s ./internal/app ./internal/platform/store/memory ./internal/platform/store/mongo`
+  - `cd reference/workerfleet && go vet ./internal/app ./internal/platform/store/memory ./internal/platform/store/mongo`
+  - `gofmt -l reference/workerfleet/internal/app reference/workerfleet/internal/platform/store`

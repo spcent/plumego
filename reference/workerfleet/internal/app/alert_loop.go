@@ -15,8 +15,9 @@ import (
 )
 
 const (
-	defaultNotificationBatchSize = 25
-	maxNotificationAttempts      = 5
+	defaultNotificationBatchSize       = 25
+	defaultNotificationRepairBatchSize = 100
+	maxNotificationAttempts            = 5
 )
 
 func NewAlertRunner(store runtimeStore, policy domain.StatusPolicy, alertPolicy domain.AlertPolicy, metrics *workerfleetmetrics.Observer, errors RuntimeErrorObserver) *AlertRunner {
@@ -149,7 +150,11 @@ func (a *AlertRunner) repairNotificationOutbox(ctx context.Context, cfg Config) 
 	if !cfg.Runtime.NotificationEnabled {
 		return nil
 	}
-	alerts, err := a.store.ListAlertRecords(ctx)
+	sinkTypes := configuredNotificationSinkTypes(cfg)
+	if len(sinkTypes) == 0 {
+		return nil
+	}
+	alerts, err := a.store.ListAlertsMissingNotificationJobs(ctx, sinkTypes, defaultNotificationRepairBatchSize)
 	if err != nil {
 		return err
 	}

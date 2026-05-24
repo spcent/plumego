@@ -40,6 +40,45 @@ func (s *Store) EnqueueNotificationJobs(ctx context.Context, jobs []platformstor
 	return nil
 }
 
+func (s *Store) ListAlertsMissingNotificationJobs(ctx context.Context, sinkTypes []platformstore.NotificationSinkType, limit int) ([]platformstore.AlertRecord, error) {
+	if err := ctxErr(ctx); err != nil {
+		return nil, err
+	}
+	if len(sinkTypes) == 0 {
+		return nil, nil
+	}
+	if limit <= 0 {
+		limit = 25
+	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	out := make([]platformstore.AlertRecord, 0, min(limit, len(s.alerts)))
+	for _, alert := range s.alerts {
+		if missingNotificationJobLocked(s.notificationJobs, alert.AlertID, sinkTypes) {
+			out = append(out, cloneAlertRecord(alert))
+			if len(out) >= limit {
+				break
+			}
+		}
+	}
+	return out, nil
+}
+
+func missingNotificationJobLocked(jobs map[string]platformstore.NotificationJob, alertID string, sinkTypes []platformstore.NotificationSinkType) bool {
+	for _, sinkType := range sinkTypes {
+		jobID := alertNotificationJobID(alertID, sinkType)
+		if _, ok := jobs[jobID]; !ok {
+			return true
+		}
+	}
+	return false
+}
+
+func alertNotificationJobID(alertID string, sinkType platformstore.NotificationSinkType) string {
+	return alertID + ":" + string(sinkType)
+}
+
 func (s *Store) ClaimNotificationJobs(ctx context.Context, now time.Time, limit int) ([]platformstore.NotificationJob, error) {
 	if err := ctxErr(ctx); err != nil {
 		return nil, err

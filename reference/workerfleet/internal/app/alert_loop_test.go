@@ -100,6 +100,71 @@ func TestDeliverNotificationOutboxRepairsMissingJobs(t *testing.T) {
 	}
 }
 
+func TestDeliverNotificationOutboxRepairsOnlyMissingJobs(t *testing.T) {
+	calls := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	baseStore := memory.NewStore()
+	store := &boundedRepairStore{Store: baseStore}
+	now := time.Now().UTC()
+	alerts := []platformstore.AlertRecord{
+		{
+			AlertID:     "alert-1",
+			AlertType:   domain.AlertWorkerOffline,
+			Status:      domain.AlertStatusFiring,
+			WorkerID:    "worker-1",
+			TriggeredAt: now,
+		},
+		{
+			AlertID:     "alert-2",
+			AlertType:   domain.AlertWorkerDegraded,
+			Status:      domain.AlertStatusFiring,
+			WorkerID:    "worker-2",
+			TriggeredAt: now.Add(time.Second),
+		},
+	}
+	for _, alert := range alerts {
+		if err := store.AppendAlert(context.Background(), alert); err != nil {
+			t.Fatalf("append alert: %v", err)
+		}
+	}
+	cfg := DefaultConfig()
+	cfg.Runtime.NotificationEnabled = true
+	cfg.Runtime.NotifierDeliveryTimeout = time.Second
+	cfg.Notifier.WebhookURL = server.URL
+	if err := store.EnqueueNotificationJobs(context.Background(), notificationJobsForAlerts(cfg, alerts[:1], now)); err != nil {
+		t.Fatalf("enqueue existing job: %v", err)
+	}
+
+	runtime := newRuntime(store, func(context.Context) error { return nil })
+	if err := runtime.shell.alerts.DeliverNotificationOutbox(context.Background(), cfg, 10); err != nil {
+		t.Fatalf("deliver notification outbox: %v", err)
+	}
+	if store.listAlertRecordsCalls != 0 {
+		t.Fatalf("full alert scans = %d, want 0", store.listAlertRecordsCalls)
+	}
+	if store.repairCalls != 1 || store.lastMissing != 1 {
+		t.Fatalf("repair calls/missing = %d/%d, want 1/1", store.repairCalls, store.lastMissing)
+	}
+	if calls != 2 {
+		t.Fatalf("webhook calls = %d, want 2", calls)
+	}
+
+	if err := runtime.shell.alerts.DeliverNotificationOutbox(context.Background(), cfg, 10); err != nil {
+		t.Fatalf("deliver notification outbox again: %v", err)
+	}
+	if store.repairCalls != 2 || store.lastMissing != 0 {
+		t.Fatalf("repair calls/missing after second delivery = %d/%d, want 2/0", store.repairCalls, store.lastMissing)
+	}
+	if calls != 2 {
+		t.Fatalf("webhook calls after second delivery = %d, want 2", calls)
+	}
+}
+
 func TestEvaluateAndNotifyAlertsEnqueuesOutbox(t *testing.T) {
 	runtime, err := Bootstrap(context.Background(), DefaultConfig())
 	if err != nil {
@@ -307,4 +372,23 @@ type domainAlertEngineFunc func(context.Context) ([]domain.AlertRecord, error)
 
 func (fn domainAlertEngineFunc) Evaluate(ctx context.Context) ([]domain.AlertRecord, error) {
 	return fn(ctx)
+}
+
+type boundedRepairStore struct {
+	*memory.Store
+	repairCalls           int
+	lastMissing           int
+	listAlertRecordsCalls int
+}
+
+func (s *boundedRepairStore) ListAlertRecords(context.Context) ([]platformstore.AlertRecord, error) {
+	s.listAlertRecordsCalls++
+	return nil, errors.New("full alert scan should not be used for notification repair")
+}
+
+func (s *boundedRepairStore) ListAlertsMissingNotificationJobs(ctx context.Context, sinkTypes []platformstore.NotificationSinkType, limit int) ([]platformstore.AlertRecord, error) {
+	s.repairCalls++
+	alerts, err := s.Store.ListAlertsMissingNotificationJobs(ctx, sinkTypes, limit)
+	s.lastMissing = len(alerts)
+	return alerts, err
 }

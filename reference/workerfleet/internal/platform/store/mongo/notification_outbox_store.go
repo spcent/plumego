@@ -61,6 +61,63 @@ func (s *Store) EnqueueNotificationJobs(ctx context.Context, jobs []platformstor
 	return nil
 }
 
+func (s *Store) ListAlertsMissingNotificationJobs(ctx context.Context, sinkTypes []platformstore.NotificationSinkType, limit int) ([]platformstore.AlertRecord, error) {
+	ctx, cancel := s.operationContext(ctx)
+	defer cancel()
+
+	if len(sinkTypes) == 0 {
+		return nil, nil
+	}
+	if limit <= 0 {
+		limit = 25
+	}
+	sinkValues := make([]string, 0, len(sinkTypes))
+	for _, sinkType := range sinkTypes {
+		if sinkType == "" {
+			continue
+		}
+		sinkValues = append(sinkValues, string(sinkType))
+	}
+	if len(sinkValues) == 0 {
+		return nil, nil
+	}
+
+	cursor, err := s.collections.AlertEvents.Aggregate(ctx, mongo.Pipeline{
+		bson.D{{Key: "$lookup", Value: bson.D{
+			{Key: "from", Value: CollectionNotificationJobs},
+			{Key: "let", Value: bson.D{{Key: "alert_id", Value: "$alert_id"}}},
+			{Key: "pipeline", Value: bson.A{
+				bson.D{{Key: "$match", Value: bson.D{{Key: "$expr", Value: bson.D{{Key: "$and", Value: bson.A{
+					bson.D{{Key: "$eq", Value: bson.A{"$alert_id", "$$alert_id"}}},
+					bson.D{{Key: "$in", Value: bson.A{"$sink_type", sinkValues}}},
+				}}}}}}},
+				bson.D{{Key: "$project", Value: bson.D{{Key: "_id", Value: 0}, {Key: "sink_type", Value: 1}}}},
+			}},
+			{Key: "as", Value: "notification_jobs"},
+		}}},
+		bson.D{{Key: "$match", Value: bson.D{{Key: "$expr", Value: bson.D{{Key: "$lt", Value: bson.A{
+			bson.D{{Key: "$size", Value: "$notification_jobs"}},
+			len(sinkValues),
+		}}}}}}},
+		bson.D{{Key: "$sort", Value: bson.D{{Key: "triggered_at", Value: 1}, {Key: "_id", Value: 1}}}},
+		bson.D{{Key: "$limit", Value: int64(limit)}},
+	})
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var docs []AlertEventDoc
+	if err := cursor.All(ctx, &docs); err != nil {
+		return nil, err
+	}
+	records := make([]platformstore.AlertRecord, 0, len(docs))
+	for _, doc := range docs {
+		records = append(records, doc.Record())
+	}
+	return records, nil
+}
+
 func (s *Store) ClaimNotificationJobs(ctx context.Context, now time.Time, limit int) ([]platformstore.NotificationJob, error) {
 	ctx, cancel := s.operationContext(ctx)
 	defer cancel()

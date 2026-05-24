@@ -46,6 +46,7 @@ type AlertStore interface {
 
 type NotificationOutboxStore interface {
 	EnqueueNotificationJobs(ctx context.Context, jobs []NotificationJob) error
+	ListAlertsMissingNotificationJobs(ctx context.Context, sinkTypes []NotificationSinkType, limit int) ([]AlertRecord, error)
 	ClaimNotificationJobs(ctx context.Context, now time.Time, limit int) ([]NotificationJob, error)
 	MarkNotificationDelivered(ctx context.Context, jobID string, deliveredAt time.Time) error
 	MarkNotificationFailed(ctx context.Context, jobID string, failure NotificationFailure) error
