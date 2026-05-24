@@ -57,9 +57,10 @@ Startup behavior:
 Mongo integration test gate:
 
 - Default repo gates do not require a local MongoDB instance.
-- `make workerfleet-mongo-test` is the repo-native optional gate for real MongoDB store behavior.
-- When `WORKERFLEET_MONGO_TEST_URI` is unset, the target prints a skip message with the exact environment variable to set.
+- `make workerfleet-mongo-test` is the repo-native optional gate for real MongoDB store behavior and is also invoked by the CI quality workflow.
+- When `WORKERFLEET_MONGO_TEST_URI` is unset, the target prints a skip message with the exact environment variable or CI secret to set.
 - When `WORKERFLEET_MONGO_TEST_URI` is set, the target runs `cd reference/workerfleet && go test -timeout 60s ./internal/platform/store/mongo`.
+- CI runs the same target without requiring MongoDB by default; configure the `WORKERFLEET_MONGO_TEST_URI` repository secret to opt in to live MongoDB coverage.
 - Run this gate before changing Mongo indexes, document mapping, retention fields, or idempotency behavior.
 
 This layout is intentionally app-local to `reference/workerfleet` and does not widen Plumego stable store packages.

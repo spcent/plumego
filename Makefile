@@ -428,8 +428,9 @@ reference-test: ## Run tests for every standalone reference module
 workerfleet-mongo-test: ## Run optional workerfleet MongoDB integration tests
 	@if [ -z "$$WORKERFLEET_MONGO_TEST_URI" ]; then \
 	  echo "Skipping workerfleet MongoDB integration tests."; \
-	  echo "Set WORKERFLEET_MONGO_TEST_URI=mongodb://127.0.0.1:27017 to run them."; \
+	  echo "Set WORKERFLEET_MONGO_TEST_URI=mongodb://127.0.0.1:27017 locally or configure the CI secret to run them."; \
 	else \
+	  echo "Running workerfleet MongoDB integration tests."; \
 	  cd reference/workerfleet && go test -timeout 60s ./internal/platform/store/mongo; \
 	fi
 

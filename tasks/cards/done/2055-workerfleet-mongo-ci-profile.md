@@ -4,7 +4,7 @@ Milestone:
 Recipe: specs/change-recipes/add-acceptance-tests.yaml
 Context Package: implementation
 Priority: P1
-State: active
+State: done
 Primary Module: reference/workerfleet
 Owned Files:
 - .github/workflows/quality-gates.yml
@@ -46,9 +46,15 @@ Validation:
 - git diff --check
 
 Done Definition:
-- [ ] Acceptance Tests pass.
-- [ ] All Validation commands exit 0.
-- [ ] gofmt -l . produces no output.
-- [ ] Docs Sync targets updated (if applicable).
+- [x] Acceptance Tests pass.
+- [x] All Validation commands exit 0.
+- [x] gofmt -l . produces no output.
+- [x] Docs Sync targets updated (if applicable).
 
 Outcome:
+- Added an explicit CI quality workflow step that invokes `make workerfleet-mongo-test` with the optional `WORKERFLEET_MONGO_TEST_URI` secret.
+- Kept the Make target skip-safe when no Mongo URI is configured.
+- Documented the local and CI Mongo integration gate contract.
+- Validation:
+  - `make workerfleet-mongo-test`
+  - `git diff --check`
