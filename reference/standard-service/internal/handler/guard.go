@@ -23,7 +23,8 @@ const codeAuthKeyInvalid = "auth.key.invalid"
 // Timing-safe comparison (crypto/subtle.ConstantTimeCompare) prevents attackers
 // from using response time to guess the key byte-by-byte.
 //
-//	mux.Post("/api/v1/items", RequireWriteKey(cfg.WriteKey)(http.HandlerFunc(items.Create)))
+//	writeGuard := handler.RequireWriteKey(cfg.App.WriteKey)
+//	v1.post("/items", writeGuard(http.HandlerFunc(items.Create)))
 func RequireWriteKey(key string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		if key == "" {

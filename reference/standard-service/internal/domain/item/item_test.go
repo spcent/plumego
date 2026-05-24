@@ -104,26 +104,26 @@ func TestMemoryStoreUpdate(t *testing.T) {
 		s := NewMemoryStore()
 		created := s.Create(ctx, "original", "an original item")
 
-		updated, ok := s.Update(ctx, created.ID, "renamed")
+		updated, ok := s.Update(ctx, created.ID, "renamed", "updated description")
 		if !ok {
 			t.Fatal("Update: want true for existing id")
 		}
-		// Description is immutable: verify it is preserved after name update.
+		// CreatedAt and ID are immutable; name and description are replaced.
 		if updated.ID != created.ID || updated.Name != "renamed" ||
-			updated.Description != created.Description || updated.CreatedAt != created.CreatedAt {
+			updated.Description != "updated description" || updated.CreatedAt != created.CreatedAt {
 			t.Fatalf("Update: unexpected result: %+v", updated)
 		}
 
 		// Verify the store reflects the change.
 		got, _ := s.Get(ctx, created.ID)
-		if got.Name != "renamed" {
-			t.Fatalf("Get after Update: name = %q, want %q", got.Name, "renamed")
+		if got.Name != "renamed" || got.Description != "updated description" {
+			t.Fatalf("Get after Update: name=%q desc=%q, want renamed/updated description", got.Name, got.Description)
 		}
 	})
 
 	t.Run("missing id returns false", func(t *testing.T) {
 		s := NewMemoryStore()
-		_, ok := s.Update(ctx, "no-such-id", "anything")
+		_, ok := s.Update(ctx, "no-such-id", "anything", "any desc")
 		if ok {
 			t.Fatal("Update missing: want false, got true")
 		}
@@ -134,10 +134,23 @@ func TestMemoryStoreUpdate(t *testing.T) {
 		s.Create(ctx, "alpha", "alpha item")
 		b := s.Create(ctx, "beta", "beta item")
 		s.Create(ctx, "gamma", "gamma item")
-		s.Update(ctx, b.ID, "BETA")
+		s.Update(ctx, b.ID, "BETA", "beta updated")
 		items := s.List(ctx)
 		if items[1].Name != "BETA" {
 			t.Fatalf("item[1].Name = %q, want BETA", items[1].Name)
+		}
+	})
+
+	t.Run("description is replaced by update", func(t *testing.T) {
+		s := NewMemoryStore()
+		created := s.Create(ctx, "widget", "original description")
+
+		updated, ok := s.Update(ctx, created.ID, "widget", "new description")
+		if !ok {
+			t.Fatal("Update: want true for existing id")
+		}
+		if updated.Description != "new description" {
+			t.Fatalf("Update: Description = %q, want %q", updated.Description, "new description")
 		}
 	})
 }

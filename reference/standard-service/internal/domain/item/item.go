@@ -72,11 +72,11 @@ func (s *MemoryStore) List(_ context.Context) []Item {
 	return result
 }
 
-// Update replaces the name of an existing item and returns the updated item.
-// Description is immutable after creation; only name is replaced by this operation.
+// Update replaces the name and description of an existing item and returns the updated item.
+// CreatedAt and ID are immutable; all other fields are replaced by this operation.
 // It reports false when no item with that id exists.
 // context.Context is accepted so callers can propagate deadlines to real storage backends.
-func (s *MemoryStore) Update(_ context.Context, id, name string) (Item, bool) {
+func (s *MemoryStore) Update(_ context.Context, id, name, description string) (Item, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -85,6 +85,7 @@ func (s *MemoryStore) Update(_ context.Context, id, name string) (Item, bool) {
 		return Item{}, false
 	}
 	item.Name = name
+	item.Description = description
 	s.items[item.ID] = item
 	return item, true
 }

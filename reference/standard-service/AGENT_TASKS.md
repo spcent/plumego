@@ -49,7 +49,7 @@ Read `ARCHITECTURE.md` (this directory) for layout rationale.
 3. Write a test in `internal/handler/handler_test.go`.
 4. Run validation (see below).
 
-**Handler with no dependencies** (zero-field struct):
+**Handler method on APIHandler** (lifecycle dependencies already wired — Logger, ServiceName, Version):
 ```go
 func (h APIHandler) MyEndpoint(w http.ResponseWriter, r *http.Request) {
     _ = contract.WriteResponse(w, r, http.StatusOK, response, nil)
@@ -121,9 +121,11 @@ health := handler.HealthHandler{
 }
 ```
 
-`GET /readyz` probes each checker in order; the first error returns 503
-TypeUnavailable with `detail.component` set to the checker's Name() and
-`detail.reason` set to the error message.
+`GET /readyz` probes **all** checkers regardless of prior failures. A 503
+TypeUnavailable is returned if any checker fails, with each failing component
+name as a detail key and its error message as the value:
+`detail.database="connection refused"`. This lets operators see every unhealthy
+dependency in a single response.
 
 ### Add a DELETE or LIST endpoint
 

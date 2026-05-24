@@ -50,29 +50,37 @@ func (h HealthHandler) Live(w http.ResponseWriter, r *http.Request) {
 	}, nil)
 }
 
-// Ready probes each registered health.ComponentChecker in order.
+// Ready probes all registered health.ComponentChecker instances.
 //
+// All checkers are always probed regardless of prior failures so operators
+// see every unhealthy dependency in a single response, not just the first one.
 // On success the response body is a health.ReadinessStatus with a per-component
 // map so load balancers and dashboards can see which dependencies passed.
-// On the first failure a 503 TypeUnavailable error includes the component
-// name and the probe error, making triage actionable without log access.
+// On failure a 503 TypeUnavailable error carries each failing component name
+// as a detail key and its error message as the value.
 //
-//	GET /readyz (all pass) → 200 health.ReadinessStatus{Ready:true, Components:{…}}
-//	GET /readyz (db fails) → 503 TypeUnavailable detail.component="database"
+//	GET /readyz (all pass)       → 200 health.ReadinessStatus{Ready:true, Components:{db:true,cache:true}}
+//	GET /readyz (db fails)       → 503 TypeUnavailable detail.database="connection refused"
+//	GET /readyz (db+cache fail)  → 503 TypeUnavailable detail.database="…" detail.cache="…"
 func (h HealthHandler) Ready(w http.ResponseWriter, r *http.Request) {
 	components := make(map[string]bool, len(h.Checkers))
+	eb := contract.NewErrorBuilder().
+		Type(contract.TypeUnavailable).
+		Code(codeComponentUnhealthy).
+		Message("one or more components are not ready")
+	anyFailed := false
 	for _, checker := range h.Checkers {
 		if err := checker.Check(r.Context()); err != nil {
-			_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-				Type(contract.TypeUnavailable).
-				Code(codeComponentUnhealthy).
-				Detail("component", checker.Name()).
-				Detail("reason", err.Error()).
-				Message("service not ready").
-				Build())
-			return
+			components[checker.Name()] = false
+			eb = eb.Detail(checker.Name(), err.Error())
+			anyFailed = true
+		} else {
+			components[checker.Name()] = true
 		}
-		components[checker.Name()] = true
+	}
+	if anyFailed {
+		_ = contract.WriteError(w, r, eb.Build())
+		return
 	}
 	_ = contract.WriteResponse(w, r, http.StatusOK, health.ReadinessStatus{
 		Ready:      true,
