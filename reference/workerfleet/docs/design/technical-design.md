@@ -390,6 +390,7 @@ Implemented runtime behavior:
 - Alert evaluation and notifier primitives are wired into the app runtime.
 - When `WORKERFLEET_ALERT_EVALUATION_ENABLED=true`, `internal/app` starts a periodic alert evaluation loop.
 - When `WORKERFLEET_NOTIFICATION_ENABLED=true`, emitted alert records enqueue per-sink `notification_jobs`, and a delivery loop sends due jobs through configured notifiers with `WORKERFLEET_NOTIFIER_DELIVERY_TIMEOUT`.
+- Notification delivery is started independently from alert evaluation, so an instance can drain existing durable outbox jobs even when new alert evaluation is disabled.
 - Startup fails when notification delivery is enabled without a configured
   Feishu or generic webhook URL.
 - Alert evaluation and notification delivery use the same guarded loop scheduler, including non-overlap, per-iteration timeout, bounded failure backoff, and Mongo-backed loop leases when Mongo storage is enabled.

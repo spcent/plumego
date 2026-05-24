@@ -4,7 +4,7 @@ Milestone:
 Recipe: specs/change-recipes/fix-bug.yaml
 Context Package: implementation
 Priority: P0
-State: active
+State: done
 Primary Module: reference/workerfleet
 Owned Files:
 - reference/workerfleet/internal/app/alert_loop.go
@@ -49,9 +49,16 @@ Validation:
 - gofmt -l reference/workerfleet/internal/app
 
 Done Definition:
-- [ ] Acceptance Tests pass.
-- [ ] All Validation commands exit 0.
-- [ ] gofmt -l . produces no output.
-- [ ] Docs Sync targets updated (if applicable).
+- [x] Acceptance Tests pass.
+- [x] All Validation commands exit 0.
+- [x] gofmt -l . produces no output.
+- [x] Docs Sync targets updated (if applicable).
 
 Outcome:
+- Split `AlertRunner.Start` gating so alert evaluation and notification delivery loops start from their own runtime switches.
+- Added `TestStartAlertLoopRunsNotificationDeliveryWithoutAlertEvaluation`.
+- Documented independent notification-drain behavior in alerts and technical design docs.
+- Validation:
+  - `cd reference/workerfleet && go test -timeout 30s ./internal/app`
+  - `cd reference/workerfleet && go vet ./internal/app`
+  - `gofmt -l reference/workerfleet/internal/app`

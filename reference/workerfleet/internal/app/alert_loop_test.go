@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -188,6 +189,59 @@ func TestStartAlertLoopDisabledIsSafe(t *testing.T) {
 		t.Fatalf("start alert loop: %v", err)
 	}
 	stop()
+}
+
+func TestStartAlertLoopRunsNotificationDeliveryWithoutAlertEvaluation(t *testing.T) {
+	delivered := make(chan struct{}, 1)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		select {
+		case delivered <- struct{}{}:
+		default:
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	store := memory.NewStore()
+	if err := store.AppendAlert(context.Background(), platformstore.AlertRecord{
+		AlertID:     "alert-1",
+		AlertType:   domain.AlertWorkerOffline,
+		Status:      domain.AlertStatusFiring,
+		WorkerID:    "worker-1",
+		TriggeredAt: time.Now().UTC(),
+	}); err != nil {
+		t.Fatalf("append alert: %v", err)
+	}
+	runtime := newRuntime(store, func(context.Context) error { return nil })
+	var evaluations atomic.Int64
+	runtime.shell.alerts.engineFactory = func() domainAlertEngine {
+		return domainAlertEngineFunc(func(context.Context) ([]domain.AlertRecord, error) {
+			evaluations.Add(1)
+			return nil, errors.New("alert evaluation should not run")
+		})
+	}
+
+	cfg := DefaultConfig()
+	cfg.Runtime.AlertEvaluationEnabled = false
+	cfg.Runtime.NotificationEnabled = true
+	cfg.Runtime.NotificationDeliveryInterval = time.Millisecond
+	cfg.Runtime.NotifierDeliveryTimeout = time.Second
+	cfg.Notifier.WebhookURL = server.URL
+
+	stop, err := runtime.StartAlertLoop(context.Background(), cfg)
+	if err != nil {
+		t.Fatalf("start alert loop: %v", err)
+	}
+
+	select {
+	case <-delivered:
+	case <-time.After(time.Second):
+		t.Fatalf("notification delivery did not run")
+	}
+	stop()
+	if got := evaluations.Load(); got != 0 {
+		t.Fatalf("alert evaluations = %d, want 0", got)
+	}
 }
 
 func TestAlertRunnerUsesInjectedDependencies(t *testing.T) {

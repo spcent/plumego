@@ -52,17 +52,19 @@ func (r *Runtime) StartAlertLoop(ctx context.Context, cfg Config) (func(), error
 }
 
 func (a *AlertRunner) Start(ctx context.Context, cfg Config) (func(), error) {
-	if a == nil || !cfg.Runtime.AlertEvaluationEnabled {
+	if a == nil || (!cfg.Runtime.AlertEvaluationEnabled && !cfg.Runtime.NotificationEnabled) {
 		return func() {}, nil
 	}
 	loopCtx, cancel := context.WithCancel(ctx)
 	var wg sync.WaitGroup
-	settings := cfg.Runtime.alertEvaluationLoopSettings()
-	settings.Lease = a.lease
-	startManagedLoop(loopCtx, &wg, settings, a.reportRuntimeError, func(ctx context.Context) error {
-		_, err := a.EvaluateAndNotifyAlerts(ctx, cfg)
-		return err
-	})
+	if cfg.Runtime.AlertEvaluationEnabled {
+		settings := cfg.Runtime.alertEvaluationLoopSettings()
+		settings.Lease = a.lease
+		startManagedLoop(loopCtx, &wg, settings, a.reportRuntimeError, func(ctx context.Context) error {
+			_, err := a.EvaluateAndNotifyAlerts(ctx, cfg)
+			return err
+		})
+	}
 	if cfg.Runtime.NotificationEnabled {
 		deliverySettings := cfg.Runtime.notificationDeliveryLoopSettings()
 		deliverySettings.Lease = a.lease

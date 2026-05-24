@@ -396,6 +396,7 @@ Grafana 看板应以聚合视图为主。单 case 或单 task 的细节排查应
 - 告警评估和 notifier 基础能力已经接入应用运行时。
 - `WORKERFLEET_ALERT_EVALUATION_ENABLED=true` 时，`internal/app` 会启动周期性告警评估循环。
 - `WORKERFLEET_NOTIFICATION_ENABLED=true` 时，已产生的告警记录会先按 sink 写入 `notification_jobs`，再由投递循环使用配置的 notifier 发送，并使用 `WORKERFLEET_NOTIFIER_DELIVERY_TIMEOUT` 控制超时。
+- 通知投递和告警评估分别按各自开关启动，因此可以在关闭新告警评估时继续消费已有的持久化 outbox job。
 - 开启通知投递但未配置飞书或通用 Webhook URL 时，启动会 fail closed。
 - 告警评估和通知投递复用同一套 guarded loop scheduler，同样具备防重入、单次执行超时、有界失败退避，并在 Mongo 存储启用时使用 Mongo-backed loop lease。
 - 评估和通知错误会通过 runtime error observer 上报，并以低基数指标导出，不再静默丢弃。
