@@ -22,7 +22,7 @@ export const SITE_COPY: Record<Locale, { footerTagline: string }> = {
 
 export const NAV_LINKS: Record<Locale, Array<{ label: string; href: string }>> = {
   en: [
-    { label: 'Why Plumego', href: '/why-plumego' },
+    { label: 'Why', href: '/why-plumego' },
     { label: 'Docs', href: '/docs' },
     { label: 'Extensions', href: '/extensions' },
     { label: 'Compare', href: '/compare' },
