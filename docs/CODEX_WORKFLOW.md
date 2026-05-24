@@ -1,32 +1,25 @@
 # Agent Workflow — Plumego
 
-This document defines the recommended way for agents to work in `plumego`.
+This document defines the default working loop for agents in `plumego`.
 
-It is a companion to:
+Use it with:
 
 - `AGENTS.md` for hard rules and validation order
 - `docs/CANONICAL_STYLE_GUIDE.md` for code shape
-- `docs/AGENT_CODE_QUALITY_RULES.md` for agent preflight, review, and gate selection
-- `docs/AGENT_CONTEXT_BUDGET.md` for token-bounded context packages and resume discipline
-- `docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md` for repository layout
+- `docs/AGENT_CODE_QUALITY_RULES.md` for preflight, review, and gate selection
+- `docs/AGENT_CONTEXT_BUDGET.md` for bounded reads and resume discipline
 - `specs/agent-quality-rules.yaml` for the machine-readable quality contract
-- `specs/*` and `<module>/module.yaml` for machine-readable ownership and boundaries
+- `specs/*` and `<module>/module.yaml` for routing, ownership, and validation
 
-Use this document when you want a repeatable prompting and execution pattern,
-not just a one-off instruction.
+Repo-native change recipes live under `specs/change-recipes/`.
 
-Repo-native recipe assets live under `specs/change-recipes/` and should be used
-when a task matches one of the standard shapes.
+## 1. Working Modes
 
-## 1. Default Operating Model
-
-The agent should work in one of three modes:
-
-### Analysis Mode
+### Analysis
 
 Use when scope, ownership, or architecture is unclear.
 
-Expected output:
+Return:
 
 - owning module or `x/*` family
 - in-scope paths
@@ -37,9 +30,9 @@ Expected output:
 
 Do not edit code in this mode.
 
-### Implementation Mode
+### Implementation
 
-Use when the task contract is already clear.
+Use when the task contract is clear.
 
 Expected behavior:
 
@@ -49,7 +42,7 @@ Expected behavior:
 - add or update focused tests
 - run validation before handoff
 
-### Review Mode
+### Review
 
 Use when the user asks for review, audit, or risk assessment.
 
@@ -57,14 +50,22 @@ Expected output:
 
 - findings first
 - severity-ordered issues
-- file-level references
+- file references
 - missing tests and regression risks
 
-Do not patch code unless the user explicitly asks for fixes.
+Do not patch unless the user explicitly asks for fixes.
 
-## 2. Task Contract
+## 2. Default Task Contract
 
-For stable and predictable runs, every task should define:
+When the task contract is incomplete, assume:
+
+- one primary module per change
+- no stable public API changes
+- no new dependencies
+- focused tests for behavior changes
+- docs sync only for implemented behavior changes
+
+Every task should still be framed in terms of:
 
 - Goal
 - In Scope
@@ -76,70 +77,56 @@ For stable and predictable runs, every task should define:
 - Validation
 - Done Definition
 
-When humans omit these details, the agent should assume:
+## 3. Default Loop
 
-- one primary module per change
-- no stable public API changes
-- no new dependencies
-- focused tests are required for behavior changes
-- docs sync is required only for implemented behavior changes
+1. Read `AGENTS.md`.
+2. Select the matching `specs/task-routing.yaml` task entry.
+3. Read that entry's `start_with` files.
+4. Identify the owning module or family.
+5. Read the target `<module>/module.yaml` before editing module behavior.
+6. State the context package, scope, and impact assumptions.
+7. Implement the smallest coherent change.
+8. Add or update focused tests.
+9. Run module validation first.
+10. Run boundary and repo-wide checks only when the gate profile requires them.
+11. Report validation as a compact command and status summary with residual risk.
 
-## 3. Context Budget
+Use targeted `rg` searches when a symbol, package, or rule needs confirmation.
+Avoid broad file dumps after ownership and validation are already clear.
 
-Use the smallest context package that can safely complete the task. The default
-startup package is `AGENTS.md` plus the matching `specs/task-routing.yaml` task
-entry. Then load the selected entry's `start_with` files, the owning
-`module.yaml` when module behavior changes, and only the extra docs or specs
-identified by preflight.
+## 4. Context Budget
 
-Do not use the full control-plane read set for routine implementation. Reserve
-it for architecture, boundary, release, and workflow-rule changes.
+Use the smallest context package that can safely complete the task.
 
-Context packages are defined in `docs/AGENT_CONTEXT_BUDGET.md`:
+- `startup`: initial orientation
+- `implementation`: normal code or docs changes
+- `review`: findings-first review
+- `control-plane`: workflow, architecture, quality, or spec changes
 
-- `startup` for task orientation
-- `implementation` for normal code or doc changes
-- `review` for findings-first review
-- `control-plane` for workflow/spec/architecture rule changes
+See `docs/AGENT_CONTEXT_BUDGET.md` for package contents, split thresholds, and
+resume discipline.
 
-Split work into a task card before implementation when the expected scope spans
-more than one primary module, more than five files, more than three validation
-commands, or unclear API, dependency, security, or boundary impact.
+Split work before implementation when the expected scope spans more than one
+primary module, more than five files, more than three validation commands, or
+unclear API, dependency, security, or boundary impact.
 
-## 4. Stop Conditions
+## 5. Stop Conditions
 
-The agent should stop and surface the issue before coding when:
+Stop and surface the issue before coding when:
 
 - the owning module is unclear
 - the task would force a stable root to import `x/*`
 - the task needs a stable public API change that was not requested
 - the task needs a new dependency that was not approved
-- the task is broad but lacks acceptance criteria or validation commands
+- the task is broad but lacks acceptance criteria
 - a repo spec, module manifest, and local pattern conflict in a behavior-changing way
 
-## 5. Daily Workflow
+Use `specs/stop-condition-handlers.yaml` for the deterministic resolution path.
 
-Use this loop for normal feature work, bug fixes, and refactors:
+## 6. Recipes
 
-1. Read `AGENTS.md`.
-2. Select the matching `specs/task-routing.yaml` task entry.
-3. Read the selected entry's `start_with` files.
-4. Identify the owning module or family.
-5. Read the target `<module>/module.yaml` before editing module behavior.
-6. State the context package, in-scope paths, out-of-scope paths, and impact assumptions.
-7. Implement the smallest coherent change.
-8. Add or update focused tests.
-9. Run module validation first.
-10. Run boundary and repo-wide checks only when selected by the gate profile.
-11. Report validation as a compact command/status summary with residual risks.
-
-Use targeted `rg` searches when a symbol, package, or rule needs confirmation.
-Avoid broad file dumps after ownership and validation are already clear.
-
-## 6. Prompt Templates
-
-Before writing a bespoke prompt, check whether one of these repo-native recipes
-already matches the task:
+Before writing a bespoke workflow, check whether one of these recipes already
+matches the task:
 
 - `specs/change-recipes/analysis-only.yaml`
 - `specs/change-recipes/fix-bug.yaml`
@@ -147,13 +134,19 @@ already matches the task:
 - `specs/change-recipes/review-only.yaml`
 - `specs/change-recipes/add-http-endpoint.yaml`
 - `specs/change-recipes/add-middleware.yaml`
+- `specs/change-recipes/add-acceptance-tests.yaml`
 - `specs/change-recipes/new-stable-module.yaml`
 - `specs/change-recipes/new-extension-module.yaml`
 - `specs/change-recipes/stable-root-boundary-review.yaml`
 - `specs/change-recipes/symbol-change.yaml`
 - `specs/change-recipes/tenant-policy-change.yaml`
+- `specs/change-recipes/add-websocket-room.yaml`
+- `specs/change-recipes/add-ai-tool.yaml`
+- `specs/change-recipes/add-grpc-method.yaml`
 
-### Analysis Prompt
+## 7. Prompt Shapes
+
+### Analysis prompt
 
 ```text
 Do not edit code.
@@ -172,7 +165,7 @@ Return:
 - smallest reversible task split
 ```
 
-### Implementation Prompt
+### Implementation prompt
 
 ```text
 Implement this change in plumego:
@@ -188,7 +181,7 @@ Constraints:
 
 Requirements:
 - complete the quality preflight before editing
-- use the smallest matching context package from docs/AGENT_CONTEXT_BUDGET.md
+- use the smallest matching context package
 - state which files you will touch before broad edits
 - make the smallest coherent change
 - add or update focused tests
@@ -196,7 +189,7 @@ Requirements:
 - report residual risks at the end
 ```
 
-### Review Prompt
+### Review prompt
 
 ```text
 Review this change only. Do not modify code.
@@ -207,224 +200,10 @@ Priorities:
 3. net/http compatibility risks
 4. hidden globals or context service-location
 5. fail-open behavior
-6. response/error path drift
+6. response or error path drift
 7. missing tests
 8. docs/config/example drift
 
 Output findings first, ordered by severity, with file references.
 Use the review output contract in docs/AGENT_CODE_QUALITY_RULES.md.
 ```
-
-### Exported Symbol Change Prompt
-
-```text
-Change this exported symbol:
-[symbol and requested change]
-
-You must:
-- enumerate every caller first with rg
-- update every caller in the same change
-- re-run the same search and verify no stale references remain
-- update tests in the same change
-- run go build ./... and go test ./...
-```
-
-### Milestone Prompt
-
-```text
-Execute this milestone:
-[tasks/milestones/active/M-NNN-short-name/M-NNN.md]
-
-Follow AGENTS.md milestone rules exactly:
-- read every Context file first
-- follow Tasks in order
-- stay inside Affected Modules
-- stop and record blockers in the spec if discovered
-- run the full validation sequence before push
-```
-
-## 7. Symbol Change Protocol
-
-When removing, renaming, or changing the behavior of an exported symbol:
-
-1. enumerate callers first with `rg -n --glob '*.go' 'SymbolName' .`
-2. decide how every site will be handled
-3. edit all callers in the same change
-4. re-run the same search
-5. update tests in the same change
-6. finish only after build, tests, and residual-reference checks pass
-
-Do not leave dead wrappers, deprecated compatibility layers, or silent discard
-sites behind.
-
-## 8. Validation
-
-Default validation order:
-
-1. run the target module tests from `<module>/module.yaml`
-2. run boundary and manifest checks
-3. run repo-wide gates when the change is code-bearing, cross-module, or release relevant
-
-Required full gate:
-
-```bash
-make gates
-```
-
-`make gates` mirrors `.github/workflows/quality-gates.yml`: boundary checks,
-`go vet ./...`, a non-mutating `gofmt -l .` check, `go test -race -timeout 60s
-./...`, and `go test -timeout 20s ./...`. Run `gofmt -w <paths>` before the
-gate when formatting is required.
-
-## 9. Milestone Workflow
-
-Use the milestone path for multi-step, single-PR scopes with explicit human
-authorship and autonomous agent execution.
-
-Companion workflow assets:
-
-- `docs/MILESTONE_PIPELINE.md`
-- `docs/github-workflows/milestone-pr-template.md`
-- `tasks/milestones/ROADMAP.md`
-
-High-level loop:
-
-1. scaffold the spec with `make new-milestone N=NNN TITLE="..."`
-2. fill Goal, Architecture Decisions, Context, Tasks, Acceptance Criteria, and Out of Scope
-3. validate with `make check-spec M=active/M-NNN-short-name`
-4. launch with `make milestone M=active/M-NNN-short-name`
-5. let the agent execute autonomously on the milestone branch
-6. review the PR as the only manual checkpoint
-7. archive the spec and update the roadmap
-
-Use milestones when:
-
-- the work spans multiple stable intermediate steps
-- there are non-obvious architecture decisions to lock down
-- the task needs explicit sequencing or parallel phases
-- the reviewer wants one PR with a spec-backed contract
-
-Do not use milestones for every small fix. Daily implementation prompts are the
-default.
-
-## 10. Worked Examples
-
-These examples show how real Plumego work maps onto the control plane.
-
-### Example A: Exported Symbol Cleanup
-
-Task shape:
-
-- rename or remove an exported `contract` or `core` symbol
-- migrate every caller in one change
-- update tests and verify zero stale references
-
-Use:
-
-- recipe: `specs/change-recipes/symbol-change.yaml`
-- routing entry: `symbol_change`
-
-Representative cards:
-
-- `tasks/cards/done/0269-rename-errtype-constants-to-type.md`
-- `tasks/cards/done/0280-contract-ctx-getter-rename.md`
-
-### Example B: HTTP Handler or Route Bug
-
-Task shape:
-
-- broken request decode
-- inconsistent error response
-- route registration or transport regression
-
-Use:
-
-- recipe: `specs/change-recipes/http-endpoint-bugfix.yaml`
-- routing entry: `http_endpoint_bugfix`
-
-Representative cards:
-
-- `tasks/cards/done/0142-writeerror-buffer-before-headers.md`
-- `tasks/cards/done/0264-redirect-safe-by-default.md`
-
-### Example C: Tenant Policy or Quota Change
-
-Task shape:
-
-- tenant resolution behavior
-- quota feedback headers
-- deny-path, isolation, or tenant-session changes
-
-Use:
-
-- recipe: `specs/change-recipes/tenant-policy-change.yaml`
-- routing entry: `tenant_policy_change`
-
-Representative cards:
-
-- `tasks/cards/done/0195-x-tenant-quota-retry-after-coverage.md`
-- `tasks/cards/done/0196-x-tenant-policy-and-isolation-coverage.md`
-- `tasks/cards/done/0276-tenant-core-ratelimit-provider-unknown-tenant.md`
-
-### Example D: Stable Root Boundary Audit
-
-Task shape:
-
-- review-only request
-- stable-root ownership drift
-- hidden coupling or x/* leakage concerns
-
-Use:
-
-- recipe: `specs/change-recipes/stable-root-boundary-review.yaml`
-- routing entry: `stable_root_boundary_review`
-
-Representative cards:
-
-- `tasks/cards/done/0031-block-tenant-leakage-into-stable-roots.md`
-- `tasks/cards/done/0245-security-jwt-session-lifecycle-pruning.md`
-- `tasks/cards/done/0247-security-resilience-boundary-pruning.md`
-
-## 11. Review Checklist for Humans
-
-When reviewing agent output, check:
-
-1. the owning module was correct
-2. the diff stayed inside scope
-3. stable roots did not learn extension-family internals
-4. control flow stayed explicit and `net/http` compatible
-5. tests cover failure paths and regressions
-6. docs changed only where implemented behavior changed
-7. `go.mod` did not change unless explicitly approved
-
-## 12. Anti-Patterns
-
-Do not ask the agent to:
-
-- "optimize this" without a target module or success bar
-- "refactor broadly" across multiple primary modules in one pass
-- "just make it cleaner" without boundaries
-- preserve deprecated wrappers indefinitely
-- infer whether public APIs or dependencies may change
-
-Do not let the agent:
-
-- widen stable roots into feature catalogs
-- hide dependency flow in context or globals
-- add one-off response helpers or route-registration idioms
-- treat subordinate `x/*` packages as competing family entrypoints
-
-## 13. Recommended Usage
-
-For best stability, use this sequence:
-
-1. analysis prompt
-2. implementation prompt
-3. review prompt
-
-For larger work:
-
-1. analysis prompt
-2. split into cards or a milestone
-3. execute one card or milestone at a time
-4. review before merge

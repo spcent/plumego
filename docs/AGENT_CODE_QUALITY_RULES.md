@@ -1,7 +1,7 @@
 # Agent Code Quality Rules
 
-This document turns Plumego's code quality expectations into an agent-facing
-checklist. Use it with `AGENTS.md`, `docs/CODEX_WORKFLOW.md`,
+This document turns Plumego's code-quality expectations into an agent-facing
+contract. Use it with `AGENTS.md`, `docs/CODEX_WORKFLOW.md`,
 `docs/AGENT_CONTEXT_BUDGET.md`, `docs/CANONICAL_STYLE_GUIDE.md`, and
 `specs/agent-quality-rules.yaml`.
 
@@ -9,8 +9,8 @@ checklist. Use it with `AGENTS.md`, `docs/CODEX_WORKFLOW.md`,
 
 ### MUST
 
-Violations block implementation handoff or merge readiness unless a documented
-exception exists.
+Violations block handoff or merge readiness unless a documented exception
+exists.
 
 - Stable roots must not import `x/*`.
 - The main module must not add an unapproved non-stdlib dependency.
@@ -18,17 +18,11 @@ exception exists.
 - Behavior changes must include focused tests.
 - Auth, verification, signature, and policy failures must fail closed.
 - Secrets, tokens, signatures, and private keys must not be logged or returned.
-- New hidden globals, `init()` registration, and context service-locator flows
-  are forbidden.
-- Exported symbol removal, rename, or behavior change must migrate every caller
-  in the same change.
-- HTTP JSON APIs must use the canonical `contract.WriteResponse` and
-  `contract.WriteError` paths.
+- Hidden globals, `init()` registration, and context service-locator flows are forbidden.
+- Exported symbol removal, rename, or behavior change must migrate every caller in the same change.
+- HTTP JSON APIs must use the canonical `contract.WriteResponse` and `contract.WriteError` paths.
 
 ### SHOULD
-
-Default to these unless the task contract explicitly justifies a narrower or
-broader path.
 
 - Keep each change centered on one primary module.
 - Prefer standard-library shapes and existing local patterns.
@@ -36,21 +30,19 @@ broader path.
 - Keep route, handler, and middleware wiring grep-friendly.
 - Document implemented behavior only.
 - Run module checks first, boundary checks second, and repo-wide gates last.
-- Load the smallest context package that can safely establish ownership,
-  boundaries, touched files, and validation.
+- Load the smallest safe context package.
+- Summarize validation output compactly.
 
 ### MAY
 
-Use these sparingly and explain the reason when they affect review scope.
-
 - Extract a small helper when local repetition is clear and stable.
-- Skip Go gates for docs-only changes after checking the edited docs.
+- Skip Go gates for docs-only changes.
 - Keep a compatibility layer only with an explicit migration window.
-- Split broad work into an analysis-only pass or task card before coding.
+- Split broad work into an analysis pass or task card before coding.
 
-## 2. Preflight Checklist
+## 2. Preflight
 
-Before editing, answer these fields:
+Before editing, answer:
 
 ```text
 Context package:
@@ -87,15 +79,15 @@ Use `docs/AGENT_CONTEXT_BUDGET.md` to choose `startup`, `implementation`,
 
 - Cover static routes, params, groups, method matching, and reverse routing.
 - Do not add response writing, auth policy, or business validation.
-- Keep routes and matching behavior grep-friendly.
+- Keep matching behavior grep-friendly.
 
 ### `contract`
 
-- Preserve error code and response shape stability.
+- Preserve error-code and response-shape stability.
 - Keep `contract` limited to transport primitives.
 - Use `With{Type}` and `{Type}FromContext` accessor pairs.
 - Use unexported zero-value struct context keys inlined at call sites.
-- Do not add new response helper families or `NewXxxError` helpers.
+- Do not add new response helper families or specific `NewXxxError` helpers.
 - Remove deprecated symbols after caller migration.
 
 ### `middleware`
@@ -103,10 +95,8 @@ Use `docs/AGENT_CONTEXT_BUDGET.md` to choose `startup`, `implementation`,
 - Call `next` exactly once.
 - Test ordering and error paths.
 - Keep behavior transport-only.
-- Do not inject business services, build business DTOs, or branch on domain
-  policy.
-- Fallible constructors should return `(..., error)` instead of adding a new
-  panic-only API.
+- Do not inject business services, build business DTOs, or branch on domain policy.
+- Fallible constructors should return `(..., error)`.
 
 ### `security`
 
@@ -131,22 +121,22 @@ Use `docs/AGENT_CONTEXT_BUDGET.md` to choose `startup`, `implementation`,
 
 ## 4. Anti-Patterns
 
-Do not introduce or expand:
+Do not introduce:
 
-- Stable package imports of `x/*`.
-- New dependencies without approval.
-- Context-based service lookup.
-- Package-level mutable registries.
-- `init()` side-effect registration.
-- Route auto-discovery or reflection-based route wiring.
-- Middleware that builds business DTOs or injects business services.
-- Ad hoc JSON response helpers.
-- Per-feature error envelopes.
-- New handler signatures.
-- New panic-only constructors for fallible behavior.
-- Generic `utils` packages for new library code.
-- Compatibility wrappers without a removal plan.
-- Deprecated symbols left after caller migration.
+- Stable package imports of `x/*`
+- New dependencies without approval
+- Context-based service lookup
+- Package-level mutable registries
+- `init()` side-effect registration
+- Route auto-discovery or reflection-based route wiring
+- Middleware that builds business DTOs or injects business services
+- Ad hoc JSON response helpers
+- Per-feature error envelopes
+- New handler signatures
+- New panic-only constructors for fallible behavior
+- Generic `utils` packages for new library code
+- Compatibility wrappers without a removal plan
+- Deprecated symbols left after caller migration
 
 ## 5. Review Output Contract
 
@@ -169,22 +159,21 @@ Residual risk:
 
 Review priorities:
 
-1. Boundary violations.
-2. Stable root imports of `x/*`.
-3. `net/http` compatibility risk.
-4. Hidden globals or context service-location.
-5. Fail-open security behavior.
-6. Response or error path drift.
-7. Missing behavior tests.
-8. Docs, config, or example drift.
+1. Boundary violations
+2. Stable-root imports of `x/*`
+3. `net/http` compatibility risk
+4. Hidden globals or context service-location
+5. Fail-open security behavior
+6. Response or error path drift
+7. Missing behavior tests
+8. Docs, config, or example drift
 
-## 6. Gate Selection Matrix
+## 6. Gate Profiles
 
 ### docs-only
 
 Check accuracy, links, terminology, and authority order. Go gates are not
-required unless code, config, generated data, or examples changed.
-Use compact validation summaries instead of pasting full link or grep output.
+required unless code, config, generated data, or runnable examples changed.
 
 ### single module behavior
 
@@ -217,10 +206,9 @@ go run ./internal/checks/dependency-rules
 
 Also confirm:
 
-- `router`: static, param, group, method, and reverse-route tests.
-- `middleware`: ordering, error path, panic, timeout, and cancel tests.
-- `security`: invalid token, invalid signature, fail-closed, and timing-safe
-  comparison tests.
+- `router`: static, param, group, method, and reverse-route tests
+- `middleware`: ordering, error-path, panic, timeout, and cancel tests
+- `security`: invalid-token, invalid-signature, fail-closed, and timing-safe tests
 
 ### cross-module, public API, or release-relevant
 

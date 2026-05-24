@@ -1,45 +1,28 @@
 # Agent Context Budget
 
-This document defines the token-bounded working model for Codex and other
-coding agents in Plumego. The goal is to keep each run focused, reversible, and
-cheap in context without weakening boundary, security, or validation rules.
+This document defines the default bounded-read model for agents working in
+Plumego. The goal is to keep each run focused, reversible, and cheap in
+context without weakening boundary, security, or validation rules.
 
 Use this document with `AGENTS.md`, `docs/CODEX_WORKFLOW.md`,
 `docs/AGENT_CODE_QUALITY_RULES.md`, and `specs/task-routing.yaml`.
 
-## 1. Objective
+## 1. Default
 
-Default agent runs should load the smallest context package that can answer the
-task safely. Do not scan the entire control plane for routine work.
+Start with the smallest safe context package.
 
-Target budget:
-
-- Startup package: `AGENTS.md` plus the matching `specs/task-routing.yaml`
-  entry.
-- Implementation package: startup package plus the owning `module.yaml`, one
-  task recipe when applicable, and only the directly relevant module primer or
-  style section.
-- Full control-plane package: only for architecture, boundary, release, or
-  workflow-rule changes.
-
-The full control plane remains authoritative, but it is not the default read
-set.
-
-## 2. Loading Order
-
-Use this order for normal work:
+Normal read order:
 
 1. Read `AGENTS.md`.
-2. Read `specs/task-routing.yaml` only far enough to select the task entry.
-3. Read the selected task entry's `start_with` files.
+2. Read only enough of `specs/task-routing.yaml` to select the task entry.
+3. Read that entry's `start_with` files.
 4. Read the target `<module>/module.yaml` before editing module behavior.
-5. Read additional docs or specs only when the preflight identifies a concrete
-   reason.
+5. Read extra docs or specs only when preflight identifies a concrete need.
 
-Stop reading when the task contract, owner, boundaries, and validation plan are
-clear. Prefer `rg`-targeted searches over broad file dumps.
+Stop reading when ownership, boundaries, touched files, and validation are
+clear. Prefer targeted `rg` searches over broad file dumps.
 
-## 3. Context Packages
+## 2. Context Packages
 
 ### `startup`
 
@@ -50,12 +33,12 @@ Use for first-pass orientation:
 
 ### `implementation`
 
-Use for normal code or doc changes:
+Use for normal code or docs changes:
 
 - `startup`
 - target `<module>/module.yaml`, when module behavior changes
 - one matching `specs/change-recipes/*.yaml`, when a recipe exists
-- one module primer or style guide section, only if needed for the edit shape
+- one directly relevant module primer or style section, only if needed
 - touched files and focused tests
 
 ### `review`
@@ -69,27 +52,25 @@ Use when the user asks for review:
 
 ### `control-plane`
 
-Use for changes to workflow, architecture rules, specs, quality gates, or
-boundary definitions:
+Use for workflow, architecture, quality, boundary, or spec changes:
 
 - `startup`
 - `docs/CODEX_WORKFLOW.md`
 - `docs/AGENT_CODE_QUALITY_RULES.md`
-- directly changed specs
+- directly changed specs or docs
 - only the architecture docs that own the changed rule
 
-## 4. Task Card Limits
+## 3. Split Thresholds
 
-Split broad work before implementation when the expected edit set exceeds one
-of these limits:
+Split work before implementation when any of these is true:
 
-- more than one primary module
-- more than five files
-- more than three validation commands
-- unclear public API, dependency, security, or boundary impact
-- work that cannot be reverted in one commit
+- More than one primary module
+- More than five files
+- More than three validation commands
+- Unclear public API, dependency, security, or boundary impact
+- Work cannot be cleanly reverted in one commit
 
-Each card should state:
+Each task card should state:
 
 - Goal
 - Scope
@@ -99,9 +80,9 @@ Each card should state:
 - Docs Sync
 - Done Definition
 
-## 5. Preflight Ledger
+## 4. Preflight Ledger
 
-Every implementation preflight should include the context package:
+Every implementation preflight should include:
 
 ```text
 Context package:
@@ -117,12 +98,11 @@ Docs impact: none / yes
 Validation plan:
 ```
 
-Use `Context package: control-plane` for edits to this document or other
-workflow/spec authority.
+Use `Context package: control-plane` for workflow, architecture, and spec edits.
 
-## 6. Output Compression
+## 5. Validation Summaries
 
-Agent handoffs should summarize validation instead of pasting full logs:
+Summarize validation instead of pasting full logs:
 
 ```text
 Validation:
@@ -130,22 +110,27 @@ Validation:
   status: pass
 - command: go run ./internal/checks/agent-workflow
   status: fail
-  key failure: specs/task-routing.yaml task x references missing start_with path
-  next step: add the missing file or correct the route entry
+  key failure: specs/task-routing.yaml entry points at a missing start_with path
+  next step: fix the path or update the routing entry
 ```
 
-For failures, include the command, status, first meaningful error, and next
-step. Keep full logs in the terminal output, not the conversational context.
+For failures, include:
 
-## 7. Resume Discipline
+- command
+- status
+- first meaningful failure
+- next step
 
-After context compaction or a long-running task, resume from the ledger rather
-than rereading the full repository:
+Keep full logs in the terminal, not in the conversational context.
+
+## 6. Resume Discipline
+
+After compaction or a long-running task:
 
 1. Re-read the current task card or preflight ledger.
 2. Check `git status --short`.
 3. Read only changed files and the directly relevant `start_with` entries.
-4. Continue validation from the last incomplete step.
+4. Continue from the last incomplete validation step.
 
 If the ledger is missing or stale, return to `startup` and rebuild the smallest
 safe package.

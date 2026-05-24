@@ -2,15 +2,15 @@
 
 This document defines the target repository shape for Plumego.
 
-## Goals
+## 1. Goals
 
 - Keep the stable surface small and explicit.
-- Make module ownership easy for agents to identify.
-- Minimize search radius for routine feature work.
-- Prevent extension capabilities from polluting the stable core.
-- Establish one canonical implementation path for new work.
+- Make ownership easy to identify.
+- Minimize search radius for routine work.
+- Prevent extension capabilities from leaking into the stable core.
+- Preserve one canonical implementation path for new work.
 
-## Repository Shape
+## 2. Repository Shape
 
 Stable packages stay at the repository root:
 
@@ -33,9 +33,12 @@ Optional or fast-moving capabilities live under `x/`:
 - `x/gateway`
 - `x/messaging`
 - `x/observability`
+- `x/openapi`
 - `x/resilience`
 - `x/rest`
+- `x/rpc`
 - `x/tenant`
+- `x/validate`
 - `x/websocket`
 
 Non-library areas stay out of import-path design:
@@ -47,63 +50,46 @@ Non-library areas stay out of import-path design:
 - `internal`
 - `tasks`
 
-## Repository Control Surfaces
+## 3. Control Surfaces
 
-The repository uses four different top-level surfaces on purpose:
+The repository intentionally keeps four top-level control surfaces:
 
-- `docs/`: human-readable explanation, architecture decisions, module primers, and roadmap
-- `specs/`: machine-readable repository rules, ownership data, dependency constraints, and change recipes
-- `tasks/`: repo-native execution cards that agents can consume as a work queue
-- `reference/`: canonical application wiring and runnable reference examples
+- `docs/`: human-readable explanation, architecture, primers, and roadmap
+- `specs/`: machine-readable routing, taxonomy, dependency rules, and recipes
+- `tasks/`: bounded execution cards and milestones
+- `reference/`: canonical application wiring and scenario apps
 
-This split is intentional and should remain stable:
+Keep this split stable:
 
-- do not move `specs/` under `docs/`; that would blur executable rules with explanatory prose
-- keep machine-readable repository contracts at the top level so discovery and checks stay simple
-- keep task cards outside `docs/` when they are meant to drive execution rather than serve as archival prose
-- keep `reference/standard-service` as the only canonical application layout; scenario reference apps must not replace it
+- Do not move `specs/` under `docs/`
+- Keep machine-readable contracts at the top level
+- Keep task cards outside `docs/`
+- Keep `reference/standard-service` as the canonical application layout
 
-## Agent Control Plane
+## 4. Agent Read Path
 
-Agents should treat the repository control plane as a layered contract:
-
-1. `AGENTS.md`: operating rules, task contracts, validation order, milestone protocol
-2. `docs/AGENT_CONTEXT_BUDGET.md`: token-bounded context packages and task-card limits
-3. `docs/CODEX_WORKFLOW.md`: repeatable prompting and execution patterns
-4. `docs/CANONICAL_STYLE_GUIDE.md`: canonical implementation path and code shape
-5. `docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md`: repository shape and ownership model
-6. `specs/*.yaml`: machine-readable routing, dependency, taxonomy, and manifest rules
-7. `<module>/module.yaml`: module-local responsibilities, review checklist, and validation commands
-8. `reference/standard-service`: canonical application wiring
-
-The intent is not just documentation. Each layer should make it harder for an
-agent to guess incorrectly about module ownership, allowed imports, or the
-canonical way to implement a change.
-
-## Canonical Implementation Path
-
-Agents should treat these as the default bounded read and write path:
+Default bounded read path:
 
 1. `AGENTS.md`
 2. matching `specs/task-routing.yaml` entry
-3. selected entry's `start_with` files
+3. that entry's `start_with` files
 4. `<module>/module.yaml` before editing module behavior
 5. targeted style, architecture, or reference docs only when preflight requires them
 
-Rules:
+Use the full architecture and spec set only for control-plane, boundary, or
+release work.
 
-- `reference/standard-service` is the only canonical application layout
-- `reference/standard-service` must depend only on stable root packages and the standard library
-- extension or scenario reference apps must live outside `reference/standard-service`
-- each extension family must publish one canonical discovery entrypoint
-- constructor policy follows `docs/CANONICAL_STYLE_GUIDE.md`: new fallible
-  constructors return errors, existing panic convenience wrappers are
-  compatibility paths, and public constructor migrations require module-owned
-  cards rather than repo-wide cleanup
+## 5. Canonical Defaults
 
-## Task Contract Defaults
+- `reference/standard-service` is the only canonical application layout.
+- Extension or scenario apps must not redefine the default app shape.
+- Each extension family should expose one canonical discovery entrypoint.
+- Constructor policy follows `docs/CANONICAL_STYLE_GUIDE.md`.
+- New fallible constructors return errors; existing panic convenience wrappers are compatibility paths only.
 
-When humans do not provide an explicit task contract, agents should default to:
+## 6. Task Contract Defaults
+
+When humans do not provide an explicit task contract, agents should assume:
 
 - one primary module per change
 - no stable public API changes
@@ -111,88 +97,48 @@ When humans do not provide an explicit task contract, agents should default to:
 - focused tests for behavior changes
 - docs sync only for implemented behavior changes
 
-Large work should be split into an analysis pass and an implementation pass.
-Analysis identifies module ownership, in-scope paths, out-of-scope paths,
-likely touched files, and validation commands before coding begins.
+Broad work should be split into an analysis pass and an implementation pass.
 
-## Hard Rules
+## 7. Hard Rules
 
 - Root package facade imports are forbidden.
 - Stable packages must not depend on `x/*`.
 - `core` is a kernel, not a feature catalog.
 - `middleware` remains transport-only.
-- Tenant-aware logic belongs in `x/tenant`, not in stable `middleware` or `store`.
-- Stable `middleware` must not grow tenant resolution, tenant policy, or tenant quota behavior.
-- Stable `store` must not grow tenant-aware adapters or tenant-specific storage policy.
+- Tenant-aware logic belongs in `x/tenant`, not stable `middleware` or `store`.
+- `health` owns models and readiness state, not HTTP endpoint ownership.
+- `contract` owns transport contracts, not protocol gateway families.
+- `store` owns primitives; topology-heavy data features belong in extensions.
 - Reference apps define the canonical app layout.
-- `health` keeps models and readiness state, not HTTP endpoint ownership.
-- `contract` keeps transport contracts, not protocol gateway families.
-- `store` stable layer keeps primitives; topology-heavy data features move to extensions.
 
-## Target Stable-Layer Boundaries
+## 8. Target Stable-Layer Boundaries
 
-- `core`: app lifecycle, route attachment, middleware attachment, server startup and shutdown
-- `router`: matching, params, groups, reverse routing
-- `contract`: error model, response helpers, request metadata helpers
-- `middleware`: narrow transport middleware packages only
-- `security`: auth, headers, input safety, abuse guard primitives
+- `core`: app lifecycle, route attachment, middleware attachment, startup, and shutdown
+- `router`: matching, params, groups, and reverse routing
+- `contract`: error model, response helpers, request metadata, and context helpers
+- `middleware`: narrow transport middleware only
+- `security`: auth, headers, input safety, and abuse-guard primitives
 - `store`: base persistence primitives only
 - `health`, `log`, `metrics`: support contracts and base implementations only
 
-Within observability concerns:
+Observability split:
 
-- stable `middleware/*` owns transport observability primitives
+- Stable `middleware/*` owns transport observability primitives
 - `x/observability` owns broader adapter and export wiring
 
-Health HTTP exposure belongs in reference apps or owning extensions, not in the stable `health` root.
+## 9. Machine-Readable Workflow
 
-Avoid growing broad buckets such as:
-
-- `middleware/tenant`
-- `middleware/observability` as a catch-all feature catalog
-- `contract/protocol` as a cross-protocol family root
-- `health` HTTP handler packages
-- `store/db/rw` or `store/db/sharding` as stable-layer defaults
-
-## Canonical Read Path
-
-1. `AGENTS.md`
-2. matching `specs/task-routing.yaml` entry
-3. selected entry's `start_with` files
-4. `<module>/module.yaml` before editing module behavior
-5. module code and focused tests
-
-Use `docs/AGENT_CONTEXT_BUDGET.md` when context package selection, task-card
-limits, validation output compression, or resume discipline is unclear. Use the
-full architecture/spec read set only for control-plane, boundary, or release
-work.
-
-## Machine-Readable Agent Workflow
-
-The repository should expose enough machine-readable metadata that an agent can
-decide where to start, who owns a boundary, and what recipe to follow without
+The repository should expose enough metadata for an agent to route work without
 guessing.
 
 Required metadata lives under `specs/`:
 
-- `specs/task-routing.yaml`: task-to-entrypoint map, context package, and disallowed first reads
-- `specs/extension-taxonomy.yaml`: canonical extension families and subordinate roots
-- `specs/package-hotspots.yaml`: ambiguity hotspot packages and first-read paths
-- `specs/change-recipes/*.yaml`: standard task recipes for common change shapes
+- `specs/task-routing.yaml`
+- `specs/extension-taxonomy.yaml`
+- `specs/package-hotspots.yaml`
+- `specs/change-recipes/*.yaml`
 
-For extension families with subordinate roots, the taxonomy and hotspot index
-are an executable pair. The canonical family root and every subordinate root in
-`specs/extension-taxonomy.yaml` must have a bounded entry in
-`specs/package-hotspots.yaml`, and subordinate root manifests must declare the
-exact `parent_family`. This lets agents route through the family entrypoint
-before opening primitive packages such as queue, pub/sub, discovery, or cache
-implementations.
-
-Human-readable module primers live under `docs/modules/` and should mirror
-manifest-declared `doc_paths`.
-
-Module manifests are part of the control plane, not just package notes. Each
-`<module>/module.yaml` should declare:
+Each `<module>/module.yaml` should declare:
 
 - summary and strict boundary
 - responsibilities and non-goals
@@ -202,38 +148,31 @@ Module manifests are part of the control plane, not just package notes. Each
 - agent hints
 - doc paths
 
-Stable roots must declare a non-empty `strict_boundary` so agents and checks can
-distinguish kernel, router, contract, middleware, and other stable roles
-without inferring from package names alone.
+Stable roots should declare a non-empty `strict_boundary`.
 
-## Execution Loop
+## 10. Execution Loop
 
-The default agent loop is:
+1. Classify the owning layer and module.
+2. Select the smallest matching context package.
+3. Declare intended scope and touched files.
+4. Implement the smallest coherent change.
+5. Run module validation first, then boundary and repo checks.
+6. Report residual risks and docs-sync impact.
 
-1. classify the owning layer and module
-2. select the smallest matching context package from `docs/AGENT_CONTEXT_BUDGET.md`
-3. declare intended scope and touched files
-4. implement the smallest coherent change
-5. run module validation first, then boundary and repo checks
-6. report residual risks and doc sync needs
+If the owning module or context package remains unclear, stop in analysis mode.
 
-If step 1 or 2 leaves the owning module unclear, the agent should stop in
-analysis mode instead of coding through ambiguity.
+## 11. Extension Discovery Defaults
 
-## Extension Discovery Defaults
-
-Agents should prefer these entrypoints when multiple related `x/*` packages exist:
-
-- Start messaging-related work in `x/messaging`; open `x/messaging/mq` or `x/messaging/pubsub` only when you already know the task is a queue primitive or broker primitive.
-- Treat `x/messaging/webhook` as a messaging sub-capability by default; start directly in `x/messaging/webhook` only for narrow webhook verification or delivery mechanics.
+- Start messaging work in `x/messaging`; open `x/messaging/mq`, `x/messaging/pubsub`, or `x/messaging/webhook` only when the task is already narrow.
 - Start gateway and edge transport work in `x/gateway`; treat `x/gateway/ipc` as a narrow primitive.
-- Start reusable resource-interface and CRUD-standardization work in `x/rest`; keep bootstrap shape in `reference/standard-service` and edge proxy topology in `x/gateway`.
-- Start broader observability adapter and export work in `x/observability`; use `x/observability/ops` only for protected admin endpoints and auth-gated diagnostics surfaces.
-- Start reusable resilience primitives in `x/resilience`; do not park them under stable `security` or a feature package unless the behavior is truly feature-specific.
-- Start app-facing file upload and download transport work in `x/fileapi`; keep tenant-aware storage implementations in `x/data/file` and pure storage interfaces in `store/file`.
-- Start frontend asset-serving work in `x/frontend`, but do not let frontend helpers define the canonical app path.
-- Start local debug and developer-only route work in `x/observability/devtools`; do not treat debug surfaces as part of `core`.
-- Start service discovery work in `x/gateway/discovery`; do not spread discovery concerns across stable roots.
-- Start transport observability work in stable `middleware/*` packages; use `x/observability` only for higher-level adapter or export wiring.
-- Do not start new app structure from `x/rest`; prefer `reference/standard-service` and explicit route binding.
-- Treat `x/gateway/ipc` as a narrow transport helper, not the default home for general eventing or workflow features.
+- Start CRUD-standardization work in `x/rest`; keep bootstrap shape in `reference/standard-service`.
+- Start broader observability adapter and export work in `x/observability`; use `x/observability/ops` only for protected admin surfaces.
+- Start reusable resilience primitives in `x/resilience`.
+- Start file upload and download transport work in `x/fileapi`; keep tenant-aware storage in `x/data/file`.
+- Start frontend asset-serving work in `x/frontend`, not in the canonical app path.
+- Start local debug and developer-only route work in `x/observability/devtools`.
+- Start service discovery work in `x/gateway/discovery`.
+- Start transport observability work in stable `middleware/*`; use `x/observability` only for higher-level adapter or export wiring.
+- Start RPC transport work in `x/rpc`; narrow into `x/rpc/server`, `x/rpc/client`, or `x/rpc/gateway` only when the transport role is already known.
+- Start OpenAPI document generation work in `x/openapi`.
+- Start explicit request binding and validation bridge work in `x/validate`.
