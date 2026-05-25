@@ -37,18 +37,24 @@
 - keep one constructor path per middleware package; delete parallel wrapper families
 - keep stable middleware packages single-purpose; split unrelated transport behaviors into separate packages instead of umbrella buckets
 - new configurable middleware should prefer `Middleware(Config)` with
-  `Config.WithDefaults()` or `DefaultConfig()`; existing package-specific stable
-  constructors such as `compression.Middleware(Config)`,
-  `timeout.Middleware(Config)`, and
-  `debug.Middleware(Config)` remain the canonical public names for
-  those packages
-- if a stable package uses an exported `Config` or `Options` type without an exported default helper, document the exception and keep the defaulting local to the constructor; current intentional exceptions are `cors.CORSOptions`, `compression.Config`, and `timeout.Config`
+  `Config.WithDefaults()` or `DefaultConfig()`; stateful middleware may expose
+  `New(Config) *Type` with a `Middleware()` method when they own explicit
+  runtime lifecycle
+- intentional stable naming exceptions should be documented instead of treated
+  as drift; current exceptions are `auth.Authenticate(...)` /
+  `auth.Authorize(...)` for dependency-validating auth adapters,
+  `cors.StrictDefaultOptions(...)` for strict preset generation, and
+  `ratelimit.NewAbuseGuard(...).Middleware()` for lifecycle-owned rate
+  limiting
 - use `accesslog.Middleware(...)` as the canonical access-log constructor
 - add ordering and error-path tests
 - keep side effects explicit and local
 - keep tenant-aware policy, resolution, and quota behavior in `x/tenant`
 - keep auth and security-header transport adapters here, on top of `security/*` primitives
 - keep stable rate limiting here as a thin `middleware/ratelimit` HTTP adapter over `security/abuse`, not as a catalog of limiter implementations
+- if a task needs the reusable limiter primitive rather than the stable HTTP
+  adapter, route it to `x/resilience/ratelimit` instead of widening
+  `middleware/ratelimit`
 - rate limiting defaults must use the direct `RemoteAddr` peer IP; applications behind trusted proxies can opt into `X-Forwarded-For`/`X-Real-IP` by supplying an explicit `ratelimit.AbuseGuardConfig.KeyFunc`
 - if a custom rate-limit `KeyFunc` returns an empty or all-whitespace key,
   `AbuseGuard` falls back to the direct `RemoteAddr` peer IP instead of sharing

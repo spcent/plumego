@@ -4,7 +4,7 @@ Milestone: M-022
 Recipe: specs/change-recipes/fix-bug.yaml
 Context Package: implementation
 Priority: P2
-State: active
+State: done
 Primary Module: middleware
 Owned Files:
 - `middleware/module.yaml`
@@ -47,10 +47,17 @@ Validation:
 - `gofmt -l .`
 
 Done Definition:
-- [ ] Acceptance Tests pass.
-- [ ] All Validation commands exit 0.
-- [ ] gofmt -l . produces no output.
-- [ ] Docs Sync targets updated (if applicable).
+- [x] Acceptance Tests pass.
+- [x] All Validation commands exit 0.
+- [x] gofmt -l . produces no output.
+- [x] Docs Sync targets updated (if applicable).
 
 Outcome:
-<!-- Agent fills this after completion: what changed and why. -->
+- Clarified that stable HTTP rate limiting belongs to `middleware/ratelimit`
+  while reusable limiter primitives belong to `x/resilience/ratelimit`.
+- Documented the intentional constructor naming exceptions for `auth`,
+  `cors.StrictDefaultOptions`, and `ratelimit.NewAbuseGuard(...).Middleware()`.
+- Validation:
+  - `go run ./internal/checks/module-manifests`
+  - `go run ./internal/checks/agent-workflow`
+  - `gofmt -l .`
