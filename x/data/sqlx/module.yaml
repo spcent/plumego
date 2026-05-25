@@ -26,6 +26,14 @@ non_goals:
   - Live database test dependency
   - Stable store/db interface changes
 
+public_entrypoints:
+  - Querier
+  - Transactor
+  - Tx
+  - DB
+  - New
+  - NewWithDB
+
 allowed_imports:
   - stdlib
   - store/db
