@@ -27,6 +27,12 @@ non_goals:
   - ORM behavior
   - Stable store/db interface changes
 
+public_entrypoints:
+  - Runner
+  - Migrator
+  - MigrationStatus
+  - New
+
 allowed_imports:
   - stdlib
 

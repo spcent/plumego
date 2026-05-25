@@ -49,13 +49,23 @@ public_entrypoints:
   - (*App).Delete
   - (*App).Patch
   - (*App).Any
+  - (*App).Group
   - (*App).PreparationState
   - (*App).URL
   - (*App).Routes
   - (*App).Logger
+  - (*App).Run
   - (*App).Prepare
   - (*App).Server
   - (*App).Shutdown
+  - RouteGroup
+  - (*RouteGroup).Group
+  - (*RouteGroup).Get
+  - (*RouteGroup).Post
+  - (*RouteGroup).Put
+  - (*RouteGroup).Delete
+  - (*RouteGroup).Patch
+  - (*RouteGroup).AddRoute
 
 allowed_imports:
   - contract
@@ -65,13 +75,6 @@ allowed_imports:
 
 forbidden_imports:
   - x/**
-  - tenant/**
-  - x/ai/**
-  - net/**
-  - pubsub/**
-  - rest/**
-  - validator/**
-  - utils/**
   - store/db
   - store/cache
   - store/file

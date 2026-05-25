@@ -13,6 +13,12 @@ type Service struct {
 	store  platformstore.QueryStore
 }
 
+// NewService wires the app-layer workerfleet service.
+//
+// Some methods still return ErrNotImplemented when the current reference
+// profile does not wire the required ingest, query, or case-step dependency.
+// These "not implemented" paths are WIP dependency guards, not a claim that
+// the whole workerfleet service is absent.
 func NewService(ingest *domain.IngestService, store platformstore.QueryStore) *Service {
 	return &Service{
 		ingest: ingest,

@@ -19,13 +19,28 @@ non_goals:
   - Stable root entrypoints
   - Business workflow orchestration
 
+public_entrypoints:
+  - Scheduler
+  - New
+  - AdminHandler
+  - NewAdminHandler
+  - MemoryStore
+  - NewMemoryStore
+  - KVStore
+  - NewKVStore
+  - JobID
+  - TaskFunc
+  - ParseCronSpec
+  - ParseCronSpecWithLocation
+  - RetryFixed
+  - RetryExponential
+
 allowed_imports:
   - log
   - metrics
   - store
 
 forbidden_imports:
-  - core/components/**
   - x/tenant/**
   - x/ai/**
 

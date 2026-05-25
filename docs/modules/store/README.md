@@ -96,10 +96,16 @@
   `SetContext`, `DeleteContext`, and read-only context helpers when
   cancellation must be observed before the filesystem write boundary.
 - `store/kv` uses package name `kv`; examples may alias the import as `kvstore` only to avoid local name collisions.
+- `store/kv.DefaultOptions(dataDir)` is the public helper for the current
+  embedded defaults while keeping `DataDir` explicit; callers can start from it
+  and then override limits as needed.
 - `NewKVStore` requires an explicit `Options.DataDir` and returns a validation
   error for invalid options; it must not silently write to the process working
   directory.
-- Default capacity is intentionally small for embedded state files: 4096 entries and 32 MiB. Callers needing larger datasets should use `x/data/kvengine` or pass explicit limits after measuring.
+- Default capacity for the embedded state file helper is 100000 entries and
+  200 MiB. Callers needing different bounds should pass explicit limits after
+  measuring, and callers needing durable-engine tuning should use
+  `x/data/kvengine`.
 - `store/kv` uses a single JSON state file replaced with `os.Rename`; each mutation rewrites the full normalized state and is O(N) in the number of retained entries.
 - Invalid keys in the persisted state file fail load with an `ErrInvalidKey`-wrapped error instead of being silently dropped.
 - `store/kv` does not provide cross-process locking, WAL, snapshots, directory fsync, or crash-recovery tuning.

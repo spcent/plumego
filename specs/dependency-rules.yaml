@@ -489,10 +489,10 @@ modules:
     layer: extension
     allow:
       - stdlib
+      - contract
     deny:
       - core/**
       - router/**
-      - contract/**
       - middleware/**
       - security/**
       - store/**

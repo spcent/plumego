@@ -47,6 +47,7 @@ Update this file when you add, complete, or reorder milestones.
 | M-019 | Module Ecosystem Foundation | [✓] | M-017 | Archived; community extension schema, plumego add command, authoring guide |
 | M-020 | Community Discovery & Documentation Overhaul | [✓] | M-008 | Archived; README overhaul, stdlib comparison table, stable root pkg.go.dev doc comments |
 | M-021 | Agent-First Ecosystem Visibility | [✓] | M-019 | Archived; docs/AGENT_FIRST.md, quality-gates workflow updates, README agent-first section |
+| M-022 | Repo Surface Audit Remediation | [→] | — | Implementation complete locally with verify artifact; awaiting push and PR packaging before merge |
 
 ---
 
@@ -77,6 +78,8 @@ M-005 ──► M-006 ──► M-007 ──► M-008 ──► M-009 ──► 
                                ├──► M-012   M-010 ──► M-018
                                ├──► M-013
                                └──► M-020
+
+M-022 (independent)
 ```
 
 ---

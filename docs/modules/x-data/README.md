@@ -75,6 +75,13 @@ go run ./internal/checks/reference-layout
 - the owning subpackage under `x/data/*`
 - `specs/repo.yaml`
 
+Manifest convention for this family:
+
+- root `x/data/module.yaml` lists importable subordinate packages such as
+  `sharding`, `rw`, `migrate`, `pgx`, and `sqlx`
+- subordinate package manifests list their concrete exported types and
+  constructors
+
 ---
 
 ## Submodules

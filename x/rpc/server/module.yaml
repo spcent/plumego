@@ -28,6 +28,15 @@ non_goals:
   - Business-specific RPC services
   - HTTP route ownership
 
+public_entrypoints:
+  - ErrRuntimeNil
+  - Runtime
+  - Server
+  - New
+  - (*Server).RegisterService
+  - (*Server).Serve
+  - (*Server).GracefulStop
+
 allowed_imports:
   - stdlib
   - x/observability

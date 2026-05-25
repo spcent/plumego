@@ -11,16 +11,16 @@ import (
 )
 
 func TestNewHS256TokenAuthRejectsWeakSecret(t *testing.T) {
-	if _, err := NewHS256TokenAuth([]byte("short")); !errors.Is(err, ErrWeakJWTSecret) {
-		t.Fatalf("NewHS256TokenAuth error = %v, want ErrWeakJWTSecret", err)
+	if _, err := NewSimpleHS256TokenAuth([]byte("short")); !errors.Is(err, ErrWeakJWTSecret) {
+		t.Fatalf("NewSimpleHS256TokenAuth error = %v, want ErrWeakJWTSecret", err)
 	}
 }
 
 func TestHS256TokenAuthRejectsMalformedExp(t *testing.T) {
 	secret := []byte("0123456789abcdef0123456789abcdef")
-	tokenAuth, err := NewHS256TokenAuth(secret)
+	tokenAuth, err := NewSimpleHS256TokenAuth(secret)
 	if err != nil {
-		t.Fatalf("NewHS256TokenAuth: %v", err)
+		t.Fatalf("NewSimpleHS256TokenAuth: %v", err)
 	}
 
 	tests := []struct {
@@ -34,9 +34,9 @@ func TestHS256TokenAuthRejectsMalformedExp(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := tokenAuth.AuthenticateToken(signHS256TestToken(secret, tc.payload))
+			_, err := tokenAuth.VerifyJWT(signHS256TestToken(secret, tc.payload))
 			if !errors.Is(err, ErrInvalidToken) {
-				t.Fatalf("AuthenticateToken error = %v, want ErrInvalidToken", err)
+				t.Fatalf("VerifyJWT error = %v, want ErrInvalidToken", err)
 			}
 		})
 	}
@@ -44,14 +44,14 @@ func TestHS256TokenAuthRejectsMalformedExp(t *testing.T) {
 
 func TestHS256TokenAuthAcceptsIntegerExp(t *testing.T) {
 	secret := []byte("0123456789abcdef0123456789abcdef")
-	tokenAuth, err := NewHS256TokenAuth(secret)
+	tokenAuth, err := NewSimpleHS256TokenAuth(secret)
 	if err != nil {
-		t.Fatalf("NewHS256TokenAuth: %v", err)
+		t.Fatalf("NewSimpleHS256TokenAuth: %v", err)
 	}
 
 	payload := `{"sub":"user1","exp":` + itoaUnix(time.Now().Add(time.Minute).Unix()) + `}`
-	if _, err := tokenAuth.AuthenticateToken(signHS256TestToken(secret, payload)); err != nil {
-		t.Fatalf("AuthenticateToken error = %v", err)
+	if _, err := tokenAuth.VerifyJWT(signHS256TestToken(secret, payload)); err != nil {
+		t.Fatalf("VerifyJWT error = %v", err)
 	}
 }
 

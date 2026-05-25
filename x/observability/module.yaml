@@ -33,6 +33,33 @@ non_goals:
   - Business metrics policy
   - Transport-only middleware primitives
 
+public_entrypoints:
+  - ObservabilityConfig
+  - DefaultObservabilityConfig
+  - MetricsConfig
+  - DefaultMetricsConfig
+  - TracingConfig
+  - DefaultTracingConfig
+  - Hooks
+  - Configure
+  - PrometheusCollector
+  - NewPrometheusCollector
+  - PrometheusExporter
+  - NewPrometheusExporter
+  - NewPrometheusExporterE
+  - OpenTelemetryTracer
+  - NewOpenTelemetryTracer
+  - Exporter
+  - ops
+  - devtools
+  - recordbuffer
+  - windowmetrics
+  - testmetrics
+  - testlog
+  - featuremetrics
+  - dbinsights
+  - tracer
+
 allowed_imports:
   - contract
   - log
@@ -41,7 +68,6 @@ allowed_imports:
   - store
 
 forbidden_imports:
-  - core/components/**
   - x/tenant/**
   - x/ai/**
 

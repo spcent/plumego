@@ -20,6 +20,21 @@ non_goals:
   - Production admin policy
   - Stable root entrypoints
 
+public_entrypoints:
+  - DevToolsBasePath
+  - DevTools
+  - New
+  - Options
+  - Hooks
+  - ConfigSnapshot
+  - RuntimeSnapshot
+  - TLSSnapshot
+  - DevCollector
+  - NewDevCollector
+  - DevCollectorConfig
+  - DefaultDevCollectorConfig
+  - pubsubdebug
+
 allowed_imports:
   - contract
   - health
@@ -29,7 +44,6 @@ allowed_imports:
   - router
 
 forbidden_imports:
-  - core/components/**
   - x/tenant/**
   - x/ai/**
 

@@ -27,6 +27,20 @@ non_goals:
   - Live database test dependency
   - Stable store/db interface changes
 
+public_entrypoints:
+  - ErrPoolNil
+  - Row
+  - Rows
+  - CommandTag
+  - TxOptions
+  - Querier
+  - Transactor
+  - Tx
+  - Pool
+  - DB
+  - New
+  - NewWithPool
+
 allowed_imports:
   - stdlib
   - store/db

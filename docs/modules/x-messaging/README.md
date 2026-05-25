@@ -79,6 +79,12 @@ closed when `EnableMQTT` or `EnableAMQP` is true, wrapping
 `ErrNotImplemented`. `StartMQTTServer` and `StartAMQPServer` remain
 compatibility stubs only.
 
+`EnableMQTT`, `MQTTPort`, `EnableAMQP`, and `AMQPPort` are deprecated
+compatibility placeholders. They do not enable a partial bridge mode, and the
+port fields have no effect while protocol support is unavailable. Leave them
+disabled for v1 and prefer direct `x/messaging/pubsub` integration unless a
+future card lands a real bridge implementation.
+
 Validate narrow queue work with:
 
 - `go test -race -timeout 60s ./x/messaging/mq/...`

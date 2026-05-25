@@ -28,13 +28,22 @@ non_goals:
   - Edge gateway proxy ownership
   - Core app bootstrap ownership
 
+public_entrypoints:
+  - HandlerFunc
+  - Option
+  - HTTPTranscoder
+  - New
+  - (*HTTPTranscoder).Register
+  - (*HTTPTranscoder).Handler
+  - (*HTTPTranscoder).Target
+
 allowed_imports:
   - stdlib
+  - contract
 
 forbidden_imports:
   - core/**
   - router/**
-  - contract/**
   - middleware/**
   - security/**
   - store/**

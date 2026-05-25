@@ -69,7 +69,8 @@ public_entrypoints:
   - TraceContext.HasTraceID
   - TraceContext.HasSpanID
   - TraceContext.Valid
-  - Err* transport sentinel errors
+  - ErrHandlerNil
+  - ErrResponseWriterNil
   - ErrInvalidResponseStatus
 
 public_surface_stability:
@@ -109,7 +110,8 @@ public_surface_stability:
     - HeaderContentType
     - ContentTypeJSON
     - RequestIDHeader
-    - Err* transport sentinel errors
+    - ErrHandlerNil
+    - ErrResponseWriterNil
     - ErrInvalidResponseStatus
   future_breaking_only:
     - Removing TraceContext as the lightweight context carrier

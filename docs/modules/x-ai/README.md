@@ -97,7 +97,13 @@ packages remain AI-provider-specific compatibility primitives used by
 `x/ai/resilience`.
 
 New cross-family resilience work should start in `x/resilience`. New AI provider
-wrapping may use `x/ai/resilience`, but dynamic composition should prefer
+wrapping should still use `x/ai/resilience`, but the first migration slice now
+lets `NewResilientProviderE` compose directly with
+`x/resilience/circuitbreaker.CircuitBreaker` and
+`x/resilience/ratelimit.KeyedBuckets` through explicit `Shared*` config fields.
+Keep the older `RateLimiter` and `CircuitBreaker` fields only for existing
+AI-local compatibility callers, and do not configure both compatibility and
+shared primitives in the same `Config`. Dynamic composition should prefer
 `NewResilientProviderE` so invalid provider wiring returns an error instead of
 panicking. `x/ai/ratelimit.TokenBucketLimiter` owns a cleanup goroutine only when
 constructed with a cleanup interval, and callers should call `Close` when that
@@ -110,6 +116,37 @@ public types between `x/ai/*` and `x/resilience` inline with feature work.
 new generic breaker or limiter algorithms belong in `x/resilience`, while
 AI-provider wrapping, fallback, request keying, and AI error classification stay
 in `x/ai/resilience`.
+
+## Metrics collector relationship
+
+Stable `metrics` remains the canonical small collector contract for cross-module
+recording. `x/ai/metrics` still owns AI-local conveniences such as `Tag`,
+`TagsE`, `MemoryCollector`, and the minimal Prometheus text exporter used by AI
+instrumentation tests and examples.
+
+When AI instrumentation should publish into the stable collector surface, prefer
+`x/ai/metrics.NewAggregateCollectorAdapter(...)` with a stable
+`metrics.AggregateCollector`. The adapter records AI counter, gauge, histogram,
+and timing calls as stable `MetricRecord` events. It intentionally does not add
+a second stable metric-kind contract; keep metric names distinct when different
+semantic series would otherwise share the same name.
+
+## Compatibility panic wrappers
+
+Several `x/ai` packages still expose panic-based compatibility helpers while the
+family remains experimental or while stable-tier callers migrate gradually:
+
+- `provider.Manager.Register` and `streaming.StreamManager.Register` remain only
+  for trusted in-code wiring. Prefer `RegisterE` for config-driven, plugin, or
+  user-provided registration.
+- `resilience.NewResilientProvider` and
+  `semanticcache.NewSemanticCachingProvider` are deprecated panic shims. Prefer
+  `NewResilientProviderE` and `NewSemanticCachingProviderE`.
+- `metrics.Tags` remains only for trusted static key-value pairs. Prefer
+  `metrics.TagsE` whenever tag input is built dynamically.
+
+These wrappers are tracked in `specs/deprecation-inventory.yaml` and should be
+removed when their remaining compatibility callers are migrated.
 
 ## Streaming error contract
 

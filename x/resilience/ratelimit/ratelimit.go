@@ -66,6 +66,17 @@ func (b *TokenBucket) AllowN(n int64) bool {
 	return true
 }
 
+// Remaining reports the whole-token capacity currently available.
+func (b *TokenBucket) Remaining() int64 {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.replenish(time.Now())
+	if b.tokens <= 0 {
+		return 0
+	}
+	return int64(b.tokens)
+}
+
 // Wait blocks until one token is available or ctx is cancelled.
 func (b *TokenBucket) Wait(ctx context.Context) error {
 	return b.WaitN(ctx, 1)
@@ -142,6 +153,11 @@ func (k *KeyedBuckets) Allow(key string) bool {
 // AllowN reports whether n tokens are available for the given key, consuming them if so.
 func (k *KeyedBuckets) AllowN(key string, n int64) bool {
 	return k.bucket(key).AllowN(n)
+}
+
+// Remaining reports the whole-token capacity currently available for the key.
+func (k *KeyedBuckets) Remaining(key string) int {
+	return int(k.bucket(key).Remaining())
 }
 
 // Wait blocks until one token is available for the given key or ctx is cancelled.

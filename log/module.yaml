@@ -30,6 +30,13 @@ non_goals:
   - Structured log aggregation or export backends (belong in x/observability)
 
 public_entrypoints:
+  - Level
+  - Fields
+  - LoggerFormat
+  - LoggerFormatText
+  - LoggerFormatJSON
+  - LoggerFormatDiscard
+  - LoggerConfig
   - StructuredLogger
   - NewLogger
 

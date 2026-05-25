@@ -18,13 +18,34 @@ non_goals:
   - Stable root entrypoints
   - Tenant policy orchestration
 
+public_entrypoints:
+  - ErrServiceNotFound
+  - ErrNoInstances
+  - ErrInvalidConfig
+  - Discovery
+  - Instance
+  - Instance.URL
+  - HealthChecker
+  - Watcher
+  - ServiceUpdate
+  - Static
+  - NewStatic
+  - Consul
+  - ConsulConfig
+  - NewConsul
+  - Etcd
+  - EtcdConfig
+  - NewEtcd
+  - Kubernetes
+  - KubernetesConfig
+  - NewKubernetes
+
 allowed_imports:
   - contract
   - log
   - metrics
 
 forbidden_imports:
-  - core/components/**
   - x/tenant/**
   - x/ai/**
 

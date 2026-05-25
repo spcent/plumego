@@ -5,6 +5,18 @@ It is not the canonical v1 reference application and is not a reusable stable
 surface for Plumego applications. Use `reference/standard-service` for v1
 application structure, route wiring, and stable-root-only onboarding.
 
+Current status:
+
+- workerfleet is a work-in-progress reference, not a production-readiness claim
+- worker ingress, heartbeats, list/detail queries, fleet summary, alerts, and
+  history-backed drilldown paths are implemented when their backing runtime
+  dependencies are wired
+- some app service methods still return `workerapp.ErrNotImplemented` when the
+  current reference profile omits the required ingest, query, or case-step
+  dependency
+- treat the app as a partial reference for worker monitoring ideas, not as the
+  canonical template or a fully complete operations product
+
 Submodule boundary:
 
 - `reference/workerfleet` builds as the `workerfleet` Go module

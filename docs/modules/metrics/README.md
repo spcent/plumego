@@ -54,6 +54,9 @@ other modules can depend on safely.
 - keep metrics test helpers in `x/observability/testmetrics`
 - keep dev-only collectors in `x/observability/devtools`
 - keep feature-specific metrics ownership in the owning extension
+- when an extension already owns a richer metrics facade, bridge it into stable
+  `AggregateCollector` with an explicit adapter instead of widening stable
+  contracts; `x/ai/metrics.NewAggregateCollectorAdapter` is the reference path
 
 ## Stable behavior notes
 
@@ -73,3 +76,7 @@ other modules can depend on safely.
   return initialized empty stats.
 - Multi collectors sum child-maintained active series; if a child omits active
   series but returns a name breakdown, the child breakdown size is used.
+- `x/ai/metrics.NewAggregateCollectorAdapter(...)` lets AI instrumentation emit
+  into the stable collector contract by translating AI metric calls into stable
+  `MetricRecord` events; metric kind is not preserved as a separate stable field,
+  so callers should keep names distinct when they need different semantic series.

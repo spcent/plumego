@@ -19,6 +19,24 @@ non_goals:
   - Stable root entrypoints
   - Tenant bootstrap policy
 
+public_entrypoints:
+  - DefaultBasePath
+  - Handler
+  - New
+  - Options
+  - Hooks
+  - AuthConfig
+  - RouteRegistrar
+  - QueueStats
+  - QueueReplayRequest
+  - QueueReplayResult
+  - ReceiptRecord
+  - TenantQuotaSnapshot
+  - QuotaLimit
+  - QuotaUsage
+  - ChannelHealth
+  - healthhttp
+
 allowed_imports:
   - contract
   - health
@@ -28,7 +46,6 @@ allowed_imports:
   - router
 
 forbidden_imports:
-  - core/components/**
   - x/tenant/**
   - x/ai/**
 

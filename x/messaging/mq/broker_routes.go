@@ -94,6 +94,10 @@ func (b *InProcBroker) SubscribeFromCluster(ctx context.Context, topic string, o
 
 // StartMQTTServer is not implemented. MQTT protocol bridging is planned but
 // not yet available. Callers should not set EnableMQTT in Config.
+//
+// Deprecated: this compatibility stub always returns ErrNotImplemented. Prefer
+// direct x/messaging/pubsub integration until a real protocol bridge lands or
+// the stub is removed.
 func (b *InProcBroker) StartMQTTServer() error {
 	if b == nil {
 		return ErrNotInitialized
@@ -103,6 +107,10 @@ func (b *InProcBroker) StartMQTTServer() error {
 
 // StartAMQPServer is not implemented. AMQP protocol bridging is planned but
 // not yet available. Callers should not set EnableAMQP in Config.
+//
+// Deprecated: this compatibility stub always returns ErrNotImplemented. Prefer
+// direct x/messaging/pubsub integration until a real protocol bridge lands or
+// the stub is removed.
 func (b *InProcBroker) StartAMQPServer() error {
 	if b == nil {
 		return ErrNotInitialized

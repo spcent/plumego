@@ -78,10 +78,9 @@ entries:
     category: public_alias
     status: keep
     owner: realtime
-    decision: Keep as experimental x/websocket compatibility aliases after merging origin/main so existing callers and release-branch tests can use either naming family while x/websocket remains outside stable-root v1.
-    replacement: NewSimpleHS256TokenAuth, VerifyJWT, ReadMessageReader, and NewHubWithConfigE
+    decision: Keep only the websocket aliases that still have live compatibility callers. The auth aliases were removed once their last repo callers migrated.
+    replacement: ReadMessageReader and NewHubWithConfigE
     paths:
-      - x/websocket/auth.go
       - x/websocket/hub.go
       - x/websocket/stream.go
 
@@ -107,7 +106,7 @@ entries:
     category: reference_placeholder
     status: keep
     owner: reference
-    decision: Keep outside the v1 stable release surface. Workerfleet is not the canonical reference app and remains a non-blocking reference placeholder.
+    decision: Keep outside the v1 stable release surface. Workerfleet is a partial WIP reference, and worker registration still returns ErrNotImplemented when the reference profile does not wire ingest dependencies.
     replacement: implemented worker registration flow
     paths:
       - reference/workerfleet/internal/handler/worker_register.go
@@ -125,10 +124,11 @@ entries:
     category: reference_placeholder
     status: keep
     owner: reference
-    decision: Workerfleet app-layer not-implemented and detail-view alias markers remain outside the stable-root v1 surface while the reference evolves through its own active cards.
+    decision: Workerfleet app-layer ErrNotImplemented markers are dependency-gated WIP behavior, not proof that the entire service is absent. Keep them outside the stable-root v1 surface while the reference fills in the remaining ingest/query/case-step wiring.
     replacement: implemented workerfleet app behavior and direct view types
     paths:
       - reference/workerfleet/internal/app/types.go
+      - reference/workerfleet/internal/app/service.go
 
   - id: x-devtools-removed-legacy-alias-regression
     category: regression_test
@@ -174,6 +174,35 @@ entries:
     replacement: provider.Role
     paths:
       - x/ai/multimodal/types.go
+
+  - id: x-ai-stable-register-panic-wrappers
+    category: compatibility_behavior
+    status: keep
+    owner: ai-gateway
+    decision: Keep temporarily for stable-tier caller migration only. Dynamic or user-provided registration must use the E-variants.
+    replacement: provider.Manager.RegisterE and streaming.StreamManager.RegisterE
+    paths:
+      - x/ai/provider/manager.go
+      - x/ai/streaming/streaming.go
+
+  - id: x-ai-experimental-constructor-panic-wrappers
+    category: compatibility_behavior
+    status: keep
+    owner: ai-gateway
+    decision: Keep temporarily while experimental x/ai callers migrate. Prefer the E-variants and remove these shims once compatibility callers are gone.
+    replacement: resilience.NewResilientProviderE and semanticcache.NewSemanticCachingProviderE
+    paths:
+      - x/ai/resilience/provider.go
+      - x/ai/semanticcache/provider.go
+
+  - id: x-ai-metrics-tags-panic-helper
+    category: compatibility_behavior
+    status: keep
+    owner: ai-gateway
+    decision: Keep as a trusted static-call helper only. Dynamic tag input must use TagsE so malformed pairs return an error instead of panicking.
+    replacement: x/ai/metrics.TagsE
+    paths:
+      - x/ai/metrics/metrics.go
 
   - id: x-data-idempotency-stable-contract-reexports
     category: public_alias
@@ -225,7 +254,7 @@ entries:
     category: unsupported_operation
     status: keep
     owner: messaging
-    decision: Keep as explicit unsupported experimental behavior. MQTT and AMQP bridge configuration fails closed and remains documented as unavailable in v1.
+    decision: Keep only as deprecated experimental compatibility placeholders. MQTT and AMQP bridge configuration fails closed today, should stay disabled in v1 callers, and should be removed in the next API cleanup unless a real bridge implementation lands.
     replacement: implemented protocol bridge or removed config surface
     paths:
       - x/messaging/mq/broker_routes.go

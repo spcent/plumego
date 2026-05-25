@@ -8,10 +8,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
-	"github.com/spcent/plumego/x/ai/circuitbreaker"
+	aicircuitbreaker "github.com/spcent/plumego/x/ai/circuitbreaker"
 	"github.com/spcent/plumego/x/ai/provider"
-	"github.com/spcent/plumego/x/ai/ratelimit"
+	airatelimit "github.com/spcent/plumego/x/ai/ratelimit"
+	sharedcircuitbreaker "github.com/spcent/plumego/x/resilience/circuitbreaker"
+	sharedratelimit "github.com/spcent/plumego/x/resilience/ratelimit"
 )
 
 var (
@@ -21,24 +24,49 @@ var (
 
 	// ErrNilRequest is returned when a provider request is nil.
 	ErrNilRequest = errors.New("ai resilience: completion request cannot be nil")
+
+	// ErrMultipleRateLimiters is returned when both compatibility and shared
+	// rate limiters are configured at once.
+	ErrMultipleRateLimiters = errors.New("ai resilience: configure either RateLimiter or SharedRateLimiter, not both")
+
+	// ErrMultipleCircuitBreakers is returned when both compatibility and shared
+	// circuit breakers are configured at once.
+	ErrMultipleCircuitBreakers = errors.New("ai resilience: configure either CircuitBreaker or SharedCircuitBreaker, not both")
 )
 
 // ResilientProvider wraps a provider with rate limiting and circuit breaking.
 type ResilientProvider struct {
 	provider       provider.Provider
-	rateLimiter    ratelimit.RateLimiter
-	circuitBreaker *circuitbreaker.CircuitBreaker
+	rateLimiter    rateLimiter
+	circuitBreaker circuitBreaker
 	name           string
 }
 
 // Config configures a resilient provider.
 type Config struct {
-	Provider       provider.Provider
-	RateLimiter    ratelimit.RateLimiter
-	CircuitBreaker *circuitbreaker.CircuitBreaker
+	Provider             provider.Provider
+	RateLimiter          airatelimit.RateLimiter
+	CircuitBreaker       *aicircuitbreaker.CircuitBreaker
+	SharedRateLimiter    *sharedratelimit.KeyedBuckets
+	SharedCircuitBreaker *sharedcircuitbreaker.CircuitBreaker
+}
+
+type rateLimiter interface {
+	Allow(ctx context.Context, key string) (bool, error)
+	Remaining(ctx context.Context, key string) (int, error)
+}
+
+type circuitBreaker interface {
+	Name() string
+	ExecuteWithContext(ctx context.Context, fn func(context.Context) error) error
+	State() aicircuitbreaker.State
+	Stats() aicircuitbreaker.Stats
 }
 
 // NewResilientProvider creates a new resilient provider.
+//
+// Deprecated: use NewResilientProviderE so invalid resilience composition
+// returns an error instead of panicking.
 func NewResilientProvider(config Config) *ResilientProvider {
 	resilient, err := NewResilientProviderE(config)
 	if err != nil {
@@ -54,17 +82,49 @@ func NewResilientProviderE(config Config) (*ResilientProvider, error) {
 		return nil, ErrNilProvider
 	}
 
+	limiter, err := resolveRateLimiter(config)
+	if err != nil {
+		return nil, err
+	}
+	breaker, err := resolveCircuitBreaker(config)
+	if err != nil {
+		return nil, err
+	}
+
 	name := config.Provider.Name()
-	if config.CircuitBreaker != nil {
-		name = config.CircuitBreaker.Name()
+	if breaker != nil {
+		name = breaker.Name()
 	}
 
 	return &ResilientProvider{
 		provider:       config.Provider,
-		rateLimiter:    config.RateLimiter,
-		circuitBreaker: config.CircuitBreaker,
+		rateLimiter:    limiter,
+		circuitBreaker: breaker,
 		name:           name,
 	}, nil
+}
+
+func resolveRateLimiter(config Config) (rateLimiter, error) {
+	if config.RateLimiter != nil && config.SharedRateLimiter != nil {
+		return nil, ErrMultipleRateLimiters
+	}
+	if config.SharedRateLimiter != nil {
+		return sharedRateLimiterAdapter{inner: config.SharedRateLimiter}, nil
+	}
+	return config.RateLimiter, nil
+}
+
+func resolveCircuitBreaker(config Config) (circuitBreaker, error) {
+	if config.CircuitBreaker != nil && config.SharedCircuitBreaker != nil {
+		return nil, ErrMultipleCircuitBreakers
+	}
+	if config.SharedCircuitBreaker != nil {
+		return sharedCircuitBreakerAdapter{inner: config.SharedCircuitBreaker}, nil
+	}
+	if config.CircuitBreaker == nil {
+		return nil, nil
+	}
+	return config.CircuitBreaker, nil
 }
 
 // Name implements provider.Provider
@@ -88,7 +148,7 @@ func (rp *ResilientProvider) Complete(ctx context.Context, req *provider.Complet
 			return nil, fmt.Errorf("rate limiter error: %w", err)
 		}
 		if !allowed {
-			return nil, ratelimit.ErrRateLimitExceeded
+			return nil, airatelimit.ErrRateLimitExceeded
 		}
 	}
 
@@ -126,7 +186,7 @@ func (rp *ResilientProvider) CompleteStream(ctx context.Context, req *provider.C
 			return nil, fmt.Errorf("rate limiter error: %w", err)
 		}
 		if !allowed {
-			return nil, ratelimit.ErrRateLimitExceeded
+			return nil, airatelimit.ErrRateLimitExceeded
 		}
 	}
 
@@ -230,21 +290,21 @@ func (rp *ResilientProvider) getRateLimitKey(req *provider.CompletionRequest) st
 }
 
 // CircuitBreakerState returns the current circuit breaker state
-func (rp *ResilientProvider) CircuitBreakerState() circuitbreaker.State {
+func (rp *ResilientProvider) CircuitBreakerState() aicircuitbreaker.State {
 	if rp.circuitBreaker != nil {
 		return rp.circuitBreaker.State()
 	}
-	return circuitbreaker.StateClosed
+	return aicircuitbreaker.StateClosed
 }
 
 // CircuitBreakerStats returns circuit breaker statistics
-func (rp *ResilientProvider) CircuitBreakerStats() circuitbreaker.Stats {
+func (rp *ResilientProvider) CircuitBreakerStats() aicircuitbreaker.Stats {
 	if rp.circuitBreaker != nil {
 		return rp.circuitBreaker.Stats()
 	}
-	return circuitbreaker.Stats{
+	return aicircuitbreaker.Stats{
 		Name:  rp.name,
-		State: circuitbreaker.StateClosed,
+		State: aicircuitbreaker.StateClosed,
 	}
 }
 
@@ -258,4 +318,73 @@ func (rp *ResilientProvider) RateLimitRemaining(ctx context.Context, model strin
 		return rp.rateLimiter.Remaining(ctx, key)
 	}
 	return -1, nil // No limit
+}
+
+type sharedRateLimiterAdapter struct {
+	inner *sharedratelimit.KeyedBuckets
+}
+
+func (a sharedRateLimiterAdapter) Allow(ctx context.Context, key string) (bool, error) {
+	if err := ctx.Err(); err != nil {
+		return false, err
+	}
+	return a.inner.Allow(key), nil
+}
+
+func (a sharedRateLimiterAdapter) Remaining(ctx context.Context, key string) (int, error) {
+	if err := ctx.Err(); err != nil {
+		return 0, err
+	}
+	return a.inner.Remaining(key), nil
+}
+
+type sharedCircuitBreakerAdapter struct {
+	inner *sharedcircuitbreaker.CircuitBreaker
+}
+
+func (a sharedCircuitBreakerAdapter) Name() string {
+	return a.inner.Name()
+}
+
+func (a sharedCircuitBreakerAdapter) ExecuteWithContext(ctx context.Context, fn func(context.Context) error) error {
+	err := a.inner.CallWithContext(ctx, func() error {
+		return fn(ctx)
+	})
+	if errors.Is(err, sharedcircuitbreaker.ErrCircuitOpen) {
+		return aicircuitbreaker.ErrCircuitBreakerOpen
+	}
+	return err
+}
+
+func (a sharedCircuitBreakerAdapter) State() aicircuitbreaker.State {
+	return toAICircuitState(a.inner.State())
+}
+
+func (a sharedCircuitBreakerAdapter) Stats() aicircuitbreaker.Stats {
+	stats := a.inner.Stats()
+	lastFailTime := time.Time{}
+	if stats.State == sharedcircuitbreaker.StateOpen {
+		lastFailTime = stats.StateChanged
+	}
+	return aicircuitbreaker.Stats{
+		Name:            stats.Name,
+		State:           toAICircuitState(stats.State),
+		Failures:        int(stats.Counts.Failures),
+		Successes:       int(stats.Counts.Successes),
+		LastFailTime:    lastFailTime,
+		LastStateChange: stats.StateChanged,
+	}
+}
+
+func toAICircuitState(state sharedcircuitbreaker.State) aicircuitbreaker.State {
+	switch state {
+	case sharedcircuitbreaker.StateClosed:
+		return aicircuitbreaker.StateClosed
+	case sharedcircuitbreaker.StateOpen:
+		return aicircuitbreaker.StateOpen
+	case sharedcircuitbreaker.StateHalfOpen:
+		return aicircuitbreaker.StateHalfOpen
+	default:
+		return aicircuitbreaker.StateClosed
+	}
 }

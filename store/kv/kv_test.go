@@ -371,6 +371,20 @@ func TestValidateOptionsErrorsAreNamespaced(t *testing.T) {
 	}
 }
 
+func TestDefaultOptions(t *testing.T) {
+	opts := DefaultOptions("  /tmp/kv-data  ")
+
+	if opts.DataDir != "/tmp/kv-data" {
+		t.Fatalf("DataDir = %q, want /tmp/kv-data", opts.DataDir)
+	}
+	if opts.MaxEntries != defaultMaxEntries {
+		t.Fatalf("MaxEntries = %d, want %d", opts.MaxEntries, defaultMaxEntries)
+	}
+	if opts.MaxMemoryMB != defaultMaxMemoryMB {
+		t.Fatalf("MaxMemoryMB = %d, want %d", opts.MaxMemoryMB, defaultMaxMemoryMB)
+	}
+}
+
 func TestKVStoreRejectsEmptyKeys(t *testing.T) {
 	store, err := NewKVStore(Options{DataDir: t.TempDir()})
 	if err != nil {

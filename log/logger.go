@@ -45,7 +45,7 @@ type LoggerConfig struct {
 // it entirely when there are no extra fields to attach:
 //
 //	logger.Info("server started")
-//	logger.Info("server started", glog.Fields{"addr": ":8080"})
+//	logger.Info("server started", log.Fields{"addr": ":8080"})
 //
 // Implementations must treat a nil or absent Fields the same as an empty one.
 type StructuredLogger interface {

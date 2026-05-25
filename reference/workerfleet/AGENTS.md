@@ -13,7 +13,7 @@ two conflict, the root security and boundary rules still win.
 - Location: `reference/workerfleet`.
 - Plumego dependency: `replace github.com/spcent/plumego => ../..`.
 - Canonical app reference remains `reference/standard-service`; workerfleet is a
-  richer production-style reference for worker monitoring.
+  work-in-progress reference for worker monitoring rather than a production-readiness template.
 - MongoDB and workerfleet-specific Kubernetes, alerting, notifier, and metrics
   dependencies stay inside this submodule.
 

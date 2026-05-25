@@ -40,11 +40,15 @@ non_goals:
   - Stable store primitives
 
 public_entrypoints:
-  - topology
-  - routing
-  - composition
+  - cache
+  - file
   - kvengine
   - idempotency
+  - migrate
+  - pgx
+  - rw
+  - sharding
+  - sqlx
 
 allowed_imports:
   - stdlib
