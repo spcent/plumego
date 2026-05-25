@@ -4,14 +4,13 @@ Milestone: M-024
 Recipe: specs/change-recipes/fix-bug.yaml
 Context Package: control-plane
 Priority: P1
-State: blocked
-Blocked By: M-022 merge; overlaps `specs` and `middleware` follow-up work
+State: done
 Primary Module: specs
 Owned Files:
 - `specs/dependency-rules.yaml`
 - `middleware/module.yaml`
 - `docs/modules/middleware/README.md`
-Depends On: M-022
+Depends On: none
 
 ## Goal
 
@@ -57,11 +56,14 @@ drop the stale special-rule path that no longer protects a real file.
 
 ## Done Definition
 
-- [ ] Acceptance Tests pass.
-- [ ] All Validation commands exit 0.
-- [ ] gofmt -l . produces no output.
-- [ ] Docs Sync targets updated (if applicable).
+- [x] Acceptance Tests pass.
+- [x] All Validation commands exit 0.
+- [x] gofmt -l . produces no output.
+- [x] Docs Sync targets updated (if applicable).
 
 ## Outcome
 
-Blocked pending M-022 merge.
+Declared `middleware/internal/telemetry` as a machine-readable internal module
+with `middleware` as its caller surface, documented its stable observability
+role in the middleware manifest and primer, and removed the dead
+`plumego.go` forbidden-path residue from dependency rules.

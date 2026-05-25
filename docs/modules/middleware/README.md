@@ -89,6 +89,11 @@
   downstream handler still runs
 - accesslog fields use the shared middleware redaction policy before they are
   passed to the configured logger
+- `middleware/internal/telemetry` is the shared internal helper surface for
+  stable observability middleware. It owns request preparation, safe
+  finalization, shared metrics derivation, and redaction helpers, while
+  exporter catalogs and backend wiring stay in `x/observability` or the owning
+  application
 
 ## Production Security Profile
 

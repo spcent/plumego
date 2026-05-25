@@ -211,6 +211,28 @@ modules:
       - reference/**
       - cmd/**
 
+  middleware/internal/telemetry:
+    path: middleware/internal/telemetry
+    layer: internal
+    allow:
+      - stdlib
+      - contract
+      - internal/httputil
+      - middleware/requestid
+    declared_callers:
+      - middleware
+    deny:
+      - core/**
+      - router/**
+      - security/**
+      - store/**
+      - health/**
+      - log/**
+      - metrics/**
+      - x/**
+      - reference/**
+      - cmd/**
+
   internal/httpx:
     path: internal/httpx
     layer: internal
@@ -599,8 +621,6 @@ modules:
       - cmd/**
 
 special_rules:
-  forbidden_paths:
-    - plumego.go
   forbidden_import_patterns:
     - github.com/spcent/plumego
   notes:
@@ -618,3 +638,4 @@ special_rules:
     - Health HTTP endpoint ownership belongs outside health
     - High-level data topology belongs in x/data or x/tenant, not in the stable store layer
     - Topology-heavy and provider-specific cache implementations belong in x/data/cache, not stable store/cache
+    - middleware/internal/telemetry is the shared internal helper surface for stable transport observability middleware; keep it internal to middleware and route exporter or pipeline wiring to x/observability or the owning app
