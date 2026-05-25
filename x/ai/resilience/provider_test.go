@@ -10,6 +10,8 @@ import (
 	"github.com/spcent/plumego/x/ai/provider"
 	"github.com/spcent/plumego/x/ai/ratelimit"
 	"github.com/spcent/plumego/x/ai/tokenizer"
+	sharedcircuitbreaker "github.com/spcent/plumego/x/resilience/circuitbreaker"
+	sharedratelimit "github.com/spcent/plumego/x/resilience/ratelimit"
 )
 
 // Mock provider for testing
@@ -109,6 +111,38 @@ func TestNewResilientProviderERejectsNilProvider(t *testing.T) {
 	if resilient != nil {
 		t.Fatalf("NewResilientProviderE returned provider = %#v, want nil", resilient)
 	}
+}
+
+func TestNewResilientProviderERejectsConflictingResilienceConfig(t *testing.T) {
+	mockProv := &mockProvider{name: "test-provider"}
+
+	t.Run("rate limiter", func(t *testing.T) {
+		resilient, err := NewResilientProviderE(Config{
+			Provider:          mockProv,
+			RateLimiter:       ratelimit.NewTokenBucketLimiter(1, 0),
+			SharedRateLimiter: sharedratelimit.NewKeyed(1, 1),
+		})
+		if !errors.Is(err, ErrMultipleRateLimiters) {
+			t.Fatalf("NewResilientProviderE error = %v, want ErrMultipleRateLimiters", err)
+		}
+		if resilient != nil {
+			t.Fatalf("NewResilientProviderE returned provider = %#v, want nil", resilient)
+		}
+	})
+
+	t.Run("circuit breaker", func(t *testing.T) {
+		resilient, err := NewResilientProviderE(Config{
+			Provider:             mockProv,
+			CircuitBreaker:       circuitbreaker.NewCircuitBreaker("ai", 1, time.Second),
+			SharedCircuitBreaker: sharedcircuitbreaker.New(sharedcircuitbreaker.Config{Name: "shared"}),
+		})
+		if !errors.Is(err, ErrMultipleCircuitBreakers) {
+			t.Fatalf("NewResilientProviderE error = %v, want ErrMultipleCircuitBreakers", err)
+		}
+		if resilient != nil {
+			t.Fatalf("NewResilientProviderE returned provider = %#v, want nil", resilient)
+		}
+	})
 }
 
 func TestResilientProviderRejectsNilCompletionRequest(t *testing.T) {
@@ -343,5 +377,89 @@ func TestResilientProvider_CountTokens(t *testing.T) {
 
 	if count <= 0 {
 		t.Errorf("Count = %d, should be > 0", count)
+	}
+}
+
+func TestResilientProvider_SharedRateLimiter(t *testing.T) {
+	mockProv := &mockProvider{name: "test-provider"}
+	limiter := sharedratelimit.NewKeyed(0, 2)
+
+	resilient := NewResilientProvider(Config{
+		Provider:          mockProv,
+		SharedRateLimiter: limiter,
+	})
+
+	ctx := t.Context()
+	req := &provider.CompletionRequest{
+		Model: "test-model",
+		Messages: []provider.Message{
+			provider.NewTextMessage(provider.RoleUser, "test"),
+		},
+	}
+
+	for i := 0; i < 2; i++ {
+		if _, err := resilient.Complete(ctx, req); err != nil {
+			t.Fatalf("request %d should succeed, got %v", i, err)
+		}
+	}
+
+	if _, err := resilient.Complete(ctx, req); !errors.Is(err, ratelimit.ErrRateLimitExceeded) {
+		t.Fatalf("third request error = %v, want ErrRateLimitExceeded", err)
+	}
+
+	remaining, err := resilient.RateLimitRemaining(ctx, "test-model")
+	if err != nil {
+		t.Fatalf("RateLimitRemaining() error = %v", err)
+	}
+	if remaining != 0 {
+		t.Fatalf("RateLimitRemaining() = %d, want 0", remaining)
+	}
+}
+
+func TestResilientProvider_SharedCircuitBreaker(t *testing.T) {
+	mockProv := &mockProvider{
+		name: "test-provider",
+		err:  errors.New("provider error"),
+	}
+	breaker := sharedcircuitbreaker.New(sharedcircuitbreaker.Config{
+		Name:             "shared-breaker",
+		FailureThreshold: 0.5,
+		MinRequests:      2,
+		Timeout:          time.Second,
+	})
+
+	resilient := NewResilientProvider(Config{
+		Provider:             mockProv,
+		SharedCircuitBreaker: breaker,
+	})
+
+	ctx := t.Context()
+	req := &provider.CompletionRequest{
+		Model: "test-model",
+		Messages: []provider.Message{
+			provider.NewTextMessage(provider.RoleUser, "test"),
+		},
+	}
+
+	for i := 0; i < 2; i++ {
+		if _, err := resilient.Complete(ctx, req); err == nil {
+			t.Fatalf("request %d should fail", i)
+		}
+	}
+
+	if resilient.CircuitBreakerState() != circuitbreaker.StateOpen {
+		t.Fatalf("CircuitBreakerState() = %v, want StateOpen", resilient.CircuitBreakerState())
+	}
+
+	if _, err := resilient.Complete(ctx, req); !errors.Is(err, circuitbreaker.ErrCircuitBreakerOpen) {
+		t.Fatalf("third request error = %v, want ErrCircuitBreakerOpen", err)
+	}
+
+	stats := resilient.CircuitBreakerStats()
+	if stats.Name != "shared-breaker" {
+		t.Fatalf("CircuitBreakerStats().Name = %q, want shared-breaker", stats.Name)
+	}
+	if stats.State != circuitbreaker.StateOpen {
+		t.Fatalf("CircuitBreakerStats().State = %v, want StateOpen", stats.State)
 	}
 }

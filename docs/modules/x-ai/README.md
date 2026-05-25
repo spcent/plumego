@@ -97,7 +97,13 @@ packages remain AI-provider-specific compatibility primitives used by
 `x/ai/resilience`.
 
 New cross-family resilience work should start in `x/resilience`. New AI provider
-wrapping may use `x/ai/resilience`, but dynamic composition should prefer
+wrapping should still use `x/ai/resilience`, but the first migration slice now
+lets `NewResilientProviderE` compose directly with
+`x/resilience/circuitbreaker.CircuitBreaker` and
+`x/resilience/ratelimit.KeyedBuckets` through explicit `Shared*` config fields.
+Keep the older `RateLimiter` and `CircuitBreaker` fields only for existing
+AI-local compatibility callers, and do not configure both compatibility and
+shared primitives in the same `Config`. Dynamic composition should prefer
 `NewResilientProviderE` so invalid provider wiring returns an error instead of
 panicking. `x/ai/ratelimit.TokenBucketLimiter` owns a cleanup goroutine only when
 constructed with a cleanup interval, and callers should call `Close` when that
