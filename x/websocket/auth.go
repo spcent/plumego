@@ -141,16 +141,6 @@ func NewSimpleHS256TokenAuth(secret []byte) (*SimpleHS256TokenAuth, error) {
 	return &SimpleHS256TokenAuth{jwtSecret: cloneBytes(secret)}, nil
 }
 
-// NewHS256TokenAuth is a compatibility alias for NewSimpleHS256TokenAuth.
-func NewHS256TokenAuth(secret []byte) (*SimpleHS256TokenAuth, error) {
-	return NewSimpleHS256TokenAuth(secret)
-}
-
-// AuthenticateToken is a compatibility alias for VerifyJWT.
-func (s *SimpleHS256TokenAuth) AuthenticateToken(token string) (map[string]any, error) {
-	return s.VerifyJWT(token)
-}
-
 // VerifyJWT verifies a compact HS256 token and returns the payload map.
 //
 // It validates the HS256 signature and optional exp claim. It does not validate

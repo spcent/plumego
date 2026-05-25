@@ -78,10 +78,9 @@ entries:
     category: public_alias
     status: keep
     owner: realtime
-    decision: Keep as experimental x/websocket compatibility aliases after merging origin/main so existing callers and release-branch tests can use either naming family while x/websocket remains outside stable-root v1.
-    replacement: NewSimpleHS256TokenAuth, VerifyJWT, ReadMessageReader, and NewHubWithConfigE
+    decision: Keep only the websocket aliases that still have live compatibility callers. The auth aliases were removed once their last repo callers migrated.
+    replacement: ReadMessageReader and NewHubWithConfigE
     paths:
-      - x/websocket/auth.go
       - x/websocket/hub.go
       - x/websocket/stream.go
 

@@ -45,6 +45,7 @@
 - `NewSimpleRoomAuth`
 - `SimpleHS256TokenAuth`
 - `NewSimpleHS256TokenAuth`
+- `VerifyJWT`
 - `SecurityConfig`
 - `NewSecureRoomAuth`
 - `SendBehavior`
@@ -153,6 +154,8 @@ snapshots, no exported API changes, and `realtime` owner sign-off.
 - keep auth and broadcast gates reviewable
 - keep JWT-required, unauthenticated, and origin allow-all behavior explicit in configuration
 - keep token authentication and room authorization split; anonymous mode must not require a JWT secret
+- use `NewSimpleHS256TokenAuth` and `VerifyJWT`; the older auth aliases were
+  removed once their last repo callers migrated
 - keep JWT and broadcast secrets caller-provided but internally copied at construction boundaries
 - keep query-string JWT transport disabled unless `AllowQueryToken` is explicitly set
 - keep room-password credentials out of URL query strings; the built-in room authorizer reads `X-WebSocket-Room-Password`
