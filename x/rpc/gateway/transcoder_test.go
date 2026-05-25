@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/spcent/plumego/contract"
 )
 
 func TestRegisterHandlerReturnsOK(t *testing.T) {
@@ -66,7 +68,7 @@ func TestMethodMismatchReturnsMethodNotAllowed(t *testing.T) {
 }
 
 func TestRegisterNilHandlerReturnsError(t *testing.T) {
-	if err := New("").Register(t.Context(), nil, "GET /"); !errors.Is(err, ErrHandlerNil) {
-		t.Fatalf("Register() error = %v, want %v", err, ErrHandlerNil)
+	if err := New("").Register(t.Context(), nil, "GET /"); !errors.Is(err, contract.ErrHandlerNil) {
+		t.Fatalf("Register() error = %v, want %v", err, contract.ErrHandlerNil)
 	}
 }

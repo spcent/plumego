@@ -3,12 +3,11 @@ package gateway
 
 import (
 	"context"
-	"errors"
 	"net/http"
 	"strings"
-)
 
-var ErrHandlerNil = errors.New("rpc gateway handler is nil")
+	"github.com/spcent/plumego/contract"
+)
 
 // HandlerFunc is a dependency-free RPC-to-HTTP handler shape.
 type HandlerFunc func(http.ResponseWriter, *http.Request, map[string]string)
@@ -37,7 +36,7 @@ func New(target string, opts ...Option) *HTTPTranscoder {
 func (t *HTTPTranscoder) Register(ctx context.Context, handler HandlerFunc, pattern string) error {
 	_ = ctx
 	if handler == nil {
-		return ErrHandlerNil
+		return contract.ErrHandlerNil
 	}
 	method, path := splitPattern(pattern)
 	t.mux.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {

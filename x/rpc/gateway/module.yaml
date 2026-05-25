@@ -29,7 +29,6 @@ non_goals:
   - Core app bootstrap ownership
 
 public_entrypoints:
-  - ErrHandlerNil
   - HandlerFunc
   - Option
   - HTTPTranscoder
@@ -40,11 +39,11 @@ public_entrypoints:
 
 allowed_imports:
   - stdlib
+  - contract
 
 forbidden_imports:
   - core/**
   - router/**
-  - contract/**
   - middleware/**
   - security/**
   - store/**
