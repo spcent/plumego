@@ -106,7 +106,7 @@ entries:
     category: reference_placeholder
     status: keep
     owner: reference
-    decision: Keep outside the v1 stable release surface. Workerfleet is not the canonical reference app and remains a non-blocking reference placeholder.
+    decision: Keep outside the v1 stable release surface. Workerfleet is a partial WIP reference, and worker registration still returns ErrNotImplemented when the reference profile does not wire ingest dependencies.
     replacement: implemented worker registration flow
     paths:
       - reference/workerfleet/internal/handler/worker_register.go
@@ -124,10 +124,11 @@ entries:
     category: reference_placeholder
     status: keep
     owner: reference
-    decision: Workerfleet app-layer not-implemented and detail-view alias markers remain outside the stable-root v1 surface while the reference evolves through its own active cards.
+    decision: Workerfleet app-layer ErrNotImplemented markers are dependency-gated WIP behavior, not proof that the entire service is absent. Keep them outside the stable-root v1 surface while the reference fills in the remaining ingest/query/case-step wiring.
     replacement: implemented workerfleet app behavior and direct view types
     paths:
       - reference/workerfleet/internal/app/types.go
+      - reference/workerfleet/internal/app/service.go
 
   - id: x-devtools-removed-legacy-alias-regression
     category: regression_test
