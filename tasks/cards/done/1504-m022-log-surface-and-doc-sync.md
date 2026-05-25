@@ -4,7 +4,7 @@ Milestone: M-022
 Recipe: specs/change-recipes/symbol-change.yaml
 Context Package: implementation
 Priority: P1
-State: active
+State: done
 Primary Module: log
 Owned Files:
 - `log/module.yaml`
@@ -44,10 +44,17 @@ Validation:
 - `go run ./internal/checks/public-entrypoints-sync`
 
 Done Definition:
-- [ ] Acceptance Tests pass.
-- [ ] All Validation commands exit 0.
-- [ ] gofmt -l . produces no output.
-- [ ] Docs Sync targets updated (if applicable).
+- [x] Acceptance Tests pass.
+- [x] All Validation commands exit 0.
+- [x] gofmt -l . produces no output.
+- [x] Docs Sync targets updated (if applicable).
 
 Outcome:
-<!-- Agent fills this after completion: what changed and why. -->
+- Added the exported logging types and format constants that callers actually
+  use to `log/module.yaml`.
+- Corrected the public example comment to use `log.Fields` instead of the
+  nonexistent `glog.Fields`.
+- Validation:
+  - `go test -timeout 20s ./log/...`
+  - `go run ./internal/checks/module-manifests`
+  - `go run ./internal/checks/public-entrypoints-sync`
