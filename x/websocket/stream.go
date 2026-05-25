@@ -215,11 +215,6 @@ func (c *Conn) ReadMessageReader() (byte, io.ReadCloser, error) {
 	}
 }
 
-// ReadMessageStream is kept as a compatibility alias for ReadMessageReader.
-func (c *Conn) ReadMessageStream() (byte, io.ReadCloser, error) {
-	return c.ReadMessageReader()
-}
-
 // ReadMessage reads a complete message into memory and returns an owned copy of
 // the message payload.
 func (c *Conn) ReadMessage() (byte, []byte, error) {

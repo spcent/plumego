@@ -78,11 +78,10 @@ entries:
     category: public_alias
     status: keep
     owner: realtime
-    decision: Keep only the websocket aliases that still have live compatibility callers. The auth aliases were removed once their last repo callers migrated.
-    replacement: ReadMessageReader and NewHubWithConfigE
+    decision: Keep only the websocket aliases that still have live compatibility callers. ReadMessageStream and auth aliases were removed. NewHubE remains while scaffold and devserver migrate to NewHubWithConfigE.
+    replacement: NewHubWithConfigE
     paths:
       - x/websocket/hub.go
-      - x/websocket/stream.go
 
   - id: x-discovery-optional-capability-contract
     category: unsupported_operation
