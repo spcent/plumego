@@ -18,13 +18,32 @@ non_goals:
   - Stable root entrypoints
   - Business event workflow logic
 
+public_entrypoints:
+  - Config
+  - DefaultConfig
+  - Broker
+  - InProcBroker
+  - New
+  - Message
+  - SubOptions
+  - DefaultSubOptions
+  - PersistentPubSub
+  - NewPersistent
+  - DistributedPubSub
+  - NewDistributed
+  - ReplayStore
+  - NewReplayStore
+  - BackpressureController
+  - NewBackpressureController
+  - PrometheusExporter
+  - NewPrometheusExporter
+
 allowed_imports:
   - log
   - metrics
   - x/resilience
 
 forbidden_imports:
-  - core/components/**
   - x/tenant/**
   - x/ai/**
 

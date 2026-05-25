@@ -20,6 +20,22 @@ non_goals:
   - Stable root entrypoints
   - Business workflow orchestration
 
+public_entrypoints:
+  - Config
+  - DefaultConfig
+  - Broker
+  - InProcBroker
+  - NewInProcBroker
+  - NewInProcBrokerE
+  - Task
+  - TaskQueue
+  - NewTaskQueue
+  - TaskHandler
+  - Worker
+  - NewWorker
+  - KVPersistence
+  - NewKVPersistence
+
 allowed_imports:
   - contract
   - log
@@ -29,7 +45,6 @@ allowed_imports:
   - x/messaging/pubsub
 
 forbidden_imports:
-  - core/components/**
   - x/tenant/**
   - x/ai/**
 
