@@ -1,0 +1,88 @@
+name: x/ai/tokenizer
+path: x/ai/tokenizer
+layer: extension
+status: experimental
+owner: ai-gateway
+risk: low
+summary: Token counting primitives for AI models, used across provider, session, orchestration, and cache packages.
+
+parent_family: x/ai
+
+entrypoint_reads:
+  - AGENTS.md
+  - docs/CANONICAL_STYLE_GUIDE.md
+  - specs/repo.yaml
+  - specs/task-routing.yaml
+  - specs/dependency-rules.yaml
+  - x/ai/module.yaml
+  - docs/modules/x-ai/README.md
+
+responsibilities:
+  - Tokenizer interface contract
+  - Approximate and model-specific token count implementations
+  - StreamCounter for live token tracking
+  - TokenUsage value type shared across the x/ai family
+
+non_goals:
+  - Model configuration or credential ownership
+  - Provider adapter implementation
+  - Session or context lifecycle ownership
+  - Business-specific prompt policy
+
+public_entrypoints:
+  - Tokenizer
+  - Message
+  - TokenUsage
+  - StreamCounter
+  - SimpleTokenizer
+  - ClaudeTokenizer
+  - GPTTokenizer
+
+allowed_imports:
+  - stdlib
+
+forbidden_imports:
+  - core/**
+  - router/**
+  - middleware/**
+  - security/**
+  - store/**
+  - metrics/**
+  - contract/**
+  - x/data/**
+  - x/fileapi/**
+  - x/frontend/**
+  - x/gateway/**
+  - x/messaging/**
+  - x/observability/**
+  - x/openapi/**
+  - x/resilience/**
+  - x/rest/**
+  - x/rpc/**
+  - x/tenant/**
+  - x/validate/**
+  - x/websocket/**
+
+test_commands:
+  - go test -race -timeout 60s ./x/ai/tokenizer/...
+  - go test -timeout 20s ./x/ai/tokenizer/...
+  - go vet ./x/ai/tokenizer/...
+
+doc_paths:
+  - docs/modules/x-ai/README.md
+
+change_risks:
+  - TokenUsage struct changes break provider, session, and orchestration consumers
+  - Tokenizer interface changes affect all counting call sites
+
+review_checklist:
+  - Keep TokenUsage as a plain value type with no hidden state
+  - Keep tokenizer implementations stdlib-only
+  - Do not widen this package with provider-specific logic
+
+agent_hints:
+  - Prefer SimpleTokenizer for approximate counts; model-specific variants for billing accuracy
+  - TokenUsage is the canonical token accounting type for the entire x/ai family
+
+landing_zones:
+  contracts: tokenizer.go

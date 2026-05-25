@@ -25,6 +25,7 @@ matching `done/` directory is present.
 | M-015 | `tasks/milestones/done/M-015-database-adapters/` |
 | M-017 | `tasks/milestones/done/M-017-grpc-support/` |
 | M-021 | `tasks/milestones/done/M-021-agent-first-ecosystem-visibility/` |
+| M-023 | `tasks/milestones/done/M-023-ai-resilience-convergence/` |
 
 ## Merged Milestones Recorded Only In History Files
 
@@ -54,7 +55,6 @@ These milestones currently have canonical `active/` directories:
 - M-009
 - M-016
 - M-022
-- M-023
 - M-024
 
 ## Superseded Draft Coverage

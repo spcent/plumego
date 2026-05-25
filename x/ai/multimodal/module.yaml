@@ -1,0 +1,95 @@
+name: x/ai/multimodal
+path: x/ai/multimodal
+layer: extension
+status: experimental
+owner: ai-gateway
+risk: medium
+summary: Multimodal content type extensions (audio, video, document) built on top of x/ai/provider content contracts.
+
+parent_family: x/ai
+
+entrypoint_reads:
+  - AGENTS.md
+  - docs/CANONICAL_STYLE_GUIDE.md
+  - specs/repo.yaml
+  - specs/task-routing.yaml
+  - specs/dependency-rules.yaml
+  - x/ai/module.yaml
+  - docs/modules/x-ai/README.md
+
+responsibilities:
+  - Extended ContentType constants (audio, video, document beyond provider's text/image/tool)
+  - ContentBlock and Message types for multimodal payloads
+  - Helper functions for loading content from files and URLs
+  - MIME type detection and format negotiation utilities
+
+non_goals:
+  - Provider adapter implementation
+  - Session or context lifecycle ownership
+  - Image processing pipelines or transcoding
+  - File storage backend ownership
+
+public_entrypoints:
+  - ContentType
+  - ContentBlock
+  - ImageContent
+  - AudioContent
+  - VideoContent
+  - DocumentContent
+  - ToolUse
+  - Message
+  - LoadFromFile
+  - LoadFromURL
+  - DetectContentType
+
+allowed_imports:
+  - stdlib
+  - x/ai/provider
+
+forbidden_imports:
+  - core/**
+  - router/**
+  - middleware/**
+  - security/**
+  - store/**
+  - metrics/**
+  - contract/**
+  - x/data/**
+  - x/fileapi/**
+  - x/frontend/**
+  - x/gateway/**
+  - x/messaging/**
+  - x/observability/**
+  - x/openapi/**
+  - x/resilience/**
+  - x/rest/**
+  - x/rpc/**
+  - x/tenant/**
+  - x/validate/**
+  - x/websocket/**
+
+test_commands:
+  - go test -race -timeout 60s ./x/ai/multimodal/...
+  - go test -timeout 20s ./x/ai/multimodal/...
+  - go vet ./x/ai/multimodal/...
+
+doc_paths:
+  - docs/modules/x-ai/README.md
+
+change_risks:
+  - ContentType enum additions may affect switch exhaustiveness in consumers
+  - ContentBlock struct changes break multimodal message construction sites
+
+review_checklist:
+  - Keep multimodal.ContentType as a strict superset of provider.ContentType constants
+  - Do not import provider.ContentType here to avoid redefinition confusion; keep the types independent
+  - Keep file/URL loading helpers free of persistent side effects
+
+agent_hints:
+  - Use x/ai/multimodal for audio, video, and document content; use x/ai/provider directly for text/image/tool
+  - Keep provider.ContentType and multimodal.ContentType independent to avoid circular imports
+
+landing_zones:
+  types: types.go
+  helpers: helpers.go
+  provider_adapter: provider.go

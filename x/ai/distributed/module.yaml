@@ -1,0 +1,99 @@
+name: x/ai/distributed
+path: x/ai/distributed
+layer: extension
+status: experimental
+owner: ai-gateway
+risk: high
+summary: Distributed workflow execution layer that wraps x/ai/orchestration.Engine with persistent queuing, checkpointing, and remote step dispatch.
+
+parent_family: x/ai
+
+entrypoint_reads:
+  - AGENTS.md
+  - docs/CANONICAL_STYLE_GUIDE.md
+  - specs/repo.yaml
+  - specs/task-routing.yaml
+  - specs/dependency-rules.yaml
+  - x/ai/module.yaml
+  - x/ai/orchestration/module.yaml
+  - docs/modules/x-ai/README.md
+
+responsibilities:
+  - DistributedEngine wrapping orchestration.Engine with durable execution
+  - TaskQueue interface and in-process queue implementation
+  - WorkflowPersistence interface for checkpoint storage
+  - Recovery of interrupted workflows from persisted state
+  - Remote step dispatch via RemoteStep adapter
+
+non_goals:
+  - Single-process orchestration primitives (owned by x/ai/orchestration)
+  - Provider adapter or session lifecycle (owned by x/ai/provider, x/ai/session)
+  - Marketplace or agent registry (owned by x/ai/marketplace)
+  - Specific queue backend implementations (caller-provided via TaskQueue)
+  - App bootstrap or HTTP handler ownership
+
+public_entrypoints:
+  - DistributedEngine
+  - EngineConfig
+  - DefaultEngineConfig
+  - TaskQueue
+  - WorkflowPersistence
+  - NewDistributedEngine
+
+allowed_imports:
+  - stdlib
+  - x/ai/orchestration
+
+forbidden_imports:
+  - core/**
+  - router/**
+  - middleware/**
+  - security/**
+  - store/**
+  - metrics/**
+  - contract/**
+  - x/data/**
+  - x/fileapi/**
+  - x/frontend/**
+  - x/gateway/**
+  - x/messaging/**
+  - x/observability/**
+  - x/openapi/**
+  - x/resilience/**
+  - x/rest/**
+  - x/rpc/**
+  - x/tenant/**
+  - x/validate/**
+  - x/websocket/**
+
+test_commands:
+  - go test -race -timeout 60s ./x/ai/distributed/...
+  - go test -timeout 20s ./x/ai/distributed/...
+  - go vet ./x/ai/distributed/...
+
+doc_paths:
+  - docs/modules/x-ai/README.md
+
+change_risks:
+  - TaskQueue interface change breaks all queue adapter implementations
+  - WorkflowPersistence serialization change invalidates persisted checkpoints
+  - DistributedEngine.Execute concurrency change causes execution ordering regression
+
+review_checklist:
+  - Keep TaskQueue and WorkflowPersistence as caller-provided interfaces; do not add built-in backend implementations
+  - Keep checkpoint serialization stable; document breaking changes explicitly
+  - Keep DistributedEngine.Execute context-cancellable with clean shutdown
+  - Do not pull in x/data, x/messaging, or any storage backend as a direct dependency
+
+agent_hints:
+  - Use x/ai/orchestration when single-process execution is sufficient; open x/ai/distributed only when durable queuing or recovery across process restarts is required
+  - Wire the TaskQueue and WorkflowPersistence implementations at the app level, not inside this package
+  - Keep remote step dispatch explicit; avoid hidden RPC registration
+
+landing_zones:
+  engine: engine.go
+  queue: queue.go
+  persistence: persistence.go
+  worker: worker.go
+  recovery: recovery.go
+  remote_step: remote_step.go

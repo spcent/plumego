@@ -1,0 +1,110 @@
+name: x/ai/semanticcache
+path: x/ai/semanticcache
+layer: extension
+status: experimental
+owner: ai-gateway
+risk: medium
+summary: Embedding-based semantic cache for AI provider responses; matches requests by vector similarity and optionally falls back to exact-key caching via x/ai/llmcache.
+
+parent_family: x/ai
+
+entrypoint_reads:
+  - AGENTS.md
+  - docs/CANONICAL_STYLE_GUIDE.md
+  - specs/repo.yaml
+  - specs/task-routing.yaml
+  - specs/dependency-rules.yaml
+  - x/ai/module.yaml
+  - x/ai/llmcache/module.yaml
+  - docs/modules/x-ai/README.md
+
+responsibilities:
+  - SemanticCache for embedding-based similarity lookup
+  - SemanticCachingProvider decorator implementing provider.Provider
+  - EmbeddingGenerator interface bridging to x/ai/semanticcache/embedding
+  - VectorStore interface bridging to x/ai/semanticcache/vectorstore
+  - SemanticCacheConfig and similarity threshold management
+
+non_goals:
+  - Exact key caching (owned by x/ai/llmcache)
+  - Distributed or persistent cache backends (owned by x/data/cache)
+  - Embedding model implementation (owned by x/ai/semanticcache/embedding)
+  - Vector store implementation (owned by x/ai/semanticcache/vectorstore)
+  - Cache lifecycle management (owned by x/ai/semanticcache/cachemanager)
+
+public_entrypoints:
+  - SemanticCache
+  - SemanticCacheConfig
+  - SemanticCacheStats
+  - DefaultSemanticCacheConfig
+  - NewSemanticCache
+  - SemanticCachingProvider
+  - ProviderConfig
+  - DefaultProviderConfig
+  - NewSemanticCachingProvider
+  - NewSemanticCachingProviderE
+  - ErrProviderRequired
+  - ErrSemanticCacheRequired
+  - EmbeddingGenerator
+  - VectorEntry
+  - VectorStore
+  - SimilarityResult
+
+allowed_imports:
+  - stdlib
+  - x/ai/provider
+  - x/ai/llmcache
+
+forbidden_imports:
+  - core/**
+  - router/**
+  - middleware/**
+  - security/**
+  - store/**
+  - metrics/**
+  - contract/**
+  - x/data/**
+  - x/fileapi/**
+  - x/frontend/**
+  - x/gateway/**
+  - x/messaging/**
+  - x/observability/**
+  - x/openapi/**
+  - x/resilience/**
+  - x/rest/**
+  - x/rpc/**
+  - x/tenant/**
+  - x/validate/**
+  - x/websocket/**
+
+test_commands:
+  - go test -race -timeout 60s ./x/ai/semanticcache/...
+  - go test -timeout 20s ./x/ai/semanticcache/...
+  - go vet ./x/ai/semanticcache/...
+
+doc_paths:
+  - docs/modules/x-ai/README.md
+
+change_risks:
+  - Similarity threshold change alters cache hit rate for all callers
+  - EmbeddingGenerator interface change breaks all embedding provider adapters
+  - VectorStore interface change breaks MemoryVectorStore and all external backends
+
+review_checklist:
+  - Keep similarity threshold caller-configurable; do not hard-code default values
+  - Keep SemanticCachingProvider.CompleteStream pass-through; streaming responses are not cached
+  - Keep EnablePassthrough true by default so semantic cache errors do not block provider calls
+  - Do not add distributed storage or eviction policy to the parent package; keep them in subordinate packages
+
+agent_hints:
+  - Use x/ai/llmcache for exact-key caching without embeddings; use x/ai/semanticcache when fuzzy prompt matching is needed
+  - Wire the EmbeddingGenerator from x/ai/semanticcache/embedding and the VectorStore from x/ai/semanticcache/vectorstore at the app level
+  - Use x/ai/semanticcache/cachemanager for warm-up, eviction, and stats management
+
+landing_zones:
+  core: vectorstore.go
+  provider_decorator: provider.go
+  instrumentation: instrumentation.go
+  embedding_subpackage: embedding/
+  vectorstore_subpackage: vectorstore/
+  cachemanager_subpackage: cachemanager/

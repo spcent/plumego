@@ -1,0 +1,90 @@
+name: x/ai/metrics
+path: x/ai/metrics
+layer: extension
+status: experimental
+owner: ai-gateway
+risk: medium
+summary: AI-specific metrics collector interface and in-process implementations, with an adapter bridging to the stable metrics layer.
+
+parent_family: x/ai
+
+entrypoint_reads:
+  - AGENTS.md
+  - docs/CANONICAL_STYLE_GUIDE.md
+  - specs/repo.yaml
+  - specs/task-routing.yaml
+  - specs/dependency-rules.yaml
+  - x/ai/module.yaml
+  - docs/modules/x-ai/README.md
+
+responsibilities:
+  - Collector interface with AI-oriented tag model (Counter, Gauge, Histogram, Timing)
+  - MemoryCollector for in-process testing and local aggregation
+  - AggregateCollectorAdapter bridging to stable metrics.AggregateCollector
+  - PrometheusExporter for opt-in Prometheus backend wiring
+
+non_goals:
+  - Replacing or duplicating the stable metrics package
+  - HTTP metrics middleware (owned by middleware/httpmetrics)
+  - Observability export wiring (owned by x/observability)
+  - Distributed tracing ownership
+
+public_entrypoints:
+  - Collector
+  - Tag
+  - TimerContext
+  - MemoryCollector
+  - NewMemoryCollector
+  - NoOpCollector
+  - AggregateCollectorAdapter
+
+allowed_imports:
+  - stdlib
+  - metrics
+
+forbidden_imports:
+  - core/**
+  - router/**
+  - middleware/**
+  - security/**
+  - store/**
+  - contract/**
+  - x/data/**
+  - x/fileapi/**
+  - x/frontend/**
+  - x/gateway/**
+  - x/messaging/**
+  - x/observability/**
+  - x/openapi/**
+  - x/resilience/**
+  - x/rest/**
+  - x/rpc/**
+  - x/tenant/**
+  - x/validate/**
+  - x/websocket/**
+
+test_commands:
+  - go test -race -timeout 60s ./x/ai/metrics/...
+  - go test -timeout 20s ./x/ai/metrics/...
+  - go vet ./x/ai/metrics/...
+
+doc_paths:
+  - docs/modules/x-ai/README.md
+
+change_risks:
+  - Collector interface change breaks x/ai/instrumentation and all metric call sites
+  - Tag model change breaks all AI metric emission
+
+review_checklist:
+  - Keep the Collector interface minimal (Counter, Gauge, Histogram, Timing)
+  - Keep the AggregateCollectorAdapter as the canonical bridge to stable metrics
+  - Do not widen this package with export-backend logic; that belongs in x/observability
+
+agent_hints:
+  - Use AggregateCollectorAdapter to wire into a stable-layer collector backend
+  - Use MemoryCollector or NoOpCollector in tests
+
+landing_zones:
+  interface: metrics.go
+  adapter: adapter.go
+  prometheus: prometheus.go

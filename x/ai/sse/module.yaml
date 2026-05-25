@@ -1,0 +1,86 @@
+name: x/ai/sse
+path: x/ai/sse
+layer: extension
+status: experimental
+owner: ai-gateway
+risk: medium
+summary: Server-Sent Events (SSE) transport primitives for streaming AI responses over HTTP.
+
+parent_family: x/ai
+
+entrypoint_reads:
+  - AGENTS.md
+  - docs/CANONICAL_STYLE_GUIDE.md
+  - specs/repo.yaml
+  - specs/task-routing.yaml
+  - specs/dependency-rules.yaml
+  - x/ai/module.yaml
+  - docs/modules/x-ai/README.md
+
+responsibilities:
+  - SSE event type and serialization
+  - HTTP SSE stream write lifecycle
+  - Stream handler helper for net/http
+
+non_goals:
+  - Workflow progress semantics (owned by x/ai/streaming)
+  - Provider adapter or session ownership
+  - Generic WebSocket transport
+  - App-level route registration
+
+public_entrypoints:
+  - Event
+  - Stream
+  - Handler
+  - NewStream
+  - NewHandler
+
+allowed_imports:
+  - stdlib
+  - contract
+
+forbidden_imports:
+  - core/**
+  - router/**
+  - middleware/**
+  - security/**
+  - store/**
+  - metrics/**
+  - x/ai/orchestration/**
+  - x/ai/streaming/**
+  - x/data/**
+  - x/fileapi/**
+  - x/frontend/**
+  - x/gateway/**
+  - x/messaging/**
+  - x/observability/**
+  - x/resilience/**
+  - x/rest/**
+  - x/rpc/**
+  - x/tenant/**
+  - x/validate/**
+  - x/websocket/**
+
+test_commands:
+  - go test -race -timeout 60s ./x/ai/sse/...
+  - go test -timeout 20s ./x/ai/sse/...
+  - go vet ./x/ai/sse/...
+
+doc_paths:
+  - docs/modules/x-ai/README.md
+
+change_risks:
+  - Stream write contract regression breaks x/ai/streaming consumers
+  - Event serialization change breaks client-side parsers
+
+review_checklist:
+  - Keep SSE serialization spec-compliant (text/event-stream)
+  - Keep stream lifecycle context-cancellation-safe
+  - Do not add workflow-level semantics here; keep this a transport primitive
+
+agent_hints:
+  - This is the low-level SSE transport; x/ai/streaming owns workflow progress semantics on top of it
+  - Use x/ai/sse directly only when you need raw event control
+
+landing_zones:
+  core: sse.go

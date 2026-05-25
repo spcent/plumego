@@ -18,12 +18,20 @@ entrypoint_reads:
 subordinate_families:
   - package: x/data/cache
     role: distributed cache with consistent hashing, replication, failover, and Redis adapter
+  - package: x/data/file
+    role: tenant-aware local/S3 file storage and PostgreSQL file metadata management
+  - package: x/data/kvengine
+    role: durable KV engine extending the stable store/kv primitive
   - package: x/data/pgx
     role: PostgreSQL-style driver interface wrapper for x/data callers
   - package: x/data/sqlx
     role: database/sql query and transaction interface wrapper for x/data callers
   - package: x/data/migrate
     role: migration runner interface wrapper for x/data callers
+  - package: x/data/rw
+    role: primary-replica read-write cluster orchestration with health checking and fallback
+  - package: x/data/sharding
+    role: database sharding router distributing SQL queries across rw.Cluster shards
 
 responsibilities:
   - Read-write splitting orchestration
@@ -107,6 +115,9 @@ landing_zones:
   cache: cache/
   file: file/
   kv_engine: kvengine/
+  idempotency: idempotency/
+  migrate: migrate/
+  pgx: pgx/
+  sqlx: sqlx/
   rw_split: rw/
   topology: sharding/
-  idempotency: idempotency/

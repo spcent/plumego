@@ -6,9 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/spcent/plumego/x/ai/circuitbreaker"
 	"github.com/spcent/plumego/x/ai/provider"
-	"github.com/spcent/plumego/x/ai/ratelimit"
 	"github.com/spcent/plumego/x/ai/tokenizer"
 	sharedcircuitbreaker "github.com/spcent/plumego/x/resilience/circuitbreaker"
 	sharedratelimit "github.com/spcent/plumego/x/resilience/ratelimit"
@@ -98,7 +96,7 @@ func TestResilientProvider_RateLimit(t *testing.T) {
 
 	// 3rd request should be rate limited
 	_, err := resilient.Complete(ctx, req)
-	if err != ratelimit.ErrRateLimitExceeded {
+	if !errors.Is(err, ErrRateLimitExceeded) {
 		t.Errorf("Error = %v, want ErrRateLimitExceeded", err)
 	}
 
@@ -165,14 +163,14 @@ func TestResilientProvider_CircuitBreaker(t *testing.T) {
 	}
 
 	// Circuit should be open
-	if resilient.CircuitBreakerState() != circuitbreaker.StateOpen {
+	if resilient.CircuitBreakerState() != sharedcircuitbreaker.StateOpen {
 		t.Errorf("Circuit state = %v, want StateOpen", resilient.CircuitBreakerState())
 	}
 
 	// Next request should fail fast
 	_, err := resilient.Complete(ctx, req)
-	if err != circuitbreaker.ErrCircuitBreakerOpen {
-		t.Errorf("Error = %v, want ErrCircuitBreakerOpen", err)
+	if !errors.Is(err, sharedcircuitbreaker.ErrCircuitOpen) {
+		t.Errorf("Error = %v, want ErrCircuitOpen", err)
 	}
 
 	// Provider should have been called only 2 times
@@ -215,7 +213,7 @@ func TestResilientProvider_Combined(t *testing.T) {
 
 	// Check stats
 	stats := resilient.CircuitBreakerStats()
-	if stats.State != circuitbreaker.StateClosed {
+	if stats.State != sharedcircuitbreaker.StateClosed {
 		t.Errorf("Circuit state = %v, want StateClosed", stats.State)
 	}
 
@@ -286,7 +284,7 @@ func TestResilientProvider_NoCircuitBreaker(t *testing.T) {
 	}
 
 	_, err := resilient.Complete(ctx, req)
-	if err != ratelimit.ErrRateLimitExceeded {
+	if !errors.Is(err, ErrRateLimitExceeded) {
 		t.Errorf("Error = %v, want ErrRateLimitExceeded", err)
 	}
 }
@@ -325,7 +323,7 @@ func TestResilientProvider_CompleteStream(t *testing.T) {
 
 	// 3rd should be rate limited
 	_, err := resilient.CompleteStream(ctx, req)
-	if err != ratelimit.ErrRateLimitExceeded {
+	if !errors.Is(err, ErrRateLimitExceeded) {
 		t.Errorf("Error = %v, want ErrRateLimitExceeded", err)
 	}
 }
@@ -409,7 +407,7 @@ func TestNewResilientProviderE_UsesSharedRateLimiterAsCanonicalInput(t *testing.
 		}
 	}
 
-	if _, err := resilient.Complete(ctx, req); !errors.Is(err, ratelimit.ErrRateLimitExceeded) {
+	if _, err := resilient.Complete(ctx, req); !errors.Is(err, ErrRateLimitExceeded) {
 		t.Fatalf("third request error = %v, want ErrRateLimitExceeded", err)
 	}
 
@@ -456,19 +454,19 @@ func TestNewResilientProviderE_UsesSharedCircuitBreakerAsCanonicalInput(t *testi
 		}
 	}
 
-	if resilient.CircuitBreakerState() != circuitbreaker.StateOpen {
+	if resilient.CircuitBreakerState() != sharedcircuitbreaker.StateOpen {
 		t.Fatalf("CircuitBreakerState() = %v, want StateOpen", resilient.CircuitBreakerState())
 	}
 
-	if _, err := resilient.Complete(ctx, req); !errors.Is(err, circuitbreaker.ErrCircuitBreakerOpen) {
-		t.Fatalf("third request error = %v, want ErrCircuitBreakerOpen", err)
+	if _, err := resilient.Complete(ctx, req); !errors.Is(err, sharedcircuitbreaker.ErrCircuitOpen) {
+		t.Fatalf("third request error = %v, want ErrCircuitOpen", err)
 	}
 
 	stats := resilient.CircuitBreakerStats()
 	if stats.Name != "shared-breaker" {
 		t.Fatalf("CircuitBreakerStats().Name = %q, want shared-breaker", stats.Name)
 	}
-	if stats.State != circuitbreaker.StateOpen {
+	if stats.State != sharedcircuitbreaker.StateOpen {
 		t.Fatalf("CircuitBreakerStats().State = %v, want StateOpen", stats.State)
 	}
 }

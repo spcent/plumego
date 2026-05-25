@@ -1,0 +1,90 @@
+name: x/ai/filter
+path: x/ai/filter
+layer: extension
+status: experimental
+owner: ai-gateway
+risk: medium
+summary: Content filtering chain for AI inputs and outputs, including PII detection, secret scrubbing, and prompt injection guards.
+
+parent_family: x/ai
+
+entrypoint_reads:
+  - AGENTS.md
+  - docs/CANONICAL_STYLE_GUIDE.md
+  - specs/repo.yaml
+  - specs/task-routing.yaml
+  - specs/dependency-rules.yaml
+  - x/ai/module.yaml
+  - docs/modules/x-ai/README.md
+
+responsibilities:
+  - Filter interface and Result contract
+  - Composable filter chain (Stage, Policy)
+  - PII, secret, prompt-injection, and profanity filter implementations
+
+non_goals:
+  - Provider or session lifecycle ownership
+  - Business-specific allow/block list policy
+  - HTTP middleware integration
+  - Persistent audit log ownership
+
+public_entrypoints:
+  - Filter
+  - Result
+  - Stage
+  - Policy
+  - Chain
+  - PIIFilter
+  - SecretFilter
+  - PromptInjectionFilter
+  - ProfanityFilter
+  - NewChain
+
+allowed_imports:
+  - stdlib
+
+forbidden_imports:
+  - core/**
+  - router/**
+  - middleware/**
+  - security/**
+  - store/**
+  - metrics/**
+  - contract/**
+  - x/data/**
+  - x/fileapi/**
+  - x/frontend/**
+  - x/gateway/**
+  - x/messaging/**
+  - x/observability/**
+  - x/openapi/**
+  - x/resilience/**
+  - x/rest/**
+  - x/rpc/**
+  - x/tenant/**
+  - x/validate/**
+  - x/websocket/**
+
+test_commands:
+  - go test -race -timeout 60s ./x/ai/filter/...
+  - go test -timeout 20s ./x/ai/filter/...
+  - go vet ./x/ai/filter/...
+
+doc_paths:
+  - docs/modules/x-ai/README.md
+
+change_risks:
+  - Filter interface change breaks all composition sites
+  - Chain ordering change alters safety guarantees
+
+review_checklist:
+  - Keep filter implementations stdlib-only
+  - Keep the Filter interface minimal and composable
+  - Do not embed policy decisions in the chain; keep them caller-owned
+
+agent_hints:
+  - Currently has no external callers; wire via provider middleware or explicit handler-level composition
+  - Keep filter rules configurable rather than hard-coded
+
+landing_zones:
+  core: filter.go

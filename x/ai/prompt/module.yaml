@@ -1,0 +1,91 @@
+name: x/ai/prompt
+path: x/ai/prompt
+layer: extension
+status: experimental
+owner: ai-gateway
+risk: low
+summary: Prompt template management with variable substitution, versioning, and tag-based queries for AI workflows.
+
+parent_family: x/ai
+
+entrypoint_reads:
+  - AGENTS.md
+  - docs/CANONICAL_STYLE_GUIDE.md
+  - specs/repo.yaml
+  - specs/task-routing.yaml
+  - specs/dependency-rules.yaml
+  - x/ai/module.yaml
+  - docs/modules/x-ai/README.md
+
+responsibilities:
+  - Template contract with variable definitions and version tracking
+  - Engine for rendering templates with variable substitution
+  - Storage interface and in-memory implementation
+  - Built-in template library for common prompt patterns
+
+non_goals:
+  - Provider adapter or session lifecycle ownership
+  - Persistent template storage backends (belongs in x/data or caller)
+  - Business-specific prompt flows
+  - A/B testing or experiment routing
+
+public_entrypoints:
+  - Template
+  - Variable
+  - Engine
+  - Storage
+  - MemoryStorage
+  - BuiltinTemplates
+  - NewEngine
+  - NewMemoryStorage
+
+allowed_imports:
+  - stdlib
+
+forbidden_imports:
+  - core/**
+  - router/**
+  - middleware/**
+  - security/**
+  - store/**
+  - metrics/**
+  - contract/**
+  - x/data/**
+  - x/fileapi/**
+  - x/frontend/**
+  - x/gateway/**
+  - x/messaging/**
+  - x/observability/**
+  - x/openapi/**
+  - x/resilience/**
+  - x/rest/**
+  - x/rpc/**
+  - x/tenant/**
+  - x/validate/**
+  - x/websocket/**
+
+test_commands:
+  - go test -race -timeout 60s ./x/ai/prompt/...
+  - go test -timeout 20s ./x/ai/prompt/...
+  - go vet ./x/ai/prompt/...
+
+doc_paths:
+  - docs/modules/x-ai/README.md
+
+change_risks:
+  - Template rendering change breaks downstream prompt pipelines
+  - Storage interface change affects persistence adapter implementations
+
+review_checklist:
+  - Keep template rendering deterministic and side-effect-free
+  - Keep MemoryStorage thread-safe
+  - Do not embed business logic in built-in templates
+
+agent_hints:
+  - Use MemoryStorage for tests and local dev; wire a persistent storage adapter in production
+  - Keep prompt content in caller configuration rather than hard-coding in built-ins
+
+landing_zones:
+  core: prompt.go
+  storage: storage.go
+  builtins: builtin.go
