@@ -4,7 +4,7 @@ Milestone: M-022
 Recipe: specs/change-recipes/symbol-change.yaml
 Context Package: implementation
 Priority: P1
-State: active
+State: done
 Primary Module: core
 Owned Files:
 - `core/module.yaml`
@@ -44,10 +44,17 @@ Validation:
 - `go run ./internal/checks/agent-workflow`
 
 Done Definition:
-- [ ] Acceptance Tests pass.
-- [ ] All Validation commands exit 0.
-- [ ] gofmt -l . produces no output.
-- [ ] Docs Sync targets updated (if applicable).
+- [x] Acceptance Tests pass.
+- [x] All Validation commands exit 0.
+- [x] gofmt -l . produces no output.
+- [x] Docs Sync targets updated (if applicable).
 
 Outcome:
-<!-- Agent fills this after completion: what changed and why. -->
+- Added the missing `core` public entrypoints for `Run`, `Group`, `RouteGroup`,
+  and the full `RouteGroup` method surface.
+- Removed redundant `forbidden_imports` entries that duplicated `x/**` or
+  pointed at discouraged top-level roots rather than real import paths.
+- Validation:
+  - `go run ./internal/checks/module-manifests`
+  - `go run ./internal/checks/public-entrypoints-sync`
+  - `go run ./internal/checks/agent-workflow`
