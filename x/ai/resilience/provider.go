@@ -24,14 +24,6 @@ var (
 
 	// ErrNilRequest is returned when a provider request is nil.
 	ErrNilRequest = errors.New("ai resilience: completion request cannot be nil")
-
-	// ErrMultipleRateLimiters is returned when both canonical shared and
-	// compatibility rate limiters are configured at once.
-	ErrMultipleRateLimiters = errors.New("ai resilience: configure either RateLimiter or LegacyRateLimiter, not both")
-
-	// ErrMultipleCircuitBreakers is returned when both canonical shared and
-	// compatibility circuit breakers are configured at once.
-	ErrMultipleCircuitBreakers = errors.New("ai resilience: configure either CircuitBreaker or LegacyCircuitBreaker, not both")
 )
 
 // ResilientProvider wraps a provider with rate limiting and circuit breaking.
@@ -44,11 +36,9 @@ type ResilientProvider struct {
 
 // Config configures a resilient provider.
 type Config struct {
-	Provider             provider.Provider
-	RateLimiter          *sharedratelimit.KeyedBuckets
-	LegacyRateLimiter    *airatelimit.CompatibilityAdapter
-	CircuitBreaker       *sharedcircuitbreaker.CircuitBreaker
-	LegacyCircuitBreaker *aicircuitbreaker.CompatibilityAdapter
+	Provider       provider.Provider
+	RateLimiter    *sharedratelimit.KeyedBuckets
+	CircuitBreaker *sharedcircuitbreaker.CircuitBreaker
 }
 
 type rateLimiter interface {
@@ -105,27 +95,15 @@ func NewResilientProviderE(config Config) (*ResilientProvider, error) {
 }
 
 func resolveRateLimiter(config Config) (rateLimiter, error) {
-	if config.RateLimiter != nil && config.LegacyRateLimiter != nil {
-		return nil, ErrMultipleRateLimiters
-	}
 	if config.RateLimiter != nil {
 		return sharedRateLimiterAdapter{inner: config.RateLimiter}, nil
-	}
-	if config.LegacyRateLimiter != nil {
-		return config.LegacyRateLimiter, nil
 	}
 	return nil, nil
 }
 
 func resolveCircuitBreaker(config Config) (circuitBreaker, error) {
-	if config.CircuitBreaker != nil && config.LegacyCircuitBreaker != nil {
-		return nil, ErrMultipleCircuitBreakers
-	}
 	if config.CircuitBreaker != nil {
 		return sharedCircuitBreakerAdapter{inner: config.CircuitBreaker}, nil
-	}
-	if config.LegacyCircuitBreaker != nil {
-		return config.LegacyCircuitBreaker, nil
 	}
 	return nil, nil
 }

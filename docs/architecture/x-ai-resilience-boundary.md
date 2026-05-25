@@ -64,12 +64,13 @@ Does not own:
 
 ### `x/ai/circuitbreaker` and `x/ai/ratelimit`
 
-These packages are retained compatibility surfaces for current AI wrappers.
-They are not the landing zone for new cross-family resilience features.
+These packages remain AI-local packages, but they are no longer alternate
+configuration inputs to `x/ai/resilience`. They are not the landing zone for
+new cross-family resilience features.
 
 New generic work should start in `x/resilience`. New AI-provider wrapping may
-continue in `x/ai/resilience`. A later migration may introduce compatibility
-aliases or adapters, but this decision does not move public symbols.
+continue in `x/ai/resilience`, but that wrapper should compose only shared
+`x/resilience/*` primitives.
 
 ---
 
@@ -101,9 +102,10 @@ classes.
 
 The safe migration path is:
 
-1. keep current public AI compatibility surfaces intact
-2. add internal adapters from AI wrappers to generic `x/resilience` primitives
-   where behavior can be proven equivalent
-3. add compatibility aliases only in a later symbol-change card
-4. document deprecations and release notes before removing any exported symbol
-
+1. keep shared `x/resilience/*` as the only resilience composition input to
+   `x/ai/resilience`
+2. add new generic breaker or limiter algorithms in `x/resilience`
+3. keep any AI-local limiter or breaker usage explicit at the direct package
+   call site instead of routing it back through `x/ai/resilience`
+4. document future symbol removals or deprecations before removing any
+   remaining exported AI-local symbols

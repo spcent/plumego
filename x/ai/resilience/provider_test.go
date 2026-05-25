@@ -118,38 +118,6 @@ func TestNewResilientProviderERejectsNilProvider(t *testing.T) {
 	}
 }
 
-func TestNewResilientProviderERejectsConflictingResilienceConfig(t *testing.T) {
-	mockProv := &mockProvider{name: "test-provider"}
-
-	t.Run("rate limiter", func(t *testing.T) {
-		resilient, err := NewResilientProviderE(Config{
-			Provider:          mockProv,
-			RateLimiter:       sharedratelimit.NewKeyed(1, 1),
-			LegacyRateLimiter: ratelimit.NewCompatibilityAdapter(ratelimit.NewTokenBucketLimiter(1, 0)),
-		})
-		if !errors.Is(err, ErrMultipleRateLimiters) {
-			t.Fatalf("NewResilientProviderE error = %v, want ErrMultipleRateLimiters", err)
-		}
-		if resilient != nil {
-			t.Fatalf("NewResilientProviderE returned provider = %#v, want nil", resilient)
-		}
-	})
-
-	t.Run("circuit breaker", func(t *testing.T) {
-		resilient, err := NewResilientProviderE(Config{
-			Provider:             mockProv,
-			CircuitBreaker:       sharedcircuitbreaker.New(sharedcircuitbreaker.Config{Name: "shared"}),
-			LegacyCircuitBreaker: circuitbreaker.NewCompatibilityAdapter(circuitbreaker.NewCircuitBreaker("ai", 1, time.Second)),
-		})
-		if !errors.Is(err, ErrMultipleCircuitBreakers) {
-			t.Fatalf("NewResilientProviderE error = %v, want ErrMultipleCircuitBreakers", err)
-		}
-		if resilient != nil {
-			t.Fatalf("NewResilientProviderE returned provider = %#v, want nil", resilient)
-		}
-	})
-}
-
 func TestResilientProviderRejectsNilCompletionRequest(t *testing.T) {
 	resilient := NewResilientProvider(Config{
 		Provider: &mockProvider{name: "test-provider"},
@@ -454,45 +422,6 @@ func TestNewResilientProviderE_UsesSharedRateLimiterAsCanonicalInput(t *testing.
 	}
 }
 
-func TestNewResilientProviderE_LegacyRateLimiterUsesCompatibilityAdapter(t *testing.T) {
-	mockProv := &mockProvider{name: "test-provider"}
-	legacyLimiter := ratelimit.NewCompatibilityAdapter(ratelimit.NewTokenBucketLimiter(2, 0))
-
-	resilient, err := NewResilientProviderE(Config{
-		Provider:          mockProv,
-		LegacyRateLimiter: legacyLimiter,
-	})
-	if err != nil {
-		t.Fatalf("NewResilientProviderE() error = %v", err)
-	}
-
-	ctx := t.Context()
-	req := &provider.CompletionRequest{
-		Model: "test-model",
-		Messages: []provider.Message{
-			provider.NewTextMessage(provider.RoleUser, "test"),
-		},
-	}
-
-	for i := 0; i < 2; i++ {
-		if _, err := resilient.Complete(ctx, req); err != nil {
-			t.Fatalf("request %d should succeed, got %v", i, err)
-		}
-	}
-
-	if _, err := resilient.Complete(ctx, req); !errors.Is(err, ratelimit.ErrRateLimitExceeded) {
-		t.Fatalf("third request error = %v, want ErrRateLimitExceeded", err)
-	}
-
-	remaining, err := resilient.RateLimitRemaining(ctx, "test-model")
-	if err != nil {
-		t.Fatalf("RateLimitRemaining() error = %v", err)
-	}
-	if remaining != 0 {
-		t.Fatalf("RateLimitRemaining() = %d, want 0", remaining)
-	}
-}
-
 func TestNewResilientProviderE_UsesSharedCircuitBreakerAsCanonicalInput(t *testing.T) {
 	mockProv := &mockProvider{
 		name: "test-provider",
@@ -538,52 +467,6 @@ func TestNewResilientProviderE_UsesSharedCircuitBreakerAsCanonicalInput(t *testi
 	stats := resilient.CircuitBreakerStats()
 	if stats.Name != "shared-breaker" {
 		t.Fatalf("CircuitBreakerStats().Name = %q, want shared-breaker", stats.Name)
-	}
-	if stats.State != circuitbreaker.StateOpen {
-		t.Fatalf("CircuitBreakerStats().State = %v, want StateOpen", stats.State)
-	}
-}
-
-func TestNewResilientProviderE_LegacyCircuitBreakerUsesCompatibilityAdapter(t *testing.T) {
-	mockProv := &mockProvider{
-		name: "test-provider",
-		err:  errors.New("provider error"),
-	}
-	legacyBreaker := circuitbreaker.NewCompatibilityAdapter(circuitbreaker.NewCircuitBreaker("legacy-breaker", 2, time.Second))
-
-	resilient, err := NewResilientProviderE(Config{
-		Provider:             mockProv,
-		LegacyCircuitBreaker: legacyBreaker,
-	})
-	if err != nil {
-		t.Fatalf("NewResilientProviderE() error = %v", err)
-	}
-
-	ctx := t.Context()
-	req := &provider.CompletionRequest{
-		Model: "test-model",
-		Messages: []provider.Message{
-			provider.NewTextMessage(provider.RoleUser, "test"),
-		},
-	}
-
-	for i := 0; i < 2; i++ {
-		if _, err := resilient.Complete(ctx, req); err == nil {
-			t.Fatalf("request %d should fail", i)
-		}
-	}
-
-	if resilient.CircuitBreakerState() != circuitbreaker.StateOpen {
-		t.Fatalf("CircuitBreakerState() = %v, want StateOpen", resilient.CircuitBreakerState())
-	}
-
-	if _, err := resilient.Complete(ctx, req); !errors.Is(err, circuitbreaker.ErrCircuitBreakerOpen) {
-		t.Fatalf("third request error = %v, want ErrCircuitBreakerOpen", err)
-	}
-
-	stats := resilient.CircuitBreakerStats()
-	if stats.Name != "legacy-breaker" {
-		t.Fatalf("CircuitBreakerStats().Name = %q, want legacy-breaker", stats.Name)
 	}
 	if stats.State != circuitbreaker.StateOpen {
 		t.Fatalf("CircuitBreakerStats().State = %v, want StateOpen", stats.State)

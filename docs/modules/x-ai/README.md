@@ -100,32 +100,28 @@ the whole `x/ai` family as beta-ready.
 
 `x/resilience` owns reusable circuit breaker and rate-limit primitives for
 cross-extension use. The older `x/ai/circuitbreaker` and `x/ai/ratelimit`
-packages remain AI-provider-specific compatibility primitives used by
-`x/ai/resilience`.
+packages remain AI-provider-specific packages, but `x/ai/resilience` now
+composes only the shared `x/resilience/*` primitives.
 
 New cross-family resilience work should start in `x/resilience`. New AI provider
 wrapping should still use `x/ai/resilience`, but the first migration slice now
 lets `NewResilientProviderE` compose directly with
 `x/resilience/ratelimit.KeyedBuckets` through the canonical `Config.RateLimiter`
-field. Existing AI-local rate-limit callers must opt in explicitly through
-`Config.LegacyRateLimiter` with
-`x/ai/ratelimit.NewCompatibilityAdapter(...)`; do not configure both at once.
-The circuit-breaker side follows the same rule: use the canonical
-`Config.CircuitBreaker` field with `x/resilience/circuitbreaker.CircuitBreaker`,
-and route older AI-local breaker wiring through `Config.LegacyCircuitBreaker`
-plus `x/ai/circuitbreaker.NewCompatibilityAdapter(...)`. Dynamic composition
-should prefer `NewResilientProviderE` so invalid provider wiring returns an
-error instead of panicking. `x/ai/ratelimit.TokenBucketLimiter` owns a cleanup
-goroutine only when constructed with a cleanup interval, and callers should
-call `Close` when that background cleanup is enabled.
+field. The circuit-breaker side follows the same rule: use
+`Config.CircuitBreaker` with
+`x/resilience/circuitbreaker.CircuitBreaker`. `x/ai/resilience` no longer
+accepts AI-local limiter or breaker implementations as alternate config paths.
+Dynamic composition should prefer `NewResilientProviderE` so invalid provider
+wiring returns an error instead of panicking. `x/ai/ratelimit.TokenBucketLimiter`
+owns a cleanup goroutine only when constructed with a cleanup interval, and
+callers should call `Close` when that background cleanup is enabled.
 
 Boundary details are recorded in
 `docs/architecture/x-ai-resilience-boundary.md`. For v1 cleanup, do not migrate
 public types between `x/ai/*` and `x/resilience` inline with feature work.
-`x/ai/circuitbreaker` and `x/ai/ratelimit` are retained compatibility surfaces;
 new generic breaker or limiter algorithms belong in `x/resilience`, while
-AI-provider wrapping, fallback, request keying, and AI error classification stay
-in `x/ai/resilience`.
+AI-provider wrapping, fallback, request keying, and AI error classification
+stay in `x/ai/resilience`.
 
 ## Metrics collector relationship
 

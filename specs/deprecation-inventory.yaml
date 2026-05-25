@@ -204,24 +204,6 @@ entries:
     paths:
       - x/ai/metrics/metrics.go
 
-  - id: x-ai-ratelimit-compatibility-adapter
-    category: compatibility_behavior
-    status: keep
-    owner: ai-gateway
-    decision: Keep temporarily while x/ai/resilience callers migrate from AI-local rate limiting to shared x/resilience/ratelimit keyed buckets. New x/ai/resilience wiring should use Config.RateLimiter directly; older x/ai/ratelimit callers must opt in explicitly through NewCompatibilityAdapter.
-    replacement: x/resilience/ratelimit.KeyedBuckets through x/ai/resilience.Config.RateLimiter
-    paths:
-      - x/ai/ratelimit/adapter.go
-
-  - id: x-ai-circuitbreaker-compatibility-adapter
-    category: compatibility_behavior
-    status: keep
-    owner: ai-gateway
-    decision: Keep temporarily while x/ai/resilience callers migrate from AI-local circuit breakers to shared x/resilience/circuitbreaker breakers. New x/ai/resilience wiring should use Config.CircuitBreaker directly; older x/ai/circuitbreaker callers must opt in explicitly through NewCompatibilityAdapter.
-    replacement: x/resilience/circuitbreaker.CircuitBreaker through x/ai/resilience.Config.CircuitBreaker
-    paths:
-      - x/ai/circuitbreaker/adapter.go
-
   - id: x-data-idempotency-stable-contract-reexports
     category: public_alias
     status: keep
