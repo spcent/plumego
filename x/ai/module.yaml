@@ -33,10 +33,10 @@ non_goals:
 # experimental — API may change in future releases without a deprecation period.
 stability_tiers:
   stable:
-    - provider      # Provider interface, CompletionRequest/Response, streaming types
-    - session       # Manager, Session, Storage interface
-    - streaming     # StreamManager, StreamingEngine, ProgressUpdate
-    - tool          # Tool interface, Registry, FuncTool, Policy
+    - provider      # Family tier index; package metadata lives in x/ai/provider/module.yaml
+    - session       # Family tier index; package metadata lives in x/ai/session/module.yaml
+    - streaming     # Family tier index; package metadata lives in x/ai/streaming/module.yaml
+    - tool          # Family tier index; package metadata lives in x/ai/tool/module.yaml
   experimental:
     - orchestration  # Agent workflow engine; step types may evolve
     - semanticcache  # Embedding-based caching; vector store backends in active development

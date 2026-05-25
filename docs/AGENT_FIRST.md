@@ -1,5 +1,11 @@
 # Agent-First Design
 
+This is the external overview of Plumego's agent-first repository model. It is
+meant for readers evaluating the design, understanding the four control
+planes, or adopting the same pattern in another Go repository. For the detailed
+internal operating reference used by maintainers and coding agents, see
+`docs/agent-first-operating-reference.md`.
+
 Plumego treats automated coding agents as regular maintainers, not as a
 separate workflow bolted onto the project. The repository is arranged so an
 agent can determine ownership, scope, validation, and stop conditions from

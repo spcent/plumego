@@ -1,0 +1,98 @@
+name: x/ai/session
+path: x/ai/session
+layer: extension
+status: experimental
+owner: ai-gateway
+risk: medium
+summary: Stable-tier AI session lifecycle and storage contracts within the experimental x/ai family.
+
+parent_family: x/ai
+
+entrypoint_reads:
+  - AGENTS.md
+  - docs/CANONICAL_STYLE_GUIDE.md
+  - specs/repo.yaml
+  - specs/task-routing.yaml
+  - specs/dependency-rules.yaml
+  - x/ai/module.yaml
+  - docs/modules/x-ai/README.md
+
+responsibilities:
+  - Session lifecycle and TTL ownership
+  - Session message append and trim behavior
+  - Token-budget-aware active-context selection
+  - Session context key-value storage
+  - In-memory storage implementation behind the session storage contract
+
+non_goals:
+  - Provider adapter ownership
+  - Tool execution policy ownership
+  - Tenant policy ownership
+  - HTTP handler or bootstrap wiring
+
+public_entrypoints:
+  - Session
+  - Manager
+  - Config
+  - CreateOptions
+  - Storage
+  - MemoryStorage
+  - DefaultConfig
+  - NewManager
+  - NewMemoryStorage
+  - WithTokenizer
+  - WithConfig
+
+allowed_imports:
+  - stdlib
+  - x/ai/provider
+  - x/ai/tokenizer
+
+forbidden_imports:
+  - core/**
+  - router/**
+  - middleware/**
+  - security/**
+  - store/**
+  - metrics/**
+  - x/data/**
+  - x/fileapi/**
+  - x/frontend/**
+  - x/gateway/**
+  - x/messaging/**
+  - x/observability/**
+  - x/openapi/**
+  - x/resilience/**
+  - x/rest/**
+  - x/rpc/**
+  - x/tenant/**
+  - x/validate/**
+  - x/websocket/**
+
+test_commands:
+  - go test -race -timeout 60s ./x/ai/session/...
+  - go test -timeout 20s ./x/ai/session/...
+  - go vet ./x/ai/session/...
+
+doc_paths:
+  - docs/modules/x-ai/README.md
+
+change_risks:
+  - session lifecycle regression
+  - token budget trimming regression
+  - storage copy-isolation regression
+
+review_checklist:
+  - Keep provider-neutral session ownership explicit
+  - Keep storage behavior behind the session Storage contract
+  - Keep token trimming and TTL policy reviewable
+  - Keep transport and tenant policy outside this package
+
+agent_hints:
+  - Keep provider-neutral session state here instead of adding lifecycle helpers to provider adapters
+  - Add durable storage adapters in an owning extension rather than widening this stable-tier contract
+  - Preserve copy isolation in storage implementations and tests when changing message or context handling
+
+landing_zones:
+  manager: session.go
+  storage: storage.go

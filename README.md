@@ -133,7 +133,9 @@ reviewable execution units, and `reference/` shows canonical wiring. The checks
 under `internal/checks/` enforce the most important boundaries locally and in
 CI, so automated changes produce reviewable evidence instead of relying on
 implicit convention. See [`docs/AGENT_FIRST.md`](./docs/AGENT_FIRST.md) for the
-full model and adoption path.
+external model and adoption path, and
+[`docs/agent-first-operating-reference.md`](./docs/agent-first-operating-reference.md)
+for the detailed internal operating reference.
 
 ## Getting Help
 

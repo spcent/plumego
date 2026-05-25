@@ -1,0 +1,109 @@
+name: x/ai/provider
+path: x/ai/provider
+layer: extension
+status: experimental
+owner: ai-gateway
+risk: medium
+summary: Stable-tier provider contracts, routing, and provider adapters within the experimental x/ai family.
+
+parent_family: x/ai
+
+entrypoint_reads:
+  - AGENTS.md
+  - docs/CANONICAL_STYLE_GUIDE.md
+  - specs/repo.yaml
+  - specs/task-routing.yaml
+  - specs/dependency-rules.yaml
+  - x/ai/module.yaml
+  - docs/modules/x-ai/README.md
+
+responsibilities:
+  - Provider-neutral completion request and response contracts
+  - Streaming chunk and parser contracts
+  - Explicit provider registration and routing
+  - Mock-backed offline provider testing helpers
+  - OpenAI and Claude adapter wiring
+
+non_goals:
+  - Session lifecycle ownership
+  - Tool execution policy ownership
+  - Generic resilience primitive ownership
+  - App bootstrap or provider credential loading
+
+public_entrypoints:
+  - Provider
+  - CompletionRequest
+  - CompletionResponse
+  - Message
+  - ContentBlock
+  - Tool
+  - ToolChoice
+  - StreamReader
+  - StreamChunk
+  - Manager
+  - Router
+  - DefaultRouter
+  - LoadBalancerRouter
+  - CostOptimizedRouter
+  - TaskBasedRouter
+  - FallbackRouter
+  - SmartRouter
+  - MockProvider
+  - OpenAIProvider
+  - ClaudeProvider
+
+allowed_imports:
+  - stdlib
+  - x/ai/tokenizer
+
+forbidden_imports:
+  - core/**
+  - router/**
+  - middleware/**
+  - security/**
+  - store/**
+  - metrics/**
+  - x/data/**
+  - x/fileapi/**
+  - x/frontend/**
+  - x/gateway/**
+  - x/messaging/**
+  - x/observability/**
+  - x/openapi/**
+  - x/resilience/**
+  - x/rest/**
+  - x/rpc/**
+  - x/tenant/**
+  - x/validate/**
+  - x/websocket/**
+
+test_commands:
+  - go test -race -timeout 60s ./x/ai/provider/...
+  - go test -timeout 20s ./x/ai/provider/...
+  - go vet ./x/ai/provider/...
+
+doc_paths:
+  - docs/modules/x-ai/README.md
+
+change_risks:
+  - provider routing regression
+  - streaming contract regression
+  - adapter compatibility regression
+
+review_checklist:
+  - Keep provider selection and routing explicit
+  - Keep session and tool policy ownership outside this package
+  - Keep stable-tier request and response contracts reviewable
+  - Keep provider adapters isolated from app bootstrap policy
+
+agent_hints:
+  - Use RegisterE for config-driven provider wiring and keep Register only for trusted static setup
+  - Add provider adapters here instead of widening stable roots or the x/ai family marker
+  - Keep generic resilience composition in x/ai/resilience or x/resilience, not in provider adapters
+
+landing_zones:
+  contracts: provider.go
+  manager: manager.go
+  openai_adapter: openai.go
+  claude_adapter: claude.go
+  test_double: mock.go

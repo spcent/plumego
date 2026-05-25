@@ -1,0 +1,106 @@
+name: x/ai/tool
+path: x/ai/tool
+layer: extension
+status: experimental
+owner: ai-gateway
+risk: medium
+summary: Stable-tier AI tool contracts, registry, policy, and local builtin tools within the experimental x/ai family.
+
+parent_family: x/ai
+
+entrypoint_reads:
+  - AGENTS.md
+  - docs/CANONICAL_STYLE_GUIDE.md
+  - specs/repo.yaml
+  - specs/task-routing.yaml
+  - specs/dependency-rules.yaml
+  - x/ai/module.yaml
+  - docs/modules/x-ai/README.md
+
+responsibilities:
+  - Tool execution contract and result shape
+  - Explicit tool registry ownership
+  - Tool execution policy interfaces
+  - Provider tool schema conversion
+  - Local builtin tool implementations
+
+non_goals:
+  - Provider routing ownership
+  - Marketplace installation ownership
+  - Remote tool transport ownership
+  - App-specific authorization policy
+
+public_entrypoints:
+  - Tool
+  - Result
+  - Metrics
+  - Registry
+  - RegistryOption
+  - Policy
+  - AllowAllPolicy
+  - AllowListPolicy
+  - FuncTool
+  - NewRegistry
+  - WithPolicy
+  - NewAllowListPolicy
+  - NewFuncTool
+  - FormatResultAsString
+  - NewEchoTool
+  - NewCalculatorTool
+  - NewReadFileTool
+  - NewWriteFileTool
+  - NewBashTool
+  - NewTimestampTool
+
+allowed_imports:
+  - stdlib
+  - x/ai/provider
+
+forbidden_imports:
+  - core/**
+  - router/**
+  - middleware/**
+  - security/**
+  - store/**
+  - metrics/**
+  - x/data/**
+  - x/fileapi/**
+  - x/frontend/**
+  - x/gateway/**
+  - x/messaging/**
+  - x/observability/**
+  - x/openapi/**
+  - x/resilience/**
+  - x/rest/**
+  - x/rpc/**
+  - x/tenant/**
+  - x/validate/**
+  - x/websocket/**
+
+test_commands:
+  - go test -race -timeout 60s ./x/ai/tool/...
+  - go test -timeout 20s ./x/ai/tool/...
+  - go vet ./x/ai/tool/...
+
+doc_paths:
+  - docs/modules/x-ai/README.md
+
+change_risks:
+  - tool policy regression
+  - registry behavior regression
+  - builtin tool safety regression
+
+review_checklist:
+  - Keep tool registration and execution explicit
+  - Keep app-specific auth or policy outside this package
+  - Keep provider conversion and tool contracts reviewable
+  - Keep builtin tools local and non-magical
+
+agent_hints:
+  - Use Registry plus Policy for explicit tool ownership instead of package globals
+  - Add app-owned tools here through FuncTool or concrete Tool implementations
+  - Keep remote marketplace or orchestration concerns outside this package
+
+landing_zones:
+  contracts_and_registry: tool.go
+  builtins: builtin.go

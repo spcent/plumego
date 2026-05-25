@@ -36,7 +36,7 @@ export const RELEASE_FACTS = {
       "area": "Subordinate extension primitives",
       "status": "experimental",
       "promise": "Maintained and tested, but discovery should start from the owning family entrypoint and compatibility is not frozen",
-      "modules": "x/data/cache, x/data/file, x/data/idempotency, x/data/kvengine, x/data/migrate, x/data/pgx, x/data/rw, x/data/sharding, x/data/sqlx, x/gateway/discovery, x/gateway/ipc, x/messaging/mq, x/messaging/pubsub, x/messaging/scheduler, x/messaging/webhook, x/observability/devtools, x/observability/ops, x/rpc/client, x/rpc/gateway, x/rpc/server"
+      "modules": "x/ai/provider, x/ai/session, x/ai/streaming, x/ai/tool, x/data/cache, x/data/file, x/data/idempotency, x/data/kvengine, x/data/migrate, x/data/pgx, x/data/rw, x/data/sharding, x/data/sqlx, x/gateway/discovery, x/gateway/ipc, x/messaging/mq, x/messaging/pubsub, x/messaging/scheduler, x/messaging/webhook, x/observability/devtools, x/observability/ops, x/rpc/client, x/rpc/gateway, x/rpc/server"
     }
   ]
 } as const;

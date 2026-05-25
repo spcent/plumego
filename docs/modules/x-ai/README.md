@@ -23,8 +23,8 @@ module marker and not a canonical bootstrap surface.
 
 ## Stability tiers
 
-The family is still experimental overall, but `x/ai/module.yaml` already
-declares subpackage-level tiers:
+The family is still experimental overall. `x/ai/module.yaml` remains the
+family-level tier index and currently declares these subpackage tiers:
 
 - stable-tier subpackages: `provider`, `session`, `streaming`, `tool`
 - experimental subpackages: `orchestration`, `semanticcache`, `marketplace`, `distributed`, `resilience`
@@ -32,7 +32,11 @@ declares subpackage-level tiers:
 Treat additional supporting subpackages under `x/ai/*` as experimental unless
 the manifest explicitly promotes them.
 
-Treat the manifest as the canonical source when these tiers change.
+For package-level machine-readable metadata, `x/ai/provider/module.yaml`,
+`x/ai/session/module.yaml`, `x/ai/streaming/module.yaml`, and
+`x/ai/tool/module.yaml` now own the status, owner, risk, review, and
+validation metadata for those stable-tier packages. `x/ai/module.yaml` remains
+the canonical family index for the tier split itself.
 
 ## Subpackage beta evidence
 
@@ -52,9 +56,12 @@ other experimental AI packages.
 The subpackage evidence records are tracked in
 `specs/extension-beta-evidence.yaml` under `subpackage_candidates`. The
 promotion check validates those entries against the `stability_tiers.stable`
-section in `x/ai/module.yaml`; root `x/ai` remains `experimental`.
-Release comparison commands in the evidence records apply only to the named
-subpackage and must not be used as root-family promotion evidence.
+section in `x/ai/module.yaml`; root `x/ai` remains `experimental`. The package
+manifests for `provider`, `session`, `streaming`, and `tool` now carry the
+package-level machine-readable metadata while the evidence records remain the
+promotion ledger. Release comparison commands in the evidence records apply
+only to the named subpackage and must not be used as root-family promotion
+evidence.
 
 ## Recommended stable-tier adoption path
 
@@ -93,29 +100,28 @@ the whole `x/ai` family as beta-ready.
 
 `x/resilience` owns reusable circuit breaker and rate-limit primitives for
 cross-extension use. The older `x/ai/circuitbreaker` and `x/ai/ratelimit`
-packages remain AI-provider-specific compatibility primitives used by
-`x/ai/resilience`.
+packages remain AI-provider-specific packages, but `x/ai/resilience` now
+composes only the shared `x/resilience/*` primitives.
 
 New cross-family resilience work should start in `x/resilience`. New AI provider
 wrapping should still use `x/ai/resilience`, but the first migration slice now
 lets `NewResilientProviderE` compose directly with
-`x/resilience/circuitbreaker.CircuitBreaker` and
-`x/resilience/ratelimit.KeyedBuckets` through explicit `Shared*` config fields.
-Keep the older `RateLimiter` and `CircuitBreaker` fields only for existing
-AI-local compatibility callers, and do not configure both compatibility and
-shared primitives in the same `Config`. Dynamic composition should prefer
-`NewResilientProviderE` so invalid provider wiring returns an error instead of
-panicking. `x/ai/ratelimit.TokenBucketLimiter` owns a cleanup goroutine only when
-constructed with a cleanup interval, and callers should call `Close` when that
-background cleanup is enabled.
+`x/resilience/ratelimit.KeyedBuckets` through the canonical `Config.RateLimiter`
+field. The circuit-breaker side follows the same rule: use
+`Config.CircuitBreaker` with
+`x/resilience/circuitbreaker.CircuitBreaker`. `x/ai/resilience` no longer
+accepts AI-local limiter or breaker implementations as alternate config paths.
+Dynamic composition should prefer `NewResilientProviderE` so invalid provider
+wiring returns an error instead of panicking. `x/ai/ratelimit.TokenBucketLimiter`
+owns a cleanup goroutine only when constructed with a cleanup interval, and
+callers should call `Close` when that background cleanup is enabled.
 
 Boundary details are recorded in
 `docs/architecture/x-ai-resilience-boundary.md`. For v1 cleanup, do not migrate
 public types between `x/ai/*` and `x/resilience` inline with feature work.
-`x/ai/circuitbreaker` and `x/ai/ratelimit` are retained compatibility surfaces;
 new generic breaker or limiter algorithms belong in `x/resilience`, while
-AI-provider wrapping, fallback, request keying, and AI error classification stay
-in `x/ai/resilience`.
+AI-provider wrapping, fallback, request keying, and AI error classification
+stay in `x/ai/resilience`.
 
 ## Metrics collector relationship
 

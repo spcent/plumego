@@ -1,5 +1,9 @@
 # Agent-First Design
 
+This is Plumego's detailed internal operating reference for agent-first
+maintenance. For the shorter external overview and adoption-oriented summary,
+see `docs/AGENT_FIRST.md`.
+
 Plumego is designed for codebases where AI coding agents participate in
 maintenance alongside human engineers. This document explains the rationale,
 describes the mechanisms that make agent-safe maintenance possible, and provides

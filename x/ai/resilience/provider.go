@@ -24,14 +24,6 @@ var (
 
 	// ErrNilRequest is returned when a provider request is nil.
 	ErrNilRequest = errors.New("ai resilience: completion request cannot be nil")
-
-	// ErrMultipleRateLimiters is returned when both compatibility and shared
-	// rate limiters are configured at once.
-	ErrMultipleRateLimiters = errors.New("ai resilience: configure either RateLimiter or SharedRateLimiter, not both")
-
-	// ErrMultipleCircuitBreakers is returned when both compatibility and shared
-	// circuit breakers are configured at once.
-	ErrMultipleCircuitBreakers = errors.New("ai resilience: configure either CircuitBreaker or SharedCircuitBreaker, not both")
 )
 
 // ResilientProvider wraps a provider with rate limiting and circuit breaking.
@@ -44,11 +36,9 @@ type ResilientProvider struct {
 
 // Config configures a resilient provider.
 type Config struct {
-	Provider             provider.Provider
-	RateLimiter          airatelimit.RateLimiter
-	CircuitBreaker       *aicircuitbreaker.CircuitBreaker
-	SharedRateLimiter    *sharedratelimit.KeyedBuckets
-	SharedCircuitBreaker *sharedcircuitbreaker.CircuitBreaker
+	Provider       provider.Provider
+	RateLimiter    *sharedratelimit.KeyedBuckets
+	CircuitBreaker *sharedcircuitbreaker.CircuitBreaker
 }
 
 type rateLimiter interface {
@@ -105,26 +95,17 @@ func NewResilientProviderE(config Config) (*ResilientProvider, error) {
 }
 
 func resolveRateLimiter(config Config) (rateLimiter, error) {
-	if config.RateLimiter != nil && config.SharedRateLimiter != nil {
-		return nil, ErrMultipleRateLimiters
+	if config.RateLimiter != nil {
+		return sharedRateLimiterAdapter{inner: config.RateLimiter}, nil
 	}
-	if config.SharedRateLimiter != nil {
-		return sharedRateLimiterAdapter{inner: config.SharedRateLimiter}, nil
-	}
-	return config.RateLimiter, nil
+	return nil, nil
 }
 
 func resolveCircuitBreaker(config Config) (circuitBreaker, error) {
-	if config.CircuitBreaker != nil && config.SharedCircuitBreaker != nil {
-		return nil, ErrMultipleCircuitBreakers
+	if config.CircuitBreaker != nil {
+		return sharedCircuitBreakerAdapter{inner: config.CircuitBreaker}, nil
 	}
-	if config.SharedCircuitBreaker != nil {
-		return sharedCircuitBreakerAdapter{inner: config.SharedCircuitBreaker}, nil
-	}
-	if config.CircuitBreaker == nil {
-		return nil, nil
-	}
-	return config.CircuitBreaker, nil
+	return nil, nil
 }
 
 // Name implements provider.Provider
