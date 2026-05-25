@@ -29,6 +29,23 @@ non_goals:
   - Circuit breaker behavior
   - Service discovery
 
+public_entrypoints:
+  - Conn
+  - DialOption
+  - Dialer
+  - Pool
+  - New
+  - CallOption
+  - UnaryInvoker
+  - UnaryInterceptor
+  - Code
+  - CodedError
+  - TraceStarter
+  - LoggingInterceptor
+  - RetryInterceptor
+  - TracingInterceptor
+  - TraceMetadata
+
 allowed_imports:
   - stdlib
   - contract

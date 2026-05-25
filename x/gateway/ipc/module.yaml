@@ -18,12 +18,57 @@ non_goals:
   - Stable root entrypoints
   - Business workflow orchestration
 
+public_entrypoints:
+  - Error
+  - Config
+  - MetricsObserver
+  - DefaultConfig
+  - Option
+  - WithConnectTimeout
+  - WithReadTimeout
+  - WithWriteTimeout
+  - WithBufferSize
+  - WithTimeouts
+  - WithKeepAlive
+  - WithKeepAlivePeriod
+  - WithMetrics
+  - WithLogger
+  - Addr
+  - NewAddr
+  - RateLimiter
+  - NewRateLimiter
+  - NewRateLimitedServer
+  - Reader
+  - Writer
+  - AddrProvider
+  - Client
+  - Dial
+  - DialWithContext
+  - FramedClient
+  - NewFramedClient
+  - Server
+  - NewServer
+  - PoolConfig
+  - DefaultPoolConfig
+  - Pool
+  - NewPool
+  - PoolStats
+  - StreamConfig
+  - DefaultStreamConfig
+  - StreamClient
+  - NewStreamClient
+  - HeartbeatConfig
+  - DefaultHeartbeatConfig
+  - NewHeartbeatClient
+  - ReconnectConfig
+  - DefaultReconnectConfig
+  - DialWithReconnect
+
 allowed_imports:
   - contract
   - log
 
 forbidden_imports:
-  - core/components/**
   - x/tenant/**
   - x/ai/**
 
