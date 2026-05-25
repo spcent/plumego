@@ -1,12 +1,15 @@
 package metrics
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
+
+	stablemetrics "github.com/spcent/plumego/metrics"
 )
 
 func TestNoOpCollector(t *testing.T) {
@@ -603,3 +606,57 @@ func TestPrometheusExporter_ScrapeConfig(t *testing.T) {
 		t.Error("Config should contain target address")
 	}
 }
+
+func TestAggregateCollectorAdapter(t *testing.T) {
+	recorder := &stubAggregateCollector{}
+	adapter := NewAggregateCollectorAdapter(recorder)
+
+	adapter.Counter("ai_requests_total", 3, Tags("provider", "openai")...)
+	adapter.Gauge("ai_queue_depth", 7, Tags("queue", "primary")...)
+	adapter.Histogram("ai_latency_seconds", 0.25, Tags("provider", "anthropic")...)
+	adapter.Timing("ai_duration_seconds", 150*time.Millisecond, Tags("operation", "complete")...)
+
+	if len(recorder.records) != 4 {
+		t.Fatalf("record count = %d, want 4", len(recorder.records))
+	}
+
+	if got := recorder.records[0]; got.Name != "ai_requests_total" || got.Value != 3 {
+		t.Fatalf("counter record = %+v, want name/value preserved", got)
+	}
+	if got := recorder.records[0].Labels["provider"]; got != "openai" {
+		t.Fatalf("counter provider label = %q, want openai", got)
+	}
+	if got := recorder.records[3].Duration; got != 150*time.Millisecond {
+		t.Fatalf("timing duration = %v, want 150ms", got)
+	}
+	if got := recorder.records[3].Value; got < 0.149 || got > 0.151 {
+		t.Fatalf("timing value = %v, want ~0.15 seconds", got)
+	}
+}
+
+func TestAggregateCollectorAdapter_NilSafe(t *testing.T) {
+	var adapter *AggregateCollectorAdapter
+	adapter.Counter("ignored", 1)
+
+	adapter = NewAggregateCollectorAdapter(nil)
+	adapter.Gauge("ignored", 1)
+	adapter.Histogram("ignored", 1)
+	adapter.Timing("ignored", time.Second)
+}
+
+type stubAggregateCollector struct {
+	records []stablemetrics.MetricRecord
+}
+
+func (s *stubAggregateCollector) Record(ctx context.Context, record stablemetrics.MetricRecord) {
+	s.records = append(s.records, record)
+}
+
+func (s *stubAggregateCollector) ObserveHTTP(ctx context.Context, method, path string, status, bytes int, duration time.Duration) {
+}
+
+func (s *stubAggregateCollector) GetStats() stablemetrics.CollectorStats {
+	return stablemetrics.CollectorStats{}
+}
+
+func (s *stubAggregateCollector) Clear() {}

@@ -117,6 +117,20 @@ new generic breaker or limiter algorithms belong in `x/resilience`, while
 AI-provider wrapping, fallback, request keying, and AI error classification stay
 in `x/ai/resilience`.
 
+## Metrics collector relationship
+
+Stable `metrics` remains the canonical small collector contract for cross-module
+recording. `x/ai/metrics` still owns AI-local conveniences such as `Tag`,
+`TagsE`, `MemoryCollector`, and the minimal Prometheus text exporter used by AI
+instrumentation tests and examples.
+
+When AI instrumentation should publish into the stable collector surface, prefer
+`x/ai/metrics.NewAggregateCollectorAdapter(...)` with a stable
+`metrics.AggregateCollector`. The adapter records AI counter, gauge, histogram,
+and timing calls as stable `MetricRecord` events. It intentionally does not add
+a second stable metric-kind contract; keep metric names distinct when different
+semantic series would otherwise share the same name.
+
 ## Streaming error contract
 
 - `x/ai/sse` and `x/ai/streaming` HTTP handlers use structured `contract.WriteError` responses for setup and request failures.
