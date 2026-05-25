@@ -4,16 +4,15 @@ Milestone: M-024
 Recipe: specs/change-recipes/fix-bug.yaml
 Context Package: control-plane
 Priority: P1
-State: blocked
-Blocked By: M-022 merge; overlaps docs/control-plane follow-up work
+State: done
 Primary Module: docs
 Owned Files:
 - `AGENTS.md`
 - `docs/README.md`
 - `docs/AGENT_FIRST.md`
-- `docs/agent-first.md`
+- `docs/agent-first-operating-reference.md`
 - `README.md`
-Depends On: M-022
+Depends On: none
 
 ## Goal
 
@@ -38,7 +37,7 @@ links so agents do not have to infer intent from filename case.
 - `AGENTS.md`
 - `docs/README.md`
 - `docs/AGENT_FIRST.md`
-- `docs/agent-first.md`
+- `docs/agent-first-operating-reference.md`
 - `README.md`
 
 ## Acceptance Tests
@@ -62,11 +61,14 @@ links so agents do not have to infer intent from filename case.
 
 ## Done Definition
 
-- [ ] Acceptance Tests pass.
-- [ ] All Validation commands exit 0.
-- [ ] gofmt -l . produces no output.
-- [ ] Docs Sync targets updated (if applicable).
+- [x] Acceptance Tests pass.
+- [x] All Validation commands exit 0.
+- [x] gofmt -l . produces no output.
+- [x] Docs Sync targets updated (if applicable).
 
 ## Outcome
 
-Blocked pending M-022 merge.
+Renamed the detailed internal guide to
+`docs/agent-first-operating-reference.md`, kept `docs/AGENT_FIRST.md` as the
+external overview, and updated authority and onboarding links so readers no
+longer need to infer intent from filename case alone.

@@ -28,7 +28,7 @@ Control-plane companions:
 - Context budget: `docs/AGENT_CONTEXT_BUDGET.md`
 - Quality contract: `docs/AGENT_CODE_QUALITY_RULES.md`
 - Style: `docs/CANONICAL_STYLE_GUIDE.md`
-- Architecture: `docs/agent-first.md`, `docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md`, `docs/architecture/core-boundary.md`, `docs/architecture/extension-boundary.md`
+- Architecture: `docs/agent-first-operating-reference.md`, `docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md`, `docs/architecture/core-boundary.md`, `docs/architecture/extension-boundary.md`
 - Maturity: `docs/EXTENSION_MATURITY.md`
 - Machine-readable rules: `specs/repo.yaml`, `specs/task-routing.yaml`, `specs/extension-taxonomy.yaml`, `specs/extension-maturity.yaml`, `specs/package-hotspots.yaml`, `specs/dependency-rules.yaml`, `specs/checks.yaml`, `specs/module-manifest.schema.yaml`, `specs/stop-condition-handlers.yaml`, `specs/request-flows.yaml`, `specs/agent-quality-rules.yaml`, `specs/change-recipes/`
 - Canonical app wiring: `reference/standard-service`

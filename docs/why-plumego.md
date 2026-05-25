@@ -188,7 +188,7 @@ in maintenance alongside human engineers. Machine-readable specs, per-module
 manifests, standardized check commands, and scoped task cards give agents a
 clear operating model.
 
-See `docs/agent-first.md` for the full agent-first design rationale and
+See `docs/agent-first-operating-reference.md` for the full agent-first design rationale and
 mechanism reference.
 
 ---
