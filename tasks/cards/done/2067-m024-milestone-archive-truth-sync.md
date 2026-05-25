@@ -4,15 +4,14 @@ Milestone: M-024
 Recipe: specs/change-recipes/fix-bug.yaml
 Context Package: control-plane
 Priority: P2
-State: blocked
-Blocked By: M-022 merge; overlaps task-history control-plane surfaces
+State: done
 Primary Module: tasks
 Owned Files:
 - `tasks/milestones/ROADMAP.md`
 - `tasks/milestones/STATUS.md`
 - `tasks/milestones/superseded/README.md`
 - `tasks/milestones/ARCHIVE_INDEX.md`
-Depends On: M-022
+Depends On: none
 
 ## Goal
 
@@ -58,11 +57,14 @@ relate to canonical milestone directories.
 
 ## Done Definition
 
-- [ ] Acceptance Tests pass.
-- [ ] All Validation commands exit 0.
-- [ ] gofmt -l . produces no output.
-- [ ] Docs Sync targets updated (if applicable).
+- [x] Acceptance Tests pass.
+- [x] All Validation commands exit 0.
+- [x] gofmt -l . produces no output.
+- [x] Docs Sync targets updated (if applicable).
 
 ## Outcome
 
-Blocked pending M-022 merge.
+Added `tasks/milestones/ARCHIVE_INDEX.md` as the canonical archive-coverage
+truth file, documented how superseded drafts relate to canonical milestones,
+and updated `ROADMAP.md` plus `STATUS.md` so on-disk archive coverage and
+current local milestone execution state are explicit.

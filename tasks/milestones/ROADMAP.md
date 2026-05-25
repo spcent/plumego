@@ -17,6 +17,11 @@ Update this file when you add, complete, or reorder milestones.
 
 ## Pipeline
 
+Archive truth note: a `[✓]` row records merged milestone history, not a
+guarantee that a matching `tasks/milestones/done/M-NNN-*/` directory is still
+present on disk. Use `tasks/milestones/ARCHIVE_INDEX.md` for canonical archive
+coverage.
+
 <!--
   Format per row:
   | M-NNN | Title | Status | Depends On | Notes |
@@ -48,8 +53,8 @@ Update this file when you add, complete, or reorder milestones.
 | M-020 | Community Discovery & Documentation Overhaul | [✓] | M-008 | Archived; README overhaul, stdlib comparison table, stable root pkg.go.dev doc comments |
 | M-021 | Agent-First Ecosystem Visibility | [✓] | M-019 | Archived; docs/AGENT_FIRST.md, quality-gates workflow updates, README agent-first section |
 | M-022 | Repo Surface Audit Remediation | [→] | — | Implementation complete locally with verify artifact; awaiting push and PR packaging before merge |
-| M-023 | AI Resilience Convergence | [ ] | — | Next actionable milestone; pulled ahead to resolve the residual `x/ai/resilience` dual-stack conflict before broader control-plane cleanup |
-| M-024 | Stable-Tier Metadata and Control-Plane Clarity | [ ] | M-022, M-023 | Planned follow-up for the remaining verified `x/ai` metadata, docs/specs, and milestone-history ambiguity |
+| M-023 | AI Resilience Convergence | [→] | — | Card implementation complete locally; verify/PR packaging still pending before merge |
+| M-024 | Stable-Tier Metadata and Control-Plane Clarity | [→] | M-022, M-023 | All planned cards completed locally; verify/PR packaging still pending before merge |
 
 ---
 
