@@ -4,8 +4,7 @@ Milestone: M-024
 Recipe: specs/change-recipes/fix-bug.yaml
 Context Package: implementation
 Priority: P1
-State: blocked
-Blocked By: card 2062, M-022 merge, and M-023 merge; same `x/ai` family metadata
+State: done
 Primary Module: x/ai
 Owned Files:
 - `x/ai/streaming/module.yaml`
@@ -61,11 +60,14 @@ docs so the stable-tier evidence no longer relies on root `x/ai` prose alone.
 
 ## Done Definition
 
-- [ ] Acceptance Tests pass.
-- [ ] All Validation commands exit 0.
-- [ ] gofmt -l . produces no output.
-- [ ] Docs Sync targets updated (if applicable).
+- [x] Acceptance Tests pass.
+- [x] All Validation commands exit 0.
+- [x] gofmt -l . produces no output.
+- [x] Docs Sync targets updated (if applicable).
 
 ## Outcome
 
-Blocked pending card 2062 plus M-022 and M-023 merge.
+Added explicit `x/ai/streaming/module.yaml` and `x/ai/tool/module.yaml`
+manifests, completed stable-tier package-level manifest coverage for `x/ai`,
+and updated the family primer and maturity dashboard so stable-tier metadata no
+longer relies on root-family prose alone.

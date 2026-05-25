@@ -1,0 +1,106 @@
+name: x/ai/streaming
+path: x/ai/streaming
+layer: extension
+status: experimental
+owner: ai-gateway
+risk: medium
+summary: Stable-tier AI streaming coordination, SSE progress updates, and workflow handlers within the experimental x/ai family.
+
+parent_family: x/ai
+
+entrypoint_reads:
+  - AGENTS.md
+  - docs/CANONICAL_STYLE_GUIDE.md
+  - specs/repo.yaml
+  - specs/task-routing.yaml
+  - specs/dependency-rules.yaml
+  - x/ai/module.yaml
+  - docs/modules/x-ai/README.md
+
+responsibilities:
+  - Workflow progress update contracts
+  - Stream registration and lifecycle ownership
+  - Streaming orchestration wrapper behavior
+  - SSE-oriented workflow handler helpers
+  - Parallel workflow streaming composition
+
+non_goals:
+  - Provider adapter ownership
+  - Session storage ownership
+  - Generic SSE transport ownership outside AI workflow streaming
+  - App bootstrap or route registration policy
+
+public_entrypoints:
+  - ProgressStatus
+  - ProgressUpdate
+  - StreamConfig
+  - DefaultStreamConfig
+  - StreamManager
+  - StreamingEngine
+  - WorkflowRequest
+  - Handler
+  - NewHandler
+  - StreamWorkflow
+  - WorkflowCallback
+  - HandleWithCallback
+  - StreamingParallelStep
+  - StreamingWorkflow
+
+allowed_imports:
+  - stdlib
+  - contract
+  - x/ai/orchestration
+  - x/ai/provider
+  - x/ai/sse
+  - x/ai/tokenizer
+
+forbidden_imports:
+  - core/**
+  - router/**
+  - middleware/**
+  - security/**
+  - store/**
+  - metrics/**
+  - x/data/**
+  - x/fileapi/**
+  - x/frontend/**
+  - x/gateway/**
+  - x/messaging/**
+  - x/observability/**
+  - x/openapi/**
+  - x/resilience/**
+  - x/rest/**
+  - x/rpc/**
+  - x/tenant/**
+  - x/validate/**
+  - x/websocket/**
+
+test_commands:
+  - go test -race -timeout 60s ./x/ai/streaming/...
+  - go test -timeout 20s ./x/ai/streaming/...
+  - go vet ./x/ai/streaming/...
+
+doc_paths:
+  - docs/modules/x-ai/README.md
+
+change_risks:
+  - progress event contract regression
+  - stream lifecycle regression
+  - workflow handler error-path regression
+
+review_checklist:
+  - Keep workflow streaming ownership explicit
+  - Keep low-level SSE transport behavior in x/ai/sse
+  - Keep handler error surfaces aligned with contract helpers
+  - Keep orchestration composition reviewable and caller-owned
+
+agent_hints:
+  - Use RegisterE for dynamic stream wiring and keep Register only for trusted in-code setup
+  - Keep generic HTTP or SSE primitives outside this package
+  - Add streaming workflow helpers here instead of widening provider or orchestration contracts
+
+landing_zones:
+  core: streaming.go
+  handler: handler.go
+  parallel: parallel.go
+  test_support: testing.go

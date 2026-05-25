@@ -32,11 +32,11 @@ family-level tier index and currently declares these subpackage tiers:
 Treat additional supporting subpackages under `x/ai/*` as experimental unless
 the manifest explicitly promotes them.
 
-For package-level machine-readable metadata, `x/ai/provider/module.yaml` and
-`x/ai/session/module.yaml` now own the status, owner, risk, review, and
+For package-level machine-readable metadata, `x/ai/provider/module.yaml`,
+`x/ai/session/module.yaml`, `x/ai/streaming/module.yaml`, and
+`x/ai/tool/module.yaml` now own the status, owner, risk, review, and
 validation metadata for those stable-tier packages. `x/ai/module.yaml` remains
-the canonical family index for the tier split itself and for stable-tier
-packages that do not yet have their own subpackage manifest.
+the canonical family index for the tier split itself.
 
 ## Subpackage beta evidence
 
@@ -56,11 +56,12 @@ other experimental AI packages.
 The subpackage evidence records are tracked in
 `specs/extension-beta-evidence.yaml` under `subpackage_candidates`. The
 promotion check validates those entries against the `stability_tiers.stable`
-section in `x/ai/module.yaml`; root `x/ai` remains `experimental`. For
-`provider` and `session`, the package manifests now carry the package-level
-machine-readable metadata while the evidence records remain the promotion
-ledger. Release comparison commands in the evidence records apply only to the
-named subpackage and must not be used as root-family promotion evidence.
+section in `x/ai/module.yaml`; root `x/ai` remains `experimental`. The package
+manifests for `provider`, `session`, `streaming`, and `tool` now carry the
+package-level machine-readable metadata while the evidence records remain the
+promotion ledger. Release comparison commands in the evidence records apply
+only to the named subpackage and must not be used as root-family promotion
+evidence.
 
 ## Recommended stable-tier adoption path
 

@@ -35,8 +35,8 @@ stability_tiers:
   stable:
     - provider      # Family tier index; package metadata lives in x/ai/provider/module.yaml
     - session       # Family tier index; package metadata lives in x/ai/session/module.yaml
-    - streaming     # Root manifest remains package-metadata authority until a subpackage manifest exists
-    - tool          # Root manifest remains package-metadata authority until a subpackage manifest exists
+    - streaming     # Family tier index; package metadata lives in x/ai/streaming/module.yaml
+    - tool          # Family tier index; package metadata lives in x/ai/tool/module.yaml
   experimental:
     - orchestration  # Agent workflow engine; step types may evolve
     - semanticcache  # Embedding-based caching; vector store backends in active development

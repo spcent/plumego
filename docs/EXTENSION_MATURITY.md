@@ -47,10 +47,11 @@ experimental. Release-backed API snapshots are recorded in
 ## Selected Beta Surfaces
 
 Selected subpackage surfaces may carry their own `module.yaml` without
-promoting the parent family. For `x/ai/provider` and `x/ai/session`, the new
-subpackage manifests own package-level owner, risk, and validation metadata;
-`x/ai/module.yaml` remains the family-tier index, and the evidence docs remain
-the promotion ledger.
+promoting the parent family. For `x/ai/provider`, `x/ai/session`,
+`x/ai/streaming`, and `x/ai/tool`, the subpackage manifests now own
+package-level owner, risk, and validation metadata; `x/ai/module.yaml`
+remains the family-tier index, and the evidence docs remain the promotion
+ledger.
 
 | Surface | Parent | Status | Owner | Release refs | Evidence |
 | --- | --- | --- | --- | --- | --- |
