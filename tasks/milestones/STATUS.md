@@ -14,6 +14,7 @@ truth matrix for agents; it does not mark a milestone complete by itself.
 | M-005 v1 release execution | `tasks/milestones/done/M-005-v1-release-execution/M-005.md` | rc.1 to final v1/no-go execution completed | Archived; `v1.0.0` evidence recorded |
 | M-006 v1.0.1 maintenance lane | `tasks/milestones/done/M-006-v1-0-1-maintenance-lane/M-006.md` | Post-v1 maintenance cards completed | Archived |
 | M-007 extension v1 baseline evidence intake | `tasks/milestones/done/M-007-extension-v1-baseline-evidence-intake/M-007.md` | First `v1.0.0` release-ref intake completed | Archived; remaining beta closures are blocked |
+| M-022 repo surface audit remediation | `tasks/milestones/active/M-022-repo-surface-audit-remediation/M-022.md` | Tracks the verified 2026-05 repo audit and splits it into bounded manifest, architecture, and deprecation cards | Queued; start with card 1503 |
 
 ## Reconciliation Rules
 
