@@ -183,7 +183,9 @@ func TestManager_Register(t *testing.T) {
 	// Mock provider
 	mockProvider := &mockProvider{name: "mock"}
 
-	manager.Register(mockProvider)
+	if err := manager.RegisterE(mockProvider); err != nil {
+		t.Fatal(err)
+	}
 
 	provider, err := manager.Get("mock")
 	if err != nil {
@@ -228,22 +230,6 @@ func TestManager_RegisterE(t *testing.T) {
 			t.Fatal("expected registered provider")
 		}
 	})
-}
-
-func TestManager_RegisterPanicsOnInvalidProvider(t *testing.T) {
-	manager := NewManager()
-
-	defer func() {
-		got := recover()
-		if got == nil {
-			t.Fatal("Register() should panic for invalid provider")
-		}
-		if !errors.Is(got.(error), ErrProviderRequired) {
-			t.Fatalf("Register() panic = %v, want ErrProviderRequired", got)
-		}
-	}()
-
-	manager.Register(nil)
 }
 
 func TestManager_Get_NotFound(t *testing.T) {
@@ -794,7 +780,9 @@ func TestManager_Complete_Success(t *testing.T) {
 		Content: []ContentBlock{{Type: ContentTypeText, Text: "delegated"}},
 	})
 	mgr := NewManager()
-	mgr.Register(mock)
+	if err := mgr.RegisterE(mock); err != nil {
+		t.Fatal(err)
+	}
 
 	resp, err := mgr.Complete(t.Context(), &CompletionRequest{Model: "test"})
 	if err != nil {
@@ -819,7 +807,9 @@ func TestManager_CompleteStream_Success(t *testing.T) {
 		{Type: "content_block_delta", Delta: &ContentDelta{Type: ContentTypeText, Text: "streamed"}},
 	})
 	mgr := NewManager()
-	mgr.Register(mock)
+	if err := mgr.RegisterE(mock); err != nil {
+		t.Fatal(err)
+	}
 
 	stream, err := mgr.CompleteStream(t.Context(), &CompletionRequest{Model: "test"})
 	if err != nil {
@@ -850,8 +840,12 @@ func TestManager_WithRouter_UsesCustomRouter(t *testing.T) {
 	customRouter := &singleProviderRouter{name: "chosen"}
 
 	mgr := NewManager(WithRouter(customRouter))
-	mgr.Register(chosen)
-	mgr.Register(other)
+	if err := mgr.RegisterE(chosen); err != nil {
+		t.Fatal(err)
+	}
+	if err := mgr.RegisterE(other); err != nil {
+		t.Fatal(err)
+	}
 
 	p, err := mgr.Route(t.Context(), &CompletionRequest{})
 	if err != nil {

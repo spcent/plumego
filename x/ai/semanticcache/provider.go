@@ -63,22 +63,6 @@ func WithProviderConfig(config *ProviderConfig) Option {
 	}
 }
 
-// NewSemanticCachingProvider creates a semantic caching provider wrapper.
-//
-// Deprecated: use NewSemanticCachingProviderE so missing provider or cache
-// dependencies return an error instead of panicking.
-func NewSemanticCachingProvider(
-	p provider.Provider,
-	semanticCache *SemanticCache,
-	opts ...Option,
-) *SemanticCachingProvider {
-	scp, err := NewSemanticCachingProviderE(p, semanticCache, opts...)
-	if err != nil {
-		panic(err)
-	}
-	return scp
-}
-
 // NewSemanticCachingProviderE creates a semantic caching provider wrapper and
 // returns validation errors for missing required dependencies.
 func NewSemanticCachingProviderE(

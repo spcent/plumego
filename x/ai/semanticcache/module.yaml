@@ -41,7 +41,6 @@ public_entrypoints:
   - SemanticCachingProvider
   - ProviderConfig
   - DefaultProviderConfig
-  - NewSemanticCachingProvider
   - NewSemanticCachingProviderE
   - ErrProviderRequired
   - ErrSemanticCacheRequired

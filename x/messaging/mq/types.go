@@ -26,12 +26,6 @@ const (
 
 	// DefaultTransactionTimeoutDuration is the default timeout for transactions.
 	DefaultTransactionTimeoutDuration = 30 * time.Second
-
-	// DefaultMQTTPort is the default port for MQTT protocol.
-	DefaultMQTTPort = 1883
-
-	// DefaultAMQPPort is the default port for AMQP protocol.
-	DefaultAMQPPort = 5672
 )
 
 // Message re-exports pubsub.Message for broker compatibility.

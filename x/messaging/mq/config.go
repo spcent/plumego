@@ -77,35 +77,6 @@ type Config struct {
 	// TransactionTimeout is the timeout for transactions (default: 30s)
 	TransactionTimeout time.Duration
 
-	// EnableMQTT requests MQTT protocol support. MQTT server support is not
-	// implemented yet, so enabling this flag fails validation.
-	//
-	// Deprecated: this is an unsupported compatibility placeholder. Leave it
-	// disabled and prefer direct x/messaging/pubsub integration until a real
-	// protocol bridge lands or the field is removed.
-	EnableMQTT bool
-
-	// MQTTPort is the port for MQTT protocol (default: 1883).
-	//
-	// Deprecated: this placeholder has no effect while MQTT support is
-	// unavailable and is kept only for compatibility with the unsupported
-	// EnableMQTT surface.
-	MQTTPort int
-
-	// EnableAMQP requests AMQP protocol support. AMQP server support is not
-	// implemented yet, so enabling this flag fails validation.
-	//
-	// Deprecated: this is an unsupported compatibility placeholder. Leave it
-	// disabled and prefer direct x/messaging/pubsub integration until a real
-	// protocol bridge lands or the field is removed.
-	EnableAMQP bool
-
-	// AMQPPort is the port for AMQP protocol (default: 5672).
-	//
-	// Deprecated: this placeholder has no effect while AMQP support is
-	// unavailable and is kept only for compatibility with the unsupported
-	// EnableAMQP surface.
-	AMQPPort int
 }
 
 // DefaultConfig returns the default configuration.
@@ -130,10 +101,6 @@ func DefaultConfig() Config {
 		EnableDeadLetterQueue:    false, // Disabled by default
 		EnableTransactions:       false, // Disabled by default
 		TransactionTimeout:       DefaultTransactionTimeoutDuration,
-		EnableMQTT:               false, // Disabled by default
-		MQTTPort:                 DefaultMQTTPort,
-		EnableAMQP:               false, // Disabled by default
-		AMQPPort:                 DefaultAMQPPort,
 	}
 }
 
@@ -192,14 +159,6 @@ func (c Config) Validate() error {
 		if c.TransactionTimeout < 0 {
 			return fmt.Errorf("%w: TransactionTimeout cannot be negative", ErrInvalidConfig)
 		}
-	}
-
-	// Protocol configuration validation
-	if c.EnableMQTT {
-		return fmt.Errorf("%w: %w: MQTT protocol server is not implemented", ErrInvalidConfig, ErrNotImplemented)
-	}
-	if c.EnableAMQP {
-		return fmt.Errorf("%w: %w: AMQP protocol server is not implemented", ErrInvalidConfig, ErrNotImplemented)
 	}
 
 	return nil

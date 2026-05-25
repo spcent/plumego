@@ -35,7 +35,6 @@ public_entrypoints:
   - ErrNilProvider
   - ErrNilRequest
   - ErrRateLimitExceeded
-  - NewResilientProvider
   - NewResilientProviderE
 
 allowed_imports:

@@ -72,11 +72,14 @@ func TestResilientProvider_RateLimit(t *testing.T) {
 		Timeout:          time.Second,
 	})
 
-	resilient := NewResilientProvider(Config{
+	resilient, err := NewResilientProviderE(Config{
 		Provider:       mockProv,
 		RateLimiter:    limiter,
 		CircuitBreaker: cb,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	ctx := t.Context()
 	req := &provider.CompletionRequest{
@@ -95,7 +98,7 @@ func TestResilientProvider_RateLimit(t *testing.T) {
 	}
 
 	// 3rd request should be rate limited
-	_, err := resilient.Complete(ctx, req)
+	_, err = resilient.Complete(ctx, req)
 	if !errors.Is(err, ErrRateLimitExceeded) {
 		t.Errorf("Error = %v, want ErrRateLimitExceeded", err)
 	}
@@ -117,9 +120,12 @@ func TestNewResilientProviderERejectsNilProvider(t *testing.T) {
 }
 
 func TestResilientProviderRejectsNilCompletionRequest(t *testing.T) {
-	resilient := NewResilientProvider(Config{
+	resilient, err := NewResilientProviderE(Config{
 		Provider: &mockProvider{name: "test-provider"},
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	if _, err := resilient.Complete(t.Context(), nil); !errors.Is(err, ErrNilRequest) {
 		t.Fatalf("Complete nil request error = %v, want ErrNilRequest", err)
@@ -141,10 +147,13 @@ func TestResilientProvider_CircuitBreaker(t *testing.T) {
 		Timeout:          time.Second,
 	})
 
-	resilient := NewResilientProvider(Config{
+	resilient, err := NewResilientProviderE(Config{
 		Provider:       mockProv,
 		CircuitBreaker: cb,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	ctx := t.Context()
 	req := &provider.CompletionRequest{
@@ -168,7 +177,7 @@ func TestResilientProvider_CircuitBreaker(t *testing.T) {
 	}
 
 	// Next request should fail fast
-	_, err := resilient.Complete(ctx, req)
+	_, err = resilient.Complete(ctx, req)
 	if !errors.Is(err, sharedcircuitbreaker.ErrCircuitOpen) {
 		t.Errorf("Error = %v, want ErrCircuitOpen", err)
 	}
@@ -189,11 +198,14 @@ func TestResilientProvider_Combined(t *testing.T) {
 		Timeout:          time.Second,
 	})
 
-	resilient := NewResilientProvider(Config{
+	resilient, err := NewResilientProviderE(Config{
 		Provider:       mockProv,
 		RateLimiter:    limiter,
 		CircuitBreaker: cb,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	ctx := t.Context()
 	req := &provider.CompletionRequest{
@@ -236,10 +248,13 @@ func TestResilientProvider_NoRateLimiter(t *testing.T) {
 		Timeout:          time.Second,
 	})
 
-	resilient := NewResilientProvider(Config{
+	resilient, err := NewResilientProviderE(Config{
 		Provider:       mockProv,
 		CircuitBreaker: cb,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	ctx := t.Context()
 	req := &provider.CompletionRequest{
@@ -262,10 +277,13 @@ func TestResilientProvider_NoCircuitBreaker(t *testing.T) {
 	mockProv := &mockProvider{name: "test-provider"}
 	limiter := sharedratelimit.NewKeyed(0, 5)
 
-	resilient := NewResilientProvider(Config{
+	resilient, err := NewResilientProviderE(Config{
 		Provider:    mockProv,
 		RateLimiter: limiter,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	ctx := t.Context()
 	req := &provider.CompletionRequest{
@@ -283,7 +301,7 @@ func TestResilientProvider_NoCircuitBreaker(t *testing.T) {
 		}
 	}
 
-	_, err := resilient.Complete(ctx, req)
+	_, err = resilient.Complete(ctx, req)
 	if !errors.Is(err, ErrRateLimitExceeded) {
 		t.Errorf("Error = %v, want ErrRateLimitExceeded", err)
 	}
@@ -299,11 +317,14 @@ func TestResilientProvider_CompleteStream(t *testing.T) {
 		Timeout:          time.Second,
 	})
 
-	resilient := NewResilientProvider(Config{
+	resilient, err := NewResilientProviderE(Config{
 		Provider:       mockProv,
 		RateLimiter:    limiter,
 		CircuitBreaker: cb,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	ctx := t.Context()
 	req := &provider.CompletionRequest{
@@ -322,7 +343,7 @@ func TestResilientProvider_CompleteStream(t *testing.T) {
 	}
 
 	// 3rd should be rate limited
-	_, err := resilient.CompleteStream(ctx, req)
+	_, err = resilient.CompleteStream(ctx, req)
 	if !errors.Is(err, ErrRateLimitExceeded) {
 		t.Errorf("Error = %v, want ErrRateLimitExceeded", err)
 	}
@@ -337,10 +358,13 @@ func TestResilientProvider_ListModels(t *testing.T) {
 		Timeout:          time.Second,
 	})
 
-	resilient := NewResilientProvider(Config{
+	resilient, err := NewResilientProviderE(Config{
 		Provider:       mockProv,
 		CircuitBreaker: cb,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	ctx := t.Context()
 	models, err := resilient.ListModels(ctx)
@@ -364,11 +388,14 @@ func TestResilientProvider_CountTokens(t *testing.T) {
 		Timeout:          time.Second,
 	})
 
-	resilient := NewResilientProvider(Config{
+	resilient, err := NewResilientProviderE(Config{
 		Provider:       mockProv,
 		RateLimiter:    limiter,
 		CircuitBreaker: cb,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// CountTokens should not be rate limited or circuit broken
 	count, err := resilient.CountTokens("test text")

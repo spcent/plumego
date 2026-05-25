@@ -14,7 +14,6 @@
 // Status:
 //   - Core features: Production-ready ✓
 //   - Advanced features (transactions, persistence, DLQ): Stable ✓
-//   - Protocol support (MQTT, AMQP): Not implemented
 //   - Cluster mode: Interface defined, implementation pending
 //
 // Example usage:

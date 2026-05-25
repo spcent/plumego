@@ -57,9 +57,6 @@ var (
 	// ErrTransactionRolledBack is returned when attempting to use a rolled back transaction.
 	ErrTransactionRolledBack = errors.New("mq: transaction already rolled back")
 
-	// ErrNotImplemented is returned by stub methods that are planned but not yet available.
-	ErrNotImplemented = errors.New("mq: not implemented")
-
 	// ErrDuplicateTask is returned when a task with the same ID already exists.
 	ErrDuplicateTask = errors.New("mq: duplicate task")
 

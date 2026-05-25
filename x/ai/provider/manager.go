@@ -46,17 +46,6 @@ func WithRouter(router Router) ManagerOption {
 	}
 }
 
-// Register registers a provider.
-//
-// Deprecated: use RegisterE for any dynamic, config-driven, or user-provided
-// registration path. Register remains only as a compatibility wrapper for
-// trusted in-code wiring and panics on invalid input.
-func (m *Manager) Register(provider Provider) {
-	if err := m.RegisterE(provider); err != nil {
-		panic(err)
-	}
-}
-
 // RegisterE registers a provider and reports invalid registration input.
 func (m *Manager) RegisterE(provider Provider) error {
 	if provider == nil {

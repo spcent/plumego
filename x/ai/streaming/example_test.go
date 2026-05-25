@@ -17,7 +17,9 @@ func ExampleStreamManager() {
 	stream, _ := sse.NewStream(ctx, recorder)
 
 	manager := streaming.NewStreamManager()
-	manager.Register("workflow-1", stream)
+	if err := manager.RegisterE("workflow-1", stream); err != nil {
+		panic(err)
+	}
 
 	_ = manager.SendUpdate("workflow-1", &streaming.ProgressUpdate{
 		WorkflowID: "workflow-1",

@@ -97,25 +97,15 @@ func TestNewSemanticCachingProviderE(t *testing.T) {
 	}
 }
 
-func TestNewSemanticCachingProviderPanicsOnInvalidDependencies(t *testing.T) {
+func TestNewSemanticCachingProvider_NilInputs(t *testing.T) {
 	cache := newTestSemanticCache()
 
-	assertPanic := func(name string, fn func()) {
-		t.Helper()
-		defer func() {
-			if r := recover(); r == nil {
-				t.Fatalf("%s did not panic", name)
-			}
-		}()
-		fn()
+	if _, err := NewSemanticCachingProviderE(nil, cache); !errors.Is(err, ErrProviderRequired) {
+		t.Fatalf("expected ErrProviderRequired, got %v", err)
 	}
-
-	assertPanic("nil provider", func() {
-		NewSemanticCachingProvider(nil, cache)
-	})
-	assertPanic("nil cache", func() {
-		NewSemanticCachingProvider(&MockProvider{}, nil)
-	})
+	if _, err := NewSemanticCachingProviderE(&MockProvider{}, nil); !errors.Is(err, ErrSemanticCacheRequired) {
+		t.Fatalf("expected ErrSemanticCacheRequired, got %v", err)
+	}
 }
 
 func TestSemanticCachingProvider(t *testing.T) {
@@ -125,7 +115,10 @@ func TestSemanticCachingProvider(t *testing.T) {
 		mockProvider := &MockProvider{responseText: "Test response"}
 		cache := newTestSemanticCache()
 
-		scp := NewSemanticCachingProvider(mockProvider, cache)
+		scp, err := NewSemanticCachingProviderE(mockProvider, cache)
+		if err != nil {
+			t.Fatal(err)
+		}
 		return scp, mockProvider, cache
 	}
 
@@ -195,11 +188,14 @@ func TestSemanticCachingProvider(t *testing.T) {
 		semanticCache := NewSemanticCache(gen, store, DefaultSemanticCacheConfig())
 		exactCache := llmcache.NewMemoryCache(1*time.Hour, 100)
 
-		scp := NewSemanticCachingProvider(
+		scp, err := NewSemanticCachingProviderE(
 			mockProvider,
 			semanticCache,
 			WithExactCache(exactCache),
 		)
+		if err != nil {
+			t.Fatal(err)
+		}
 
 		req := &provider.CompletionRequest{
 			Model: "test-model",
@@ -209,7 +205,7 @@ func TestSemanticCachingProvider(t *testing.T) {
 		}
 
 		// First call
-		_, err := scp.Complete(ctx, req)
+		_, err = scp.Complete(ctx, req)
 		if err != nil {
 			t.Fatalf("Complete failed: %v", err)
 		}
@@ -236,7 +232,10 @@ func TestSemanticCachingProvider(t *testing.T) {
 		store := NewMemoryVectorStore(100, 1*time.Hour)
 		cache := NewSemanticCache(gen, store, DefaultSemanticCacheConfig())
 
-		scp := NewSemanticCachingProvider(mockProvider, cache)
+		scp, err := NewSemanticCachingProviderE(mockProvider, cache)
+		if err != nil {
+			t.Fatal(err)
+		}
 
 		req := &provider.CompletionRequest{
 			Model: "test-model",
@@ -245,7 +244,7 @@ func TestSemanticCachingProvider(t *testing.T) {
 			},
 		}
 
-		_, err := scp.Complete(ctx, req)
+		_, err = scp.Complete(ctx, req)
 		if err == nil {
 			t.Error("expected error from provider")
 		}
@@ -391,12 +390,15 @@ func TestProviderConfig(t *testing.T) {
 			EnablePassthrough: false,
 		}
 
-		scp := NewSemanticCachingProvider(
+		scp, err := NewSemanticCachingProviderE(
 			mockProvider,
 			cache,
 			WithExactCache(exactCache),
 			WithProviderConfig(customConfig),
 		)
+		if err != nil {
+			t.Fatal(err)
+		}
 
 		if scp.exactCache == nil {
 			t.Error("expected exact cache to be set")
