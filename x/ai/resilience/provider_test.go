@@ -66,7 +66,7 @@ func (m *mockProvider) CountTokens(text string) (int, error) {
 
 func TestResilientProvider_RateLimit(t *testing.T) {
 	mockProv := &mockProvider{name: "test-provider"}
-	limiter := ratelimit.NewTokenBucketLimiter(2, 0) // 2 requests, no refill
+	limiter := sharedratelimit.NewKeyed(0, 2) // 2 requests, no refill
 	cb := circuitbreaker.NewCircuitBreaker("test", 5, 1*time.Second)
 
 	resilient := NewResilientProvider(Config{
@@ -119,8 +119,8 @@ func TestNewResilientProviderERejectsConflictingResilienceConfig(t *testing.T) {
 	t.Run("rate limiter", func(t *testing.T) {
 		resilient, err := NewResilientProviderE(Config{
 			Provider:          mockProv,
-			RateLimiter:       ratelimit.NewTokenBucketLimiter(1, 0),
-			SharedRateLimiter: sharedratelimit.NewKeyed(1, 1),
+			RateLimiter:       sharedratelimit.NewKeyed(1, 1),
+			LegacyRateLimiter: ratelimit.NewCompatibilityAdapter(ratelimit.NewTokenBucketLimiter(1, 0)),
 		})
 		if !errors.Is(err, ErrMultipleRateLimiters) {
 			t.Fatalf("NewResilientProviderE error = %v, want ErrMultipleRateLimiters", err)
@@ -205,7 +205,7 @@ func TestResilientProvider_CircuitBreaker(t *testing.T) {
 
 func TestResilientProvider_Combined(t *testing.T) {
 	mockProv := &mockProvider{name: "test-provider"}
-	limiter := ratelimit.NewTokenBucketLimiter(5, 1.0)
+	limiter := sharedratelimit.NewKeyed(1, 5)
 	cb := circuitbreaker.NewCircuitBreaker("test", 3, 1*time.Second)
 
 	resilient := NewResilientProvider(Config{
@@ -274,7 +274,7 @@ func TestResilientProvider_NoRateLimiter(t *testing.T) {
 
 func TestResilientProvider_NoCircuitBreaker(t *testing.T) {
 	mockProv := &mockProvider{name: "test-provider"}
-	limiter := ratelimit.NewTokenBucketLimiter(5, 0)
+	limiter := sharedratelimit.NewKeyed(0, 5)
 
 	resilient := NewResilientProvider(Config{
 		Provider:    mockProv,
@@ -305,7 +305,7 @@ func TestResilientProvider_NoCircuitBreaker(t *testing.T) {
 
 func TestResilientProvider_CompleteStream(t *testing.T) {
 	mockProv := &mockProvider{name: "test-provider"}
-	limiter := ratelimit.NewTokenBucketLimiter(2, 0)
+	limiter := sharedratelimit.NewKeyed(0, 2)
 	cb := circuitbreaker.NewCircuitBreaker("test", 5, 1*time.Second)
 
 	resilient := NewResilientProvider(Config{
@@ -360,7 +360,7 @@ func TestResilientProvider_ListModels(t *testing.T) {
 
 func TestResilientProvider_CountTokens(t *testing.T) {
 	mockProv := &mockProvider{name: "test-provider"}
-	limiter := ratelimit.NewTokenBucketLimiter(1, 0)
+	limiter := sharedratelimit.NewKeyed(0, 1)
 	cb := circuitbreaker.NewCircuitBreaker("test", 1, 1*time.Second)
 
 	resilient := NewResilientProvider(Config{
@@ -380,14 +380,56 @@ func TestResilientProvider_CountTokens(t *testing.T) {
 	}
 }
 
-func TestResilientProvider_SharedRateLimiter(t *testing.T) {
+func TestNewResilientProviderE_UsesSharedRateLimiterAsCanonicalInput(t *testing.T) {
 	mockProv := &mockProvider{name: "test-provider"}
 	limiter := sharedratelimit.NewKeyed(0, 2)
 
-	resilient := NewResilientProvider(Config{
-		Provider:          mockProv,
-		SharedRateLimiter: limiter,
+	resilient, err := NewResilientProviderE(Config{
+		Provider:    mockProv,
+		RateLimiter: limiter,
 	})
+	if err != nil {
+		t.Fatalf("NewResilientProviderE() error = %v", err)
+	}
+
+	ctx := t.Context()
+	req := &provider.CompletionRequest{
+		Model: "test-model",
+		Messages: []provider.Message{
+			provider.NewTextMessage(provider.RoleUser, "test"),
+		},
+	}
+
+	for i := 0; i < 2; i++ {
+		if _, err := resilient.Complete(ctx, req); err != nil {
+			t.Fatalf("request %d should succeed, got %v", i, err)
+		}
+	}
+
+	if _, err := resilient.Complete(ctx, req); !errors.Is(err, ratelimit.ErrRateLimitExceeded) {
+		t.Fatalf("third request error = %v, want ErrRateLimitExceeded", err)
+	}
+
+	remaining, err := resilient.RateLimitRemaining(ctx, "test-model")
+	if err != nil {
+		t.Fatalf("RateLimitRemaining() error = %v", err)
+	}
+	if remaining != 0 {
+		t.Fatalf("RateLimitRemaining() = %d, want 0", remaining)
+	}
+}
+
+func TestNewResilientProviderE_LegacyRateLimiterUsesCompatibilityAdapter(t *testing.T) {
+	mockProv := &mockProvider{name: "test-provider"}
+	legacyLimiter := ratelimit.NewCompatibilityAdapter(ratelimit.NewTokenBucketLimiter(2, 0))
+
+	resilient, err := NewResilientProviderE(Config{
+		Provider:          mockProv,
+		LegacyRateLimiter: legacyLimiter,
+	})
+	if err != nil {
+		t.Fatalf("NewResilientProviderE() error = %v", err)
+	}
 
 	ctx := t.Context()
 	req := &provider.CompletionRequest{

@@ -99,15 +99,16 @@ packages remain AI-provider-specific compatibility primitives used by
 New cross-family resilience work should start in `x/resilience`. New AI provider
 wrapping should still use `x/ai/resilience`, but the first migration slice now
 lets `NewResilientProviderE` compose directly with
-`x/resilience/circuitbreaker.CircuitBreaker` and
-`x/resilience/ratelimit.KeyedBuckets` through explicit `Shared*` config fields.
-Keep the older `RateLimiter` and `CircuitBreaker` fields only for existing
-AI-local compatibility callers, and do not configure both compatibility and
-shared primitives in the same `Config`. Dynamic composition should prefer
-`NewResilientProviderE` so invalid provider wiring returns an error instead of
-panicking. `x/ai/ratelimit.TokenBucketLimiter` owns a cleanup goroutine only when
-constructed with a cleanup interval, and callers should call `Close` when that
-background cleanup is enabled.
+`x/resilience/ratelimit.KeyedBuckets` through the canonical `Config.RateLimiter`
+field. Existing AI-local rate-limit callers must opt in explicitly through
+`Config.LegacyRateLimiter` with
+`x/ai/ratelimit.NewCompatibilityAdapter(...)`; do not configure both at once.
+The circuit-breaker side still has a follow-up convergence step while
+`x/ai/circuitbreaker` remains the compatibility surface. Dynamic composition
+should prefer `NewResilientProviderE` so invalid provider wiring returns an
+error instead of panicking. `x/ai/ratelimit.TokenBucketLimiter` owns a cleanup
+goroutine only when constructed with a cleanup interval, and callers should
+call `Close` when that background cleanup is enabled.
 
 Boundary details are recorded in
 `docs/architecture/x-ai-resilience-boundary.md`. For v1 cleanup, do not migrate
