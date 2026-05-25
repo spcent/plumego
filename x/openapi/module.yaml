@@ -26,6 +26,33 @@ non_goals:
   - Stable root route annotation ownership
   - External OpenAPI library dependency
 
+public_entrypoints:
+  - Op
+  - Param
+  - Schema
+  - RequestBody
+  - Response
+  - MediaType
+  - Document
+  - Info
+  - PathItem
+  - Operation
+  - Generator
+  - New
+  - (*Generator).Generate
+  - PathParam
+  - QueryParam
+  - HeaderParam
+  - JSONContent
+  - String
+  - Integer
+  - Boolean
+  - Array
+  - MarshalJSON
+  - MarshalYAML
+  - WriteJSON
+  - WriteYAML
+
 allowed_imports:
   - stdlib
   - router

@@ -34,13 +34,39 @@ non_goals:
   - Business-specific UI flows
   - Router matching primitives
 
+public_entrypoints:
+  - Mount
+  - Registrar
+  - RegisterFromDir
+  - NewMountFromDir
+  - RegisterFS
+  - NewMountFS
+  - NewHandlerFS
+  - (*Mount).Prefix
+  - (*Mount).Handler
+  - (*Mount).Register
+  - Option
+  - WithPrefix
+  - WithIndex
+  - WithCacheControl
+  - WithIndexCacheControl
+  - WithFallback
+  - WithHeaders
+  - WithPrecompressed
+  - PrecompressedVariantMiss
+  - WithPrecompressedVariantMissHandler
+  - PrecompressedVariants
+  - WithPrecompressedVariantPlan
+  - WithNotFoundPage
+  - WithErrorPage
+  - WithMIMETypes
+
 allowed_imports:
   - contract
   - log
   - router
 
 forbidden_imports:
-  - core/components/**
   - x/tenant/**
   - x/ai/**
 

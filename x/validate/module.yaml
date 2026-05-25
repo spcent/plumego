@@ -24,6 +24,14 @@ non_goals:
   - Middleware or route registration
   - Stable contract binding behavior
 
+public_entrypoints:
+  - Validator
+  - ValidationError
+  - ValidationError.Error
+  - ValidationError.Unwrap
+  - BindJSON
+  - Bind
+
 allowed_imports:
   - stdlib
   - contract
