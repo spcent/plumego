@@ -48,6 +48,8 @@ Update this file when you add, complete, or reorder milestones.
 | M-020 | Community Discovery & Documentation Overhaul | [✓] | M-008 | Archived; README overhaul, stdlib comparison table, stable root pkg.go.dev doc comments |
 | M-021 | Agent-First Ecosystem Visibility | [✓] | M-019 | Archived; docs/AGENT_FIRST.md, quality-gates workflow updates, README agent-first section |
 | M-022 | Repo Surface Audit Remediation | [→] | — | Implementation complete locally with verify artifact; awaiting push and PR packaging before merge |
+| M-023 | AI Resilience Convergence | [ ] | — | Next actionable milestone; pulled ahead to resolve the residual `x/ai/resilience` dual-stack conflict before broader control-plane cleanup |
+| M-024 | Stable-Tier Metadata and Control-Plane Clarity | [ ] | M-022, M-023 | Planned follow-up for the remaining verified `x/ai` metadata, docs/specs, and milestone-history ambiguity |
 
 ---
 
@@ -79,7 +81,8 @@ M-005 ──► M-006 ──► M-007 ──► M-008 ──► M-009 ──► 
                                ├──► M-013
                                └──► M-020
 
-M-022 (independent)
+M-022 ──► M-024
+M-023 ──► M-024
 ```
 
 ---

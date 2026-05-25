@@ -15,6 +15,8 @@ truth matrix for agents; it does not mark a milestone complete by itself.
 | M-006 v1.0.1 maintenance lane | `tasks/milestones/done/M-006-v1-0-1-maintenance-lane/M-006.md` | Post-v1 maintenance cards completed | Archived |
 | M-007 extension v1 baseline evidence intake | `tasks/milestones/done/M-007-extension-v1-baseline-evidence-intake/M-007.md` | First `v1.0.0` release-ref intake completed | Archived; remaining beta closures are blocked |
 | M-022 repo surface audit remediation | `tasks/milestones/active/M-022-repo-surface-audit-remediation/M-022.md` | Tracks the verified 2026-05 repo audit and splits it into bounded manifest, architecture, and deprecation cards | Implementation complete locally; verify artifact recorded, push and PR packaging pending |
+| M-023 AI resilience convergence | `tasks/milestones/active/M-023-ai-resilience-convergence/M-023.md` | Pulls the highest-risk residual audit finding forward: finish `x/ai/resilience` convergence onto shared `x/resilience/*` primitives without waiting on control-plane cleanup | Planned and actionable now; cards `2060` and `2061` moved to the active queue |
+| M-024 stable-tier metadata and control-plane clarity | `tasks/milestones/active/M-024-stable-tier-metadata-and-control-plane-clarity/M-024.md` | Follow-up cleanup after M-022 and M-023: stable-tier AI manifests plus the remaining docs/specs/tasks ambiguity | Planned; blocked on M-022 and M-023 because the affected module sets overlap |
 
 ## Reconciliation Rules
 
