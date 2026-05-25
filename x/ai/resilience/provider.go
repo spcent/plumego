@@ -29,9 +29,9 @@ var (
 	// compatibility rate limiters are configured at once.
 	ErrMultipleRateLimiters = errors.New("ai resilience: configure either RateLimiter or LegacyRateLimiter, not both")
 
-	// ErrMultipleCircuitBreakers is returned when both compatibility and shared
-	// circuit breakers are configured at once.
-	ErrMultipleCircuitBreakers = errors.New("ai resilience: configure either CircuitBreaker or SharedCircuitBreaker, not both")
+	// ErrMultipleCircuitBreakers is returned when both canonical shared and
+	// compatibility circuit breakers are configured at once.
+	ErrMultipleCircuitBreakers = errors.New("ai resilience: configure either CircuitBreaker or LegacyCircuitBreaker, not both")
 )
 
 // ResilientProvider wraps a provider with rate limiting and circuit breaking.
@@ -47,8 +47,8 @@ type Config struct {
 	Provider             provider.Provider
 	RateLimiter          *sharedratelimit.KeyedBuckets
 	LegacyRateLimiter    *airatelimit.CompatibilityAdapter
-	CircuitBreaker       *aicircuitbreaker.CircuitBreaker
-	SharedCircuitBreaker *sharedcircuitbreaker.CircuitBreaker
+	CircuitBreaker       *sharedcircuitbreaker.CircuitBreaker
+	LegacyCircuitBreaker *aicircuitbreaker.CompatibilityAdapter
 }
 
 type rateLimiter interface {
@@ -118,16 +118,16 @@ func resolveRateLimiter(config Config) (rateLimiter, error) {
 }
 
 func resolveCircuitBreaker(config Config) (circuitBreaker, error) {
-	if config.CircuitBreaker != nil && config.SharedCircuitBreaker != nil {
+	if config.CircuitBreaker != nil && config.LegacyCircuitBreaker != nil {
 		return nil, ErrMultipleCircuitBreakers
 	}
-	if config.SharedCircuitBreaker != nil {
-		return sharedCircuitBreakerAdapter{inner: config.SharedCircuitBreaker}, nil
+	if config.CircuitBreaker != nil {
+		return sharedCircuitBreakerAdapter{inner: config.CircuitBreaker}, nil
 	}
-	if config.CircuitBreaker == nil {
-		return nil, nil
+	if config.LegacyCircuitBreaker != nil {
+		return config.LegacyCircuitBreaker, nil
 	}
-	return config.CircuitBreaker, nil
+	return nil, nil
 }
 
 // Name implements provider.Provider

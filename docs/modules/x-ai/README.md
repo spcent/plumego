@@ -103,8 +103,10 @@ lets `NewResilientProviderE` compose directly with
 field. Existing AI-local rate-limit callers must opt in explicitly through
 `Config.LegacyRateLimiter` with
 `x/ai/ratelimit.NewCompatibilityAdapter(...)`; do not configure both at once.
-The circuit-breaker side still has a follow-up convergence step while
-`x/ai/circuitbreaker` remains the compatibility surface. Dynamic composition
+The circuit-breaker side follows the same rule: use the canonical
+`Config.CircuitBreaker` field with `x/resilience/circuitbreaker.CircuitBreaker`,
+and route older AI-local breaker wiring through `Config.LegacyCircuitBreaker`
+plus `x/ai/circuitbreaker.NewCompatibilityAdapter(...)`. Dynamic composition
 should prefer `NewResilientProviderE` so invalid provider wiring returns an
 error instead of panicking. `x/ai/ratelimit.TokenBucketLimiter` owns a cleanup
 goroutine only when constructed with a cleanup interval, and callers should

@@ -67,7 +67,12 @@ func (m *mockProvider) CountTokens(text string) (int, error) {
 func TestResilientProvider_RateLimit(t *testing.T) {
 	mockProv := &mockProvider{name: "test-provider"}
 	limiter := sharedratelimit.NewKeyed(0, 2) // 2 requests, no refill
-	cb := circuitbreaker.NewCircuitBreaker("test", 5, 1*time.Second)
+	cb := sharedcircuitbreaker.New(sharedcircuitbreaker.Config{
+		Name:             "test",
+		FailureThreshold: 1.0,
+		MinRequests:      5,
+		Timeout:          time.Second,
+	})
 
 	resilient := NewResilientProvider(Config{
 		Provider:       mockProv,
@@ -133,8 +138,8 @@ func TestNewResilientProviderERejectsConflictingResilienceConfig(t *testing.T) {
 	t.Run("circuit breaker", func(t *testing.T) {
 		resilient, err := NewResilientProviderE(Config{
 			Provider:             mockProv,
-			CircuitBreaker:       circuitbreaker.NewCircuitBreaker("ai", 1, time.Second),
-			SharedCircuitBreaker: sharedcircuitbreaker.New(sharedcircuitbreaker.Config{Name: "shared"}),
+			CircuitBreaker:       sharedcircuitbreaker.New(sharedcircuitbreaker.Config{Name: "shared"}),
+			LegacyCircuitBreaker: circuitbreaker.NewCompatibilityAdapter(circuitbreaker.NewCircuitBreaker("ai", 1, time.Second)),
 		})
 		if !errors.Is(err, ErrMultipleCircuitBreakers) {
 			t.Fatalf("NewResilientProviderE error = %v, want ErrMultipleCircuitBreakers", err)
@@ -163,7 +168,12 @@ func TestResilientProvider_CircuitBreaker(t *testing.T) {
 		name: "test-provider",
 		err:  errors.New("provider error"),
 	}
-	cb := circuitbreaker.NewCircuitBreaker("test", 2, 1*time.Second)
+	cb := sharedcircuitbreaker.New(sharedcircuitbreaker.Config{
+		Name:             "test",
+		FailureThreshold: 1.0,
+		MinRequests:      2,
+		Timeout:          time.Second,
+	})
 
 	resilient := NewResilientProvider(Config{
 		Provider:       mockProv,
@@ -206,7 +216,12 @@ func TestResilientProvider_CircuitBreaker(t *testing.T) {
 func TestResilientProvider_Combined(t *testing.T) {
 	mockProv := &mockProvider{name: "test-provider"}
 	limiter := sharedratelimit.NewKeyed(1, 5)
-	cb := circuitbreaker.NewCircuitBreaker("test", 3, 1*time.Second)
+	cb := sharedcircuitbreaker.New(sharedcircuitbreaker.Config{
+		Name:             "test",
+		FailureThreshold: 1.0,
+		MinRequests:      3,
+		Timeout:          time.Second,
+	})
 
 	resilient := NewResilientProvider(Config{
 		Provider:       mockProv,
@@ -248,7 +263,12 @@ func TestResilientProvider_Combined(t *testing.T) {
 
 func TestResilientProvider_NoRateLimiter(t *testing.T) {
 	mockProv := &mockProvider{name: "test-provider"}
-	cb := circuitbreaker.NewCircuitBreaker("test", 5, 1*time.Second)
+	cb := sharedcircuitbreaker.New(sharedcircuitbreaker.Config{
+		Name:             "test",
+		FailureThreshold: 1.0,
+		MinRequests:      5,
+		Timeout:          time.Second,
+	})
 
 	resilient := NewResilientProvider(Config{
 		Provider:       mockProv,
@@ -306,7 +326,12 @@ func TestResilientProvider_NoCircuitBreaker(t *testing.T) {
 func TestResilientProvider_CompleteStream(t *testing.T) {
 	mockProv := &mockProvider{name: "test-provider"}
 	limiter := sharedratelimit.NewKeyed(0, 2)
-	cb := circuitbreaker.NewCircuitBreaker("test", 5, 1*time.Second)
+	cb := sharedcircuitbreaker.New(sharedcircuitbreaker.Config{
+		Name:             "test",
+		FailureThreshold: 1.0,
+		MinRequests:      5,
+		Timeout:          time.Second,
+	})
 
 	resilient := NewResilientProvider(Config{
 		Provider:       mockProv,
@@ -339,7 +364,12 @@ func TestResilientProvider_CompleteStream(t *testing.T) {
 
 func TestResilientProvider_ListModels(t *testing.T) {
 	mockProv := &mockProvider{name: "test-provider"}
-	cb := circuitbreaker.NewCircuitBreaker("test", 5, 1*time.Second)
+	cb := sharedcircuitbreaker.New(sharedcircuitbreaker.Config{
+		Name:             "test",
+		FailureThreshold: 1.0,
+		MinRequests:      5,
+		Timeout:          time.Second,
+	})
 
 	resilient := NewResilientProvider(Config{
 		Provider:       mockProv,
@@ -361,7 +391,12 @@ func TestResilientProvider_ListModels(t *testing.T) {
 func TestResilientProvider_CountTokens(t *testing.T) {
 	mockProv := &mockProvider{name: "test-provider"}
 	limiter := sharedratelimit.NewKeyed(0, 1)
-	cb := circuitbreaker.NewCircuitBreaker("test", 1, 1*time.Second)
+	cb := sharedcircuitbreaker.New(sharedcircuitbreaker.Config{
+		Name:             "test",
+		FailureThreshold: 1.0,
+		MinRequests:      1,
+		Timeout:          time.Second,
+	})
 
 	resilient := NewResilientProvider(Config{
 		Provider:       mockProv,
@@ -458,7 +493,7 @@ func TestNewResilientProviderE_LegacyRateLimiterUsesCompatibilityAdapter(t *test
 	}
 }
 
-func TestResilientProvider_SharedCircuitBreaker(t *testing.T) {
+func TestNewResilientProviderE_UsesSharedCircuitBreakerAsCanonicalInput(t *testing.T) {
 	mockProv := &mockProvider{
 		name: "test-provider",
 		err:  errors.New("provider error"),
@@ -470,10 +505,13 @@ func TestResilientProvider_SharedCircuitBreaker(t *testing.T) {
 		Timeout:          time.Second,
 	})
 
-	resilient := NewResilientProvider(Config{
-		Provider:             mockProv,
-		SharedCircuitBreaker: breaker,
+	resilient, err := NewResilientProviderE(Config{
+		Provider:       mockProv,
+		CircuitBreaker: breaker,
 	})
+	if err != nil {
+		t.Fatalf("NewResilientProviderE() error = %v", err)
+	}
 
 	ctx := t.Context()
 	req := &provider.CompletionRequest{
@@ -500,6 +538,52 @@ func TestResilientProvider_SharedCircuitBreaker(t *testing.T) {
 	stats := resilient.CircuitBreakerStats()
 	if stats.Name != "shared-breaker" {
 		t.Fatalf("CircuitBreakerStats().Name = %q, want shared-breaker", stats.Name)
+	}
+	if stats.State != circuitbreaker.StateOpen {
+		t.Fatalf("CircuitBreakerStats().State = %v, want StateOpen", stats.State)
+	}
+}
+
+func TestNewResilientProviderE_LegacyCircuitBreakerUsesCompatibilityAdapter(t *testing.T) {
+	mockProv := &mockProvider{
+		name: "test-provider",
+		err:  errors.New("provider error"),
+	}
+	legacyBreaker := circuitbreaker.NewCompatibilityAdapter(circuitbreaker.NewCircuitBreaker("legacy-breaker", 2, time.Second))
+
+	resilient, err := NewResilientProviderE(Config{
+		Provider:             mockProv,
+		LegacyCircuitBreaker: legacyBreaker,
+	})
+	if err != nil {
+		t.Fatalf("NewResilientProviderE() error = %v", err)
+	}
+
+	ctx := t.Context()
+	req := &provider.CompletionRequest{
+		Model: "test-model",
+		Messages: []provider.Message{
+			provider.NewTextMessage(provider.RoleUser, "test"),
+		},
+	}
+
+	for i := 0; i < 2; i++ {
+		if _, err := resilient.Complete(ctx, req); err == nil {
+			t.Fatalf("request %d should fail", i)
+		}
+	}
+
+	if resilient.CircuitBreakerState() != circuitbreaker.StateOpen {
+		t.Fatalf("CircuitBreakerState() = %v, want StateOpen", resilient.CircuitBreakerState())
+	}
+
+	if _, err := resilient.Complete(ctx, req); !errors.Is(err, circuitbreaker.ErrCircuitBreakerOpen) {
+		t.Fatalf("third request error = %v, want ErrCircuitBreakerOpen", err)
+	}
+
+	stats := resilient.CircuitBreakerStats()
+	if stats.Name != "legacy-breaker" {
+		t.Fatalf("CircuitBreakerStats().Name = %q, want legacy-breaker", stats.Name)
 	}
 	if stats.State != circuitbreaker.StateOpen {
 		t.Fatalf("CircuitBreakerStats().State = %v, want StateOpen", stats.State)

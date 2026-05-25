@@ -4,7 +4,7 @@ Milestone: M-023
 Recipe: specs/change-recipes/symbol-change.yaml
 Context Package: implementation
 Priority: P0
-State: active
+State: done
 Primary Module: x/ai
 Owned Files:
 - `x/ai/resilience/provider.go`
@@ -62,11 +62,24 @@ paths for the same behavior.
 
 ## Done Definition
 
-- [ ] Acceptance Tests pass.
-- [ ] All Validation commands exit 0.
-- [ ] gofmt -l . produces no output.
-- [ ] Docs Sync targets updated (if applicable).
+- [x] Acceptance Tests pass.
+- [x] All Validation commands exit 0.
+- [x] gofmt -l . produces no output.
+- [x] Docs Sync targets updated (if applicable).
 
 ## Outcome
 
-<!-- Agent fills this after completion: what changed and why. -->
+- `x/ai/resilience.Config.CircuitBreaker` is now the canonical shared
+  `x/resilience/circuitbreaker.CircuitBreaker` input.
+- Legacy AI-local breaker wiring moved behind the explicit
+  `LegacyCircuitBreaker` field plus
+  `x/ai/circuitbreaker.NewCompatibilityAdapter(...)`.
+- `ErrMultipleCircuitBreakers` now guards canonical-vs-legacy composition
+  instead of AI-local-vs-shared duplication.
+- Added `x-ai-circuitbreaker-compatibility-adapter` to the deprecation
+  inventory and updated the `x/ai` module primer to document the breaker
+  migration path.
+- Validation:
+  - `go test -timeout 20s ./x/ai/... ./x/resilience/...`
+  - `go run ./internal/checks/deprecation-inventory -strict`
+  - `gofmt -l .`
