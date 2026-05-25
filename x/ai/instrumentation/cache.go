@@ -28,7 +28,7 @@ func NewInstrumentedCache(cache llmcache.Cache, collector metrics.Collector, cac
 func (ic *InstrumentedCache) Get(ctx context.Context, key *llmcache.CacheKey) (*llmcache.CacheEntry, error) {
 	start := time.Now()
 
-	tags := metrics.Tags("cache_type", ic.cacheType)
+	tags, _ := metrics.TagsE("cache_type", ic.cacheType)
 
 	entry, err := ic.cache.Get(ctx, key)
 
@@ -51,7 +51,7 @@ func (ic *InstrumentedCache) Get(ctx context.Context, key *llmcache.CacheKey) (*
 func (ic *InstrumentedCache) Set(ctx context.Context, key *llmcache.CacheKey, entry *llmcache.CacheEntry) error {
 	start := time.Now()
 
-	tags := metrics.Tags("cache_type", ic.cacheType)
+	tags, _ := metrics.TagsE("cache_type", ic.cacheType)
 
 	err := ic.cache.Set(ctx, key, entry)
 
@@ -72,7 +72,7 @@ func (ic *InstrumentedCache) Set(ctx context.Context, key *llmcache.CacheKey, en
 func (ic *InstrumentedCache) Delete(ctx context.Context, key *llmcache.CacheKey) error {
 	start := time.Now()
 
-	tags := metrics.Tags("cache_type", ic.cacheType)
+	tags, _ := metrics.TagsE("cache_type", ic.cacheType)
 
 	err := ic.cache.Delete(ctx, key)
 
@@ -90,7 +90,7 @@ func (ic *InstrumentedCache) Delete(ctx context.Context, key *llmcache.CacheKey)
 func (ic *InstrumentedCache) Clear(ctx context.Context) error {
 	start := time.Now()
 
-	tags := metrics.Tags("cache_type", ic.cacheType)
+	tags, _ := metrics.TagsE("cache_type", ic.cacheType)
 
 	err := ic.cache.Clear(ctx)
 
@@ -123,7 +123,7 @@ func NewInstrumentedMemoryCache(memCache *llmcache.MemoryCache, collector metric
 func (imc *InstrumentedMemoryCache) PublishStats() {
 	stats := imc.memCache.Stats()
 
-	tags := metrics.Tags("cache_type", "memory")
+	tags, _ := metrics.TagsE("cache_type", "memory")
 
 	// Publish as gauges
 	imc.collector.Gauge("ai_cache_hits", float64(stats.Hits), tags...)

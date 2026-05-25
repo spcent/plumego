@@ -54,19 +54,6 @@ func TagsE(keyValues ...string) ([]Tag, error) {
 	return tags, nil
 }
 
-// Tags creates a slice of tags from static key-value pairs.
-//
-// Deprecated: prefer TagsE when tag input is built at runtime. Tags remains a
-// compatibility helper for trusted static call sites and panics on malformed
-// key-value input.
-func Tags(keyValues ...string) []Tag {
-	tags, err := TagsE(keyValues...)
-	if err != nil {
-		panic(err)
-	}
-	return tags
-}
-
 // NoOpCollector is a collector that does nothing (for testing/disabled metrics)
 type NoOpCollector struct{}
 
