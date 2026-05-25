@@ -79,16 +79,32 @@ type Config struct {
 
 	// EnableMQTT requests MQTT protocol support. MQTT server support is not
 	// implemented yet, so enabling this flag fails validation.
+	//
+	// Deprecated: this is an unsupported compatibility placeholder. Leave it
+	// disabled and prefer direct x/messaging/pubsub integration until a real
+	// protocol bridge lands or the field is removed.
 	EnableMQTT bool
 
-	// MQTTPort is the port for MQTT protocol (default: 1883)
+	// MQTTPort is the port for MQTT protocol (default: 1883).
+	//
+	// Deprecated: this placeholder has no effect while MQTT support is
+	// unavailable and is kept only for compatibility with the unsupported
+	// EnableMQTT surface.
 	MQTTPort int
 
 	// EnableAMQP requests AMQP protocol support. AMQP server support is not
 	// implemented yet, so enabling this flag fails validation.
+	//
+	// Deprecated: this is an unsupported compatibility placeholder. Leave it
+	// disabled and prefer direct x/messaging/pubsub integration until a real
+	// protocol bridge lands or the field is removed.
 	EnableAMQP bool
 
-	// AMQPPort is the port for AMQP protocol (default: 5672)
+	// AMQPPort is the port for AMQP protocol (default: 5672).
+	//
+	// Deprecated: this placeholder has no effect while AMQP support is
+	// unavailable and is kept only for compatibility with the unsupported
+	// EnableAMQP surface.
 	AMQPPort int
 }
 

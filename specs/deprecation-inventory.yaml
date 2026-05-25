@@ -254,7 +254,7 @@ entries:
     category: unsupported_operation
     status: keep
     owner: messaging
-    decision: Keep as explicit unsupported experimental behavior. MQTT and AMQP bridge configuration fails closed and remains documented as unavailable in v1.
+    decision: Keep only as deprecated experimental compatibility placeholders. MQTT and AMQP bridge configuration fails closed today, should stay disabled in v1 callers, and should be removed in the next API cleanup unless a real bridge implementation lands.
     replacement: implemented protocol bridge or removed config surface
     paths:
       - x/messaging/mq/broker_routes.go
