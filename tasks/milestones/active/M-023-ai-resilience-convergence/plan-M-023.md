@@ -48,9 +48,9 @@ Affected Modules: `x/ai`, `x/resilience`, `docs`, `specs`
 
 | Phase | Checkpoint Gate | Status |
 |-------|-----------------|--------|
-| Phase 1 | `go test -timeout 20s ./x/ai/... ./x/resilience/...` | pending |
-| Phase 2 | `go test -race -timeout 60s ./x/ai/... ./x/resilience/...` | pending |
-| Phase 3 | `go run ./internal/checks/deprecation-inventory -strict && go run ./internal/checks/dependency-rules` | pending |
+| Phase 1 | `go test -timeout 20s ./x/ai/... ./x/resilience/...` | passed |
+| Phase 2 | `go test -race -timeout 60s ./x/ai/... ./x/resilience/...` | passed |
+| Phase 3 | `go run ./internal/checks/deprecation-inventory -strict && go run ./internal/checks/dependency-rules` | passed |
 
 ## Exit Condition
 
