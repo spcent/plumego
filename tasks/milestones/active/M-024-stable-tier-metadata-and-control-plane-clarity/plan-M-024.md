@@ -64,9 +64,9 @@ Affected Modules: `x/ai`, `docs`, `specs`, `middleware`, `tasks`
 
 | Phase | Checkpoint Gate | Status |
 |-------|-----------------|--------|
-| Phase 1 | `go run ./internal/checks/module-manifests && go run ./internal/checks/extension-maturity` | pending |
-| Phase 2 | `go run ./internal/checks/dependency-rules && go test -timeout 20s ./middleware/...` | pending |
-| Phase 3 | `go run ./internal/checks/agent-workflow` | pending |
+| Phase 1 | `go run ./internal/checks/module-manifests && go run ./internal/checks/extension-maturity` | passed |
+| Phase 2 | `go run ./internal/checks/dependency-rules && go test -timeout 20s ./middleware/...` | passed |
+| Phase 3 | `go run ./internal/checks/agent-workflow` | passed |
 
 ## Exit Condition
 
