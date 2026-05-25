@@ -18,6 +18,15 @@ type Options struct {
 	MaxMemoryMB int    `json:"max_memory_mb"`
 }
 
+// DefaultOptions returns the default stable KV options for the caller-selected
+// data directory. DataDir remains explicit so callers choose where filesystem
+// state is created.
+func DefaultOptions(dataDir string) Options {
+	opts := Options{DataDir: dataDir}
+	setDefaults(&opts)
+	return opts
+}
+
 func setDefaults(opts *Options) {
 	opts.DataDir = strings.TrimSpace(opts.DataDir)
 	if opts.MaxEntries == 0 {
