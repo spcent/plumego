@@ -4,8 +4,7 @@ Milestone: M-024
 Recipe: specs/change-recipes/fix-bug.yaml
 Context Package: implementation
 Priority: P1
-State: blocked
-Blocked By: M-022 and M-023 merge; overlaps `x/ai` follow-up metadata work
+State: done
 Primary Module: x/ai
 Owned Files:
 - `x/ai/provider/module.yaml`
@@ -13,7 +12,7 @@ Owned Files:
 - `x/ai/module.yaml`
 - `docs/modules/x-ai/README.md`
 - `docs/EXTENSION_MATURITY.md`
-Depends On: M-022, M-023
+Depends On: M-023
 
 ## Goal
 
@@ -62,11 +61,14 @@ sync the dashboard and primer wording to reference the new manifest authority.
 
 ## Done Definition
 
-- [ ] Acceptance Tests pass.
-- [ ] All Validation commands exit 0.
-- [ ] gofmt -l . produces no output.
-- [ ] Docs Sync targets updated (if applicable).
+- [x] Acceptance Tests pass.
+- [x] All Validation commands exit 0.
+- [x] gofmt -l . produces no output.
+- [x] Docs Sync targets updated (if applicable).
 
 ## Outcome
 
-Blocked pending M-022 and M-023 merge.
+Added explicit `x/ai/provider/module.yaml` and `x/ai/session/module.yaml`
+manifests, kept `x/ai/module.yaml` as the family tier index, and updated the
+AI primer and extension maturity dashboard to point package-level metadata at
+the new subpackage manifests.
