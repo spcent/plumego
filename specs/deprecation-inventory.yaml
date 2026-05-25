@@ -175,6 +175,35 @@ entries:
     paths:
       - x/ai/multimodal/types.go
 
+  - id: x-ai-stable-register-panic-wrappers
+    category: compatibility_behavior
+    status: keep
+    owner: ai-gateway
+    decision: Keep temporarily for stable-tier caller migration only. Dynamic or user-provided registration must use the E-variants.
+    replacement: provider.Manager.RegisterE and streaming.StreamManager.RegisterE
+    paths:
+      - x/ai/provider/manager.go
+      - x/ai/streaming/streaming.go
+
+  - id: x-ai-experimental-constructor-panic-wrappers
+    category: compatibility_behavior
+    status: keep
+    owner: ai-gateway
+    decision: Keep temporarily while experimental x/ai callers migrate. Prefer the E-variants and remove these shims once compatibility callers are gone.
+    replacement: resilience.NewResilientProviderE and semanticcache.NewSemanticCachingProviderE
+    paths:
+      - x/ai/resilience/provider.go
+      - x/ai/semanticcache/provider.go
+
+  - id: x-ai-metrics-tags-panic-helper
+    category: compatibility_behavior
+    status: keep
+    owner: ai-gateway
+    decision: Keep as a trusted static-call helper only. Dynamic tag input must use TagsE so malformed pairs return an error instead of panicking.
+    replacement: x/ai/metrics.TagsE
+    paths:
+      - x/ai/metrics/metrics.go
+
   - id: x-data-idempotency-stable-contract-reexports
     category: public_alias
     status: keep

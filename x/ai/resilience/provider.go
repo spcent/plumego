@@ -64,6 +64,9 @@ type circuitBreaker interface {
 }
 
 // NewResilientProvider creates a new resilient provider.
+//
+// Deprecated: use NewResilientProviderE so invalid resilience composition
+// returns an error instead of panicking.
 func NewResilientProvider(config Config) *ResilientProvider {
 	resilient, err := NewResilientProviderE(config)
 	if err != nil {

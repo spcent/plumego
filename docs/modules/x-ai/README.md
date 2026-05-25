@@ -131,6 +131,23 @@ and timing calls as stable `MetricRecord` events. It intentionally does not add
 a second stable metric-kind contract; keep metric names distinct when different
 semantic series would otherwise share the same name.
 
+## Compatibility panic wrappers
+
+Several `x/ai` packages still expose panic-based compatibility helpers while the
+family remains experimental or while stable-tier callers migrate gradually:
+
+- `provider.Manager.Register` and `streaming.StreamManager.Register` remain only
+  for trusted in-code wiring. Prefer `RegisterE` for config-driven, plugin, or
+  user-provided registration.
+- `resilience.NewResilientProvider` and
+  `semanticcache.NewSemanticCachingProvider` are deprecated panic shims. Prefer
+  `NewResilientProviderE` and `NewSemanticCachingProviderE`.
+- `metrics.Tags` remains only for trusted static key-value pairs. Prefer
+  `metrics.TagsE` whenever tag input is built dynamically.
+
+These wrappers are tracked in `specs/deprecation-inventory.yaml` and should be
+removed when their remaining compatibility callers are migrated.
+
 ## Streaming error contract
 
 - `x/ai/sse` and `x/ai/streaming` HTTP handlers use structured `contract.WriteError` responses for setup and request failures.

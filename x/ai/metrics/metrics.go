@@ -55,7 +55,10 @@ func TagsE(keyValues ...string) ([]Tag, error) {
 }
 
 // Tags creates a slice of tags from static key-value pairs.
-// Use TagsE when tag input is built at runtime.
+//
+// Deprecated: prefer TagsE when tag input is built at runtime. Tags remains a
+// compatibility helper for trusted static call sites and panics on malformed
+// key-value input.
 func Tags(keyValues ...string) []Tag {
 	tags, err := TagsE(keyValues...)
 	if err != nil {
