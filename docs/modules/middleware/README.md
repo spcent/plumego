@@ -249,7 +249,9 @@ websocket handlers. The shared conformance suite covers panic propagation,
 `Flush`, `Hijack`, post-timeout writes, and partial gzip panic finalization for
 the high-risk wrappers represented here.
 Each `Unwrap`, `Flush`, and `Hijack` claim in the matrix is also covered by a
-shared positive or negative conformance case.
+shared positive or negative conformance case. See
+`middleware/conformance/README.md` for the scope of that test-only suite and
+when a shared invariant belongs there instead of in a package-local test.
 
 | Package | Buffers response body | `Unwrap` | `Flush` | `Hijack` | Streaming / websocket guidance |
 |---|---:|---:|---:|---:|---|

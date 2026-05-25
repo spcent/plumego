@@ -4,8 +4,7 @@ Milestone: M-024
 Recipe: specs/change-recipes/fix-bug.yaml
 Context Package: implementation
 Priority: P2
-State: blocked
-Blocked By: card 2065 and M-022 merge; same middleware documentation surface
+State: done
 Primary Module: middleware
 Owned Files:
 - `middleware/conformance/README.md`
@@ -60,4 +59,7 @@ implementation skeleton.
 
 ## Outcome
 
-Blocked pending card 2065 and M-022 merge.
+Added `middleware/conformance/README.md` to explain that the directory is a
+shared test-only suite for stable middleware invariants, and linked to it from
+the middleware primer so the path no longer reads like an abandoned runtime
+package.
