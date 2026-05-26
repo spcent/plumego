@@ -119,17 +119,12 @@ func (c Config) Validate() error {
 		return fmt.Errorf("%w: MaxSubscribers cannot be negative", ErrInvalidConfig)
 	}
 
-	// Cluster configuration validation
+	// Cluster configuration validation.
+	// Cluster mode is not yet implemented; the Config fields are reserved for a
+	// future release. Reject now so callers get an explicit error rather than a
+	// silent no-op. Remove this guard when the implementation lands.
 	if c.EnableCluster {
-		if strings.TrimSpace(c.ClusterNodeID) == "" {
-			return fmt.Errorf("%w: ClusterNodeID is required when cluster mode is enabled", ErrInvalidConfig)
-		}
-		if c.ClusterReplicationFactor < 1 {
-			return fmt.Errorf("%w: ClusterReplicationFactor must be at least 1", ErrInvalidConfig)
-		}
-		if c.ClusterSyncInterval < 0 {
-			return fmt.Errorf("%w: ClusterSyncInterval cannot be negative", ErrInvalidConfig)
-		}
+		return fmt.Errorf("%w: cluster mode is not yet implemented; set EnableCluster to false until a future release adds distributed support", ErrInvalidConfig)
 	}
 
 	// Persistence configuration validation
