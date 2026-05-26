@@ -6,7 +6,7 @@ owner: ai-gateway
 risk: low
 summary: Cache lifecycle orchestration over vectorstore backends, including cache warming, eviction coordination, and statistics management.
 
-parent_family: x/ai/semanticcache
+parent_family: x/ai
 
 entrypoint_reads:
   - AGENTS.md

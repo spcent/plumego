@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/spcent/plumego/metrics"
 	kv "github.com/spcent/plumego/store/kv"
 	"github.com/spcent/plumego/x/ai/orchestration"
 	"github.com/spcent/plumego/x/messaging/mq"
@@ -30,7 +29,7 @@ func newTestInstrumentedEngine(t *testing.T) (*InstrumentedDistributedEngine, fu
 	localEngine := orchestration.NewEngine()
 	engine := NewDistributedEngine(localEngine, queue, persistence, DefaultEngineConfig())
 
-	collector := metrics.NewNoopCollector()
+	collector := NoopMetricRecorder()
 	ie := NewInstrumentedDistributedEngine(engine, collector)
 
 	cleanup := func() {
@@ -80,7 +79,7 @@ func TestInstrumentedEngine_ExecuteAsync_RegisteredWorkflow(t *testing.T) {
 	localEngine.RegisterWorkflow(wf)
 
 	engine := NewDistributedEngine(localEngine, queue, persistence, DefaultEngineConfig())
-	ie := NewInstrumentedDistributedEngine(engine, metrics.NewNoopCollector())
+	ie := NewInstrumentedDistributedEngine(engine, NoopMetricRecorder())
 	defer ie.Close()
 
 	id, err := ie.ExecuteAsync(t.Context(), "wf-inst", map[string]any{}, DefaultExecutionOptions())
@@ -111,7 +110,7 @@ func TestInstrumentedEngine_GetExecutionStatus(t *testing.T) {
 	localEngine.RegisterWorkflow(wf)
 
 	engine := NewDistributedEngine(localEngine, queue, persistence, DefaultEngineConfig())
-	ie := NewInstrumentedDistributedEngine(engine, metrics.NewNoopCollector())
+	ie := NewInstrumentedDistributedEngine(engine, NoopMetricRecorder())
 	defer ie.Close()
 
 	id, err := ie.ExecuteAsync(t.Context(), "wf-status", nil, DefaultExecutionOptions())

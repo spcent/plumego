@@ -392,6 +392,34 @@ packages:
       - x/observability
     summary: Stable request and trace ID propagation middleware primitive.
 
+  x/ai:
+    module: x/ai
+    layer: extension
+    role: app_surface
+    task_families:
+      - ai
+    start_with:
+      - x/ai/module.yaml
+      - docs/modules/x-ai/README.md
+    avoid:
+      - x/ai/semanticcache
+      - x/ai/distributed
+    summary: Canonical AI provider, orchestration, session, and resilience family entrypoint.
+
+  x/ai/semanticcache:
+    module: x/ai
+    layer: extension
+    role: implementation
+    task_families:
+      - ai
+    start_with:
+      - x/ai/module.yaml
+      - x/ai/semanticcache/module.yaml
+      - x/ai/semanticcache/provider.go
+    avoid:
+      - core
+    summary: Embedding-based semantic cache for AI provider responses under x/ai.
+
   contract:
     module: contract
     layer: stable

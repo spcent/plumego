@@ -32,6 +32,11 @@ non_goals:
   - Vector store implementation (owned by x/ai/semanticcache/vectorstore)
   - Cache lifecycle management (owned by x/ai/semanticcache/cachemanager)
 
+subordinate_families:
+  - x/ai/semanticcache/cachemanager
+  - x/ai/semanticcache/embedding
+  - x/ai/semanticcache/vectorstore
+
 public_entrypoints:
   - SemanticCache
   - SemanticCacheConfig
@@ -41,13 +46,20 @@ public_entrypoints:
   - SemanticCachingProvider
   - ProviderConfig
   - DefaultProviderConfig
-  - NewSemanticCachingProviderE
+  - NewSemanticCachingProvider
   - ErrProviderRequired
   - ErrSemanticCacheRequired
   - EmbeddingGenerator
   - VectorEntry
   - VectorStore
   - SimilarityResult
+  - MetricRecorder
+  - MetricRecord
+  - NoopMetricRecorder
+  - InstrumentedSemanticCache
+  - NewInstrumentedSemanticCache
+  - InstrumentedVectorStore
+  - NewInstrumentedVectorStore
 
 allowed_imports:
   - stdlib

@@ -6,7 +6,7 @@ owner: ai-gateway
 risk: medium
 summary: Vector storage backend interface and in-memory implementations (MemoryVectorStore, TieredVectorStore) for semantic similarity search.
 
-parent_family: x/ai/semanticcache
+parent_family: x/ai
 
 entrypoint_reads:
   - AGENTS.md

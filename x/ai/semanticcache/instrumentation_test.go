@@ -4,7 +4,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/spcent/plumego/metrics"
 	"github.com/spcent/plumego/x/ai/provider"
 	"github.com/spcent/plumego/x/ai/tokenizer"
 )
@@ -16,7 +15,7 @@ func TestInstrumentedSemanticCache(t *testing.T) {
 		gen := NewSimpleEmbeddingGenerator(128)
 		store := NewMemoryVectorStore(100, 1*time.Hour)
 		cache := NewSemanticCache(gen, store, DefaultSemanticCacheConfig())
-		collector := metrics.NewNoopCollector()
+		collector := NoopMetricRecorder()
 
 		instrumented := NewInstrumentedSemanticCache(cache, collector)
 
@@ -46,7 +45,7 @@ func TestInstrumentedSemanticCache(t *testing.T) {
 		gen := NewSimpleEmbeddingGenerator(128)
 		store := NewMemoryVectorStore(100, 1*time.Hour)
 		cache := NewSemanticCache(gen, store, DefaultSemanticCacheConfig())
-		collector := metrics.NewNoopCollector()
+		collector := NoopMetricRecorder()
 
 		instrumented := NewInstrumentedSemanticCache(cache, collector)
 
@@ -76,7 +75,7 @@ func TestInstrumentedSemanticCache(t *testing.T) {
 		gen := NewSimpleEmbeddingGenerator(128)
 		store := NewMemoryVectorStore(100, 1*time.Hour)
 		cache := NewSemanticCache(gen, store, DefaultSemanticCacheConfig())
-		collector := metrics.NewNoopCollector()
+		collector := NoopMetricRecorder()
 
 		instrumented := NewInstrumentedSemanticCache(cache, collector)
 
@@ -118,7 +117,7 @@ func TestInstrumentedSemanticCache(t *testing.T) {
 		gen := NewSimpleEmbeddingGenerator(128)
 		store := NewMemoryVectorStore(100, 1*time.Hour)
 		cache := NewSemanticCache(gen, store, DefaultSemanticCacheConfig())
-		collector := metrics.NewNoopCollector()
+		collector := NoopMetricRecorder()
 
 		instrumented := NewInstrumentedSemanticCache(cache, collector)
 
@@ -132,7 +131,7 @@ func TestInstrumentedSemanticCache(t *testing.T) {
 		gen := NewSimpleEmbeddingGenerator(128)
 		store := NewMemoryVectorStore(100, 1*time.Hour)
 		cache := NewSemanticCache(gen, store, DefaultSemanticCacheConfig())
-		collector := metrics.NewNoopCollector()
+		collector := NoopMetricRecorder()
 
 		instrumented := NewInstrumentedSemanticCache(cache, collector)
 
@@ -147,7 +146,7 @@ func TestInstrumentedVectorStore(t *testing.T) {
 
 	t.Run("InstrumentedAdd", func(t *testing.T) {
 		store := NewMemoryVectorStore(100, 1*time.Hour)
-		collector := metrics.NewNoopCollector()
+		collector := NoopMetricRecorder()
 
 		instrumented := NewInstrumentedVectorStore(store, collector)
 
@@ -165,7 +164,7 @@ func TestInstrumentedVectorStore(t *testing.T) {
 
 	t.Run("InstrumentedSearch", func(t *testing.T) {
 		store := NewMemoryVectorStore(100, 1*time.Hour)
-		collector := metrics.NewNoopCollector()
+		collector := NoopMetricRecorder()
 
 		instrumented := NewInstrumentedVectorStore(store, collector)
 
@@ -189,7 +188,7 @@ func TestInstrumentedVectorStore(t *testing.T) {
 
 	t.Run("DeleteAndClear", func(t *testing.T) {
 		store := NewMemoryVectorStore(100, 1*time.Hour)
-		collector := metrics.NewNoopCollector()
+		collector := NoopMetricRecorder()
 
 		instrumented := NewInstrumentedVectorStore(store, collector)
 
@@ -220,7 +219,7 @@ func TestInstrumentedVectorStore(t *testing.T) {
 
 	t.Run("Stats", func(t *testing.T) {
 		store := NewMemoryVectorStore(100, 1*time.Hour)
-		collector := metrics.NewNoopCollector()
+		collector := NoopMetricRecorder()
 
 		instrumented := NewInstrumentedVectorStore(store, collector)
 

@@ -28,6 +28,9 @@ non_goals:
   - Generic persistence abstractions
   - Business-specific prompt flows
 
+subordinate_families:
+  - x/ai/semanticcache
+
 # Stability tiers for subpackages.
 # stable   — API is covered by semantic versioning; breaking changes require a major version bump.
 # experimental — API may change in future releases without a deprecation period.

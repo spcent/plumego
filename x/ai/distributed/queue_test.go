@@ -2,6 +2,8 @@ package distributed
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"path/filepath"
 	"testing"
 	"time"
@@ -12,6 +14,291 @@ import (
 	"github.com/spcent/plumego/x/messaging/mq"
 	"github.com/spcent/plumego/x/messaging/pubsub"
 )
+
+// MQTaskQueue implements TaskQueue using the message queue.
+// This is a test-local backend implementation; app-level wiring should provide
+// its own TaskQueue adapter rather than depending on this package's implementation.
+type MQTaskQueue struct {
+	broker            mq.Broker
+	taskTopic         string
+	resultTopicPrefix string
+	statusTopicPrefix string
+	persistence       WorkflowPersistence
+}
+
+// MQTaskQueueConfig configures the MQ-based task queue.
+type MQTaskQueueConfig struct {
+	TaskTopic         string
+	ResultTopicPrefix string
+	StatusTopicPrefix string
+}
+
+// DefaultMQTaskQueueConfig returns default configuration.
+func DefaultMQTaskQueueConfig() MQTaskQueueConfig {
+	return MQTaskQueueConfig{
+		TaskTopic:         "distributed:tasks",
+		ResultTopicPrefix: "distributed:results:",
+		StatusTopicPrefix: "distributed:status:",
+	}
+}
+
+// NewMQTaskQueue creates a new MQ-based task queue.
+func NewMQTaskQueue(broker mq.Broker, persistence WorkflowPersistence, config MQTaskQueueConfig) *MQTaskQueue {
+	if config.TaskTopic == "" {
+		config = DefaultMQTaskQueueConfig()
+	}
+
+	return &MQTaskQueue{
+		broker:            broker,
+		taskTopic:         config.TaskTopic,
+		resultTopicPrefix: config.ResultTopicPrefix,
+		statusTopicPrefix: config.StatusTopicPrefix,
+		persistence:       persistence,
+	}
+}
+
+func (q *MQTaskQueue) Enqueue(ctx context.Context, task *WorkflowTask) error {
+	if task == nil {
+		return fmt.Errorf("task cannot be nil")
+	}
+	if task.ID == "" {
+		return fmt.Errorf("task ID cannot be empty")
+	}
+
+	if task.CreatedAt.IsZero() {
+		task.CreatedAt = time.Now()
+	}
+
+	data, err := json.Marshal(task)
+	if err != nil {
+		return fmt.Errorf("failed to marshal task: %w", err)
+	}
+
+	msg := pubsub.Message{
+		ID:   task.ID,
+		Data: data,
+		Meta: map[string]string{"priority": fmt.Sprintf("%d", task.Priority)},
+	}
+
+	if err := q.broker.Publish(ctx, q.taskTopic, msg); err != nil {
+		return fmt.Errorf("failed to enqueue task: %w", err)
+	}
+
+	status := &TaskStatus{
+		TaskID:    task.ID,
+		Status:    TaskStatusPending,
+		StartedAt: task.CreatedAt,
+	}
+
+	return q.UpdateTaskStatus(ctx, task.ID, status)
+}
+
+func (q *MQTaskQueue) Subscribe(ctx context.Context, workerID string, handler TaskHandler) error {
+	if workerID == "" {
+		return fmt.Errorf("worker ID cannot be empty")
+	}
+	if handler == nil {
+		return fmt.Errorf("handler cannot be nil")
+	}
+
+	sub, err := q.broker.Subscribe(ctx, q.taskTopic, mq.SubOptions{
+		BufferSize: 100,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to subscribe to tasks: %w", err)
+	}
+
+	go q.processTasks(ctx, workerID, sub, handler)
+
+	return nil
+}
+
+func (q *MQTaskQueue) processTasks(ctx context.Context, workerID string, sub mq.Subscription, handler TaskHandler) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case msg, ok := <-sub.C():
+			if !ok {
+				return
+			}
+
+			var task WorkflowTask
+			data, ok := msg.Data.([]byte)
+			if !ok {
+				continue
+			}
+			if err := json.Unmarshal(data, &task); err != nil {
+				continue
+			}
+
+			status := &TaskStatus{
+				TaskID:    task.ID,
+				Status:    TaskStatusRunning,
+				WorkerID:  workerID,
+				StartedAt: time.Now(),
+			}
+			q.UpdateTaskStatus(ctx, task.ID, status)
+
+			result, err := handler(ctx, &task)
+
+			if err != nil {
+				status.Status = TaskStatusFailed
+				status.LastError = err.Error()
+				status.CompletedAt = time.Now()
+			} else {
+				status.Status = TaskStatusCompleted
+				status.CompletedAt = time.Now()
+
+				if result != nil {
+					result.TaskID = task.ID
+					result.CompletedAt = time.Now()
+					q.PublishResult(ctx, result)
+				}
+			}
+
+			q.UpdateTaskStatus(ctx, task.ID, status)
+		}
+	}
+}
+
+func (q *MQTaskQueue) UpdateTaskStatus(ctx context.Context, taskID string, status *TaskStatus) error {
+	if taskID == "" {
+		return fmt.Errorf("task ID cannot be empty")
+	}
+	if status == nil {
+		return fmt.Errorf("status cannot be nil")
+	}
+
+	data, err := json.Marshal(status)
+	if err != nil {
+		return fmt.Errorf("failed to marshal status: %w", err)
+	}
+
+	topic := q.statusTopicPrefix + taskID
+	msg := pubsub.Message{
+		ID:   taskID + "-status",
+		Data: data,
+	}
+
+	return q.broker.Publish(ctx, topic, msg)
+}
+
+func (q *MQTaskQueue) GetTaskStatus(ctx context.Context, taskID string) (*TaskStatus, error) {
+	if taskID == "" {
+		return nil, fmt.Errorf("task ID cannot be empty")
+	}
+
+	topic := q.statusTopicPrefix + taskID
+	sub, err := q.broker.Subscribe(ctx, topic, mq.SubOptions{
+		BufferSize: 1,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to subscribe to status: %w", err)
+	}
+	defer sub.Cancel()
+
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case msg, ok := <-sub.C():
+		if !ok {
+			return nil, fmt.Errorf("status subscription closed")
+		}
+
+		var status TaskStatus
+		data, ok := msg.Data.([]byte)
+		if !ok {
+			return nil, fmt.Errorf("invalid message data type")
+		}
+		if err := json.Unmarshal(data, &status); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal status: %w", err)
+		}
+
+		return &status, nil
+	case <-time.After(5 * time.Second):
+		return nil, fmt.Errorf("timeout waiting for task status")
+	}
+}
+
+func (q *MQTaskQueue) PublishResult(ctx context.Context, result *TaskResult) error {
+	if result == nil {
+		return fmt.Errorf("result cannot be nil")
+	}
+	if result.TaskID == "" {
+		return fmt.Errorf("task ID cannot be empty")
+	}
+
+	data, err := json.Marshal(result)
+	if err != nil {
+		return fmt.Errorf("failed to marshal result: %w", err)
+	}
+
+	topic := q.resultTopicPrefix + result.TaskID
+	msg := pubsub.Message{
+		ID:   result.TaskID + "-result",
+		Data: data,
+	}
+
+	return q.broker.Publish(ctx, topic, msg)
+}
+
+func (q *MQTaskQueue) SubscribeResults(ctx context.Context, executionID string) (<-chan *TaskResult, error) {
+	if executionID == "" {
+		return nil, fmt.Errorf("execution ID cannot be empty")
+	}
+
+	topic := q.resultTopicPrefix + executionID + ":*"
+	sub, err := q.broker.Subscribe(ctx, topic, mq.SubOptions{
+		BufferSize: 100,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to subscribe to results: %w", err)
+	}
+
+	results := make(chan *TaskResult, 100)
+
+	go func() {
+		defer close(results)
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case msg, ok := <-sub.C():
+				if !ok {
+					return
+				}
+
+				var result TaskResult
+				data, ok := msg.Data.([]byte)
+				if !ok {
+					continue
+				}
+				if err := json.Unmarshal(data, &result); err != nil {
+					continue
+				}
+
+				select {
+				case results <- &result:
+				case <-ctx.Done():
+					return
+				}
+			}
+		}
+	}()
+
+	return results, nil
+}
+
+func (q *MQTaskQueue) Close() error {
+	if q.broker != nil {
+		return q.broker.Close()
+	}
+	return nil
+}
+
+// suppress unused import for orchestration in test helpers below
+var _ = (*orchestration.AgentResult)(nil)
 
 func TestMQTaskQueue_Enqueue(t *testing.T) {
 	ctx := t.Context()

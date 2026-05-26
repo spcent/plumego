@@ -376,6 +376,14 @@ tasks:
       - security
       - core
 
+  ai:
+    start_with:
+      - x/ai/module.yaml
+      - docs/modules/x-ai/README.md
+    avoid:
+      - core
+      - x/resilience
+
   acceptance_test:
     intent: Write pre-failing acceptance test functions that define a task card's done condition before implementation begins.
     start_with:

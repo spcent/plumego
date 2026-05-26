@@ -49,7 +49,7 @@ sidebar:
 
 先从这些具体 API 表面开始：
 
-- `observability.NewPrometheusCollector` 与 `observability.NewPrometheusExporterE`：接入 scrape endpoint 和 exporter
+- `observability.NewPrometheusCollector` 与 `observability.NewPrometheusExporter`：接入 scrape endpoint 和 exporter
 - `observability.NewOpenTelemetryTracer`：服务需要应用层 tracer adapter 时使用
 - `recordbuffer.NewCollector` 与 `windowmetrics.NewAggregator`：扩展拥有的缓冲与滚动窗口聚合
 - `dbinsights.NewInstrumentedDB` 与 `dbinsights.NewObserver`：数据库查询洞察 helper

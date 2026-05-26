@@ -4,20 +4,41 @@ import (
 	"context"
 	"time"
 
-	"github.com/spcent/plumego/metrics"
 	"github.com/spcent/plumego/x/ai/orchestration"
 )
+
+// MetricRecord holds a single metric observation for this package.
+type MetricRecord struct {
+	Name     string
+	Value    float64
+	Labels   map[string]string
+	Duration time.Duration
+	Error    error
+}
+
+// MetricRecorder accepts metric records emitted by InstrumentedDistributedEngine.
+// metrics.Recorder satisfies this interface via a thin adapter at the call site.
+type MetricRecorder interface {
+	Record(ctx context.Context, record MetricRecord)
+}
+
+type noopRecorder struct{}
+
+func (noopRecorder) Record(context.Context, MetricRecord) {}
+
+// NoopMetricRecorder returns a MetricRecorder that silently discards all records.
+func NoopMetricRecorder() MetricRecorder { return noopRecorder{} }
 
 // InstrumentedDistributedEngine wraps DistributedEngine with metrics collection.
 type InstrumentedDistributedEngine struct {
 	engine    *DistributedEngine
-	collector metrics.Recorder
+	collector MetricRecorder
 }
 
 // NewInstrumentedDistributedEngine creates an instrumented distributed engine.
 func NewInstrumentedDistributedEngine(
 	engine *DistributedEngine,
-	collector metrics.Recorder,
+	collector MetricRecorder,
 ) *InstrumentedDistributedEngine {
 	return &InstrumentedDistributedEngine{
 		engine:    engine,
@@ -51,7 +72,7 @@ func (ie *InstrumentedDistributedEngine) ExecuteAsync(
 			tags["result"] = "success"
 		}
 
-		ie.collector.Record(ctx, metrics.MetricRecord{
+		ie.collector.Record(ctx, MetricRecord{
 			Name:     "workflow_execution_started",
 			Value:    1,
 			Labels:   tags,
@@ -88,7 +109,7 @@ func (ie *InstrumentedDistributedEngine) ExecuteSync(
 			tags["result"] = "success"
 		}
 
-		ie.collector.Record(ctx, metrics.MetricRecord{
+		ie.collector.Record(ctx, MetricRecord{
 			Name:     "workflow_execution_completed",
 			Value:    1,
 			Labels:   tags,
@@ -119,7 +140,7 @@ func (ie *InstrumentedDistributedEngine) Resume(ctx context.Context, executionID
 			tags["result"] = "success"
 		}
 
-		ie.collector.Record(ctx, metrics.MetricRecord{
+		ie.collector.Record(ctx, MetricRecord{
 			Name:     "workflow_resume",
 			Value:    1,
 			Labels:   tags,
@@ -150,7 +171,7 @@ func (ie *InstrumentedDistributedEngine) Pause(ctx context.Context, executionID 
 			tags["result"] = "success"
 		}
 
-		ie.collector.Record(ctx, metrics.MetricRecord{
+		ie.collector.Record(ctx, MetricRecord{
 			Name:     "workflow_pause",
 			Value:    1,
 			Labels:   tags,

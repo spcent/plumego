@@ -76,10 +76,10 @@ entries:
 
   - id: x-websocket-merged-main-compatibility-aliases
     category: public_alias
-    status: keep
+    status: removed
     owner: realtime
-    decision: Keep only the websocket aliases that still have live compatibility callers. ReadMessageStream and auth aliases were removed. NewHubE remains while scaffold and devserver migrate to NewHubWithConfigE.
-    replacement: NewHubWithConfigE
+    decision: All compatibility aliases removed. NewHubE and NewHubWithConfigE panic wrappers deleted; callers now use NewHubWithConfig which returns (*Hub, error).
+    replacement: NewHubWithConfig
     paths:
       - x/websocket/hub.go
 

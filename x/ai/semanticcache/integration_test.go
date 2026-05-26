@@ -4,7 +4,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/spcent/plumego/metrics"
 	"github.com/spcent/plumego/x/ai/llmcache"
 	"github.com/spcent/plumego/x/ai/provider"
 )
@@ -17,7 +16,7 @@ func TestIntegration_FullStack(t *testing.T) {
 	mockProvider := &MockProvider{responseText: "This is a response about AI"}
 	gen := NewSimpleEmbeddingGenerator(128)
 	vectorStore := NewMemoryVectorStore(1000, 1*time.Hour)
-	metricsCollector := metrics.NewNoopCollector()
+	metricsCollector := NoopMetricRecorder()
 
 	// Wrap vector store with instrumentation
 	instrumentedStore := NewInstrumentedVectorStore(vectorStore, metricsCollector)

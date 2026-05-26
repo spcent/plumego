@@ -82,3 +82,4 @@ families:
     canonical_root: x/ai
     roots:
       - x/ai
+      - x/ai/semanticcache

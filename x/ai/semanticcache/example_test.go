@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/spcent/plumego/metrics"
 	"github.com/spcent/plumego/x/ai/llmcache"
 	"github.com/spcent/plumego/x/ai/provider"
 	"github.com/spcent/plumego/x/ai/semanticcache"
@@ -113,7 +112,7 @@ func Example_withMetrics() {
 	mockProvider := &mockProvider{response: "Response"}
 
 	// Create metrics collector
-	collector := metrics.NewNoopCollector() // Use PrometheusCollector in production
+	collector := semanticcache.NoopMetricRecorder() // Use PrometheusCollector in production
 
 	// Create instrumented components
 	generator := semanticcache.NewSimpleEmbeddingGenerator(128)
