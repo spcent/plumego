@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/spcent/plumego/contract"
+	plumelog "github.com/spcent/plumego/log"
 	workerapp "workerfleet/internal/app"
 	"workerfleet/internal/domain"
 )
@@ -27,10 +28,13 @@ type Service interface {
 	ListAlerts(ctx context.Context, query workerapp.AlertListQuery) (workerapp.AlertListResult, error)
 }
 
+// Handler serves all workerfleet HTTP endpoints.
+// Logger should be set via WithLogger; when nil, write errors are silently dropped.
 type Handler struct {
 	service    Service
 	workerAuth workerapp.WorkerIngressAuthConfig
 	adminAuth  workerapp.AdminAuthConfig
+	Logger     plumelog.StructuredLogger
 }
 
 type Option func(*Handler)
@@ -44,6 +48,12 @@ func WithWorkerIngressAuth(auth workerapp.WorkerIngressAuthConfig) Option {
 func WithAdminAuth(auth workerapp.AdminAuthConfig) Option {
 	return func(h *Handler) {
 		h.adminAuth = auth
+	}
+}
+
+func WithLogger(logger plumelog.StructuredLogger) Option {
+	return func(h *Handler) {
+		h.Logger = logger
 	}
 }
 
@@ -77,7 +87,7 @@ type RegisterWorkerResult struct {
 
 func (h *Handler) RegisterWorker(w http.ResponseWriter, r *http.Request) {
 	if h.service == nil {
-		writeNotImplemented(w, r, "REGISTER_SERVICE_NOT_CONFIGURED", "register worker service not configured")
+		h.writeNotImplemented(w, r, "REGISTER_SERVICE_NOT_CONFIGURED", "register worker service not configured")
 		return
 	}
 	if !h.requireWorkerIngressAuth(w, r) {
@@ -86,23 +96,23 @@ func (h *Handler) RegisterWorker(w http.ResponseWriter, r *http.Request) {
 
 	var req RegisterWorkerRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeInvalidJSON(w, r)
+		h.writeInvalidJSON(w, r)
 		return
 	}
 	if strings.TrimSpace(req.WorkerID) == "" {
-		writeRequiredJSONField(w, r, "worker_id")
+		h.writeRequiredJSONField(w, r, "worker_id")
 		return
 	}
 	if strings.TrimSpace(req.Namespace) == "" {
-		writeRequiredJSONField(w, r, "namespace")
+		h.writeRequiredJSONField(w, r, "namespace")
 		return
 	}
 	if strings.TrimSpace(req.PodName) == "" {
-		writeRequiredJSONField(w, r, "pod_name")
+		h.writeRequiredJSONField(w, r, "pod_name")
 		return
 	}
 	if strings.TrimSpace(req.ContainerName) == "" {
-		writeRequiredJSONField(w, r, "container_name")
+		h.writeRequiredJSONField(w, r, "container_name")
 		return
 	}
 
@@ -120,11 +130,11 @@ func (h *Handler) RegisterWorker(w http.ResponseWriter, r *http.Request) {
 		ObservedAt: req.ObservedAt,
 	})
 	if err != nil {
-		writeServiceError(w, r, err)
+		h.writeServiceError(w, r, err)
 		return
 	}
 
-	_ = contract.WriteResponse(w, r, http.StatusCreated, registerWorkerResultFromApp(result), nil)
+	logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusCreated, registerWorkerResultFromApp(result), nil))
 }
 
 func (h *Handler) requireWorkerIngressAuth(w http.ResponseWriter, r *http.Request) bool {
@@ -135,7 +145,7 @@ func (h *Handler) requireWorkerIngressAuth(w http.ResponseWriter, r *http.Reques
 
 	got, ok := bearerToken(r.Header.Get("Authorization"))
 	if !ok || !constantTimeTokenEqual(got, token) {
-		writeWorkerAuthError(w, r)
+		h.writeWorkerAuthError(w, r)
 		return false
 	}
 	return true
@@ -147,13 +157,13 @@ func (h *Handler) requireAdminAuth(w http.ResponseWriter, r *http.Request) bool 
 		return true
 	}
 	if token == "" {
-		writeAdminAuthError(w, r)
+		h.writeAdminAuthError(w, r)
 		return false
 	}
 
 	got, ok := bearerToken(r.Header.Get("Authorization"))
 	if !ok || !constantTimeTokenEqual(got, token) {
-		writeAdminAuthError(w, r)
+		h.writeAdminAuthError(w, r)
 		return false
 	}
 	return true
@@ -177,20 +187,20 @@ func constantTimeTokenEqual(got string, want string) bool {
 	return subtle.ConstantTimeCompare(gotHash[:], wantHash[:]) == 1
 }
 
-func writeWorkerAuthError(w http.ResponseWriter, r *http.Request) {
-	_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+func (h *Handler) writeWorkerAuthError(w http.ResponseWriter, r *http.Request) {
+	logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
 		Type(contract.TypeUnauthorized).
 		Code(contract.CodeUnauthorized).
 		Message("worker ingress authentication required").
-		Build())
+		Build()))
 }
 
-func writeAdminAuthError(w http.ResponseWriter, r *http.Request) {
-	_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+func (h *Handler) writeAdminAuthError(w http.ResponseWriter, r *http.Request) {
+	logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
 		Type(contract.TypeUnauthorized).
 		Code(contract.CodeUnauthorized).
 		Message("workerfleet admin authentication required").
-		Build())
+		Build()))
 }
 
 func registerWorkerResultFromApp(result workerapp.RegisterWorkerResult) RegisterWorkerResult {
@@ -201,56 +211,56 @@ func registerWorkerResultFromApp(result workerapp.RegisterWorkerResult) Register
 	}
 }
 
-func writeInvalidJSON(w http.ResponseWriter, r *http.Request) {
-	_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+func (h *Handler) writeInvalidJSON(w http.ResponseWriter, r *http.Request) {
+	logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
 		Type(contract.TypeValidation).
 		Code(contract.CodeInvalidJSON).
 		Message("invalid request body").
-		Build())
+		Build()))
 }
 
-func writeRequiredJSONField(w http.ResponseWriter, r *http.Request, field string) {
-	_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+func (h *Handler) writeRequiredJSONField(w http.ResponseWriter, r *http.Request, field string) {
+	logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
 		Type(contract.TypeRequired).
 		Code(contract.CodeRequired).
 		Message(field+" is required").
 		Detail("field", field).
-		Build())
+		Build()))
 }
 
-func writeNotImplemented(w http.ResponseWriter, r *http.Request, code string, message string) {
-	_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+func (h *Handler) writeNotImplemented(w http.ResponseWriter, r *http.Request, code string, message string) {
+	logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
 		Type(contract.TypeNotImplemented).
 		Code(strings.ToUpper(code)).
 		Message(message).
-		Build())
+		Build()))
 }
 
-func writeServiceError(w http.ResponseWriter, r *http.Request, err error) {
+func (h *Handler) writeServiceError(w http.ResponseWriter, r *http.Request, err error) {
 	switch {
 	case errors.Is(err, workerapp.ErrNotFound):
-		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeNotFound).
 			Code(contract.CodeResourceNotFound).
 			Message("workerfleet resource not found").
-			Build())
+			Build()))
 	case errors.Is(err, workerapp.ErrConflict):
-		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeConflict).
 			Code(contract.CodeConflict).
 			Message("workerfleet conflict").
-			Build())
+			Build()))
 	case errors.Is(err, workerapp.ErrNotImplemented):
-		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeNotImplemented).
 			Code(contract.CodeNotImplemented).
 			Message("workerfleet operation not implemented").
-			Build())
+			Build()))
 	default:
-		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeInternal).
 			Code(contract.CodeInternalError).
 			Message("workerfleet service unavailable").
-			Build())
+			Build()))
 	}
 }

@@ -10,10 +10,17 @@ import (
 	"testing"
 
 	"github.com/spcent/plumego/contract"
+	plumelog "github.com/spcent/plumego/log"
 )
 
+// discardLogger returns a StructuredLogger that silently discards all output.
+// Use it in tests that construct handlers to satisfy the non-nil Logger requirement.
+func discardLogger() plumelog.StructuredLogger {
+	return plumelog.NewLogger(plumelog.LoggerConfig{Format: plumelog.LoggerFormatDiscard})
+}
+
 func TestHealthHandlerLive(t *testing.T) {
-	h := NewHealthHandler(nil)
+	h := NewHealthHandler(nil, discardLogger())
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/healthz", nil)
 
@@ -27,7 +34,7 @@ func TestHealthHandlerLive(t *testing.T) {
 func TestHealthHandlerReadyReportsUnavailable(t *testing.T) {
 	h := NewHealthHandler(func(context.Context) error {
 		return errors.New("store unavailable")
-	})
+	}, discardLogger())
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/readyz", nil)
 
