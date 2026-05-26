@@ -17,17 +17,9 @@ type PrometheusExporter struct {
 	collector *PrometheusCollector
 }
 
-func NewPrometheusExporter(collector *PrometheusCollector) *PrometheusExporter {
-	exporter, err := NewPrometheusExporterE(collector)
-	if err != nil {
-		panic(err.Error())
-	}
-	return exporter
-}
-
-// NewPrometheusExporterE creates a Prometheus exporter and returns an error for
-// invalid dependencies instead of panicking.
-func NewPrometheusExporterE(collector *PrometheusCollector) (*PrometheusExporter, error) {
+// NewPrometheusExporter creates a Prometheus exporter and returns an error for
+// invalid dependencies.
+func NewPrometheusExporter(collector *PrometheusCollector) (*PrometheusExporter, error) {
 	if collector == nil {
 		return nil, ErrNilCollector
 	}

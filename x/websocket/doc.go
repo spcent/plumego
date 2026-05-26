@@ -20,7 +20,7 @@
 //	import "github.com/spcent/plumego/x/websocket"
 //
 //	// Create a WebSocket hub
-//	hub, err := websocket.NewHubWithConfigE(websocket.HubConfig{
+//	hub, err := websocket.NewHubWithConfig(websocket.HubConfig{
 //		WorkerCount:        4,
 //		JobQueueSize:       1024,
 //		MaxRoomRegistrations:     10000,

@@ -34,7 +34,7 @@ func (ip *InstrumentedProvider) Complete(ctx context.Context, req *provider.Comp
 	start := time.Now()
 
 	// Common tags
-	tags, _ := metrics.TagsE(
+	tags, _ := metrics.Tags(
 		"provider", ip.provider.Name(),
 		"model", req.Model,
 	)
@@ -83,7 +83,7 @@ func (ip *InstrumentedProvider) Complete(ctx context.Context, req *provider.Comp
 func (ip *InstrumentedProvider) CompleteStream(ctx context.Context, req *provider.CompletionRequest) (*provider.StreamReader, error) {
 	start := time.Now()
 
-	tags, _ := metrics.TagsE(
+	tags, _ := metrics.Tags(
 		"provider", ip.provider.Name(),
 		"model", req.Model,
 	)
@@ -111,7 +111,7 @@ func (ip *InstrumentedProvider) ListModels(ctx context.Context) ([]provider.Mode
 	models, err := ip.provider.ListModels(ctx)
 
 	duration := time.Since(start)
-	tags, _ := metrics.TagsE("provider", ip.provider.Name())
+	tags, _ := metrics.Tags("provider", ip.provider.Name())
 	ip.collector.Timing("ai_list_models_duration_seconds", duration, tags...)
 
 	if err == nil {
@@ -128,7 +128,7 @@ func (ip *InstrumentedProvider) GetModel(ctx context.Context, modelID string) (*
 	model, err := ip.provider.GetModel(ctx, modelID)
 
 	duration := time.Since(start)
-	tags, _ := metrics.TagsE(
+	tags, _ := metrics.Tags(
 		"provider", ip.provider.Name(),
 		"model", modelID,
 	)
@@ -144,7 +144,7 @@ func (ip *InstrumentedProvider) CountTokens(text string) (int, error) {
 	count, err := ip.provider.CountTokens(text)
 
 	duration := time.Since(start)
-	tags, _ := metrics.TagsE("provider", ip.provider.Name())
+	tags, _ := metrics.Tags("provider", ip.provider.Name())
 	ip.collector.Timing("ai_count_tokens_duration_seconds", duration, tags...)
 
 	if err == nil {

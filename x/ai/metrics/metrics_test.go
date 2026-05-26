@@ -14,7 +14,7 @@ import (
 
 // tags is a test-only helper wrapping TagsE for static balanced key-value pairs.
 func tags(kv ...string) []Tag {
-	t, err := TagsE(kv...)
+	t, err := Tags(kv...)
 	if err != nil {
 		panic(err)
 	}
@@ -175,7 +175,7 @@ func TestMemoryCollector_Reset(t *testing.T) {
 	}
 }
 
-func TestTags(t *testing.T) {
+func TestTagsHelper(t *testing.T) {
 	tags := tags("key1", "value1", "key2", "value2")
 
 	if len(tags) != 2 {
@@ -191,13 +191,13 @@ func TestTags(t *testing.T) {
 	}
 }
 
-func TestTagsE(t *testing.T) {
-	tags, err := TagsE("key1", "value1", "key2", "value2")
+func TestTags(t *testing.T) {
+	tags, err := Tags("key1", "value1", "key2", "value2")
 	if err != nil {
-		t.Fatalf("TagsE error: %v", err)
+		t.Fatalf("Tags error: %v", err)
 	}
 	if len(tags) != 2 {
-		t.Fatalf("TagsE length = %v, want 2", len(tags))
+		t.Fatalf("Tags length = %v, want 2", len(tags))
 	}
 	if tags[0] != (Tag{Key: "key1", Value: "value1"}) {
 		t.Fatalf("Tag 0 = %+v, want {key1, value1}", tags[0])
@@ -206,8 +206,8 @@ func TestTagsE(t *testing.T) {
 		t.Fatalf("Tag 1 = %+v, want {key2, value2}", tags[1])
 	}
 
-	if _, err := TagsE("key1", "value1", "key2"); !errors.Is(err, ErrOddTagArguments) {
-		t.Fatalf("TagsE odd input error = %v, want ErrOddTagArguments", err)
+	if _, err := Tags("key1", "value1", "key2"); !errors.Is(err, ErrOddTagArguments) {
+		t.Fatalf("Tags odd input error = %v, want ErrOddTagArguments", err)
 	}
 }
 

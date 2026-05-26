@@ -17,7 +17,7 @@ func ExampleStreamManager() {
 	stream, _ := sse.NewStream(ctx, recorder)
 
 	manager := streaming.NewStreamManager()
-	if err := manager.RegisterE("workflow-1", stream); err != nil {
+	if err := manager.Register("workflow-1", stream); err != nil {
 		panic(err)
 	}
 

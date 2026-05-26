@@ -47,7 +47,7 @@ func WithRouter(router Router) ManagerOption {
 }
 
 // RegisterE registers a provider and reports invalid registration input.
-func (m *Manager) RegisterE(provider Provider) error {
+func (m *Manager) Register(provider Provider) error {
 	if provider == nil {
 		return ErrProviderRequired
 	}

@@ -240,17 +240,8 @@ func TestPrometheusCollectorEmptyNamespace(t *testing.T) {
 	}
 }
 
-func TestNewPrometheusExporter_NilCollector_Panics(t *testing.T) {
-	defer func() {
-		if r := recover(); r == nil {
-			t.Error("expected panic for nil collector, got none")
-		}
-	}()
-	NewPrometheusExporter(nil)
-}
-
-func TestNewPrometheusExporterE_NilCollector_ReturnsError(t *testing.T) {
-	exporter, err := NewPrometheusExporterE(nil)
+func TestNewPrometheusExporter_NilCollector_ReturnsError(t *testing.T) {
+	exporter, err := NewPrometheusExporter(nil)
 	if !errors.Is(err, ErrNilCollector) {
 		t.Fatalf("error = %v, want %v", err, ErrNilCollector)
 	}
@@ -259,11 +250,11 @@ func TestNewPrometheusExporterE_NilCollector_ReturnsError(t *testing.T) {
 	}
 }
 
-func TestNewPrometheusExporterE_ConstructsExporter(t *testing.T) {
+func TestNewPrometheusExporter_ConstructsExporter(t *testing.T) {
 	collector := NewPrometheusCollector("plumego_test")
-	exporter, err := NewPrometheusExporterE(collector)
+	exporter, err := NewPrometheusExporter(collector)
 	if err != nil {
-		t.Fatalf("NewPrometheusExporterE returned error: %v", err)
+		t.Fatalf("NewPrometheusExporter returned error: %v", err)
 	}
 	if exporter == nil {
 		t.Fatalf("expected exporter")
@@ -307,7 +298,10 @@ func TestPrometheusExporter_Handler_OutputFormat(t *testing.T) {
 	collector.ObserveHTTP(t.Context(), http.MethodGet, "/ping", http.StatusOK, 0, 10*time.Millisecond)
 	collector.ObserveHTTP(t.Context(), http.MethodPost, "/users", http.StatusCreated, 0, 20*time.Millisecond)
 
-	exporter := NewPrometheusExporter(collector)
+	exporter, err := NewPrometheusExporter(collector)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	w := httptest.NewRecorder()
 	exporter.Handler().ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/metrics", nil))
@@ -337,7 +331,10 @@ func TestPrometheusExporter_Handler_OutputFormat(t *testing.T) {
 
 func TestPrometheusExporter_Handler_ContentType(t *testing.T) {
 	collector := NewPrometheusCollector("ns")
-	exporter := NewPrometheusExporter(collector)
+	exporter, err := NewPrometheusExporter(collector)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	w := httptest.NewRecorder()
 	exporter.Handler().ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/metrics", nil))
@@ -350,7 +347,10 @@ func TestPrometheusExporter_Handler_ContentType(t *testing.T) {
 
 func TestPrometheusExporter_Handler_EmptyCollector(t *testing.T) {
 	collector := NewPrometheusCollector("ns")
-	exporter := NewPrometheusExporter(collector)
+	exporter, err := NewPrometheusExporter(collector)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	w := httptest.NewRecorder()
 	exporter.Handler().ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/metrics", nil))

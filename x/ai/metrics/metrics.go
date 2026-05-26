@@ -42,7 +42,7 @@ type Tag struct {
 
 // TagsE creates a slice of tags from key-value pairs and returns an error for
 // malformed runtime input.
-func TagsE(keyValues ...string) ([]Tag, error) {
+func Tags(keyValues ...string) ([]Tag, error) {
 	if len(keyValues)%2 != 0 {
 		return nil, ErrOddTagArguments
 	}

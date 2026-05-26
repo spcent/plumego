@@ -41,9 +41,9 @@ type Config struct {
 	CircuitBreaker *sharedcircuitbreaker.CircuitBreaker
 }
 
-// NewResilientProviderE creates a new resilient provider and reports invalid
-// composition through an error instead of panicking.
-func NewResilientProviderE(config Config) (*ResilientProvider, error) {
+// NewResilientProvider creates a new resilient provider and returns validation
+// errors for invalid composition.
+func NewResilientProvider(config Config) (*ResilientProvider, error) {
 	if config.Provider == nil {
 		return nil, ErrNilProvider
 	}

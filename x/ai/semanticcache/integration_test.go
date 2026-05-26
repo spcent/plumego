@@ -31,7 +31,7 @@ func TestIntegration_FullStack(t *testing.T) {
 
 	// Create semantic caching provider with exact cache fallback
 	providerConfig := DefaultProviderConfig()
-	cachingProvider, err := NewSemanticCachingProviderE(
+	cachingProvider, err := NewSemanticCachingProvider(
 		mockProvider,
 		semanticCache,
 		WithExactCache(exactCache),
@@ -172,7 +172,7 @@ func TestIntegration_MultipleQueries(t *testing.T) {
 	vectorStore := NewMemoryVectorStore(100, 1*time.Hour)
 	semanticCache := NewSemanticCache(gen, vectorStore, DefaultSemanticCacheConfig())
 
-	cachingProvider, err := NewSemanticCachingProviderE(mockProvider, semanticCache)
+	cachingProvider, err := NewSemanticCachingProvider(mockProvider, semanticCache)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -251,7 +251,7 @@ func TestIntegration_ConcurrentAccess(t *testing.T) {
 	vectorStore := NewMemoryVectorStore(1000, 1*time.Hour)
 	semanticCache := NewSemanticCache(gen, vectorStore, DefaultSemanticCacheConfig())
 
-	cachingProvider, err := NewSemanticCachingProviderE(mockProvider, semanticCache)
+	cachingProvider, err := NewSemanticCachingProvider(mockProvider, semanticCache)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -312,7 +312,7 @@ func TestIntegration_TTLExpiration(t *testing.T) {
 		MaxSize:             100,
 	}
 	semanticCache := NewSemanticCache(gen, vectorStore, config)
-	cachingProvider, err := NewSemanticCachingProviderE(mockProvider, semanticCache)
+	cachingProvider, err := NewSemanticCachingProvider(mockProvider, semanticCache)
 	if err != nil {
 		t.Fatal(err)
 	}

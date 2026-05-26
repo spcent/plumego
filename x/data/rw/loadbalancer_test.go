@@ -148,7 +148,10 @@ func TestLeastConnBalancer(t *testing.T) {
 
 func TestWeightedBalancer(t *testing.T) {
 	weights := []int{1, 2, 3}
-	lb := NewWeightedBalancer(weights)
+	lb, err := NewWeightedBalancer(weights)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	replicas := []Replica{
 		{Index: 0, IsHealthy: true},
@@ -184,7 +187,10 @@ func TestWeightedBalancer(t *testing.T) {
 
 func TestWeightedBalancerSkipsUnhealthy(t *testing.T) {
 	weights := []int{1, 2, 3}
-	lb := NewWeightedBalancer(weights)
+	lb, err := NewWeightedBalancer(weights)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	replicas := []Replica{
 		{Index: 0, IsHealthy: true},
@@ -205,7 +211,10 @@ func TestWeightedBalancerSkipsUnhealthy(t *testing.T) {
 }
 
 func TestWeightedBalancerNoWeights(t *testing.T) {
-	lb := NewWeightedBalancer([]int{})
+	lb, err := NewWeightedBalancer([]int{})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	replicas := []Replica{
 		{Index: 0, IsHealthy: true},
@@ -231,30 +240,19 @@ func TestWeightedBalancerNoWeights(t *testing.T) {
 	}
 }
 
-func TestWeightedBalancerRejectsNonPositiveWeights(t *testing.T) {
-	replicas := []Replica{
-		{Index: 0, IsHealthy: true},
-		{Index: 1, IsHealthy: true},
-	}
-
+func TestNewWeightedBalancer_RejectsNonPositiveWeights(t *testing.T) {
 	for _, weights := range [][]int{{0, 1}, {-1, 1}, {0, 0}} {
-		lb := NewWeightedBalancer(weights)
-		if _, err := lb.Next(replicas); !errors.Is(err, ErrInvalidReplicaWeight) {
-			t.Fatalf("weights %v Next() error = %v, want ErrInvalidReplicaWeight", weights, err)
-		}
-	}
-}
-
-func TestNewWeightedBalancerERejectsNonPositiveWeights(t *testing.T) {
-	for _, weights := range [][]int{{0, 1}, {-1, 1}, {0, 0}} {
-		if _, err := NewWeightedBalancerE(weights); !errors.Is(err, ErrInvalidReplicaWeight) {
+		if _, err := NewWeightedBalancer(weights); !errors.Is(err, ErrInvalidReplicaWeight) {
 			t.Fatalf("weights %v constructor error = %v, want ErrInvalidReplicaWeight", weights, err)
 		}
 	}
 }
 
 func TestWeightedBalancerRejectsReplicaWeightMismatch(t *testing.T) {
-	lb := NewWeightedBalancer([]int{1})
+	lb, err := NewWeightedBalancer([]int{1})
+	if err != nil {
+		t.Fatal(err)
+	}
 	replicas := []Replica{
 		{Index: 0, IsHealthy: true},
 		{Index: 1, IsHealthy: true},
@@ -284,7 +282,10 @@ func TestLoadBalancerReset(t *testing.T) {
 	})
 
 	t.Run("Weighted", func(t *testing.T) {
-		lb := NewWeightedBalancer([]int{1, 2})
+		lb, err := NewWeightedBalancer([]int{1, 2})
+		if err != nil {
+			t.Fatal(err)
+		}
 		replicas := []Replica{{Index: 0, IsHealthy: true}, {Index: 1, IsHealthy: true}}
 
 		// Advance state
@@ -296,14 +297,17 @@ func TestLoadBalancerReset(t *testing.T) {
 		lb.Reset()
 
 		// State should be reset (hard to test exact behavior, but shouldn't panic)
-		_, err := lb.Next(replicas)
+		_, err = lb.Next(replicas)
 		if err != nil {
 			t.Errorf("after reset: unexpected error: %v", err)
 		}
 	})
 
 	t.Run("WeightedNoWeights", func(t *testing.T) {
-		lb := NewWeightedBalancer(nil)
+		lb, err := NewWeightedBalancer(nil)
+		if err != nil {
+			t.Fatal(err)
+		}
 		replicas := []Replica{{Index: 0, IsHealthy: true}, {Index: 1, IsHealthy: true}}
 
 		_, _ = lb.Next(replicas)
@@ -351,7 +355,10 @@ func BenchmarkRandomBalancer(b *testing.B) {
 }
 
 func BenchmarkWeightedBalancer(b *testing.B) {
-	lb := NewWeightedBalancer([]int{1, 2, 3, 4})
+	lb, err := NewWeightedBalancer([]int{1, 2, 3, 4})
+	if err != nil {
+		b.Fatal(err)
+	}
 	replicas := []Replica{
 		{Index: 0, IsHealthy: true},
 		{Index: 1, IsHealthy: true},

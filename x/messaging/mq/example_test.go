@@ -12,7 +12,10 @@ import (
 
 // Example_basicPubSub demonstrates basic publish/subscribe functionality.
 func Example_basicPubSub() {
-	broker := mq.NewInProcBroker(pubsub.New())
+	broker, err := mq.NewInProcBroker(pubsub.New())
+	if err != nil {
+		panic(err)
+	}
 	defer broker.Close()
 
 	ctx := context.Background()
@@ -35,7 +38,10 @@ func Example_basicPubSub() {
 func Example_priorityMessages() {
 	cfg := mq.DefaultConfig()
 	cfg.EnablePriorityQueue = true
-	broker := mq.NewInProcBroker(pubsub.New(), mq.WithConfig(cfg))
+	broker, err := mq.NewInProcBroker(pubsub.New(), mq.WithConfig(cfg))
+	if err != nil {
+		panic(err)
+	}
 	defer broker.Close()
 
 	ctx := context.Background()
@@ -71,7 +77,10 @@ func Example_priorityMessages() {
 func Example_ttlMessages() {
 	cfg := mq.DefaultConfig()
 	cfg.MessageTTL = 100 * time.Millisecond
-	broker := mq.NewInProcBroker(pubsub.New(), mq.WithConfig(cfg))
+	broker, err := mq.NewInProcBroker(pubsub.New(), mq.WithConfig(cfg))
+	if err != nil {
+		panic(err)
+	}
 	defer broker.Close()
 
 	ctx := context.Background()
@@ -95,7 +104,10 @@ func Example_ttlMessages() {
 func Example_acknowledgment() {
 	cfg := mq.DefaultConfig()
 	cfg.EnableAckSupport = true
-	broker := mq.NewInProcBroker(pubsub.New(), mq.WithConfig(cfg))
+	broker, err := mq.NewInProcBroker(pubsub.New(), mq.WithConfig(cfg))
+	if err != nil {
+		panic(err)
+	}
 	defer broker.Close()
 
 	ctx := context.Background()
@@ -129,7 +141,10 @@ func Example_acknowledgment() {
 func Example_transactions() {
 	cfg := mq.DefaultConfig()
 	cfg.EnableTransactions = true
-	broker := mq.NewInProcBroker(pubsub.New(), mq.WithConfig(cfg))
+	broker, err := mq.NewInProcBroker(pubsub.New(), mq.WithConfig(cfg))
+	if err != nil {
+		panic(err)
+	}
 	defer broker.Close()
 
 	ctx := context.Background()
@@ -163,7 +178,10 @@ func Example_deadLetterQueue() {
 	cfg := mq.DefaultConfig()
 	cfg.EnableDeadLetterQueue = true
 	cfg.DeadLetterTopic = "dlq"
-	broker := mq.NewInProcBroker(pubsub.New(), mq.WithConfig(cfg))
+	broker, err := mq.NewInProcBroker(pubsub.New(), mq.WithConfig(cfg))
+	if err != nil {
+		panic(err)
+	}
 	defer broker.Close()
 
 	ctx := context.Background()
@@ -193,7 +211,10 @@ func Example_persistence() {
 	cfg := mq.DefaultConfig()
 	cfg.EnablePersistence = true
 	cfg.PersistencePath = "/tmp/mq-example"
-	broker := mq.NewInProcBroker(pubsub.New(), mq.WithConfig(cfg))
+	broker, err := mq.NewInProcBroker(pubsub.New(), mq.WithConfig(cfg))
+	if err != nil {
+		panic(err)
+	}
 
 	ctx := context.Background()
 
@@ -204,7 +225,10 @@ func Example_persistence() {
 	broker.Close()
 
 	// Restart broker
-	broker2 := mq.NewInProcBroker(pubsub.New(), mq.WithConfig(cfg))
+	broker2, err := mq.NewInProcBroker(pubsub.New(), mq.WithConfig(cfg))
+	if err != nil {
+		panic(err)
+	}
 	defer broker2.Close()
 
 	// Recover persisted messages
@@ -226,7 +250,10 @@ func Example_comprehensive() {
 	cfg.PersistencePath = "/tmp/mq-comprehensive"
 	cfg.MaxMemoryUsage = 100 * 1024 * 1024 // 100MB
 
-	broker := mq.NewInProcBroker(pubsub.New(), mq.WithConfig(cfg))
+	broker, err := mq.NewInProcBroker(pubsub.New(), mq.WithConfig(cfg))
+	if err != nil {
+		panic(err)
+	}
 	defer broker.Close()
 
 	ctx := context.Background()
@@ -269,7 +296,10 @@ func Example_comprehensive() {
 
 // Example_batchOperations demonstrates batch publish and subscribe.
 func Example_batchOperations() {
-	broker := mq.NewInProcBroker(pubsub.New())
+	broker, err := mq.NewInProcBroker(pubsub.New())
+	if err != nil {
+		panic(err)
+	}
 	defer broker.Close()
 
 	ctx := context.Background()
@@ -307,7 +337,10 @@ LOOP:
 func Example_healthMonitoring() {
 	cfg := mq.DefaultConfig()
 	cfg.EnableMetrics = true
-	broker := mq.NewInProcBroker(pubsub.New(), mq.WithConfig(cfg))
+	broker, err := mq.NewInProcBroker(pubsub.New(), mq.WithConfig(cfg))
+	if err != nil {
+		panic(err)
+	}
 	defer broker.Close()
 
 	ctx := context.Background()

@@ -66,13 +66,13 @@ func newTestSemanticCache() *SemanticCache {
 	return NewSemanticCache(gen, store, DefaultSemanticCacheConfig())
 }
 
-func TestNewSemanticCachingProviderE(t *testing.T) {
+func TestNewSemanticCachingProvider(t *testing.T) {
 	mockProvider := &MockProvider{responseText: "Test response"}
 	cache := newTestSemanticCache()
 
-	scp, err := NewSemanticCachingProviderE(mockProvider, cache)
+	scp, err := NewSemanticCachingProvider(mockProvider, cache)
 	if err != nil {
-		t.Fatalf("NewSemanticCachingProviderE error: %v", err)
+		t.Fatalf("NewSemanticCachingProvider error: %v", err)
 	}
 	if scp == nil {
 		t.Fatal("expected provider")
@@ -81,14 +81,14 @@ func TestNewSemanticCachingProviderE(t *testing.T) {
 		t.Fatalf("Name = %q, want mock", scp.Name())
 	}
 
-	if _, err := NewSemanticCachingProviderE(nil, cache); !errors.Is(err, ErrProviderRequired) {
+	if _, err := NewSemanticCachingProvider(nil, cache); !errors.Is(err, ErrProviderRequired) {
 		t.Fatalf("nil provider error = %v, want ErrProviderRequired", err)
 	}
-	if _, err := NewSemanticCachingProviderE(mockProvider, nil); !errors.Is(err, ErrSemanticCacheRequired) {
+	if _, err := NewSemanticCachingProvider(mockProvider, nil); !errors.Is(err, ErrSemanticCacheRequired) {
 		t.Fatalf("nil cache error = %v, want ErrSemanticCacheRequired", err)
 	}
 
-	scp, err = NewSemanticCachingProviderE(mockProvider, cache, WithProviderConfig(nil))
+	scp, err = NewSemanticCachingProvider(mockProvider, cache, WithProviderConfig(nil))
 	if err != nil {
 		t.Fatalf("nil config option should use defaults: %v", err)
 	}
@@ -100,10 +100,10 @@ func TestNewSemanticCachingProviderE(t *testing.T) {
 func TestNewSemanticCachingProvider_NilInputs(t *testing.T) {
 	cache := newTestSemanticCache()
 
-	if _, err := NewSemanticCachingProviderE(nil, cache); !errors.Is(err, ErrProviderRequired) {
+	if _, err := NewSemanticCachingProvider(nil, cache); !errors.Is(err, ErrProviderRequired) {
 		t.Fatalf("expected ErrProviderRequired, got %v", err)
 	}
-	if _, err := NewSemanticCachingProviderE(&MockProvider{}, nil); !errors.Is(err, ErrSemanticCacheRequired) {
+	if _, err := NewSemanticCachingProvider(&MockProvider{}, nil); !errors.Is(err, ErrSemanticCacheRequired) {
 		t.Fatalf("expected ErrSemanticCacheRequired, got %v", err)
 	}
 }
@@ -115,7 +115,7 @@ func TestSemanticCachingProvider(t *testing.T) {
 		mockProvider := &MockProvider{responseText: "Test response"}
 		cache := newTestSemanticCache()
 
-		scp, err := NewSemanticCachingProviderE(mockProvider, cache)
+		scp, err := NewSemanticCachingProvider(mockProvider, cache)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -188,7 +188,7 @@ func TestSemanticCachingProvider(t *testing.T) {
 		semanticCache := NewSemanticCache(gen, store, DefaultSemanticCacheConfig())
 		exactCache := llmcache.NewMemoryCache(1*time.Hour, 100)
 
-		scp, err := NewSemanticCachingProviderE(
+		scp, err := NewSemanticCachingProvider(
 			mockProvider,
 			semanticCache,
 			WithExactCache(exactCache),
@@ -232,7 +232,7 @@ func TestSemanticCachingProvider(t *testing.T) {
 		store := NewMemoryVectorStore(100, 1*time.Hour)
 		cache := NewSemanticCache(gen, store, DefaultSemanticCacheConfig())
 
-		scp, err := NewSemanticCachingProviderE(mockProvider, cache)
+		scp, err := NewSemanticCachingProvider(mockProvider, cache)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -390,7 +390,7 @@ func TestProviderConfig(t *testing.T) {
 			EnablePassthrough: false,
 		}
 
-		scp, err := NewSemanticCachingProviderE(
+		scp, err := NewSemanticCachingProvider(
 			mockProvider,
 			cache,
 			WithExactCache(exactCache),

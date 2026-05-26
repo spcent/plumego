@@ -59,7 +59,10 @@ func (m *mockProvider) Name() string {
 
 func TestWorker_StartStop(t *testing.T) {
 	ctx := t.Context()
-	broker := mq.NewInProcBroker(pubsub.New())
+	broker, err := mq.NewInProcBroker(pubsub.New())
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer broker.Close()
 
 	tmpDir := t.TempDir()
@@ -195,7 +198,10 @@ func TestStepExecutor(t *testing.T) {
 
 func TestWorkerPool(t *testing.T) {
 	ctx := t.Context()
-	broker := mq.NewInProcBroker(pubsub.New())
+	broker, err := mq.NewInProcBroker(pubsub.New())
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer broker.Close()
 
 	tmpDir := t.TempDir()
@@ -338,7 +344,10 @@ func TestDefaultConfigs(t *testing.T) {
 
 func TestWorker_HandleTask(t *testing.T) {
 	ctx := t.Context()
-	broker := mq.NewInProcBroker(pubsub.New())
+	broker, err := mq.NewInProcBroker(pubsub.New())
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer broker.Close()
 
 	tmpDir := t.TempDir()

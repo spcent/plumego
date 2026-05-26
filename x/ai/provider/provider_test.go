@@ -178,39 +178,19 @@ func TestToolChoiceHelpersReturnFreshValues(t *testing.T) {
 }
 
 func TestManager_Register(t *testing.T) {
-	manager := NewManager()
-
-	// Mock provider
-	mockProvider := &mockProvider{name: "mock"}
-
-	if err := manager.RegisterE(mockProvider); err != nil {
-		t.Fatal(err)
-	}
-
-	provider, err := manager.Get("mock")
-	if err != nil {
-		t.Errorf("Get() error = %v", err)
-	}
-
-	if provider.Name() != "mock" {
-		t.Errorf("Provider name = %v, want mock", provider.Name())
-	}
-}
-
-func TestManager_RegisterE(t *testing.T) {
 	t.Run("nil provider", func(t *testing.T) {
 		manager := NewManager()
-		err := manager.RegisterE(nil)
+		err := manager.Register(nil)
 		if !errors.Is(err, ErrProviderRequired) {
-			t.Fatalf("RegisterE() error = %v, want ErrProviderRequired", err)
+			t.Fatalf("Register() error = %v, want ErrProviderRequired", err)
 		}
 	})
 
 	t.Run("empty provider name", func(t *testing.T) {
 		manager := NewManager()
-		err := manager.RegisterE(&mockProvider{})
+		err := manager.Register(&mockProvider{})
 		if !errors.Is(err, ErrProviderNameRequired) {
-			t.Fatalf("RegisterE() error = %v, want ErrProviderNameRequired", err)
+			t.Fatalf("Register() error = %v, want ErrProviderNameRequired", err)
 		}
 	})
 
@@ -218,8 +198,8 @@ func TestManager_RegisterE(t *testing.T) {
 		manager := NewManager()
 		mockProvider := &mockProvider{name: "mock"}
 
-		if err := manager.RegisterE(mockProvider); err != nil {
-			t.Fatalf("RegisterE() error = %v", err)
+		if err := manager.Register(mockProvider); err != nil {
+			t.Fatalf("Register() error = %v", err)
 		}
 
 		provider, err := manager.Get("mock")
@@ -780,7 +760,7 @@ func TestManager_Complete_Success(t *testing.T) {
 		Content: []ContentBlock{{Type: ContentTypeText, Text: "delegated"}},
 	})
 	mgr := NewManager()
-	if err := mgr.RegisterE(mock); err != nil {
+	if err := mgr.Register(mock); err != nil {
 		t.Fatal(err)
 	}
 
@@ -807,7 +787,7 @@ func TestManager_CompleteStream_Success(t *testing.T) {
 		{Type: "content_block_delta", Delta: &ContentDelta{Type: ContentTypeText, Text: "streamed"}},
 	})
 	mgr := NewManager()
-	if err := mgr.RegisterE(mock); err != nil {
+	if err := mgr.Register(mock); err != nil {
 		t.Fatal(err)
 	}
 
@@ -840,10 +820,10 @@ func TestManager_WithRouter_UsesCustomRouter(t *testing.T) {
 	customRouter := &singleProviderRouter{name: "chosen"}
 
 	mgr := NewManager(WithRouter(customRouter))
-	if err := mgr.RegisterE(chosen); err != nil {
+	if err := mgr.Register(chosen); err != nil {
 		t.Fatal(err)
 	}
-	if err := mgr.RegisterE(other); err != nil {
+	if err := mgr.Register(other); err != nil {
 		t.Fatal(err)
 	}
 

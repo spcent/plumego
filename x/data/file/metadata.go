@@ -42,15 +42,9 @@ func WithMetadataClock(now func() time.Time) DBMetadataOption {
 	}
 }
 
-// NewDBMetadataManager creates a new database-backed metadata manager.
-func NewDBMetadataManager(db *sql.DB, opts ...DBMetadataOption) MetadataManager {
-	m := newDBMetadataManager(db, opts...)
-	return m
-}
-
-// NewDBMetadataManagerE creates a database-backed metadata manager and reports
-// invalid dependencies without relying on later method calls.
-func NewDBMetadataManagerE(db *sql.DB, opts ...DBMetadataOption) (*DBMetadataManager, error) {
+// NewDBMetadataManager creates a database-backed metadata manager and returns
+// an error if db is nil.
+func NewDBMetadataManager(db *sql.DB, opts ...DBMetadataOption) (*DBMetadataManager, error) {
 	if db == nil {
 		return nil, ErrNilMetadataDB
 	}

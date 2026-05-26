@@ -19,7 +19,7 @@ func TestStreamManager(t *testing.T) {
 		w := httptest.NewRecorder()
 		stream, _ := sse.NewStream(t.Context(), w)
 
-		if err := sm.RegisterE("workflow-1", stream); err != nil {
+		if err := sm.Register("workflow-1", stream); err != nil {
 			t.Fatal(err)
 		}
 
@@ -39,7 +39,7 @@ func TestStreamManager(t *testing.T) {
 		w := httptest.NewRecorder()
 		stream, _ := sse.NewStream(t.Context(), w)
 
-		if err := sm.RegisterE("workflow-1", stream); err != nil {
+		if err := sm.Register("workflow-1", stream); err != nil {
 			t.Fatal(err)
 		}
 		sm.Unregister("workflow-1")
@@ -61,10 +61,10 @@ func TestStreamManager(t *testing.T) {
 		w2 := httptest.NewRecorder()
 		stream1, _ := sse.NewStream(t.Context(), w1)
 		stream2, _ := sse.NewStream(t.Context(), w2)
-		if err := sm.RegisterE("workflow-1", stream1); err != nil {
+		if err := sm.Register("workflow-1", stream1); err != nil {
 			t.Fatal(err)
 		}
-		if err := sm.RegisterE("workflow-2", stream2); err != nil {
+		if err := sm.Register("workflow-2", stream2); err != nil {
 			t.Fatal(err)
 		}
 
@@ -79,7 +79,7 @@ func TestStreamManager(t *testing.T) {
 		w := httptest.NewRecorder()
 		stream, _ := sse.NewStream(t.Context(), w)
 
-		if err := sm.RegisterE("workflow-1", stream); err != nil {
+		if err := sm.Register("workflow-1", stream); err != nil {
 			t.Fatal(err)
 		}
 
@@ -124,7 +124,7 @@ func TestStreamManager(t *testing.T) {
 
 		w := httptest.NewRecorder()
 		stream, _ := sse.NewStream(t.Context(), w)
-		if err := sm.RegisterE("workflow-1", stream); err != nil {
+		if err := sm.Register("workflow-1", stream); err != nil {
 			t.Fatal(err)
 		}
 
@@ -149,7 +149,7 @@ func TestStreamManager(t *testing.T) {
 		w := httptest.NewRecorder()
 		stream, _ := sse.NewStream(t.Context(), w)
 
-		if err := sm.RegisterE("workflow-1", stream); err != nil {
+		if err := sm.Register("workflow-1", stream); err != nil {
 			t.Fatal(err)
 		}
 
@@ -165,14 +165,14 @@ func TestStreamManager(t *testing.T) {
 	})
 }
 
-func TestStreamManager_RegisterE(t *testing.T) {
+func TestStreamManager_Register(t *testing.T) {
 	t.Run("empty workflow ID", func(t *testing.T) {
 		sm := NewStreamManager()
 
 		w := httptest.NewRecorder()
 		stream, _ := sse.NewStream(t.Context(), w)
 
-		err := sm.RegisterE("", stream)
+		err := sm.Register("", stream)
 		if !errors.Is(err, ErrWorkflowIDRequired) {
 			t.Fatalf("RegisterE() error = %v, want ErrWorkflowIDRequired", err)
 		}
@@ -181,7 +181,7 @@ func TestStreamManager_RegisterE(t *testing.T) {
 	t.Run("nil stream", func(t *testing.T) {
 		sm := NewStreamManager()
 
-		err := sm.RegisterE("workflow-1", nil)
+		err := sm.Register("workflow-1", nil)
 		if !errors.Is(err, ErrStreamRequired) {
 			t.Fatalf("RegisterE() error = %v, want ErrStreamRequired", err)
 		}
@@ -193,7 +193,7 @@ func TestStreamManager_RegisterE(t *testing.T) {
 		w := httptest.NewRecorder()
 		stream, _ := sse.NewStream(t.Context(), w)
 
-		if err := sm.RegisterE("workflow-1", stream); err != nil {
+		if err := sm.Register("workflow-1", stream); err != nil {
 			t.Fatalf("RegisterE() error = %v", err)
 		}
 

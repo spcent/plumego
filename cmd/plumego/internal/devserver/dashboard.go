@@ -187,7 +187,7 @@ func wireDashboardServices(absDir string, cfg Config) (dashboardServices, error)
 	ps := pubsub.New()
 	builder := NewBuilder(absDir, ps)
 	runner := NewAppRunner(absDir, ps)
-	hub, err := websocket.NewHubE(4, 100)
+	hub, err := websocket.NewHub(4, 100)
 	if err != nil {
 		return dashboardServices{}, fmt.Errorf("create websocket hub: %w", err)
 	}
@@ -428,7 +428,7 @@ func (d *Dashboard) Start(ctx context.Context) (err error) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	// Note: WebSocket hub workers are automatically started in NewHubE.
+	// Note: WebSocket hub workers are automatically started in NewHub.
 
 	if err := d.app.Prepare(); err != nil {
 		return fmt.Errorf("prepare dashboard app: %w", err)

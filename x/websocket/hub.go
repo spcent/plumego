@@ -48,7 +48,7 @@ func (r BroadcastResult) Rejected() bool {
 //	import "github.com/spcent/plumego/x/websocket"
 //
 //	// Create hub with 4 workers and 1024 job queue size
-//	hub, err := websocket.NewHubWithConfigE(websocket.HubConfig{WorkerCount: 4, JobQueueSize: 1024})
+//	hub, err := websocket.NewHubWithConfig(websocket.HubConfig{WorkerCount: 4, JobQueueSize: 1024})
 //	defer hub.Stop()
 //
 //	// Join a connection to a room
@@ -209,7 +209,7 @@ type securityEvent struct {
 //		MaxConnectionRate:      100, // 100 connections per second
 //		EnableSecurityMetrics:  true,
 //	}
-//	hub, err := websocket.NewHubWithConfigE(config)
+//	hub, err := websocket.NewHubWithConfig(config)
 type HubConfig struct {
 	// WorkerCount is the number of worker goroutines for message delivery
 	WorkerCount int
@@ -254,7 +254,7 @@ type HubConfig struct {
 //
 //	import "github.com/spcent/plumego/x/websocket"
 //
-//	hub, err := websocket.NewHubWithConfigE(websocket.HubConfig{WorkerCount: 4, JobQueueSize: 1024})
+//	hub, err := websocket.NewHubWithConfig(websocket.HubConfig{WorkerCount: 4, JobQueueSize: 1024})
 //	metrics := hub.Metrics()
 //	fmt.Printf("Active: %d, Rooms: %d\n", metrics.ActiveConnections, metrics.Rooms)
 type HubMetrics struct {
@@ -279,9 +279,9 @@ type HubMetrics struct {
 	SuccessfulAuths    uint64 `json:"successful_auths"`
 }
 
-// NewHubWithConfigE creates a new WebSocket hub with custom configuration and
+// NewHubWithConfig creates a new WebSocket hub with custom configuration and
 // returns explicit validation errors for invalid public inputs.
-func NewHubWithConfigE(cfg HubConfig) (*Hub, error) {
+func NewHubWithConfig(cfg HubConfig) (*Hub, error) {
 	if cfg.WorkerCount < 0 {
 		return nil, ErrNegativeWorkerCount
 	}
@@ -300,11 +300,11 @@ func NewHubWithConfigE(cfg HubConfig) (*Hub, error) {
 	return newHubWithNormalizedConfig(cfg)
 }
 
-// NewHubE creates a hub from worker and queue sizes.
+// NewHub creates a hub from worker and queue sizes.
 //
-// It is a compatibility alias for NewHubWithConfigE.
-func NewHubE(workerCount, jobQueueSize int) (*Hub, error) {
-	return NewHubWithConfigE(HubConfig{
+// It delegates to NewHubWithConfig.
+func NewHub(workerCount, jobQueueSize int) (*Hub, error) {
+	return NewHubWithConfig(HubConfig{
 		WorkerCount:  workerCount,
 		JobQueueSize: jobQueueSize,
 	})
@@ -468,7 +468,7 @@ func (h *Hub) recordSecurityEvent(eventType string, details map[string]any, seve
 //
 //	import "github.com/spcent/plumego/x/websocket"
 //
-//	hub, err := websocket.NewHubWithConfigE(websocket.HubConfig{WorkerCount: 4, JobQueueSize: 1024})
+//	hub, err := websocket.NewHubWithConfig(websocket.HubConfig{WorkerCount: 4, JobQueueSize: 1024})
 //	defer hub.Stop()
 func (h *Hub) Stop() {
 	if !h.stopped.CompareAndSwap(false, true) {
@@ -502,7 +502,7 @@ func (h *Hub) Stop() {
 //	    "github.com/spcent/plumego/x/websocket"
 //	)
 //
-//	hub, err := websocket.NewHubWithConfigE(websocket.HubConfig{WorkerCount: 4, JobQueueSize: 1024})
+//	hub, err := websocket.NewHubWithConfig(websocket.HubConfig{WorkerCount: 4, JobQueueSize: 1024})
 //	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 //	defer cancel()
 //	if err := hub.Shutdown(ctx); err != nil {

@@ -352,18 +352,13 @@ type ProbabilitySampler struct {
 	probability float64
 }
 
-// NewProbabilitySampler creates a new probability sampler.
-func NewProbabilitySampler(probability float64) *ProbabilitySampler {
-	return &ProbabilitySampler{probability: probability}
-}
-
-// NewProbabilitySamplerE creates a probability sampler and rejects invalid
-// dynamic sampling configuration.
-func NewProbabilitySamplerE(probability float64) (*ProbabilitySampler, error) {
+// NewProbabilitySampler creates a probability sampler and returns an error for
+// out-of-range sampling rates.
+func NewProbabilitySampler(probability float64) (*ProbabilitySampler, error) {
 	if probability < 0 || probability > 1 {
 		return nil, ErrInvalidSamplingRate
 	}
-	return NewProbabilitySampler(probability), nil
+	return &ProbabilitySampler{probability: probability}, nil
 }
 
 // ShouldSample returns true if the trace should be sampled.
@@ -411,14 +406,9 @@ type Tracer struct {
 	activeSpans map[SpanID]*Span
 }
 
-// NewTracer creates a new Tracer with the given configuration.
-func NewTracer(config TracerConfig) *Tracer {
-	return newTracer(config, NewProbabilitySampler(config.SamplingRate))
-}
-
-// NewTracerE creates a tracer and returns validation errors for dynamic config.
-func NewTracerE(config TracerConfig) (*Tracer, error) {
-	sampler, err := NewProbabilitySamplerE(config.SamplingRate)
+// NewTracer creates a tracer and returns validation errors for invalid config.
+func NewTracer(config TracerConfig) (*Tracer, error) {
+	sampler, err := NewProbabilitySampler(config.SamplingRate)
 	if err != nil {
 		return nil, err
 	}

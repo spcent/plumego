@@ -55,7 +55,10 @@ func TestSMSPrometheusExporterWritesMetrics(t *testing.T) {
 	reporter.RecordStatus(ctx, "tenant-1", messageStatusSent)
 	reporter.RecordReceiptDelay(ctx, "tenant-1", "provider-a", 2*time.Second)
 
-	exporter := NewSMSPrometheusExporter("plumego_test", collector)
+	exporter, err := NewSMSPrometheusExporter("plumego_test", collector)
+	if err != nil {
+		t.Fatal(err)
+	}
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/metrics/sms", nil)
 	exporter.Handler().ServeHTTP(rec, req)
@@ -80,7 +83,10 @@ func TestSMSPrometheusExporterUsesValueWhenDurationMissing(t *testing.T) {
 		},
 	})
 
-	exporter := NewSMSPrometheusExporter("plumego_test", collector)
+	exporter, err := NewSMSPrometheusExporter("plumego_test", collector)
+	if err != nil {
+		t.Fatal(err)
+	}
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/metrics/sms", nil)
 	exporter.Handler().ServeHTTP(rec, req)
@@ -88,17 +94,8 @@ func TestSMSPrometheusExporterUsesValueWhenDurationMissing(t *testing.T) {
 	assertMetricsBodyContains(t, rec.Body.String(), `plumego_test_sms_gateway_send_latency_seconds_sum{tenant="tenant-1",provider="provider-a"} 0.125000000`)
 }
 
-func TestNewSMSPrometheusExporterNilSourcePanics(t *testing.T) {
-	defer func() {
-		if recover() == nil {
-			t.Fatal("expected panic for nil metric record source")
-		}
-	}()
-	_ = NewSMSPrometheusExporter("plumego_test", nil)
-}
-
-func TestNewSMSPrometheusExporterEReturnsNilSourceError(t *testing.T) {
-	exporter, err := NewSMSPrometheusExporterE("plumego_test", nil)
+func TestNewSMSPrometheusExporter_NilSource_ReturnsError(t *testing.T) {
+	exporter, err := NewSMSPrometheusExporter("plumego_test", nil)
 	if !errors.Is(err, ErrNilMetricRecordSource) {
 		t.Fatalf("error = %v, want %v", err, ErrNilMetricRecordSource)
 	}
@@ -107,11 +104,11 @@ func TestNewSMSPrometheusExporterEReturnsNilSourceError(t *testing.T) {
 	}
 }
 
-func TestNewSMSPrometheusExporterEConstructsExporter(t *testing.T) {
+func TestNewSMSPrometheusExporter_ConstructsExporter(t *testing.T) {
 	collector := recordbuffer.NewCollector()
-	exporter, err := NewSMSPrometheusExporterE("", collector)
+	exporter, err := NewSMSPrometheusExporter("", collector)
 	if err != nil {
-		t.Fatalf("NewSMSPrometheusExporterE returned error: %v", err)
+		t.Fatalf("NewSMSPrometheusExporter returned error: %v", err)
 	}
 	if exporter == nil {
 		t.Fatalf("expected exporter")

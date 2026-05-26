@@ -323,9 +323,9 @@ func TestDashboardActionWithoutConfiguredTokenRemainsLocalErgonomic(t *testing.T
 }
 
 func TestDashboardWebSocketRequiresConfiguredToken(t *testing.T) {
-	hub, err := websocket.NewHubE(1, 10)
+	hub, err := websocket.NewHub(1, 10)
 	if err != nil {
-		t.Fatalf("NewHubE: %v", err)
+		t.Fatalf("NewHub: %v", err)
 	}
 	defer hub.Stop()
 	d := &Dashboard{
@@ -342,9 +342,9 @@ func TestDashboardWebSocketRequiresConfiguredToken(t *testing.T) {
 }
 
 func TestDashboardWebSocketAcceptsQueryTokenBeforeUpgradeValidation(t *testing.T) {
-	hub, err := websocket.NewHubE(1, 10)
+	hub, err := websocket.NewHub(1, 10)
 	if err != nil {
-		t.Fatalf("NewHubE: %v", err)
+		t.Fatalf("NewHub: %v", err)
 	}
 	defer hub.Stop()
 	d := &Dashboard{

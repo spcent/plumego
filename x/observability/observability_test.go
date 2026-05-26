@@ -148,9 +148,13 @@ func TestConfigureMetricsWithExplicitCollector(t *testing.T) {
 	cfg := DefaultObservabilityConfig()
 	cfg.Metrics.Enabled = true
 	cfg.Metrics.Collector = prom
-	cfg.Metrics.Exporter = NewPrometheusExporter(prom)
+	exporter, err := NewPrometheusExporter(prom)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg.Metrics.Exporter = exporter
 
-	err := Configure(hooks, cfg)
+	err = Configure(hooks, cfg)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -190,9 +194,13 @@ func TestConfigureMetricsWithExplicitExporter(t *testing.T) {
 	cfg := DefaultObservabilityConfig()
 	cfg.Metrics.Enabled = true
 	cfg.Metrics.Collector = prom
-	cfg.Metrics.Exporter = NewPrometheusExporter(prom)
+	exporter, err := NewPrometheusExporter(prom)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg.Metrics.Exporter = exporter
 
-	err := Configure(hooks, cfg)
+	err = Configure(hooks, cfg)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -210,9 +218,13 @@ func TestConfigureMetricsCollectorFromHooks(t *testing.T) {
 	}
 	cfg := DefaultObservabilityConfig()
 	cfg.Metrics.Enabled = true
-	cfg.Metrics.Exporter = NewPrometheusExporter(prom)
+	exporter, err := NewPrometheusExporter(prom)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg.Metrics.Exporter = exporter
 
-	err := Configure(hooks, cfg)
+	err = Configure(hooks, cfg)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

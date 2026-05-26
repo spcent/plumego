@@ -107,7 +107,7 @@ func configureMetrics(hooks Hooks, cfg MetricsConfig) error {
 		}
 		collector = prom
 		var err error
-		exporter, err = NewPrometheusExporterE(prom)
+		exporter, err = NewPrometheusExporter(prom)
 		if err != nil {
 			return err
 		}
@@ -115,7 +115,7 @@ func configureMetrics(hooks Hooks, cfg MetricsConfig) error {
 
 	if handler == nil && exporter == nil && collector != nil {
 		var err error
-		exporter, err = NewPrometheusExporterE(collector)
+		exporter, err = NewPrometheusExporter(collector)
 		if err != nil {
 			return err
 		}

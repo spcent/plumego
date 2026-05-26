@@ -345,7 +345,7 @@ func createMockConnection(t *testing.T) (*Conn, error) {
 	server, client := createMockPipe(t)
 
 	// Create Conn with minimal configuration
-	conn, err := NewConnE(server, 10, 100*time.Millisecond, SendDrop)
+	conn, err := NewConn(server, 10, 100*time.Millisecond, SendDrop)
 	if err != nil {
 		return nil, err
 	}

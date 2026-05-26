@@ -59,7 +59,7 @@ func (p *PrometheusCollector) WithMaxMemory(max int) *PrometheusCollector {
 }
 
 func (p *PrometheusCollector) Handler() http.Handler {
-	return NewPrometheusExporter(p).Handler()
+	return (&PrometheusExporter{collector: p}).Handler()
 }
 
 func (p *PrometheusCollector) Record(ctx context.Context, record metrics.MetricRecord) {

@@ -63,9 +63,9 @@ func WithProviderConfig(config *ProviderConfig) Option {
 	}
 }
 
-// NewSemanticCachingProviderE creates a semantic caching provider wrapper and
+// NewSemanticCachingProvider creates a semantic caching provider wrapper and
 // returns validation errors for missing required dependencies.
-func NewSemanticCachingProviderE(
+func NewSemanticCachingProvider(
 	p provider.Provider,
 	semanticCache *SemanticCache,
 	opts ...Option,

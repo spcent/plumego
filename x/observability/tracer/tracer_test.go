@@ -30,7 +30,10 @@ func TestRandomIDGenerator(t *testing.T) {
 }
 
 func TestTracer(t *testing.T) {
-	tracer := NewTracer(DefaultTracerConfig())
+	tracer, err := NewTracer(DefaultTracerConfig())
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	ctx, span := tracer.StartTrace(t.Context(), "test-operation")
 
@@ -70,7 +73,10 @@ func TestTracer(t *testing.T) {
 }
 
 func TestTracerWithOptions(t *testing.T) {
-	tracer := NewTracer(DefaultTracerConfig())
+	tracer, err := NewTracer(DefaultTracerConfig())
+	if err != nil {
+		t.Fatal(err)
+	}
 	attrs := map[string]any{"service.name": "test-service"}
 
 	ctx, span := tracer.StartTrace(t.Context(), "test-operation",
@@ -87,7 +93,10 @@ func TestTracerWithOptions(t *testing.T) {
 }
 
 func TestStartChildSpan(t *testing.T) {
-	tracer := NewTracer(DefaultTracerConfig())
+	tracer, err := NewTracer(DefaultTracerConfig())
+	if err != nil {
+		t.Fatal(err)
+	}
 	_, parentSpan := tracer.StartTrace(t.Context(), "parent-operation")
 	ctx, childSpan := tracer.StartChildSpan(t.Context(), parentSpan, "child-operation")
 
@@ -111,7 +120,10 @@ func TestStartChildSpan(t *testing.T) {
 }
 
 func TestStartChildSpanWithNilParent(t *testing.T) {
-	tracer := NewTracer(DefaultTracerConfig())
+	tracer, err := NewTracer(DefaultTracerConfig())
+	if err != nil {
+		t.Fatal(err)
+	}
 	ctx, span := tracer.StartChildSpan(t.Context(), nil, "standalone-operation")
 
 	if span == nil {
@@ -130,7 +142,10 @@ func TestTracerMaxSpansPerTrace(t *testing.T) {
 	config.SamplingRate = 1.0
 	config.MaxSpansPerTrace = 1
 
-	tracer := NewTracer(config)
+	tracer, err := NewTracer(config)
+	if err != nil {
+		t.Fatal(err)
+	}
 	ctx, root := tracer.StartTrace(t.Context(), "root")
 	_, child := tracer.StartChildSpan(ctx, root, "child")
 	tracer.EndSpan(child)
@@ -158,27 +173,27 @@ func TestDefaultTracerConfig(t *testing.T) {
 	}
 }
 
-func TestNewProbabilitySamplerEValidation(t *testing.T) {
+func TestNewProbabilitySamplerValidation(t *testing.T) {
 	for _, probability := range []float64{-0.01, 1.01} {
-		sampler, err := NewProbabilitySamplerE(probability)
+		sampler, err := NewProbabilitySampler(probability)
 		if err == nil {
-			t.Fatalf("NewProbabilitySamplerE(%f) error = nil", probability)
+			t.Fatalf("NewProbabilitySampler(%f) error = nil", probability)
 		}
 		if sampler != nil {
-			t.Fatalf("NewProbabilitySamplerE(%f) sampler = %#v, want nil", probability, sampler)
+			t.Fatalf("NewProbabilitySampler(%f) sampler = %#v, want nil", probability, sampler)
 		}
 	}
 
-	sampler, err := NewProbabilitySamplerE(0.5)
+	sampler, err := NewProbabilitySampler(0.5)
 	if err != nil {
-		t.Fatalf("NewProbabilitySamplerE valid config: %v", err)
+		t.Fatalf("NewProbabilitySampler valid config: %v", err)
 	}
 	if sampler == nil {
-		t.Fatal("NewProbabilitySamplerE valid config returned nil sampler")
+		t.Fatal("NewProbabilitySampler valid config returned nil sampler")
 	}
 }
 
-func TestNewTracerEValidation(t *testing.T) {
+func TestNewTracerValidation(t *testing.T) {
 	tests := []struct {
 		name string
 		cfg  TracerConfig
@@ -215,23 +230,23 @@ func TestNewTracerEValidation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tracer, err := NewTracerE(tt.cfg)
+			tracer, err := NewTracer(tt.cfg)
 			if err != tt.want {
-				t.Fatalf("NewTracerE error = %v, want %v", err, tt.want)
+				t.Fatalf("NewTracer error = %v, want %v", err, tt.want)
 			}
 			if tracer != nil {
-				t.Fatalf("NewTracerE tracer = %#v, want nil", tracer)
+				t.Fatalf("NewTracer tracer = %#v, want nil", tracer)
 			}
 		})
 	}
 }
 
-func TestNewTracerEValidConfig(t *testing.T) {
-	tracer, err := NewTracerE(DefaultTracerConfig())
+func TestNewTracerValidConfig(t *testing.T) {
+	tracer, err := NewTracer(DefaultTracerConfig())
 	if err != nil {
-		t.Fatalf("NewTracerE valid config: %v", err)
+		t.Fatalf("NewTracer valid config: %v", err)
 	}
 	if tracer == nil {
-		t.Fatal("NewTracerE valid config returned nil tracer")
+		t.Fatal("NewTracer valid config returned nil tracer")
 	}
 }

@@ -29,7 +29,7 @@ func Example_basicUsage() {
 	semanticCache := semanticcache.NewSemanticCache(generator, vectorStore, config)
 
 	// 4. Create caching provider
-	cachingProvider, err := semanticcache.NewSemanticCachingProviderE(
+	cachingProvider, err := semanticcache.NewSemanticCachingProvider(
 		mockProvider,
 		semanticCache,
 	)
@@ -79,7 +79,7 @@ func Example_withExactCache() {
 	)
 
 	// Create provider with both caches
-	cachingProvider, err := semanticcache.NewSemanticCachingProviderE(
+	cachingProvider, err := semanticcache.NewSemanticCachingProvider(
 		mockProvider,
 		semanticCache,
 		semanticcache.WithExactCache(exactCache),
@@ -126,7 +126,7 @@ func Example_withMetrics() {
 		semanticcache.DefaultSemanticCacheConfig(),
 	)
 
-	cachingProvider, err := semanticcache.NewSemanticCachingProviderE(
+	cachingProvider, err := semanticcache.NewSemanticCachingProvider(
 		mockProvider,
 		semanticCache,
 	)
@@ -177,7 +177,7 @@ func Example_customConfiguration() {
 	vectorStore := semanticcache.NewMemoryVectorStore(5000, 2*time.Hour)
 	semanticCache := semanticcache.NewSemanticCache(generator, vectorStore, cacheConfig)
 
-	cachingProvider, err := semanticcache.NewSemanticCachingProviderE(
+	cachingProvider, err := semanticcache.NewSemanticCachingProvider(
 		mockProvider,
 		semanticCache,
 		semanticcache.WithProviderConfig(providerConfig),
@@ -213,7 +213,7 @@ func Example_concurrentAccess() {
 		semanticcache.DefaultSemanticCacheConfig(),
 	)
 
-	cachingProvider, err := semanticcache.NewSemanticCachingProviderE(
+	cachingProvider, err := semanticcache.NewSemanticCachingProvider(
 		mockProvider,
 		semanticCache,
 	)

@@ -167,7 +167,10 @@ func TestBrokerPersistence(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.EnablePersistence = true
 	cfg.PersistencePath = tmpDir
-	broker := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	broker, err := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer broker.Close()
 
 	if broker.persistenceManager == nil {
@@ -178,7 +181,7 @@ func TestBrokerPersistence(t *testing.T) {
 
 	// Publish message
 	msg := Message{ID: "persist-1", Data: "persistent data"}
-	err := broker.Publish(ctx, "test-topic", msg)
+	err = broker.Publish(ctx, "test-topic", msg)
 	if err != nil {
 		t.Fatalf("Publish error: %v", err)
 	}
@@ -204,14 +207,17 @@ func TestBrokerPersistenceReplay(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.EnablePersistence = true
 	cfg.PersistencePath = tmpDir
-	broker1 := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	broker1, err := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	ctx := t.Context()
 
 	// Publish messages
 	msg1 := Message{ID: "replay-1", Data: "data-1"}
 	msg2 := Message{ID: "replay-2", Data: "data-2"}
-	err := broker1.Publish(ctx, "test-topic", msg1)
+	err = broker1.Publish(ctx, "test-topic", msg1)
 	if err != nil {
 		t.Fatalf("Publish error: %v", err)
 	}
@@ -224,7 +230,10 @@ func TestBrokerPersistenceReplay(t *testing.T) {
 	broker1.Close()
 
 	// Create second broker instance (simulating restart)
-	broker2 := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	broker2, err := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer broker2.Close()
 
 	// Subscribe to topic
@@ -258,13 +267,16 @@ func TestBrokerPersistenceReplay(t *testing.T) {
 
 func TestPersistenceDisabled(t *testing.T) {
 	// Create broker without persistence
-	broker := NewInProcBroker(pubsub.New())
+	broker, err := NewInProcBroker(pubsub.New())
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer broker.Close()
 
 	ctx := t.Context()
 
 	// Try to recover messages when persistence is disabled
-	_, err := broker.RecoverMessages(ctx, "test-topic", 10)
+	_, err = broker.RecoverMessages(ctx, "test-topic", 10)
 	if err == nil {
 		t.Fatal("expected error when persistence is disabled")
 	}
@@ -283,7 +295,10 @@ func TestPersistenceBatch(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.EnablePersistence = true
 	cfg.PersistencePath = tmpDir
-	broker := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	broker, err := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer broker.Close()
 
 	ctx := t.Context()
@@ -295,7 +310,7 @@ func TestPersistenceBatch(t *testing.T) {
 		{ID: "batch-3", Data: "data-3"},
 	}
 
-	err := broker.PublishBatch(ctx, "test-topic", messages)
+	err = broker.PublishBatch(ctx, "test-topic", messages)
 	if err != nil {
 		t.Fatalf("PublishBatch error: %v", err)
 	}
@@ -317,13 +332,16 @@ func TestPersistenceClose(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.EnablePersistence = true
 	cfg.PersistencePath = tmpDir
-	broker := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	broker, err := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	ctx := t.Context()
 
 	// Publish message
 	msg := Message{ID: "close-1", Data: "data"}
-	err := broker.Publish(ctx, "test-topic", msg)
+	err = broker.Publish(ctx, "test-topic", msg)
 	if err != nil {
 		t.Fatalf("Publish error: %v", err)
 	}

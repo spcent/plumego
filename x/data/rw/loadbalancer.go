@@ -193,23 +193,9 @@ type WeightedBalancer struct {
 	mu            sync.Mutex
 }
 
-// NewWeightedBalancer creates a new weighted load balancer
-func NewWeightedBalancer(weights []int) *WeightedBalancer {
-	lb, err := NewWeightedBalancerE(weights)
-	if err == nil {
-		return lb
-	}
-	copied := append([]int(nil), weights...)
-	return &WeightedBalancer{
-		weights:       copied,
-		currentWeight: make([]int, len(copied)),
-		invalid:       true,
-	}
-}
-
-// NewWeightedBalancerE creates a new weighted load balancer and validates
+// NewWeightedBalancer creates a new weighted load balancer and validates
 // weights at construction time.
-func NewWeightedBalancerE(weights []int) (*WeightedBalancer, error) {
+func NewWeightedBalancer(weights []int) (*WeightedBalancer, error) {
 	if len(weights) == 0 {
 		return &WeightedBalancer{}, nil
 	}

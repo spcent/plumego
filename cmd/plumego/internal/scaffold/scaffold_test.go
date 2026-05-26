@@ -279,7 +279,7 @@ func TestScenarioProfiles_GenerateRunnableRoutes(t *testing.T) {
 	gatewayRoutes := getTemplateContent("internal/app/routes.go", "myapp", "example.com/myapp", "gateway")
 	assertContainsAll(t, gatewayRoutes, []string{
 		`"github.com/spcent/plumego/x/gateway"`,
-		`gateway.NewGatewayE(gateway.GatewayConfig{`,
+		`gateway.NewGateway(gateway.GatewayConfig{`,
 		`PathRewrite: gateway.ReplacePrefix("/edge", "/api/status")`,
 		`a.Core.Get("/edge", proxy)`,
 	})
@@ -287,7 +287,7 @@ func TestScenarioProfiles_GenerateRunnableRoutes(t *testing.T) {
 	realtimeRoutes := getTemplateContent("internal/app/routes.go", "myapp", "example.com/myapp", "realtime")
 	assertContainsAll(t, realtimeRoutes, []string{
 		`"github.com/spcent/plumego/x/websocket"`,
-		`hub, err := websocket.NewHubE(4, 1024)`,
+		`hub, err := websocket.NewHub(4, 1024)`,
 		`a.Core.Get("/realtime/metrics", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request)`,
 		`hub.Metrics()`,
 	})

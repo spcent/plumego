@@ -70,22 +70,9 @@ type Proxy struct {
 	mu sync.RWMutex
 }
 
-// New creates a new reverse proxy handler that implements http.Handler.
-// The proxy can be directly registered as a route handler.
-// Panics if the configuration is invalid or the backend pool cannot be created.
-// Use NewE or the app-facing NewGatewayE for a safe variant that returns an
-// error instead.
-func New(config Config) *Proxy {
-	p, err := NewE(config)
-	if err != nil {
-		panic(err)
-	}
-	return p
-}
-
-// NewE creates a new reverse proxy handler and returns an error instead of panicking
-// on invalid configuration or backend pool initialization failures.
-func NewE(config Config) (*Proxy, error) {
+// New creates a new reverse proxy handler and returns an error for invalid
+// configuration or backend pool initialization failures.
+func New(config Config) (*Proxy, error) {
 	cfg := config.WithDefaults()
 
 	if err := cfg.Validate(); err != nil {

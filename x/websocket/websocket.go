@@ -121,7 +121,7 @@ func New(cfg WebSocketConfig) (*Server, error) {
 	cfg.Secret = cloneBytes(cfg.Secret)
 	cfg.BroadcastSecret = cloneBytes(cfg.BroadcastSecret)
 
-	hub, err := NewHubWithConfigE(HubConfig{
+	hub, err := NewHubWithConfig(HubConfig{
 		WorkerCount:           cfg.WorkerCount,
 		JobQueueSize:          cfg.JobQueueSize,
 		MaxRoomRegistrations:  cfg.MaxRoomRegistrations,

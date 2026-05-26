@@ -119,17 +119,9 @@ type SMSPrometheusExporter struct {
 	source    metricRecordSource
 }
 
-func NewSMSPrometheusExporter(namespace string, source metricRecordSource) *SMSPrometheusExporter {
-	exporter, err := NewSMSPrometheusExporterE(namespace, source)
-	if err != nil {
-		panic(err.Error())
-	}
-	return exporter
-}
-
-// NewSMSPrometheusExporterE creates an SMS Prometheus exporter and reports
-// invalid dependencies instead of panicking.
-func NewSMSPrometheusExporterE(namespace string, source metricRecordSource) (*SMSPrometheusExporter, error) {
+// NewSMSPrometheusExporter creates an SMS Prometheus exporter and returns an
+// error for invalid dependencies.
+func NewSMSPrometheusExporter(namespace string, source metricRecordSource) (*SMSPrometheusExporter, error) {
 	if source == nil {
 		return nil, ErrNilMetricRecordSource
 	}

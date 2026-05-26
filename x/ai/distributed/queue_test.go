@@ -15,7 +15,10 @@ import (
 
 func TestMQTaskQueue_Enqueue(t *testing.T) {
 	ctx := t.Context()
-	broker := mq.NewInProcBroker(pubsub.New())
+	broker, err := mq.NewInProcBroker(pubsub.New())
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer broker.Close()
 
 	tmpDir := t.TempDir()
@@ -70,7 +73,10 @@ func TestMQTaskQueue_Subscribe(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 	defer cancel()
 
-	broker := mq.NewInProcBroker(pubsub.New())
+	broker, err := mq.NewInProcBroker(pubsub.New())
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer broker.Close()
 
 	tmpDir := t.TempDir()
@@ -149,7 +155,10 @@ func TestMQTaskQueue_Subscribe(t *testing.T) {
 
 func TestMQTaskQueue_TaskStatus(t *testing.T) {
 	ctx := t.Context()
-	broker := mq.NewInProcBroker(pubsub.New())
+	broker, err := mq.NewInProcBroker(pubsub.New())
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer broker.Close()
 
 	tmpDir := t.TempDir()
@@ -188,7 +197,10 @@ func TestMQTaskQueue_Results(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 	defer cancel()
 
-	broker := mq.NewInProcBroker(pubsub.New())
+	broker, err := mq.NewInProcBroker(pubsub.New())
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer broker.Close()
 
 	tmpDir := t.TempDir()

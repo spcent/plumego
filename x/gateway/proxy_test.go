@@ -28,11 +28,14 @@ func TestProxyBasicRequest(t *testing.T) {
 		fmt.Fprint(w, "hello")
 	}))
 
-	proxy := New(Config{
+	proxy, err := New(Config{
 		Targets:             []string{backend.URL},
 		RetryBackoff:        0,
 		AddForwardedHeaders: true,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer proxy.Close()
 
 	w := httptest.NewRecorder()
@@ -57,10 +60,13 @@ func TestProxyForwardedHeaders(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
-	proxy := New(Config{
+	proxy, err := New(Config{
 		Targets:             []string{backend.URL},
 		AddForwardedHeaders: true,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer proxy.Close()
 
 	w := httptest.NewRecorder()
@@ -80,10 +86,13 @@ func TestProxyPathRewrite(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
-	proxy := New(Config{
+	proxy, err := New(Config{
 		Targets:     []string{backend.URL},
 		PathRewrite: StripPrefix("/api"),
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer proxy.Close()
 
 	w := httptest.NewRecorder()
@@ -96,7 +105,10 @@ func TestProxyPathRewrite(t *testing.T) {
 }
 
 func TestProxyNoHealthyBackends(t *testing.T) {
-	proxy := New(Config{Targets: []string{"http://localhost:9999"}})
+	proxy, err := New(Config{Targets: []string{"http://localhost:9999"}})
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer proxy.Close()
 
 	// Mark the only backend unhealthy
@@ -117,11 +129,14 @@ func TestProxyBackendFailureRecorded(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
-	proxy := New(Config{
+	proxy, err := New(Config{
 		Targets:      []string{backend.URL},
 		RetryCount:   0,
 		RetryBackoff: 0,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer proxy.Close()
 
 	w := httptest.NewRecorder()
@@ -148,10 +163,13 @@ func TestProxyCustomModifyRequest(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
-	proxy := New(Config{
+	proxy, err := New(Config{
 		Targets:       []string{backend.URL},
 		ModifyRequest: SetHeader("X-Custom", "injected"),
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer proxy.Close()
 
 	w := httptest.NewRecorder()
@@ -168,10 +186,13 @@ func TestProxyCustomModifyResponse(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
-	proxy := New(Config{
+	proxy, err := New(Config{
 		Targets:        []string{backend.URL},
 		ModifyResponse: SetResponseHeader("X-Modified", "yes"),
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer proxy.Close()
 
 	w := httptest.NewRecorder()
@@ -190,10 +211,13 @@ func TestProxyPreserveHost(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
-	proxy := New(Config{
+	proxy, err := New(Config{
 		Targets:      []string{backend.URL},
 		PreserveHost: true,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer proxy.Close()
 
 	w := httptest.NewRecorder()
@@ -207,10 +231,13 @@ func TestProxyPreserveHost(t *testing.T) {
 }
 
 func TestProxyStats(t *testing.T) {
-	proxy := New(Config{
+	proxy, err := New(Config{
 		Targets:      []string{"http://a:8080", "http://b:8080"},
 		LoadBalancer: NewRoundRobinBalancer(),
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer proxy.Close()
 
 	stats := proxy.Stats()
@@ -227,7 +254,10 @@ func TestProxyMiddleware(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
-	proxy := New(Config{Targets: []string{backend.URL}})
+	proxy, err := New(Config{Targets: []string{backend.URL}})
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer proxy.Close()
 
 	mw := proxy.Middleware()
@@ -250,10 +280,13 @@ func TestProxyWebSocketDetection(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
-	proxy := New(Config{
+	proxy, err := New(Config{
 		Targets:          []string{backend.URL},
 		WebSocketEnabled: false,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer proxy.Close()
 
 	w := httptest.NewRecorder()
@@ -276,12 +309,15 @@ func TestProxyRetryOnFailure(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
-	proxy := New(Config{
+	proxy, err := New(Config{
 		Targets:      []string{backend.URL},
 		RetryCount:   2,
 		RetryBackoff: 0,
 		Timeout:      5 * time.Second,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer proxy.Close()
 
 	w := httptest.NewRecorder()
@@ -303,7 +339,7 @@ func TestProxyDoesNotRetryAfterCommittedBodyCopyError(t *testing.T) {
 	}))
 
 	errorHandlerCalls := 0
-	proxy := New(Config{
+	proxy, err := New(Config{
 		Targets:      []string{backend.URL},
 		RetryCount:   2,
 		RetryBackoff: 0,
@@ -312,6 +348,9 @@ func TestProxyDoesNotRetryAfterCommittedBodyCopyError(t *testing.T) {
 			w.WriteHeader(http.StatusBadGateway)
 		},
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer proxy.Close()
 
 	w := newFailingBodyResponseWriter()
@@ -338,7 +377,7 @@ func TestProxyRetriesPreCommitFailure(t *testing.T) {
 	}))
 
 	errorHandlerCalls := 0
-	proxy := New(Config{
+	proxy, err := New(Config{
 		Targets:      []string{backend.URL},
 		RetryCount:   2,
 		RetryBackoff: 0,
@@ -350,6 +389,9 @@ func TestProxyRetriesPreCommitFailure(t *testing.T) {
 			w.WriteHeader(http.StatusBadGateway)
 		},
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer proxy.Close()
 
 	w := httptest.NewRecorder()
@@ -400,10 +442,13 @@ func TestProxyLeastConnectionsBalancer(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
-	proxy := New(Config{
+	proxy, err := New(Config{
 		Targets:      []string{backend.URL},
 		LoadBalancer: NewLeastConnectionsBalancer(),
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer proxy.Close()
 
 	w := httptest.NewRecorder()
@@ -417,13 +462,16 @@ func TestProxyLeastConnectionsBalancer(t *testing.T) {
 
 // TestProxyCustomErrorHandler verifies custom error handler is invoked.
 func TestProxyCustomErrorHandler(t *testing.T) {
-	proxy := New(Config{
+	proxy, err := New(Config{
 		Targets: []string{"http://localhost:9999"},
 		ErrorHandler: func(w http.ResponseWriter, r *http.Request, err error) {
 			w.Header().Set("X-Custom-Error", "yes")
 			w.WriteHeader(http.StatusBadGateway)
 		},
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer proxy.Close()
 
 	// Force all backends unhealthy
@@ -438,15 +486,7 @@ func TestProxyCustomErrorHandler(t *testing.T) {
 	}
 }
 
-// TestProxyNewPanicsOnInvalidConfig ensures New panics on invalid config.
-func TestProxyNewPanicsOnInvalidConfig(t *testing.T) {
-	defer func() {
-		if r := recover(); r == nil {
-			t.Error("expected panic for invalid config")
-		}
-	}()
-	New(Config{}) // no targets or discovery
-}
+
 
 // TestProxyIsWebSocketRequest exercises the helper.
 func TestProxyIsWebSocketRequest(t *testing.T) {
@@ -480,8 +520,8 @@ func TestProxyIsWebSocketRequest(t *testing.T) {
 
 // --- NewE safe constructor ---
 
-func TestProxyNewE_InvalidConfig_ReturnsError(t *testing.T) {
-	p, err := NewE(Config{}) // no targets or discovery
+func TestProxyNew_InvalidConfig_ReturnsError(t *testing.T) {
+	p, err := New(Config{}) // no targets or discovery
 	if err == nil {
 		t.Error("expected error for invalid config, got nil")
 	}
@@ -490,14 +530,14 @@ func TestProxyNewE_InvalidConfig_ReturnsError(t *testing.T) {
 	}
 }
 
-func TestProxyNewE_ValidConfig_ReturnsProxy(t *testing.T) {
+func TestProxyNew_ValidConfig_ReturnsProxy(t *testing.T) {
 	backend := startBackend(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
-	p, err := NewE(Config{Targets: []string{backend.URL}})
+	p, err := New(Config{Targets: []string{backend.URL}})
 	if err != nil {
-		t.Fatalf("NewE error: %v", err)
+		t.Fatalf("New error: %v", err)
 	}
 	if p == nil {
 		t.Fatal("expected non-nil proxy")
@@ -511,12 +551,12 @@ func TestProxyCloseCancelsServiceDiscoveryWatch(t *testing.T) {
 		watchCanceled: make(chan struct{}),
 	}
 
-	p, err := NewE(Config{
+	p, err := New(Config{
 		Discovery:   discovery,
 		ServiceName: "users",
 	})
 	if err != nil {
-		t.Fatalf("NewE error: %v", err)
+		t.Fatalf("New error: %v", err)
 	}
 
 	select {
@@ -545,7 +585,7 @@ func TestProxyCircuitBreakerTripsAfterFailures(t *testing.T) {
 	targetURL := srv.URL
 	srv.Close() // subsequent connections → "connection refused"
 
-	proxy := New(Config{
+	proxy, err := New(Config{
 		Targets:               []string{targetURL},
 		CircuitBreakerEnabled: true,
 		CircuitBreakerConfig: &CircuitBreakerConfig{
@@ -558,6 +598,9 @@ func TestProxyCircuitBreakerTripsAfterFailures(t *testing.T) {
 		RetryCount:   1,
 		RetryBackoff: time.Nanosecond,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer proxy.Close()
 
 	pool := proxy.pool
@@ -587,7 +630,7 @@ func TestProxyCircuitBreakerReset(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
-	proxy := New(Config{
+	proxy, err := New(Config{
 		Targets:               []string{backend.URL},
 		CircuitBreakerEnabled: true,
 		CircuitBreakerConfig: &CircuitBreakerConfig{
@@ -596,6 +639,9 @@ func TestProxyCircuitBreakerReset(t *testing.T) {
 			SuccessThreshold: 2,
 		},
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer proxy.Close()
 
 	pool := proxy.pool
@@ -623,10 +669,13 @@ func TestProxyBufferPool(t *testing.T) {
 		fmt.Fprint(w, strings.Repeat("x", 1024))
 	}))
 
-	proxy := New(Config{
+	proxy, err := New(Config{
 		Targets:    []string{backend.URL},
 		BufferPool: &testBufferPool{},
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer proxy.Close()
 
 	w := httptest.NewRecorder()

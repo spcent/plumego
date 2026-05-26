@@ -15,7 +15,10 @@ import (
 func newTestInstrumentedEngine(t *testing.T) (*InstrumentedDistributedEngine, func()) {
 	t.Helper()
 
-	broker := mq.NewInProcBroker(pubsub.New())
+	broker, err := mq.NewInProcBroker(pubsub.New())
+	if err != nil {
+		t.Fatal(err)
+	}
 	tmpDir := t.TempDir()
 	store, err := kv.NewKVStore(kv.Options{DataDir: filepath.Join(tmpDir, "inst")})
 	if err != nil {
@@ -59,7 +62,10 @@ func TestInstrumentedEngine_ExecuteSync_NonexistentWorkflow(t *testing.T) {
 }
 
 func TestInstrumentedEngine_ExecuteAsync_RegisteredWorkflow(t *testing.T) {
-	broker := mq.NewInProcBroker(pubsub.New())
+	broker, err := mq.NewInProcBroker(pubsub.New())
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer broker.Close()
 
 	tmpDir := t.TempDir()
@@ -87,7 +93,10 @@ func TestInstrumentedEngine_ExecuteAsync_RegisteredWorkflow(t *testing.T) {
 }
 
 func TestInstrumentedEngine_GetExecutionStatus(t *testing.T) {
-	broker := mq.NewInProcBroker(pubsub.New())
+	broker, err := mq.NewInProcBroker(pubsub.New())
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer broker.Close()
 
 	tmpDir := t.TempDir()

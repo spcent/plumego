@@ -59,20 +59,10 @@ type GatewayProtocolResponse = protocol.Response
 // GatewayProtocolResponseWriter writes adapter responses.
 type GatewayProtocolResponseWriter = protocol.ResponseWriter
 
-// NewGateway constructs the canonical reverse proxy handler for app-facing code.
-// It panics on invalid configuration for compatibility with New.
-func NewGateway(cfg GatewayConfig) *GatewayProxy {
-	proxy, err := NewGatewayE(cfg)
-	if err != nil {
-		panic(err)
-	}
-	return proxy
-}
-
-// NewGatewayE constructs the canonical reverse proxy handler for app-facing code
-// and returns configuration errors instead of panicking.
-func NewGatewayE(cfg GatewayConfig) (*GatewayProxy, error) {
-	return NewE(cfg)
+// NewGateway constructs the canonical reverse proxy handler for app-facing code
+// and returns configuration errors.
+func NewGateway(cfg GatewayConfig) (*GatewayProxy, error) {
+	return New(cfg)
 }
 
 // NewGatewayBackendPool constructs a backend pool from backend URLs.
@@ -107,7 +97,7 @@ func RegisterProxy(r *router.Router, path string, cfg GatewayConfig) (*GatewayPr
 	if strings.TrimSpace(path) == "" {
 		return nil, errRegisterEmptyPath
 	}
-	proxy, err := NewGatewayE(cfg)
+	proxy, err := NewGateway(cfg)
 	if err != nil {
 		return nil, err
 	}

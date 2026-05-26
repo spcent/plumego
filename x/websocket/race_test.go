@@ -386,7 +386,7 @@ func newMockConn() *Conn {
 		writer: w2,
 	}
 
-	conn, err := NewConnE(mockConn, 64, 5*time.Second, SendDrop)
+	conn, err := NewConn(mockConn, 64, 5*time.Second, SendDrop)
 	if err != nil {
 		panic(err)
 	}

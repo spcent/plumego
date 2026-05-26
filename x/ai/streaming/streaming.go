@@ -99,7 +99,7 @@ func NewStreamManager() *StreamManager {
 }
 
 // RegisterE registers a new stream for a workflow and reports invalid input.
-func (sm *StreamManager) RegisterE(workflowID string, stream *sse.Stream) error {
+func (sm *StreamManager) Register(workflowID string, stream *sse.Stream) error {
 	if workflowID == "" {
 		return ErrWorkflowIDRequired
 	}
@@ -203,7 +203,7 @@ func (se *StreamingEngine) ExecuteStreaming(
 	stream *sse.Stream,
 ) ([]*orchestration.AgentResult, error) {
 	// Register stream
-	if err := se.streamMgr.RegisterE(workflowID, stream); err != nil {
+	if err := se.streamMgr.Register(workflowID, stream); err != nil {
 		return nil, err
 	}
 	defer se.streamMgr.Unregister(workflowID)

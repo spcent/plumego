@@ -15,7 +15,7 @@ func TestStreamingParallelStep(t *testing.T) {
 		w := httptest.NewRecorder()
 		ctx := t.Context()
 		stream, _ := sse.NewStream(ctx, w)
-		if err := streamMgr.RegisterE("workflow-1", stream); err != nil {
+		if err := streamMgr.Register("workflow-1", stream); err != nil {
 			t.Fatal(err)
 		}
 
@@ -40,7 +40,7 @@ func TestStreamingParallelStep(t *testing.T) {
 		w := httptest.NewRecorder()
 		ctx := t.Context()
 		stream, _ := sse.NewStream(ctx, w)
-		if err := streamMgr.RegisterE("workflow-1", stream); err != nil {
+		if err := streamMgr.Register("workflow-1", stream); err != nil {
 			t.Fatal(err)
 		}
 
@@ -79,7 +79,7 @@ func TestStreamingParallelStep(t *testing.T) {
 		w := httptest.NewRecorder()
 		ctx := t.Context()
 		stream, _ := sse.NewStream(ctx, w)
-		if err := streamMgr.RegisterE("workflow-1", stream); err != nil {
+		if err := streamMgr.Register("workflow-1", stream); err != nil {
 			t.Fatal(err)
 		}
 
@@ -136,7 +136,7 @@ func TestStreamingParallelStep(t *testing.T) {
 		w := httptest.NewRecorder()
 		ctx := t.Context()
 		stream, _ := sse.NewStream(ctx, w)
-		if err := streamMgr.RegisterE("workflow-1", stream); err != nil {
+		if err := streamMgr.Register("workflow-1", stream); err != nil {
 			t.Fatal(err)
 		}
 
@@ -181,7 +181,7 @@ func TestStreamingParallelStep(t *testing.T) {
 		w := httptest.NewRecorder()
 		ctx := t.Context()
 		stream, _ := sse.NewStream(ctx, w)
-		if err := streamMgr.RegisterE("workflow-1", stream); err != nil {
+		if err := streamMgr.Register("workflow-1", stream); err != nil {
 			t.Fatal(err)
 		}
 
@@ -296,7 +296,7 @@ func TestConcurrentStreamingParallelStep(t *testing.T) {
 		w := httptest.NewRecorder()
 		ctx := t.Context()
 		stream, _ := sse.NewStream(ctx, w)
-		if err := streamMgr.RegisterE("workflow-1", stream); err != nil {
+		if err := streamMgr.Register("workflow-1", stream); err != nil {
 			t.Fatal(err)
 		}
 

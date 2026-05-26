@@ -72,7 +72,7 @@ func TestResilientProvider_RateLimit(t *testing.T) {
 		Timeout:          time.Second,
 	})
 
-	resilient, err := NewResilientProviderE(Config{
+	resilient, err := NewResilientProvider(Config{
 		Provider:       mockProv,
 		RateLimiter:    limiter,
 		CircuitBreaker: cb,
@@ -109,18 +109,18 @@ func TestResilientProvider_RateLimit(t *testing.T) {
 	}
 }
 
-func TestNewResilientProviderERejectsNilProvider(t *testing.T) {
-	resilient, err := NewResilientProviderE(Config{})
+func TestNewResilientProviderRejectsNilProvider(t *testing.T) {
+	resilient, err := NewResilientProvider(Config{})
 	if !errors.Is(err, ErrNilProvider) {
-		t.Fatalf("NewResilientProviderE error = %v, want ErrNilProvider", err)
+		t.Fatalf("NewResilientProvider error = %v, want ErrNilProvider", err)
 	}
 	if resilient != nil {
-		t.Fatalf("NewResilientProviderE returned provider = %#v, want nil", resilient)
+		t.Fatalf("NewResilientProvider returned provider = %#v, want nil", resilient)
 	}
 }
 
 func TestResilientProviderRejectsNilCompletionRequest(t *testing.T) {
-	resilient, err := NewResilientProviderE(Config{
+	resilient, err := NewResilientProvider(Config{
 		Provider: &mockProvider{name: "test-provider"},
 	})
 	if err != nil {
@@ -147,7 +147,7 @@ func TestResilientProvider_CircuitBreaker(t *testing.T) {
 		Timeout:          time.Second,
 	})
 
-	resilient, err := NewResilientProviderE(Config{
+	resilient, err := NewResilientProvider(Config{
 		Provider:       mockProv,
 		CircuitBreaker: cb,
 	})
@@ -198,7 +198,7 @@ func TestResilientProvider_Combined(t *testing.T) {
 		Timeout:          time.Second,
 	})
 
-	resilient, err := NewResilientProviderE(Config{
+	resilient, err := NewResilientProvider(Config{
 		Provider:       mockProv,
 		RateLimiter:    limiter,
 		CircuitBreaker: cb,
@@ -248,7 +248,7 @@ func TestResilientProvider_NoRateLimiter(t *testing.T) {
 		Timeout:          time.Second,
 	})
 
-	resilient, err := NewResilientProviderE(Config{
+	resilient, err := NewResilientProvider(Config{
 		Provider:       mockProv,
 		CircuitBreaker: cb,
 	})
@@ -277,7 +277,7 @@ func TestResilientProvider_NoCircuitBreaker(t *testing.T) {
 	mockProv := &mockProvider{name: "test-provider"}
 	limiter := sharedratelimit.NewKeyed(0, 5)
 
-	resilient, err := NewResilientProviderE(Config{
+	resilient, err := NewResilientProvider(Config{
 		Provider:    mockProv,
 		RateLimiter: limiter,
 	})
@@ -317,7 +317,7 @@ func TestResilientProvider_CompleteStream(t *testing.T) {
 		Timeout:          time.Second,
 	})
 
-	resilient, err := NewResilientProviderE(Config{
+	resilient, err := NewResilientProvider(Config{
 		Provider:       mockProv,
 		RateLimiter:    limiter,
 		CircuitBreaker: cb,
@@ -358,7 +358,7 @@ func TestResilientProvider_ListModels(t *testing.T) {
 		Timeout:          time.Second,
 	})
 
-	resilient, err := NewResilientProviderE(Config{
+	resilient, err := NewResilientProvider(Config{
 		Provider:       mockProv,
 		CircuitBreaker: cb,
 	})
@@ -388,7 +388,7 @@ func TestResilientProvider_CountTokens(t *testing.T) {
 		Timeout:          time.Second,
 	})
 
-	resilient, err := NewResilientProviderE(Config{
+	resilient, err := NewResilientProvider(Config{
 		Provider:       mockProv,
 		RateLimiter:    limiter,
 		CircuitBreaker: cb,
@@ -408,16 +408,16 @@ func TestResilientProvider_CountTokens(t *testing.T) {
 	}
 }
 
-func TestNewResilientProviderE_UsesSharedRateLimiterAsCanonicalInput(t *testing.T) {
+func TestNewResilientProvider_UsesSharedRateLimiterAsCanonicalInput(t *testing.T) {
 	mockProv := &mockProvider{name: "test-provider"}
 	limiter := sharedratelimit.NewKeyed(0, 2)
 
-	resilient, err := NewResilientProviderE(Config{
+	resilient, err := NewResilientProvider(Config{
 		Provider:    mockProv,
 		RateLimiter: limiter,
 	})
 	if err != nil {
-		t.Fatalf("NewResilientProviderE() error = %v", err)
+		t.Fatalf("NewResilientProvider() error = %v", err)
 	}
 
 	ctx := t.Context()
@@ -447,7 +447,7 @@ func TestNewResilientProviderE_UsesSharedRateLimiterAsCanonicalInput(t *testing.
 	}
 }
 
-func TestNewResilientProviderE_UsesSharedCircuitBreakerAsCanonicalInput(t *testing.T) {
+func TestNewResilientProvider_UsesSharedCircuitBreakerAsCanonicalInput(t *testing.T) {
 	mockProv := &mockProvider{
 		name: "test-provider",
 		err:  errors.New("provider error"),
@@ -459,12 +459,12 @@ func TestNewResilientProviderE_UsesSharedCircuitBreakerAsCanonicalInput(t *testi
 		Timeout:          time.Second,
 	})
 
-	resilient, err := NewResilientProviderE(Config{
+	resilient, err := NewResilientProvider(Config{
 		Provider:       mockProv,
 		CircuitBreaker: breaker,
 	})
 	if err != nil {
-		t.Fatalf("NewResilientProviderE() error = %v", err)
+		t.Fatalf("NewResilientProvider() error = %v", err)
 	}
 
 	ctx := t.Context()

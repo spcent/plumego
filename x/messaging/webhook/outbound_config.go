@@ -127,24 +127,15 @@ type ValueReader interface {
 	GetString(key, defaultValue string) string
 }
 
-// ConfigFromReader creates config from an explicit configuration reader.
+// ConfigFromReader creates config from an explicit configuration reader and
+// returns an error for invalid inputs.
 //
 // Example:
 //
 //	import "github.com/spcent/plumego/x/messaging/webhook"
 //
-//	config := webhookout.ConfigFromReader(reader)
-func ConfigFromReader(reader ValueReader) Config {
-	cfg, err := ConfigFromReaderE(reader)
-	if err != nil {
-		panic(err)
-	}
-	return cfg
-}
-
-// ConfigFromReaderE creates config from an explicit configuration reader and
-// returns an error instead of panicking for invalid construction inputs.
-func ConfigFromReaderE(reader ValueReader) (Config, error) {
+//	config, err := webhookout.ConfigFromReader(reader)
+func ConfigFromReader(reader ValueReader) (Config, error) {
 	if reader == nil {
 		return Config{}, ErrNilValueReader
 	}
@@ -198,7 +189,7 @@ func ConfigFromReaderE(reader ValueReader) (Config, error) {
 
 // ConfigFromEnv creates config from process environment variables.
 func ConfigFromEnv() Config {
-	cfg, _ := ConfigFromReaderE(envReader{})
+	cfg, _ := ConfigFromReader(envReader{})
 	return cfg
 }
 
