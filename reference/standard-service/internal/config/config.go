@@ -145,26 +145,31 @@ func applyFlags(cfg *Config, args []string) error {
 	if len(args) == 0 {
 		return fs.Parse(nil)
 	}
-	return fs.Parse(configFlagArgs(args[1:]))
+	// Collect registered flag names from the FlagSet itself so filterFlagArgs
+	// stays in sync automatically when new flags are added above.
+	// Adding a new flag to fs only requires the fs.StringVar call above;
+	// no separate name list needs to be maintained.
+	known := make(map[string]bool)
+	fs.VisitAll(func(f *flag.Flag) { known[f.Name] = true })
+	return fs.Parse(filterFlagArgs(args[1:], known))
 }
 
-// configFlagArgs filters args to pass only the flag names that applyFlags registers.
-// flag.FlagSet returns an error for unrecognized flags, so this filter lets the
-// process accept arbitrary positional arguments without breaking the FlagSet parse.
-// When adding a new flag to applyFlags, add its name to the case list here too —
-// omitting it causes the flag to be silently dropped at startup.
-func configFlagArgs(args []string) []string {
+// filterFlagArgs returns only the elements of args that correspond to flags in
+// known, along with their values. Unrecognized flags and positional arguments
+// are dropped so the process can accept arbitrary extra arguments without the
+// FlagSet returning an error.
+func filterFlagArgs(args []string, known map[string]bool) []string {
 	out := make([]string, 0, len(args))
 	for i := 0; i < len(args); i++ {
 		arg := args[i]
 		name, hasValue := flagName(arg)
-		switch name {
-		case "addr", "env-file":
-			out = append(out, arg)
-			if !hasValue && i+1 < len(args) {
-				i++
-				out = append(out, args[i])
-			}
+		if !known[name] {
+			continue
+		}
+		out = append(out, arg)
+		if !hasValue && i+1 < len(args) {
+			i++
+			out = append(out, args[i])
 		}
 	}
 	return out

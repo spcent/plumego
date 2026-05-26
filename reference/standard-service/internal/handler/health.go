@@ -6,6 +6,7 @@ import (
 
 	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/health"
+	plumelog "github.com/spcent/plumego/log"
 )
 
 const codeComponentUnhealthy = "health.component.unhealthy"
@@ -23,8 +24,12 @@ const codeComponentUnhealthy = "health.component.unhealthy"
 // checker type. It carries a stable Name() for labeling plus Check() for the
 // probe. Implement health.ComponentChecker directly or adapt an existing
 // client's health method with a small wrapper struct in routes.go.
+//
+// Logger must not be nil; pass a.Core.Logger() from routes.go.
+// Use plumelog.NewLogger(plumelog.LoggerConfig{Format: plumelog.LoggerFormatDiscard}) in tests.
 type HealthHandler struct {
 	ServiceName string
+	Logger      plumelog.StructuredLogger
 	// Checkers is an optional list of dependency readiness probes.
 	// Each checker's Name() labels its result in the readiness response.
 	// When nil or empty the readiness endpoint reports ready immediately.
@@ -43,11 +48,11 @@ type livenessResponse struct {
 // Kubernetes liveness probes call this endpoint; it must never be gated on
 // dependency health — if a dependency is down the process is still alive.
 func (h HealthHandler) Live(w http.ResponseWriter, r *http.Request) {
-	_ = contract.WriteResponse(w, r, http.StatusOK, livenessResponse{
+	logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusOK, livenessResponse{
 		Status:    "ok",
 		Service:   h.ServiceName,
 		Timestamp: time.Now().UTC().Format(time.RFC3339),
-	}, nil)
+	}, nil))
 }
 
 // Ready probes all registered health.ComponentChecker instances.
@@ -79,12 +84,12 @@ func (h HealthHandler) Ready(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if anyFailed {
-		_ = contract.WriteError(w, r, eb.Build())
+		logWriteErr(h.Logger, contract.WriteError(w, r, eb.Build()))
 		return
 	}
-	_ = contract.WriteResponse(w, r, http.StatusOK, health.ReadinessStatus{
+	logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusOK, health.ReadinessStatus{
 		Ready:      true,
 		Timestamp:  time.Now().UTC(),
 		Components: components,
-	}, nil)
+	}, nil))
 }
