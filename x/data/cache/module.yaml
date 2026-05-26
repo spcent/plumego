@@ -2,6 +2,8 @@ name: x/data/cache
 path: x/data/cache
 layer: extension
 status: experimental
+suggested_gate_profile: single_module_behavior
+stability_tier: experimental
 owner: platform
 risk: medium
 summary: Subordinate extension-layer cache adapters and topology-heavy cache implementations within the x/data family.

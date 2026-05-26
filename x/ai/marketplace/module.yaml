@@ -2,6 +2,8 @@ name: x/ai/marketplace
 path: x/ai/marketplace
 layer: extension
 status: experimental
+suggested_gate_profile: single_module_behavior
+stability_tier: experimental
 owner: ai-gateway
 risk: high
 summary: Agent registry and installer for distributing and loading reusable AI agents from local registries; installation and rating APIs are not yet stable.

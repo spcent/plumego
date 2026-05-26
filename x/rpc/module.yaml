@@ -2,6 +2,7 @@ name: x/rpc
 path: x/rpc
 layer: extension
 status: experimental
+suggested_gate_profile: single_module_behavior
 owner: rpc
 risk: medium
 summary: Dependency-free RPC transport interfaces and lifecycle helpers for Plumego services.
@@ -14,12 +15,9 @@ entrypoint_reads:
   - specs/dependency-rules.yaml
 
 subordinate_families:
-  - package: x/rpc/server
-    role: Caller-owned RPC server lifecycle wrapper aligned with context cancellation
-  - package: x/rpc/client
-    role: Transport-neutral client connection pool and unary interceptors
-  - package: x/rpc/gateway
-    role: HTTP route adapter for caller-owned RPC handlers
+  - x/rpc/server
+  - x/rpc/client
+  - x/rpc/gateway
 
 responsibilities:
   - RPC server lifecycle wrappers
@@ -73,5 +71,28 @@ agent_hints:
   - Keep concrete gRPC, Connect, or other transport wiring in user applications or adapters
   - Do not add hidden service registries or globals
 
+stop_conditions:
+  - The change introduces concrete gRPC or Connect binaries directly into x/rpc
+  - The change adds service-registry globals or init() side-effect registration
+  - The change requires stable roots to import x/rpc
+
+task_affinity:
+  rpc: x/rpc/
+  bugfix_triage: x/rpc/
+
 landing_zones:
   server: server/
+  client: client/
+  gateway: gateway/
+
+docs_sync_contract:
+  on_status_change:
+    - docs/EXTENSION_MATURITY.md
+    - docs/ROADMAP.md
+    - specs/extension-maturity.yaml
+  on_api_change:
+    - docs/modules/x-rpc/README.md
+    - website/src/content/docs/docs/modules/x-rpc.mdx
+    - website/src/content/docs/zh/docs/modules/x-rpc.mdx
+  on_behavior_change:
+    - docs/modules/x-rpc/README.md

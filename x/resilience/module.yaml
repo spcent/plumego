@@ -2,6 +2,7 @@ name: x/resilience
 path: x/resilience
 layer: extension
 status: experimental
+suggested_gate_profile: single_module_behavior
 owner: runtime
 risk: medium
 summary: Reusable resilience primitives and adapters that do not belong to stable security or a single feature family.
@@ -79,3 +80,15 @@ task_affinity:
 landing_zones:
   circuit_breaker: circuitbreaker/
   rate_limit: ratelimit/
+
+docs_sync_contract:
+  on_status_change:
+    - docs/EXTENSION_MATURITY.md
+    - docs/ROADMAP.md
+    - specs/extension-maturity.yaml
+  on_api_change:
+    - docs/modules/x-resilience/README.md
+    - website/src/content/docs/docs/modules/x-resilience.mdx
+    - website/src/content/docs/zh/docs/modules/x-resilience.mdx
+  on_behavior_change:
+    - docs/modules/x-resilience/README.md

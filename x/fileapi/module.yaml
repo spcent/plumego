@@ -2,6 +2,7 @@ name: x/fileapi
 path: x/fileapi
 layer: extension
 status: experimental
+suggested_gate_profile: single_module_behavior
 owner: persistence
 risk: medium
 summary: HTTP transport layer for tenant-aware file operations, composing x/data/file implementations behind stable store/file contracts.
@@ -88,3 +89,15 @@ task_affinity:
 landing_zones:
   handler: handler.go
   context: context.go
+
+docs_sync_contract:
+  on_status_change:
+    - docs/EXTENSION_MATURITY.md
+    - docs/ROADMAP.md
+    - specs/extension-maturity.yaml
+  on_api_change:
+    - docs/modules/x-fileapi/README.md
+    - website/src/content/docs/docs/modules/x-fileapi.mdx
+    - website/src/content/docs/zh/docs/modules/x-fileapi.mdx
+  on_behavior_change:
+    - docs/modules/x-fileapi/README.md

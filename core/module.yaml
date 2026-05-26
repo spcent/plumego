@@ -2,6 +2,7 @@ name: core
 path: core
 layer: stable
 status: ga
+suggested_gate_profile: stable_root_change
 owner: runtime
 risk: high
 summary: App lifecycle and HTTP server assembly.
@@ -119,3 +120,10 @@ landing_zones:
   lifecycle: core/lifecycle.go
   route_registration: core/routing.go
   middleware_attachment: core/middleware.go
+
+docs_sync_contract:
+  on_api_change:
+    - docs/stable-api/snapshots/core-head.snapshot
+    - docs/modules/core/README.md
+  on_behavior_change:
+    - docs/modules/core/README.md

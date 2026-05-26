@@ -2,6 +2,7 @@ name: x/messaging/pubsub
 path: x/messaging/pubsub
 layer: extension
 status: experimental
+suggested_gate_profile: single_module_behavior
 owner: messaging
 risk: medium
 summary: Subordinate in-process publish-subscribe primitives used by x/messaging, x/messaging/webhook, and local debugging support.

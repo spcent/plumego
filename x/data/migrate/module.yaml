@@ -2,6 +2,8 @@ name: x/data/migrate
 path: x/data/migrate
 layer: extension
 status: experimental
+suggested_gate_profile: single_module_behavior
+stability_tier: experimental
 owner: persistence
 risk: medium
 summary: Dependency-free database migration runner contract for x/data callers.

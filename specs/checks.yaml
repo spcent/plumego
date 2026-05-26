@@ -29,6 +29,8 @@ repo:
     - go run ./internal/checks/extension-beta-evidence
     - go run ./internal/checks/deprecation-inventory -strict
     - go run ./internal/checks/public-entrypoints-sync
+    - go run ./internal/checks/semantic-boundary
+    - go run ./internal/checks/docs-sync-contract
   evidence_checks:
     - go run ./internal/checks/extension-api-snapshot -module ./x/rest/... -out /tmp/plumego-x-rest-api.snapshot
     - go run ./internal/checks/extension-api-snapshot -compare /tmp/plumego-x-rest-api.snapshot /tmp/plumego-x-rest-api.snapshot

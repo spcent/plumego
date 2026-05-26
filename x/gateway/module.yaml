@@ -2,6 +2,7 @@ name: x/gateway
 path: x/gateway
 layer: extension
 status: beta
+suggested_gate_profile: single_module_behavior
 owner: edge
 risk: medium
 summary: The canonical and only app-facing gateway and edge transport entrypoint for proxying, balancing, caching, and rewrite helpers.
@@ -96,3 +97,15 @@ landing_zones:
   entrypoint: entrypoints.go
   discovery: discovery/
   ipc: ipc/
+
+docs_sync_contract:
+  on_status_change:
+    - docs/EXTENSION_MATURITY.md
+    - docs/ROADMAP.md
+    - specs/extension-maturity.yaml
+  on_api_change:
+    - docs/modules/x-gateway/README.md
+    - website/src/content/docs/docs/modules/x-gateway.mdx
+    - website/src/content/docs/zh/docs/modules/x-gateway.mdx
+  on_behavior_change:
+    - docs/modules/x-gateway/README.md

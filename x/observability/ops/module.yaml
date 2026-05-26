@@ -2,6 +2,7 @@ name: x/observability/ops
 path: x/observability/ops
 layer: extension
 status: experimental
+suggested_gate_profile: single_module_behavior
 owner: observability
 risk: medium
 summary: Subordinate protected operations endpoints for queues, receipts, and runtime diagnostics within the x/observability family.

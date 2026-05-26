@@ -2,6 +2,7 @@ name: security
 path: security
 layer: stable
 status: ga
+suggested_gate_profile: stable_root_change
 owner: security
 risk: critical
 summary: Security helpers for auth, headers, input safety, and abuse protection.
@@ -92,3 +93,10 @@ landing_zones:
   input_safety: input/
   abuse_guard: abuse/
   authn: authn/
+
+docs_sync_contract:
+  on_api_change:
+    - docs/stable-api/snapshots/security-head.snapshot
+    - docs/modules/security/README.md
+  on_behavior_change:
+    - docs/modules/security/README.md

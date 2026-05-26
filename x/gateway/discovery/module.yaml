@@ -2,6 +2,7 @@ name: x/gateway/discovery
 path: x/gateway/discovery
 layer: extension
 status: experimental
+suggested_gate_profile: single_module_behavior
 owner: edge
 risk: medium
 summary: Subordinate service discovery primitives and adapters within the x/gateway family.

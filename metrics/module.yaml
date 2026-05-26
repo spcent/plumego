@@ -2,6 +2,7 @@ name: metrics
 path: metrics
 layer: stable
 status: ga
+suggested_gate_profile: stable_root_change
 owner: observability
 risk: medium
 summary: Metrics interfaces and base collectors.
@@ -87,3 +88,10 @@ task_affinity:
 landing_zones:
   collector_interface: collector.go
   noop: noop.go
+
+docs_sync_contract:
+  on_api_change:
+    - docs/stable-api/snapshots/metrics-head.snapshot
+    - docs/modules/metrics/README.md
+  on_behavior_change:
+    - docs/modules/metrics/README.md

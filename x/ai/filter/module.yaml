@@ -2,6 +2,8 @@ name: x/ai/filter
 path: x/ai/filter
 layer: extension
 status: experimental
+suggested_gate_profile: single_module_behavior
+stability_tier: experimental
 owner: ai-gateway
 risk: medium
 summary: Content filtering chain for AI inputs and outputs, including PII detection, secret scrubbing, and prompt injection guards.

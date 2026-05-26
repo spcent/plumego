@@ -29,6 +29,18 @@ enums:
     - medium
     - high
     - critical
+  stability_tier:
+    - ga
+    - beta
+    - experimental
+    - prototype
+
+# Optional fields — not enforced as required but recognized as first-class schema fields.
+# Checkers may validate their values when present.
+optional_fields:
+  suggested_gate_profile: string  # docs_only | single_module_behavior | stable_root_change | cross_module_public_api_release
+  stability_tier: enum            # overrides parent family status for subpackages; see enums.stability_tier
+  docs_sync_contract: map         # on_status_change / on_api_change / on_behavior_change → list of doc paths
 
 limits:
   responsibilities_max: 7

@@ -2,6 +2,7 @@ name: x/frontend
 path: x/frontend
 layer: extension
 status: beta
+suggested_gate_profile: single_module_behavior
 owner: frontend
 risk: medium
 summary: Static and embedded frontend serving helpers for explicit mounting.
@@ -118,3 +119,15 @@ landing_zones:
   response: response.go
   compression: compression.go
   paths: paths.go
+
+docs_sync_contract:
+  on_status_change:
+    - docs/EXTENSION_MATURITY.md
+    - docs/ROADMAP.md
+    - specs/extension-maturity.yaml
+  on_api_change:
+    - docs/modules/x-frontend/README.md
+    - website/src/content/docs/docs/modules/x-frontend.mdx
+    - website/src/content/docs/zh/docs/modules/x-frontend.mdx
+  on_behavior_change:
+    - docs/modules/x-frontend/README.md

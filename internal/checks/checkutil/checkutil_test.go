@@ -474,8 +474,8 @@ func TestValidateXFamilyTaxonomyDetectsViolations(t *testing.T) {
 	// x/messaging/mq declares an unknown parent_family → violation
 	writeFile(t, filepath.Join(repo, "x", "messaging", "mq", "module.yaml"), validManifestWithParentFamily("x/messaging/mq", "extension", "x/nonexistent"))
 
-	// x/gateway has subordinate_families → no violation
-	writeFile(t, filepath.Join(repo, "x", "gateway", "module.yaml"), validManifestWithSubordinateFamilies("x/gateway", "extension"))
+	// x/gateway declares subordinate_families listing x/nonexistent-sub → Check 1 fires
+	writeFile(t, filepath.Join(repo, "x", "gateway", "module.yaml"), validManifestWithSubordinateFamilies("x/gateway", "extension", "x/nonexistent-sub"))
 
 	// x/messaging/pubsub declares a valid parent_family → no violation
 	writeFile(t, filepath.Join(repo, "x", "messaging", "pubsub", "module.yaml"), validManifestWithParentFamily("x/messaging/pubsub", "extension", "x/messaging"))
@@ -484,10 +484,11 @@ func TestValidateXFamilyTaxonomyDetectsViolations(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ValidateXFamilyTaxonomy: %v", err)
 	}
-	// expect exactly 3: x/messaging missing subordinate_families,
-	// x/messaging/mq points at the wrong parent, and that parent is unknown.
-	if len(violations) != 3 {
-		t.Fatalf("expected 3 violations, got %d: %v", len(violations), violations)
+	// expect exactly 4: x/messaging missing subordinate_families,
+	// x/messaging/mq points at the wrong parent, that parent is unknown,
+	// and x/gateway lists a non-existent subordinate.
+	if len(violations) != 4 {
+		t.Fatalf("expected 4 violations, got %d: %v", len(violations), violations)
 	}
 	joined := strings.Join(violations, "\n")
 	if !strings.Contains(joined, "x/messaging/module.yaml") || !strings.Contains(joined, "subordinate_families") {
@@ -499,13 +500,16 @@ func TestValidateXFamilyTaxonomyDetectsViolations(t *testing.T) {
 	if !strings.Contains(joined, "x/messaging/mq/module.yaml") || !strings.Contains(joined, "x/nonexistent") {
 		t.Fatalf("expected parent_family violation for x/messaging/mq, got:\n%s", joined)
 	}
+	if !strings.Contains(joined, "x/gateway/module.yaml") || !strings.Contains(joined, "x/nonexistent-sub") {
+		t.Fatalf("expected subordinate_families missing-child violation for x/gateway, got:\n%s", joined)
+	}
 }
 
 func TestValidateXFamilyTaxonomyPassesForValidSetup(t *testing.T) {
 	repo := t.TempDir()
 	writeExtensionTaxonomySpec(t, repo)
 
-	writeFile(t, filepath.Join(repo, "x", "messaging", "module.yaml"), validManifestWithSubordinateFamilies("x/messaging", "extension"))
+	writeFile(t, filepath.Join(repo, "x", "messaging", "module.yaml"), validManifestWithSubordinateFamilies("x/messaging", "extension", "x/messaging/mq"))
 	writeFile(t, filepath.Join(repo, "x", "messaging", "mq", "module.yaml"), validManifestWithParentFamily("x/messaging/mq", "extension", "x/messaging"))
 	writeFile(t, filepath.Join(repo, "x", "rest", "module.yaml"), validManifest("x/rest", "extension"))
 
@@ -845,8 +849,8 @@ func validManifestWithParentFamily(path, layer, parent string) string {
 	return validManifest(path, layer) + "parent_family: " + parent + "\n"
 }
 
-func validManifestWithSubordinateFamilies(path, layer string) string {
-	return validManifest(path, layer) + "subordinate_families:\n  - package: x/sub\n    role: subordinate\n"
+func validManifestWithSubordinateFamilies(path, layer, sub string) string {
+	return validManifest(path, layer) + "subordinate_families:\n  - " + sub + "\n"
 }
 
 func hasString(values []string, want string) bool {

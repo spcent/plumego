@@ -2,6 +2,7 @@ name: x/observability/devtools
 path: x/observability/devtools
 layer: extension
 status: experimental
+suggested_gate_profile: single_module_behavior
 owner: observability
 risk: medium
 summary: Subordinate debug-only routes, env reload helpers, and local profiling within the x/observability family.

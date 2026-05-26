@@ -2,6 +2,7 @@ name: x/ai
 path: x/ai
 layer: extension
 status: experimental
+suggested_gate_profile: single_module_behavior
 owner: ai-gateway
 risk: high
 summary: AI gateway capabilities including providers, sessions, streaming, tools, and resilience helpers.
@@ -129,3 +130,15 @@ landing_zones:
   semanticcache: semanticcache/
   marketplace: marketplace/
   distributed: distributed/
+
+docs_sync_contract:
+  on_status_change:
+    - docs/EXTENSION_MATURITY.md
+    - docs/ROADMAP.md
+    - specs/extension-maturity.yaml
+  on_api_change:
+    - docs/modules/x-ai/README.md
+    - website/src/content/docs/docs/modules/x-ai.mdx
+    - website/src/content/docs/zh/docs/modules/x-ai.mdx
+  on_behavior_change:
+    - docs/modules/x-ai/README.md

@@ -2,6 +2,7 @@ name: x/tenant
 path: x/tenant
 layer: extension
 status: beta
+suggested_gate_profile: single_module_behavior
 owner: multitenancy
 risk: high
 summary: Multi-tenant resolution, policy, quota, rate limit, and tenant-aware adapters.
@@ -101,3 +102,15 @@ landing_zones:
   rate_limit: ratelimit/
   store: store/
   config: config/
+
+docs_sync_contract:
+  on_status_change:
+    - docs/EXTENSION_MATURITY.md
+    - docs/ROADMAP.md
+    - specs/extension-maturity.yaml
+  on_api_change:
+    - docs/modules/x-tenant/README.md
+    - website/src/content/docs/docs/modules/x-tenant.mdx
+    - website/src/content/docs/zh/docs/modules/x-tenant.mdx
+  on_behavior_change:
+    - docs/modules/x-tenant/README.md

@@ -2,6 +2,7 @@ name: x/rest
 path: x/rest
 layer: extension
 status: beta
+suggested_gate_profile: single_module_behavior
 owner: platform-api
 risk: medium
 summary: The canonical and only app-facing reusable resource-interface layer for REST controllers, query parsing, pagination, and repository-backed resource wiring.
@@ -84,3 +85,15 @@ landing_zones:
   resource_spec: spec.go
   route_registration: entrypoints.go
   db_resource: resource_db_routes.go
+
+docs_sync_contract:
+  on_status_change:
+    - docs/EXTENSION_MATURITY.md
+    - docs/ROADMAP.md
+    - specs/extension-maturity.yaml
+  on_api_change:
+    - docs/modules/x-rest/README.md
+    - website/src/content/docs/docs/modules/x-rest.mdx
+    - website/src/content/docs/zh/docs/modules/x-rest.mdx
+  on_behavior_change:
+    - docs/modules/x-rest/README.md

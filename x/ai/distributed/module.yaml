@@ -2,6 +2,8 @@ name: x/ai/distributed
 path: x/ai/distributed
 layer: extension
 status: experimental
+suggested_gate_profile: single_module_behavior
+stability_tier: experimental
 owner: ai-gateway
 risk: high
 summary: Distributed workflow execution layer that wraps x/ai/orchestration.Engine with persistent queuing, checkpointing, and remote step dispatch.

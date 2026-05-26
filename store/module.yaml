@@ -2,6 +2,7 @@ name: store
 path: store
 layer: stable
 status: ga
+suggested_gate_profile: stable_root_change
 owner: persistence
 risk: medium
 summary: Stable storage primitives and base abstractions. Topology-heavy cache, durable KV-engine, and durable idempotency providers live in x/*.
@@ -93,3 +94,10 @@ landing_zones:
   file: file/
   key_value: kv/
   idempotency: idempotency/
+
+docs_sync_contract:
+  on_api_change:
+    - docs/stable-api/snapshots/store-head.snapshot
+    - docs/modules/store/README.md
+  on_behavior_change:
+    - docs/modules/store/README.md

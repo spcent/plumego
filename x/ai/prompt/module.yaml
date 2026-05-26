@@ -2,6 +2,8 @@ name: x/ai/prompt
 path: x/ai/prompt
 layer: extension
 status: experimental
+suggested_gate_profile: single_module_behavior
+stability_tier: experimental
 owner: ai-gateway
 risk: low
 summary: Prompt template management with variable substitution, versioning, and tag-based queries for AI workflows.

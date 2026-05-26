@@ -2,6 +2,9 @@ name: x/data/sharding
 path: x/data/sharding
 layer: extension
 status: experimental
+suggested_gate_profile: single_module_behavior
+parent_family: x/data
+stability_tier: experimental
 owner: persistence
 risk: high
 summary: Database sharding router that distributes SQL queries across multiple rw.Cluster shards with safe-default cross-shard denial, explicit shard-scoped transactions, and configurable strategy selection.

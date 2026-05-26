@@ -2,6 +2,7 @@ name: x/gateway/ipc
 path: x/gateway/ipc
 layer: extension
 status: experimental
+suggested_gate_profile: single_module_behavior
 owner: edge
 risk: medium
 summary: Subordinate inter-process communication transport helpers within the x/gateway family.

@@ -2,6 +2,7 @@ name: x/validate
 path: x/validate
 layer: extension
 status: experimental
+suggested_gate_profile: single_module_behavior
 owner: api
 risk: medium
 summary: Explicit request binding and validation helpers for application handlers.
@@ -74,3 +75,24 @@ agent_hints:
   - Keep adapters in subordinate packages
   - Decode JSON before calling validators
   - Prefer contract.NewErrorBuilder for API errors
+
+task_affinity:
+  validation: x/validate/
+  bugfix_triage: x/validate/
+
+landing_zones:
+  bind: bind.go
+  validator: validator.go
+  errors: errors.go
+
+docs_sync_contract:
+  on_status_change:
+    - docs/EXTENSION_MATURITY.md
+    - docs/ROADMAP.md
+    - specs/extension-maturity.yaml
+  on_api_change:
+    - docs/modules/x-validate/README.md
+    - website/src/content/docs/docs/modules/x-validate.mdx
+    - website/src/content/docs/zh/docs/modules/x-validate.mdx
+  on_behavior_change:
+    - docs/modules/x-validate/README.md

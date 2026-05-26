@@ -2,6 +2,8 @@ name: x/ai/session
 path: x/ai/session
 layer: extension
 status: experimental
+suggested_gate_profile: single_module_behavior
+stability_tier: beta
 owner: ai-gateway
 risk: medium
 summary: Stable-tier AI session lifecycle and storage contracts within the experimental x/ai family.

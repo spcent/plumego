@@ -2,6 +2,8 @@ name: x/ai/resilience
 path: x/ai/resilience
 layer: extension
 status: experimental
+suggested_gate_profile: single_module_behavior
+stability_tier: experimental
 owner: ai-gateway
 risk: medium
 summary: Resilience wrapper for AI providers; composes x/resilience circuit-breaker and rate-limit primitives into a provider-compatible decorator.

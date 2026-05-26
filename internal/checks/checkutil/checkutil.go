@@ -1495,10 +1495,23 @@ func ValidateStableBoundaryDeclarations(repoRoot string) ([]string, error) {
 	return violations, nil
 }
 
+// extractSubordinatePackagePath extracts the package path from a
+// subordinate_families list entry. Handles both plain string ("x/foo/bar")
+// and YAML-object prefix ("package: x/foo/bar") formats.
+func extractSubordinatePackagePath(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if after, found := strings.CutPrefix(raw, "package:"); found {
+		return strings.TrimSpace(after)
+	}
+	return raw
+}
+
 // ValidateXFamilyTaxonomy checks that:
 //   - x/* primary families that coordinate subordinates declare subordinate_families
 //   - x/* subordinate roots declare the exact canonical parent_family
 //   - x/* packages that declare parent_family reference a recognized primary family
+//   - each package listed in subordinate_families declares the correct parent_family
+//   - each taxonomy-level non-canonical root is listed in its canonical parent's subordinate_families
 func ValidateXFamilyTaxonomy(repoRoot string) ([]string, error) {
 	taxonomy, err := ReadExtensionTaxonomy(repoRoot)
 	if err != nil {
@@ -1523,6 +1536,15 @@ func ValidateXFamilyTaxonomy(repoRoot string) ([]string, error) {
 			}
 		}
 	}
+
+	// moduleData collects per-module info for cross-validation.
+	type moduleData struct {
+		path                 string
+		parentFamily         string
+		subordinates         []string // extracted package paths from subordinate_families
+		hasSubordinatesField bool     // true when subordinate_families key is declared
+	}
+	collected := map[string]*moduleData{}
 
 	var violations []string
 	xDir := filepath.Join(repoRoot, "x")
@@ -1567,6 +1589,19 @@ func ValidateXFamilyTaxonomy(repoRoot string) ([]string, error) {
 				violations = append(violations, pkg+"/module.yaml: parent_family "+strconv.Quote(parentFamily)+" is not a recognized primary x/* family")
 			}
 		}
+
+		// Collect data for cross-validation passes below.
+		md := &moduleData{
+			path:                 pkg,
+			parentFamily:         parentFamily,
+			hasSubordinatesField: doc.Seen["subordinate_families"],
+		}
+		for _, raw := range doc.Lists["subordinate_families"] {
+			if sub := extractSubordinatePackagePath(raw); sub != "" {
+				md.subordinates = append(md.subordinates, sub)
+			}
+		}
+		collected[pkg] = md
 		return nil
 	})
 	if err != nil {
@@ -1574,6 +1609,56 @@ func ValidateXFamilyTaxonomy(repoRoot string) ([]string, error) {
 			return nil, nil
 		}
 		return nil, err
+	}
+
+	// Cross-validation pass 1: each explicit subordinate_families entry must
+	// have its child module declare parent_family pointing to the canonical root.
+	for pkg, md := range collected {
+		canonicalOfPkg := taxonomy.RootToCanonical[pkg]
+		if canonicalOfPkg == "" {
+			canonicalOfPkg = pkg // pkg is itself a canonical root
+		}
+		for _, sub := range md.subordinates {
+			childMd, ok := collected[sub]
+			if !ok {
+				violations = append(violations, pkg+"/module.yaml: subordinate_families lists "+strconv.Quote(sub)+" but "+sub+"/module.yaml was not found")
+				continue
+			}
+			if childMd.parentFamily == "" {
+				violations = append(violations, sub+"/module.yaml: listed as subordinate of "+pkg+" but does not declare parent_family "+strconv.Quote(canonicalOfPkg))
+			} else if childMd.parentFamily != canonicalOfPkg {
+				violations = append(violations, sub+"/module.yaml: parent_family "+strconv.Quote(childMd.parentFamily)+" does not match canonical root "+strconv.Quote(canonicalOfPkg)+" declared by "+pkg+"/module.yaml")
+			}
+		}
+	}
+
+	// Cross-validation pass 2: each taxonomy-level non-canonical root must be
+	// listed in its canonical parent's subordinate_families. This only fires
+	// when the parent has declared subordinate_families (if the field is absent
+	// entirely, the "primary family must declare subordinate_families" check
+	// above already covers that case).
+	for pkg := range taxonomy.RootToCanonical {
+		expectedParent := taxonomy.RootToCanonical[pkg]
+		if expectedParent == "" || expectedParent == pkg {
+			continue
+		}
+		parentMd, ok := collected[expectedParent]
+		if !ok {
+			continue
+		}
+		if !parentMd.hasSubordinatesField {
+			continue // missing field already reported by the check above
+		}
+		found := false
+		for _, sub := range parentMd.subordinates {
+			if sub == pkg {
+				found = true
+				break
+			}
+		}
+		if !found {
+			violations = append(violations, expectedParent+"/module.yaml: taxonomy lists "+strconv.Quote(pkg)+" as subordinate but it is not in subordinate_families")
+		}
 	}
 
 	sort.Strings(violations)

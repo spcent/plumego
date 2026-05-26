@@ -2,6 +2,7 @@ name: health
 path: health
 layer: stable
 status: ga
+suggested_gate_profile: stable_root_change
 owner: runtime
 risk: medium
 summary: Health state, readiness status, and component or aggregate health models, not an HTTP or ops analytics package.
@@ -85,3 +86,10 @@ task_affinity:
 landing_zones:
   health_check: health.go
   readiness: readiness.go
+
+docs_sync_contract:
+  on_api_change:
+    - docs/stable-api/snapshots/health-head.snapshot
+    - docs/modules/health/README.md
+  on_behavior_change:
+    - docs/modules/health/README.md
