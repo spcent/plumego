@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/spcent/plumego/contract"
+	plumelog "github.com/spcent/plumego/log"
 	tenantcore "github.com/spcent/plumego/x/tenant/core"
 	"production-service/internal/domain/tenant"
 )
@@ -20,8 +21,10 @@ type ProfileStore interface {
 // ProfileHandler serves GET /api/profile.
 // It reads the tenant ID from request context (populated by x/tenant/resolve middleware)
 // and returns the matching profile or a 404 TypeNotFound error.
+// Logger must not be nil; pass a.Core.Logger() from routes.go.
 type ProfileHandler struct {
 	Profiles ProfileStore
+	Logger   plumelog.StructuredLogger
 }
 
 const codeProfileNotFound = "profile.not_found"
@@ -34,13 +37,13 @@ func (h ProfileHandler) GetProfile(w http.ResponseWriter, r *http.Request) {
 	tenantID := tenantcore.TenantIDFromContext(r.Context())
 	profile, ok := h.Profiles.Get(r.Context(), tenantID)
 	if !ok {
-		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeNotFound).
 			Code(codeProfileNotFound).
 			Detail("tenant_id", tenantID).
 			Message("tenant profile not found").
-			Build())
+			Build()))
 		return
 	}
-	_ = contract.WriteResponse(w, r, http.StatusOK, profile, nil)
+	logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusOK, profile, nil))
 }

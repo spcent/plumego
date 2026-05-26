@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/spcent/plumego/contract"
+	plumelog "github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/metrics"
 )
 
@@ -15,12 +16,14 @@ type MetricsCollector interface {
 
 // OpsHandler serves GET /ops/metrics.
 // It returns in-process HTTP request metrics collected by the httpmetrics middleware.
+// Logger must not be nil; pass a.Core.Logger() from routes.go.
 type OpsHandler struct {
 	Metrics MetricsCollector
+	Logger  plumelog.StructuredLogger
 }
 
 // MetricStats handles GET /ops/metrics.
 // This route is protected by bearer-token auth wired in routes.go.
 func (h OpsHandler) MetricStats(w http.ResponseWriter, r *http.Request) {
-	_ = contract.WriteResponse(w, r, http.StatusOK, h.Metrics.GetStats(), nil)
+	logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusOK, h.Metrics.GetStats(), nil))
 }

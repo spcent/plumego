@@ -10,6 +10,7 @@ import (
 
 	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/health"
+	plumelog "github.com/spcent/plumego/log"
 )
 
 const codeComponentUnhealthy = "health.component.unhealthy"
@@ -19,15 +20,16 @@ const codeComponentUnhealthy = "health.component.unhealthy"
 // Checkers is an optional list of dependency readiness probes for /readyz.
 // Each checker's Name() labels its result in the readiness response.
 // When nil or empty the readiness endpoint reports ready immediately.
+// Logger must not be nil; pass a.Core.Logger() from routes.go.
 type ServiceHandler struct {
 	ServiceName string
 	Features    []string
+	Logger      plumelog.StructuredLogger
 	Checkers    []health.ComponentChecker
 }
 
 type serviceResponse struct {
 	Service   string   `json:"service"`
-	Mode      string   `json:"mode"`
 	Timestamp string   `json:"timestamp"`
 	Features  []string `json:"features"`
 }
@@ -41,53 +43,62 @@ type livenessResponse struct {
 
 // Root responds with service identity and enabled features.
 func (h ServiceHandler) Root(w http.ResponseWriter, r *http.Request) {
-	_ = contract.WriteResponse(w, r, http.StatusOK, serviceResponse{
+	logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusOK, serviceResponse{
 		Service:   h.ServiceName,
-		Mode:      "production-reference",
 		Timestamp: utcNow(),
 		Features:  h.Features,
-	}, nil)
+	}, nil))
 }
 
 // Live reports that the process is serving HTTP traffic.
 // Kubernetes liveness probes call this endpoint; it must never be gated on
 // dependency health — if a dependency is down the process is still alive.
 func (h ServiceHandler) Live(w http.ResponseWriter, r *http.Request) {
-	_ = contract.WriteResponse(w, r, http.StatusOK, livenessResponse{
+	logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusOK, livenessResponse{
 		Status:    "ok",
 		Service:   h.ServiceName,
 		Check:     "liveness",
 		Timestamp: utcNow(),
-	}, nil)
+	}, nil))
 }
 
-// Ready probes each registered health.ComponentChecker in order.
-// On success it returns health.ReadinessStatus with a per-component map.
-// On the first failure it returns 503 TypeUnavailable naming the failing
-// component so operators can triage without log access.
+// Ready probes all registered health.ComponentChecker instances.
 //
-//	GET /readyz (all pass)  → 200 health.ReadinessStatus{Ready:true, Components:{…}}
-//	GET /readyz (db fails)  → 503 TypeUnavailable detail.component="database"
+// All checkers are always probed regardless of prior failures so operators
+// see every unhealthy dependency in a single response, not just the first one.
+// On success the response body is a health.ReadinessStatus with a per-component
+// map so load balancers and dashboards can see which dependencies passed.
+// On failure a 503 TypeUnavailable error carries each failing component name
+// as a detail key and its error message as the value.
+//
+//	GET /readyz (all pass)       → 200 health.ReadinessStatus{Ready:true, Components:{db:true,cache:true}}
+//	GET /readyz (db fails)       → 503 TypeUnavailable detail.database="connection refused"
+//	GET /readyz (db+cache fail)  → 503 TypeUnavailable detail.database="…" detail.cache="…"
 func (h ServiceHandler) Ready(w http.ResponseWriter, r *http.Request) {
 	components := make(map[string]bool, len(h.Checkers))
+	eb := contract.NewErrorBuilder().
+		Type(contract.TypeUnavailable).
+		Code(codeComponentUnhealthy).
+		Message("one or more components are not ready")
+	anyFailed := false
 	for _, checker := range h.Checkers {
 		if err := checker.Check(r.Context()); err != nil {
-			_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-				Type(contract.TypeUnavailable).
-				Code(codeComponentUnhealthy).
-				Detail("component", checker.Name()).
-				Detail("reason", err.Error()).
-				Message("service not ready").
-				Build())
-			return
+			components[checker.Name()] = false
+			eb = eb.Detail(checker.Name(), err.Error())
+			anyFailed = true
+		} else {
+			components[checker.Name()] = true
 		}
-		components[checker.Name()] = true
 	}
-	_ = contract.WriteResponse(w, r, http.StatusOK, health.ReadinessStatus{
+	if anyFailed {
+		logWriteErr(h.Logger, contract.WriteError(w, r, eb.Build()))
+		return
+	}
+	logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusOK, health.ReadinessStatus{
 		Ready:      true,
 		Timestamp:  time.Now().UTC(),
 		Components: components,
-	}, nil)
+	}, nil))
 }
 
 func utcNow() string {
