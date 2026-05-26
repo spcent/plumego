@@ -43,20 +43,23 @@ Prefer narrow packages such as `requestid`, `tracing`, `accesslog`, `recovery`, 
 
 ```text
 cmd/myservice/main.go
-internal/httpapp/app.go
-internal/httpapp/routes.go
-internal/httpapp/handlers/health.go
-internal/httpapp/handlers/user_create.go
-internal/httpapp/middleware/logging.go
+internal/config/config.go
+internal/app/app.go
+internal/app/routes.go
+internal/handler/health.go
+internal/handler/user_create.go
+internal/handler/handler_test.go
 internal/domain/user/service.go
 internal/domain/user/repository.go
 ```
 
-This layout should be demonstrated first in `reference/standard-service` and copied by templates and scaffolds, not reinvented per example.
+This layout matches `reference/standard-service` and must be copied by templates and scaffolds, not reinvented per example.
 
-- `cmd/` — startup only
-- `internal/httpapp/` — HTTP wiring only
-- `internal/domain/` — business logic
+- `cmd/` — startup only (load config, construct app, start server)
+- `internal/config/` — config loading, defaults, validation
+- `internal/app/` — HTTP wiring: core construction, middleware order, route table
+- `internal/handler/` — HTTP adaptation: one file per handler group, tests alongside
+- `internal/domain/` — business logic and domain models
 - `internal/platform/` — optional app-local infra adapters only when the behavior does not already belong to a stable Plumego package
 - success and error writes should go directly through `contract.WriteResponse` / `contract.WriteError` from handlers instead of app-local JSON/error helper families
 - Do not mix routing, domain logic, persistence, and transport helper policy in one package

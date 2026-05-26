@@ -47,13 +47,18 @@ allowed_imports:
   - log
   - metrics
   - middleware
+  - router
   - security
-  - store
+  - x/resilience
+  - internal/httpx
+  - internal/httputil
 
 forbidden_imports:
-  - core/components/**
+  - core/**
+  - store/**
   - x/tenant/**
   - x/ai/**
+  - x/messaging/**
 
 test_commands:
   - go test -race -timeout 60s ./x/gateway/...

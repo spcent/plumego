@@ -1,3 +1,11 @@
+// Package tracing provides a transport-layer tracing middleware. It defines
+// the [Tracer] and [TraceSpan] interfaces that callers must implement; it does
+// not own the concrete tracing infrastructure.
+//
+// Concrete implementations (OpenTelemetry adapters, span collectors, samplers)
+// belong in x/observability/tracer. The interface is defined here so that
+// stable middleware can remain decoupled from extension packages: stable roots
+// must not import x/*.
 package tracing
 
 import (

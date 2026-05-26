@@ -45,6 +45,7 @@ When guidance conflicts, follow this order:
 - Preserve `net/http` compatibility.
 - Keep the main module dependency-free beyond the standard library unless explicitly approved.
 - Do not add `go.mod` anywhere under `x/**`; extension packages remain part of the main module.
+- Reference apps under `reference/` MAY have an independent `go.mod` only when they require external dependencies (e.g. MongoDB, driver-specific packages) that must not enter the root module. The one current example is `reference/workerfleet`, which uses MongoDB and references the root module via a `replace` directive. Any new reference app requiring this exception must document the rationale in its own README and use the same `replace` pattern.
 - Stable roots must not import `x/*`.
 - Do not introduce hidden globals, `init()` registration, or context service-locator patterns.
 - Never log secrets, tokens, signatures, or private keys.
@@ -214,6 +215,11 @@ lifecycle behavior, or boundaries change. Common sync targets:
 
 Also sync affected module primers under `docs/modules/`, `docs/EXTENSION_MATURITY.md`,
 `docs/ROADMAP.md`, or `docs/stable-api/` when that surface changes.
+
+The `docs/modules/` naming convention: stable roots use bare names (`core/`, `contract/`);
+top-level extensions use `x-{family}/` (`x-ai/`, `x-gateway/`); extension sub-packages also
+use `x-{subpkg}/` (`x-cache/` = `x/data/cache`, `x-mq/` = `x/messaging/mq`). See
+`docs/modules/INDEX.md` for the full mapping table.
 
 Document implemented behavior only.
 

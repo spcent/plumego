@@ -1,5 +1,7 @@
 # x/data/cache
 
+> **Import path:** `github.com/spcent/plumego/x/data/cache` — sub-package of [`x/data`](../x-data/README.md). This primer lives under `docs/modules/x-cache/` because the `docs/modules/` naming convention uses `x-{subpkg}` for both top-level extensions and their sub-packages.
+
 ## Purpose
 
 `x/data/cache` provides extension-layer cache adapters and topology-heavy cache implementations. It builds on the stable `store/cache` abstractions.

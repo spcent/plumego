@@ -1,5 +1,7 @@
 # x/messaging/mq — Durable Message Queue
 
+> **Import path:** `github.com/spcent/plumego/x/messaging/mq` — sub-package of [`x/messaging`](../x-messaging/README.md). This primer lives under `docs/modules/x-mq/` following the `x-{subpkg}` convention.
+
 **Purpose:** Durable queue primitives and worker coordination within the `x/messaging` family. Provides in-process broker, persistent task queue, worker pool, dead-letter handling, deduplication, and TTL-based expiry.
 
 **Status:** Experimental — API may change. Start app-facing messaging feature discovery from [`x/messaging`](../x-messaging/README.md) before opening this package directly.

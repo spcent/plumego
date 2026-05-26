@@ -65,14 +65,16 @@ public_entrypoints:
 
 allowed_imports:
   - contract
-  - middleware
-  - security
-  - store
   - log
   - metrics
+  - x/resilience
 
 forbidden_imports:
-  - core/components/**
+  - core/**
+  - router/**
+  - middleware/**
+  - security/**
+  - store/**
   - x/tenant/**
   - x/messaging/webhook/**
   - x/websocket/**

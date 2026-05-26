@@ -1,5 +1,7 @@
 # x/messaging/webhook — Webhook Ingress and Egress
 
+> **Import path:** `github.com/spcent/plumego/x/messaging/webhook` — sub-package of [`x/messaging`](../x-messaging/README.md). This primer lives under `docs/modules/x-webhook/` following the `x-{subpkg}` convention.
+
 **Purpose:** Webhook ingress, egress, and bridge primitives within the `x/messaging` family. Handles inbound signature verification (GitHub, Stripe, HMAC), outbound delivery service with retry and store, and a pub/sub bridge for routing inbound events to outbound targets.
 
 **Status:** Experimental — API may change. Start app-facing messaging feature discovery from [`x/messaging`](../x-messaging/README.md) before opening this package directly.

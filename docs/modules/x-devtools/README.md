@@ -1,5 +1,7 @@
 # x/observability/devtools
 
+> **Import path:** `github.com/spcent/plumego/x/observability/devtools` — sub-package of [`x/observability`](../x-observability/README.md). This primer lives under `docs/modules/x-devtools/` following the `x-{subpkg}` convention used for sub-packages in `docs/modules/`.
+
 ## Purpose
 
 `x/observability/devtools` provides debug-only routes, profiling endpoints, env reload helpers, and development metrics wiring.

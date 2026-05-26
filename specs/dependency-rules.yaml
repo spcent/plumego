@@ -620,6 +620,151 @@ modules:
       - reference/**
       - cmd/**
 
+  x/ai:
+    path: x/ai
+    layer: extension
+    # status: experimental. AI gateway capabilities: providers, sessions, streaming, tools, resilience.
+    # Sub-packages may carry individual beta surfaces (see docs/EXTENSION_MATURITY.md).
+    # x/ai/metrics defines an AI-specific Collector interface deliberately distinct from the
+    # stable metrics.AggregateCollector. See x/ai/metrics package doc for the boundary rationale.
+    allow:
+      - stdlib
+      - contract
+      - log
+      - metrics
+      - x/resilience
+    deny:
+      - core/**
+      - router/**
+      - middleware/**
+      - security/**
+      - store/**
+      - x/tenant/**
+      - x/websocket/**
+      - x/messaging/webhook/**
+      - reference/**
+      - cmd/**
+
+  x/frontend:
+    path: x/frontend
+    layer: extension
+    # status: beta. Static and embedded asset serving with directory safety and content negotiation.
+    allow:
+      - stdlib
+      - contract
+      - log
+      - router
+    deny:
+      - core/**
+      - middleware/**
+      - security/**
+      - store/**
+      - x/tenant/**
+      - x/ai/**
+      - reference/**
+      - cmd/**
+
+  x/gateway:
+    path: x/gateway
+    layer: extension
+    # status: beta. Reverse proxy, rewrite, balancing, edge transport, service discovery, IPC.
+    # Sub-packages (discovery, ipc, cache, transform, protocol, protocolmw) may import a narrower set.
+    allow:
+      - stdlib
+      - contract
+      - router
+      - log
+      - health
+      - metrics
+      - middleware
+      - security
+      - x/resilience
+      - internal/httpx
+      - internal/httputil
+    deny:
+      - core/**
+      - store/**
+      - x/tenant/**
+      - x/ai/**
+      - x/messaging/**
+      - reference/**
+      - cmd/**
+
+  x/observability:
+    path: x/observability
+    layer: extension
+    # status: beta (top-level exporter/tracer/collector wiring). Sub-packages devtools and ops are
+    # experimental. x/observability/devtools imports x/messaging/pubsub for debug pub/sub inspection;
+    # this is a declared cross-extension dependency confined to the devtools sub-package.
+    allow:
+      - stdlib
+      - contract
+      - log
+      - metrics
+      - middleware
+      - store
+      - core
+      - health
+      - router
+      - security
+      - internal/config
+      - x/messaging/pubsub
+    deny:
+      - x/tenant/**
+      - x/ai/**
+      - x/data/**
+      - x/fileapi/**
+      - x/frontend/**
+      - x/rest/**
+      - x/rpc/**
+      - x/validate/**
+      - x/websocket/**
+      - reference/**
+      - cmd/**
+
+  x/rest:
+    path: x/rest
+    layer: extension
+    # status: beta. Resource controller and CRUD route conventions.
+    allow:
+      - stdlib
+      - contract
+      - log
+      - router
+      - store
+      - middleware
+    deny:
+      - core/**
+      - security/**
+      - x/tenant/**
+      - x/ai/**
+      - x/gateway/**
+      - x/messaging/**
+      - x/observability/**
+      - reference/**
+      - cmd/**
+
+  x/websocket:
+    path: x/websocket
+    layer: extension
+    # status: beta. WebSocket hub, room auth, explicit route registration. No core bootstrap ownership.
+    allow:
+      - stdlib
+      - contract
+      - health
+      - log
+      - middleware
+      - router
+      - security
+    deny:
+      - core/**
+      - store/**
+      - x/tenant/**
+      - x/ai/**
+      - x/messaging/**
+      - reference/**
+      - cmd/**
+
 special_rules:
   forbidden_import_patterns:
     - github.com/spcent/plumego

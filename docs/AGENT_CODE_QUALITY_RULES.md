@@ -121,22 +121,19 @@ Use `docs/AGENT_CONTEXT_BUDGET.md` to choose `startup`, `implementation`,
 
 ## 4. Anti-Patterns
 
-Do not introduce:
+The canonical anti-patterns list lives in `AGENTS.md §9`. This section adds
+review-facing context for why each pattern matters; it does not duplicate the
+authoritative list.
 
-- Stable package imports of `x/*`
-- New dependencies without approval
-- Context-based service lookup
-- Package-level mutable registries
-- `init()` side-effect registration
-- Route auto-discovery or reflection-based route wiring
-- Middleware that builds business DTOs or injects business services
-- Ad hoc JSON response helpers
-- Per-feature error envelopes
-- New handler signatures
-- New panic-only constructors for fallible behavior
-- Generic `utils` packages for new library code
-- Compatibility wrappers without a removal plan
-- Deprecated symbols left after caller migration
+| Anti-pattern | Why it matters |
+|---|---|
+| Stable `x/*` imports | Breaks the boundary the dependency checker enforces; causes stability regression cascade |
+| `init()` registration or hidden globals | Eliminates grep-ability; forces load-order awareness across the codebase |
+| Context service-locator | Prevents per-request dependency substitution; hides test seams |
+| Business DTOs in middleware | Couples transport and domain; forces middleware to change when schema changes |
+| Per-feature error envelopes | Breaks the single canonical `contract.WriteError` path; clients cannot rely on one shape |
+| Panic-only constructors | Forces callers to recover or crash; prefer `New(...) (*T, error)` |
+| Compatibility wrappers without removal plan | Dead code that agents must read and reason about indefinitely |
 
 ## 5. Review Output Contract
 

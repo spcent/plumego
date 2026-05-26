@@ -128,13 +128,14 @@ public_entrypoints:
   - NewCloseError
 
 allowed_imports:
+  - contract
   - health
   - log
   - middleware
   - router
+  - security
 
 forbidden_imports:
-  - core/components/**
   - x/tenant/**
   - x/ai/**
 
