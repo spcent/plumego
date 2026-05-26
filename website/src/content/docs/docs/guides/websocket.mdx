@@ -112,7 +112,7 @@ if err != nil {
     return err
 }
 roomAuth := websocket.NewSimpleRoomAuth()
-hub, err := websocket.NewHubWithConfigE(websocket.HubConfig{WorkerCount: 4, JobQueueSize: 512})
+hub, err := websocket.NewHubWithConfig(websocket.HubConfig{WorkerCount: 4, JobQueueSize: 512})
 if err != nil {
     return err
 }

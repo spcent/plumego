@@ -1,0 +1,100 @@
+name: x/ai/semanticcache/embedding
+path: x/ai/semanticcache/embedding
+layer: extension
+status: experimental
+owner: ai-gateway
+risk: medium
+summary: Embedding provider interface and HTTP-backed implementations (OpenAI, Cohere) for semantic cache text vectorization.
+
+parent_family: x/ai
+
+entrypoint_reads:
+  - AGENTS.md
+  - docs/CANONICAL_STYLE_GUIDE.md
+  - specs/repo.yaml
+  - specs/task-routing.yaml
+  - specs/dependency-rules.yaml
+  - x/ai/module.yaml
+  - x/ai/semanticcache/module.yaml
+  - docs/modules/x-ai/README.md
+
+responsibilities:
+  - Provider interface for embedding generation (single and batch)
+  - Embedding value type with vector, metadata, and token cost fields
+  - OpenAI embedding HTTP adapter
+  - Cohere embedding HTTP adapter
+  - ProviderWithStats wrapper for usage tracking
+
+non_goals:
+  - Vector similarity search (owned by x/ai/semanticcache/vectorstore)
+  - Cache lifecycle management (owned by x/ai/semanticcache/cachemanager)
+  - LLM completion provider adapters (owned by x/ai/provider)
+  - Persistent embedding storage
+
+public_entrypoints:
+  - Provider
+  - Embedding
+  - Config
+  - Stats
+  - BatchRequest
+  - BatchResponse
+  - ProviderWithStats
+  - NewProviderWithStats
+  - OpenAIProvider
+  - OpenAIConfig
+  - NewOpenAIProvider
+  - CohereProvider
+  - CohereConfig
+  - NewCohereProvider
+
+allowed_imports:
+  - stdlib
+
+forbidden_imports:
+  - core/**
+  - router/**
+  - middleware/**
+  - security/**
+  - store/**
+  - metrics/**
+  - contract/**
+  - x/data/**
+  - x/fileapi/**
+  - x/frontend/**
+  - x/gateway/**
+  - x/messaging/**
+  - x/observability/**
+  - x/openapi/**
+  - x/resilience/**
+  - x/rest/**
+  - x/rpc/**
+  - x/tenant/**
+  - x/validate/**
+  - x/websocket/**
+
+test_commands:
+  - go test -race -timeout 60s ./x/ai/semanticcache/embedding/...
+  - go test -timeout 20s ./x/ai/semanticcache/embedding/...
+  - go vet ./x/ai/semanticcache/embedding/...
+
+doc_paths:
+  - docs/modules/x-ai/README.md
+
+change_risks:
+  - Provider interface change breaks all callers in cachemanager and parent semanticcache
+  - Embedding.Vector field type change breaks all similarity computation
+
+review_checklist:
+  - Keep HTTP adapters offline-testable via injectable http.Client
+  - Keep the Provider interface minimal; add methods only when all implementations can implement them
+  - Keep Embedding as a plain value type with no hidden state
+
+agent_hints:
+  - Use ProviderWithStats to track embedding cost and latency without modifying the underlying provider
+  - Keep OpenAI and Cohere implementations free of third-party SDK dependencies; use net/http directly
+
+landing_zones:
+  interface: provider.go
+  openai_adapter: openai.go
+  cohere_adapter: cohere.go
+  stats_wrapper: provider.go

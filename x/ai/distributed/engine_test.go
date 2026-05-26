@@ -15,7 +15,10 @@ func TestDistributedEngine_ExecuteAsync(t *testing.T) {
 	ctx := t.Context()
 
 	// Setup
-	broker := mq.NewInProcBroker(pubsub.New())
+	broker, err := mq.NewInProcBroker(pubsub.New())
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer broker.Close()
 
 	tmpDir := t.TempDir()
@@ -71,7 +74,10 @@ func TestDistributedEngine_ExecuteSync(t *testing.T) {
 	ctx := t.Context()
 
 	// Setup
-	broker := mq.NewInProcBroker(pubsub.New())
+	broker, err := mq.NewInProcBroker(pubsub.New())
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer broker.Close()
 
 	tmpDir := t.TempDir()
@@ -109,7 +115,10 @@ func TestDistributedEngine_GetExecutionStatus(t *testing.T) {
 	ctx := t.Context()
 
 	// Setup
-	broker := mq.NewInProcBroker(pubsub.New())
+	broker, err := mq.NewInProcBroker(pubsub.New())
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer broker.Close()
 
 	tmpDir := t.TempDir()
@@ -161,7 +170,10 @@ func TestDistributedEngine_Pause(t *testing.T) {
 	ctx := t.Context()
 
 	// Setup
-	broker := mq.NewInProcBroker(pubsub.New())
+	broker, err := mq.NewInProcBroker(pubsub.New())
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer broker.Close()
 
 	tmpDir := t.TempDir()
@@ -257,7 +269,10 @@ func TestDefaultConfigs_Engine(t *testing.T) {
 func TestDistributedEngine_Close(t *testing.T) {
 	ctx := t.Context()
 
-	broker := mq.NewInProcBroker(pubsub.New())
+	broker, err := mq.NewInProcBroker(pubsub.New())
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer broker.Close()
 
 	tmpDir := t.TempDir()
@@ -275,7 +290,7 @@ func TestDistributedEngine_Close(t *testing.T) {
 	localEngine.RegisterWorkflow(workflow)
 
 	// Start execution
-	_, err := engine.ExecuteAsync(ctx, "wf-close", map[string]any{}, DefaultExecutionOptions())
+	_, err = engine.ExecuteAsync(ctx, "wf-close", map[string]any{}, DefaultExecutionOptions())
 	if err != nil {
 		t.Fatalf("ExecuteAsync failed: %v", err)
 	}

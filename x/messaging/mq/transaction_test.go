@@ -11,7 +11,10 @@ import (
 func TestTransactionManagerBasic(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.EnableTransactions = true
-	broker := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	broker, err := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer broker.Close()
 
 	if broker.txManager == nil {
@@ -25,7 +28,7 @@ func TestTransactionManagerBasic(t *testing.T) {
 	msg1 := Message{ID: "msg-1", Data: "data-1"}
 	msg2 := Message{ID: "msg-2", Data: "data-2"}
 
-	err := broker.PublishWithTransaction(ctx, "test-topic", msg1, txID)
+	err = broker.PublishWithTransaction(ctx, "test-topic", msg1, txID)
 	if err != nil {
 		t.Fatalf("PublishWithTransaction error: %v", err)
 	}
@@ -90,7 +93,10 @@ func TestTransactionManagerBasic(t *testing.T) {
 func TestTransactionRollback(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.EnableTransactions = true
-	broker := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	broker, err := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer broker.Close()
 
 	ctx := t.Context()
@@ -145,7 +151,10 @@ func TestTransactionTimeout(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.EnableTransactions = true
 	cfg.TransactionTimeout = 100 * time.Millisecond
-	broker := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	broker, err := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer broker.Close()
 
 	ctx := t.Context()
@@ -154,7 +163,7 @@ func TestTransactionTimeout(t *testing.T) {
 	txID := "tx-timeout"
 	msg := Message{ID: "msg-1", Data: "data-1"}
 
-	err := broker.PublishWithTransaction(ctx, "test-topic", msg, txID)
+	err = broker.PublishWithTransaction(ctx, "test-topic", msg, txID)
 	if err != nil {
 		t.Fatalf("PublishWithTransaction error: %v", err)
 	}
@@ -184,13 +193,16 @@ func TestTransactionTimeout(t *testing.T) {
 func TestTransactionNotFound(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.EnableTransactions = true
-	broker := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	broker, err := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer broker.Close()
 
 	ctx := t.Context()
 
 	// Try to commit non-existent transaction
-	err := broker.CommitTransaction(ctx, "non-existent")
+	err = broker.CommitTransaction(ctx, "non-existent")
 	if err == nil {
 		t.Fatal("expected error for non-existent transaction")
 	}
@@ -211,7 +223,10 @@ func TestTransactionNotFound(t *testing.T) {
 func TestTransactionDoubleCommit(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.EnableTransactions = true
-	broker := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	broker, err := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer broker.Close()
 
 	ctx := t.Context()
@@ -220,7 +235,7 @@ func TestTransactionDoubleCommit(t *testing.T) {
 	txID := "tx-double-commit"
 	msg := Message{ID: "msg-1", Data: "data-1"}
 
-	err := broker.PublishWithTransaction(ctx, "test-topic", msg, txID)
+	err = broker.PublishWithTransaction(ctx, "test-topic", msg, txID)
 	if err != nil {
 		t.Fatalf("PublishWithTransaction error: %v", err)
 	}
@@ -243,14 +258,17 @@ func TestTransactionDoubleCommit(t *testing.T) {
 
 func TestTransactionDisabled(t *testing.T) {
 	// Create broker without transaction support
-	broker := NewInProcBroker(pubsub.New())
+	broker, err := NewInProcBroker(pubsub.New())
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer broker.Close()
 
 	ctx := t.Context()
 
 	// Try to publish with transaction when disabled
 	msg := Message{ID: "msg-1", Data: "data-1"}
-	err := broker.PublishWithTransaction(ctx, "test-topic", msg, "tx-1")
+	err = broker.PublishWithTransaction(ctx, "test-topic", msg, "tx-1")
 	if err == nil {
 		t.Fatal("expected error when transactions are disabled")
 	}
@@ -280,7 +298,10 @@ func TestTransactionDisabled(t *testing.T) {
 func TestTransactionConcurrent(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.EnableTransactions = true
-	broker := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	broker, err := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer broker.Close()
 
 	ctx := t.Context()
@@ -334,7 +355,10 @@ func TestTransactionConcurrent(t *testing.T) {
 func TestTransactionClose(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.EnableTransactions = true
-	broker := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	broker, err := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	ctx := t.Context()
 
@@ -342,7 +366,7 @@ func TestTransactionClose(t *testing.T) {
 	txID := "tx-close"
 	msg := Message{ID: "msg-1", Data: "data-1"}
 
-	err := broker.PublishWithTransaction(ctx, "test-topic", msg, txID)
+	err = broker.PublishWithTransaction(ctx, "test-topic", msg, txID)
 	if err != nil {
 		t.Fatalf("PublishWithTransaction error: %v", err)
 	}

@@ -1,0 +1,90 @@
+name: x/ai/resilience
+path: x/ai/resilience
+layer: extension
+status: experimental
+owner: ai-gateway
+risk: medium
+summary: Resilience wrapper for AI providers; composes x/resilience circuit-breaker and rate-limit primitives into a provider-compatible decorator.
+
+parent_family: x/ai
+
+entrypoint_reads:
+  - AGENTS.md
+  - docs/CANONICAL_STYLE_GUIDE.md
+  - specs/repo.yaml
+  - specs/task-routing.yaml
+  - specs/dependency-rules.yaml
+  - x/ai/module.yaml
+  - docs/modules/x-ai/README.md
+
+responsibilities:
+  - ResilientProvider decorator implementing provider.Provider
+  - Config-driven wiring of x/resilience/ratelimit.KeyedBuckets and x/resilience/circuitbreaker.CircuitBreaker
+  - Rate-limit key derivation per provider and model
+  - Circuit breaker state and stats exposure
+
+non_goals:
+  - Owning resilience primitive definitions (owned by x/resilience)
+  - Provider adapter implementation
+  - Session or context lifecycle ownership
+  - Feature-specific retry or orchestration policy
+
+public_entrypoints:
+  - ResilientProvider
+  - Config
+  - ErrNilProvider
+  - ErrNilRequest
+  - ErrRateLimitExceeded
+  - NewResilientProviderE
+
+allowed_imports:
+  - stdlib
+  - x/ai/provider
+  - x/resilience/circuitbreaker
+  - x/resilience/ratelimit
+
+forbidden_imports:
+  - core/**
+  - router/**
+  - middleware/**
+  - security/**
+  - store/**
+  - metrics/**
+  - contract/**
+  - x/data/**
+  - x/fileapi/**
+  - x/frontend/**
+  - x/gateway/**
+  - x/messaging/**
+  - x/observability/**
+  - x/openapi/**
+  - x/rest/**
+  - x/rpc/**
+  - x/tenant/**
+  - x/validate/**
+  - x/websocket/**
+
+test_commands:
+  - go test -race -timeout 60s ./x/ai/resilience/...
+  - go test -timeout 20s ./x/ai/resilience/...
+  - go vet ./x/ai/resilience/...
+
+doc_paths:
+  - docs/modules/x-ai/README.md
+  - docs/architecture/x-ai-resilience-boundary.md
+
+change_risks:
+  - CircuitBreakerState/CircuitBreakerStats return type changes break callers that inspect breaker state
+  - Rate-limit key change causes per-model bucket isolation to shift
+
+review_checklist:
+  - Keep Config fields as the canonical input types from x/resilience; do not re-introduce AI-specific type aliases
+  - Keep CircuitBreakerState() and CircuitBreakerStats() returning x/resilience/circuitbreaker types
+  - Do not add retry loops or fallback chains here; keep policy caller-owned
+
+agent_hints:
+  - Use x/resilience/circuitbreaker.New and x/resilience/ratelimit.NewKeyed to construct Config fields
+  - Do not add AI-specific circuit breaker or rate limiter types; compose from x/resilience primitives
+
+landing_zones:
+  core: provider.go

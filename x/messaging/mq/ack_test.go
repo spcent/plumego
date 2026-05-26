@@ -12,7 +12,10 @@ func TestAckTrackerBasic(t *testing.T) {
 	// Test basic ACK tracker functionality
 	cfg := DefaultConfig()
 	cfg.EnableAckSupport = true
-	broker := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	broker, err := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer broker.Close()
 
 	if broker.ackTracker == nil {
@@ -21,7 +24,7 @@ func TestAckTrackerBasic(t *testing.T) {
 
 	// Test tracking a message
 	msg := Message{ID: "test-1", Data: "test data"}
-	err := broker.ackTracker.track("ack-1", "test-topic", msg, 1*time.Second, 3)
+	err = broker.ackTracker.track("ack-1", "test-topic", msg, 1*time.Second, 3)
 	if err != nil {
 		t.Fatalf("track error: %v", err)
 	}
@@ -48,13 +51,16 @@ func TestAckTrackerBasic(t *testing.T) {
 func TestAckTrackerDuplicateAckID(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.EnableAckSupport = true
-	broker := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	broker, err := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer broker.Close()
 
 	msg := Message{ID: "test-1", Data: "test data"}
 
 	// Track first message
-	err := broker.ackTracker.track("ack-1", "test-topic", msg, 1*time.Second, 3)
+	err = broker.ackTracker.track("ack-1", "test-topic", msg, 1*time.Second, 3)
 	if err != nil {
 		t.Fatalf("first track error: %v", err)
 	}
@@ -72,11 +78,14 @@ func TestAckTrackerDuplicateAckID(t *testing.T) {
 func TestAckTrackerNotFound(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.EnableAckSupport = true
-	broker := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	broker, err := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer broker.Close()
 
 	// Try to acknowledge non-existent message
-	err := broker.ackTracker.acknowledge("non-existent")
+	err = broker.ackTracker.acknowledge("non-existent")
 	if err == nil {
 		t.Fatal("expected error for non-existent ACK ID")
 	}
@@ -88,7 +97,10 @@ func TestAckTrackerNotFound(t *testing.T) {
 func TestPublishWithAckSuccess(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.EnableAckSupport = true
-	broker := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	broker, err := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer broker.Close()
 
 	ctx := t.Context()
@@ -101,7 +113,7 @@ func TestPublishWithAckSuccess(t *testing.T) {
 		AckTimeout: 1 * time.Second,
 	}
 
-	err := broker.PublishWithAck(ctx, "test-topic", ackMsg)
+	err = broker.PublishWithAck(ctx, "test-topic", ackMsg)
 	if err != nil {
 		t.Fatalf("PublishWithAck error: %v", err)
 	}
@@ -131,7 +143,10 @@ func TestPublishWithAckTimeout(t *testing.T) {
 	cfg.EnableAckSupport = true
 	cfg.EnableDeadLetterQueue = true
 	cfg.DeadLetterTopic = "dlq"
-	broker := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	broker, err := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer broker.Close()
 
 	ctx := t.Context()
@@ -175,7 +190,10 @@ func TestPublishWithAckTimeout(t *testing.T) {
 func TestNackImmediateRedelivery(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.EnableAckSupport = true
-	broker := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	broker, err := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer broker.Close()
 
 	ctx := t.Context()
@@ -229,7 +247,10 @@ func TestNackImmediateRedelivery(t *testing.T) {
 
 func TestAckDisabledError(t *testing.T) {
 	// Create broker without ACK support
-	broker := NewInProcBroker(pubsub.New())
+	broker, err := NewInProcBroker(pubsub.New())
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer broker.Close()
 
 	ctx := t.Context()
@@ -240,7 +261,7 @@ func TestAckDisabledError(t *testing.T) {
 		AckPolicy: AckRequired,
 	}
 
-	err := broker.PublishWithAck(ctx, "test-topic", ackMsg)
+	err = broker.PublishWithAck(ctx, "test-topic", ackMsg)
 	if err == nil {
 		t.Fatal("expected error when ACK support is disabled")
 	}
@@ -270,10 +291,13 @@ func TestAckDisabledError(t *testing.T) {
 func TestAckTrackerClose(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.EnableAckSupport = true
-	broker := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	broker, err := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	msg := Message{ID: "test-1", Data: "test"}
-	err := broker.ackTracker.track("ack-1", "test-topic", msg, 1*time.Second, 3)
+	err = broker.ackTracker.track("ack-1", "test-topic", msg, 1*time.Second, 3)
 	if err != nil {
 		t.Fatalf("track error: %v", err)
 	}
@@ -297,7 +321,10 @@ func TestAckTrackerClose(t *testing.T) {
 func TestAckTrackerStats(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.EnableAckSupport = true
-	broker := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	broker, err := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer broker.Close()
 
 	msg := Message{ID: "test-1", Data: "test"}
@@ -312,7 +339,7 @@ func TestAckTrackerStats(t *testing.T) {
 	}
 
 	// Track a message
-	err := broker.ackTracker.track("ack-1", "test-topic", msg, 1*time.Second, 3)
+	err = broker.ackTracker.track("ack-1", "test-topic", msg, 1*time.Second, 3)
 	if err != nil {
 		t.Fatalf("track error: %v", err)
 	}
@@ -336,7 +363,10 @@ func TestAckTrackerStats(t *testing.T) {
 func TestAckGeneratedID(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.EnableAckSupport = true
-	broker := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	broker, err := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer broker.Close()
 
 	ctx := t.Context()
@@ -348,7 +378,7 @@ func TestAckGeneratedID(t *testing.T) {
 		// AckID is empty, should be generated
 	}
 
-	err := broker.PublishWithAck(ctx, "test-topic", ackMsg)
+	err = broker.PublishWithAck(ctx, "test-topic", ackMsg)
 	if err != nil {
 		t.Fatalf("PublishWithAck error: %v", err)
 	}
@@ -366,7 +396,10 @@ func TestAckGeneratedID(t *testing.T) {
 func TestAckNoPolicySkipsTracking(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.EnableAckSupport = true
-	broker := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	broker, err := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer broker.Close()
 
 	ctx := t.Context()
@@ -377,7 +410,7 @@ func TestAckNoPolicySkipsTracking(t *testing.T) {
 		AckPolicy: AckNone, // No acknowledgment required
 	}
 
-	err := broker.PublishWithAck(ctx, "test-topic", ackMsg)
+	err = broker.PublishWithAck(ctx, "test-topic", ackMsg)
 	if err != nil {
 		t.Fatalf("PublishWithAck error: %v", err)
 	}

@@ -12,7 +12,10 @@ func TestTTLTrackerBasic(t *testing.T) {
 	// Test basic TTL tracker functionality
 	cfg := DefaultConfig()
 	cfg.MessageTTL = 1 * time.Second
-	broker := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	broker, err := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer broker.Close()
 
 	if broker.ttlTracker == nil {
@@ -21,7 +24,7 @@ func TestTTLTrackerBasic(t *testing.T) {
 
 	// Test tracking a message
 	expiresAt := time.Now().Add(1 * time.Second)
-	err := broker.ttlTracker.track("msg-1", "test-topic", expiresAt)
+	err = broker.ttlTracker.track("msg-1", "test-topic", expiresAt)
 	if err != nil {
 		t.Fatalf("track error: %v", err)
 	}
@@ -48,12 +51,15 @@ func TestTTLTrackerBasic(t *testing.T) {
 func TestTTLTrackerExpiration(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.MessageTTL = 100 * time.Millisecond
-	broker := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	broker, err := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer broker.Close()
 
 	// Track message that expires soon
 	expiresAt := time.Now().Add(50 * time.Millisecond)
-	err := broker.ttlTracker.track("msg-expired", "test-topic", expiresAt)
+	err = broker.ttlTracker.track("msg-expired", "test-topic", expiresAt)
 	if err != nil {
 		t.Fatalf("track error: %v", err)
 	}
@@ -79,12 +85,15 @@ func TestTTLTrackerExpiration(t *testing.T) {
 func TestTTLTrackerCleanup(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.MessageTTL = 100 * time.Millisecond
-	broker := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	broker, err := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer broker.Close()
 
 	// Track message that expires soon
 	expiresAt := time.Now().Add(50 * time.Millisecond)
-	err := broker.ttlTracker.track("msg-cleanup", "test-topic", expiresAt)
+	err = broker.ttlTracker.track("msg-cleanup", "test-topic", expiresAt)
 	if err != nil {
 		t.Fatalf("track error: %v", err)
 	}
@@ -107,7 +116,10 @@ func TestTTLTrackerCleanup(t *testing.T) {
 func TestPublishTTLSuccess(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.MessageTTL = 5 * time.Second
-	broker := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	broker, err := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer broker.Close()
 
 	ctx := t.Context()
@@ -150,7 +162,10 @@ func TestPublishTTLSuccess(t *testing.T) {
 func TestPublishTTLExpired(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.MessageTTL = 1 * time.Second
-	broker := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	broker, err := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer broker.Close()
 
 	ctx := t.Context()
@@ -161,7 +176,7 @@ func TestPublishTTLExpired(t *testing.T) {
 		ExpiresAt: time.Now().Add(-1 * time.Second), // Expired 1 second ago
 	}
 
-	err := broker.PublishTTL(ctx, "test-topic", ttlMsg)
+	err = broker.PublishTTL(ctx, "test-topic", ttlMsg)
 	if err == nil {
 		t.Fatal("expected error when publishing expired message")
 	}
@@ -173,7 +188,10 @@ func TestPublishTTLExpired(t *testing.T) {
 func TestPublishTTLNoExpiration(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.MessageTTL = 1 * time.Second
-	broker := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	broker, err := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer broker.Close()
 
 	ctx := t.Context()
@@ -184,7 +202,7 @@ func TestPublishTTLNoExpiration(t *testing.T) {
 		ExpiresAt: time.Time{}, // Zero time, no expiration
 	}
 
-	err := broker.PublishTTL(ctx, "test-topic", ttlMsg)
+	err = broker.PublishTTL(ctx, "test-topic", ttlMsg)
 	if err != nil {
 		t.Fatalf("PublishTTL error: %v", err)
 	}
@@ -199,7 +217,10 @@ func TestPublishTTLNoExpiration(t *testing.T) {
 func TestPublishPriorityTTL(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.MessageTTL = 5 * time.Second
-	broker := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	broker, err := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer broker.Close()
 
 	ctx := t.Context()
@@ -244,7 +265,10 @@ func TestPublishWithAckTTL(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.MessageTTL = 5 * time.Second
 	cfg.EnableAckSupport = true
-	broker := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	broker, err := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer broker.Close()
 
 	ctx := t.Context()
@@ -307,10 +331,13 @@ func TestPublishWithAckTTL(t *testing.T) {
 func TestTTLTrackerClose(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.MessageTTL = 1 * time.Second
-	broker := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	broker, err := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	expiresAt := time.Now().Add(5 * time.Second)
-	err := broker.ttlTracker.track("msg-1", "test-topic", expiresAt)
+	err = broker.ttlTracker.track("msg-1", "test-topic", expiresAt)
 	if err != nil {
 		t.Fatalf("track error: %v", err)
 	}
@@ -333,7 +360,10 @@ func TestTTLTrackerClose(t *testing.T) {
 
 func TestTTLDisabled(t *testing.T) {
 	// Create broker without TTL (default MessageTTL = 0)
-	broker := NewInProcBroker(pubsub.New())
+	broker, err := NewInProcBroker(pubsub.New())
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer broker.Close()
 
 	if broker.ttlTracker != nil {
@@ -348,14 +378,17 @@ func TestTTLDisabled(t *testing.T) {
 		ExpiresAt: time.Now().Add(1 * time.Second),
 	}
 
-	err := broker.PublishTTL(ctx, "test-topic", ttlMsg)
+	err = broker.PublishTTL(ctx, "test-topic", ttlMsg)
 	if err != nil {
 		t.Fatalf("PublishTTL should work even without tracker: %v", err)
 	}
 }
 
 func TestValidateTTL(t *testing.T) {
-	broker := NewInProcBroker(pubsub.New())
+	broker, err := NewInProcBroker(pubsub.New())
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer broker.Close()
 
 	tests := []struct {
@@ -396,7 +429,10 @@ func TestValidateTTL(t *testing.T) {
 func TestTTLTrackerConcurrent(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.MessageTTL = 10 * time.Second
-	broker := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	broker, err := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer broker.Close()
 
 	ctx := t.Context()

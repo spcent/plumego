@@ -1,0 +1,92 @@
+name: x/ai/llmcache
+path: x/ai/llmcache
+layer: extension
+status: experimental
+owner: ai-gateway
+risk: medium
+summary: LLM response caching interface and in-memory implementation; used by x/ai/semanticcache and x/ai/instrumentation.
+
+parent_family: x/ai
+
+entrypoint_reads:
+  - AGENTS.md
+  - docs/CANONICAL_STYLE_GUIDE.md
+  - specs/repo.yaml
+  - specs/task-routing.yaml
+  - specs/dependency-rules.yaml
+  - x/ai/module.yaml
+  - docs/modules/x-ai/README.md
+
+responsibilities:
+  - Cache interface contract (Get, Set, Delete, Clear)
+  - CacheKey construction from prompt hash and model identity
+  - CacheEntry value type with TTL and hit/miss metadata
+  - In-memory cache implementation
+  - CachingProvider wrapper for transparent cache-aside pattern
+
+non_goals:
+  - Semantic or embedding-based matching (owned by x/ai/semanticcache)
+  - Distributed or persistent cache backends (owned by x/data/cache)
+  - HTTP response caching (owned by x/gateway/cache)
+  - Tenant-scoped cache isolation
+
+public_entrypoints:
+  - Cache
+  - CacheKey
+  - CacheEntry
+  - MemoryCache
+  - CachingProvider
+  - NewMemoryCache
+  - NewCachingProvider
+
+allowed_imports:
+  - stdlib
+  - x/ai/provider
+  - x/ai/tokenizer
+
+forbidden_imports:
+  - core/**
+  - router/**
+  - middleware/**
+  - security/**
+  - store/**
+  - metrics/**
+  - contract/**
+  - x/data/**
+  - x/fileapi/**
+  - x/frontend/**
+  - x/gateway/**
+  - x/messaging/**
+  - x/observability/**
+  - x/openapi/**
+  - x/resilience/**
+  - x/rest/**
+  - x/rpc/**
+  - x/tenant/**
+  - x/validate/**
+  - x/websocket/**
+
+test_commands:
+  - go test -race -timeout 60s ./x/ai/llmcache/...
+  - go test -timeout 20s ./x/ai/llmcache/...
+  - go vet ./x/ai/llmcache/...
+
+doc_paths:
+  - docs/modules/x-ai/README.md
+
+change_risks:
+  - Cache interface change breaks x/ai/semanticcache and x/ai/instrumentation
+  - CacheKey hash change invalidates existing cached entries
+
+review_checklist:
+  - Keep Cache interface minimal and backend-neutral
+  - Keep CacheKey deterministic for identical prompts
+  - Do not embed eviction policy in the interface; keep it in implementations
+
+agent_hints:
+  - Use MemoryCache for local dev and unit tests
+  - For semantic (fuzzy) matching, compose with x/ai/semanticcache on top of this cache
+  - For distributed caching, use x/data/cache as the storage backend
+
+landing_zones:
+  core: cache.go

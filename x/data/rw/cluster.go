@@ -120,7 +120,11 @@ func New(config Config) (*Cluster, error) {
 	// Set defaults
 	if config.LoadBalancer == nil {
 		if len(replicaWeights) > 0 {
-			config.LoadBalancer = NewWeightedBalancer(replicaWeights)
+			lb, err := NewWeightedBalancer(replicaWeights)
+			if err != nil {
+				return nil, err
+			}
+			config.LoadBalancer = lb
 		} else {
 			config.LoadBalancer = NewRoundRobinBalancer()
 		}

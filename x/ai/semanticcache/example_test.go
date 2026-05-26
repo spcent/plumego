@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/spcent/plumego/metrics"
 	"github.com/spcent/plumego/x/ai/llmcache"
 	"github.com/spcent/plumego/x/ai/provider"
 	"github.com/spcent/plumego/x/ai/semanticcache"
@@ -29,10 +28,13 @@ func Example_basicUsage() {
 	semanticCache := semanticcache.NewSemanticCache(generator, vectorStore, config)
 
 	// 4. Create caching provider
-	cachingProvider := semanticcache.NewSemanticCachingProvider(
+	cachingProvider, err := semanticcache.NewSemanticCachingProvider(
 		mockProvider,
 		semanticCache,
 	)
+	if err != nil {
+		panic(err)
+	}
 
 	// First request - cache miss
 	req := &provider.CompletionRequest{
@@ -76,11 +78,14 @@ func Example_withExactCache() {
 	)
 
 	// Create provider with both caches
-	cachingProvider := semanticcache.NewSemanticCachingProvider(
+	cachingProvider, err := semanticcache.NewSemanticCachingProvider(
 		mockProvider,
 		semanticCache,
 		semanticcache.WithExactCache(exactCache),
 	)
+	if err != nil {
+		panic(err)
+	}
 
 	req := &provider.CompletionRequest{
 		Model: "test-model",
@@ -107,7 +112,7 @@ func Example_withMetrics() {
 	mockProvider := &mockProvider{response: "Response"}
 
 	// Create metrics collector
-	collector := metrics.NewNoopCollector() // Use PrometheusCollector in production
+	collector := semanticcache.NoopMetricRecorder() // Use PrometheusCollector in production
 
 	// Create instrumented components
 	generator := semanticcache.NewSimpleEmbeddingGenerator(128)
@@ -120,10 +125,13 @@ func Example_withMetrics() {
 		semanticcache.DefaultSemanticCacheConfig(),
 	)
 
-	cachingProvider := semanticcache.NewSemanticCachingProvider(
+	cachingProvider, err := semanticcache.NewSemanticCachingProvider(
 		mockProvider,
 		semanticCache,
 	)
+	if err != nil {
+		panic(err)
+	}
 
 	req := &provider.CompletionRequest{
 		Model: "test-model",
@@ -168,11 +176,14 @@ func Example_customConfiguration() {
 	vectorStore := semanticcache.NewMemoryVectorStore(5000, 2*time.Hour)
 	semanticCache := semanticcache.NewSemanticCache(generator, vectorStore, cacheConfig)
 
-	cachingProvider := semanticcache.NewSemanticCachingProvider(
+	cachingProvider, err := semanticcache.NewSemanticCachingProvider(
 		mockProvider,
 		semanticCache,
 		semanticcache.WithProviderConfig(providerConfig),
 	)
+	if err != nil {
+		panic(err)
+	}
 
 	req := &provider.CompletionRequest{
 		Model: "test-model",
@@ -201,10 +212,13 @@ func Example_concurrentAccess() {
 		semanticcache.DefaultSemanticCacheConfig(),
 	)
 
-	cachingProvider := semanticcache.NewSemanticCachingProvider(
+	cachingProvider, err := semanticcache.NewSemanticCachingProvider(
 		mockProvider,
 		semanticCache,
 	)
+	if err != nil {
+		panic(err)
+	}
 
 	// Concurrent requests
 	done := make(chan bool, 10)

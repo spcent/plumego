@@ -76,13 +76,12 @@ entries:
 
   - id: x-websocket-merged-main-compatibility-aliases
     category: public_alias
-    status: keep
+    status: removed
     owner: realtime
-    decision: Keep only the websocket aliases that still have live compatibility callers. The auth aliases were removed once their last repo callers migrated.
-    replacement: ReadMessageReader and NewHubWithConfigE
+    decision: All compatibility aliases removed. NewHubE and NewHubWithConfigE panic wrappers deleted; callers now use NewHubWithConfig which returns (*Hub, error).
+    replacement: NewHubWithConfig
     paths:
       - x/websocket/hub.go
-      - x/websocket/stream.go
 
   - id: x-discovery-optional-capability-contract
     category: unsupported_operation
@@ -92,15 +91,6 @@ entries:
     replacement: provider-specific implementation
     paths:
       - x/gateway/discovery/discovery.go
-
-  - id: x-cache-distributed-new-e-deprecation
-    category: compatibility_behavior
-    status: keep
-    owner: cache
-    decision: Keep NewE as an experimental x/data/cache migration helper while NewWithConfig is the canonical constructor with construction errors.
-    replacement: distributed.NewWithConfig
-    paths:
-      - x/data/cache/distributed/distributed.go
 
   - id: reference-workerfleet-unimplemented-registration
     category: reference_placeholder
@@ -175,35 +165,6 @@ entries:
     paths:
       - x/ai/multimodal/types.go
 
-  - id: x-ai-stable-register-panic-wrappers
-    category: compatibility_behavior
-    status: keep
-    owner: ai-gateway
-    decision: Keep temporarily for stable-tier caller migration only. Dynamic or user-provided registration must use the E-variants.
-    replacement: provider.Manager.RegisterE and streaming.StreamManager.RegisterE
-    paths:
-      - x/ai/provider/manager.go
-      - x/ai/streaming/streaming.go
-
-  - id: x-ai-experimental-constructor-panic-wrappers
-    category: compatibility_behavior
-    status: keep
-    owner: ai-gateway
-    decision: Keep temporarily while experimental x/ai callers migrate. Prefer the E-variants and remove these shims once compatibility callers are gone.
-    replacement: resilience.NewResilientProviderE and semanticcache.NewSemanticCachingProviderE
-    paths:
-      - x/ai/resilience/provider.go
-      - x/ai/semanticcache/provider.go
-
-  - id: x-ai-metrics-tags-panic-helper
-    category: compatibility_behavior
-    status: keep
-    owner: ai-gateway
-    decision: Keep as a trusted static-call helper only. Dynamic tag input must use TagsE so malformed pairs return an error instead of panicking.
-    replacement: x/ai/metrics.TagsE
-    paths:
-      - x/ai/metrics/metrics.go
-
   - id: x-data-idempotency-stable-contract-reexports
     category: public_alias
     status: keep
@@ -249,19 +210,6 @@ entries:
     replacement: direct x/messaging/pubsub and x/messaging/webhook imports
     paths:
       - x/messaging/entrypoints.go
-
-  - id: x-mq-protocol-bridge-placeholders
-    category: unsupported_operation
-    status: keep
-    owner: messaging
-    decision: Keep only as deprecated experimental compatibility placeholders. MQTT and AMQP bridge configuration fails closed today, should stay disabled in v1 callers, and should be removed in the next API cleanup unless a real bridge implementation lands.
-    replacement: implemented protocol bridge or removed config surface
-    paths:
-      - x/messaging/mq/broker_routes.go
-      - x/messaging/mq/broker.go
-      - x/messaging/mq/config.go
-      - x/messaging/mq/errors.go
-      - x/messaging/mq/mq_test.go
 
   - id: x-mq-broker-compatibility-defaults
     category: compatibility_behavior

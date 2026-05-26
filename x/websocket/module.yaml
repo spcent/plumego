@@ -62,12 +62,12 @@ public_entrypoints:
   - Outbound
   - UserInfo
   - Conn
-  - NewConnE
+  - NewConn
   - BroadcastResult
   - Hub
   - HubConfig
   - HubMetrics
-  - NewHubWithConfigE
+  - NewHubWithConfig
   - ServeWSWithConfig
   - ServeRoomFanoutWS
   - MessageValidationConfig

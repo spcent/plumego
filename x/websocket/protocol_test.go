@@ -53,9 +53,9 @@ func TestReadFrameRejectsUnknownOpcode(t *testing.T) {
 
 func TestReadMessageStreamRejectsContinuationBeforeMessage(t *testing.T) {
 	c := newFrameReadConn(maskedClientFrame(finBit|opcodeContinuation, []byte("x")))
-	_, _, err := c.ReadMessageStream()
+	_, _, err := c.ReadMessageReader()
 	if !errors.Is(err, ErrProtocolError) {
-		t.Fatalf("ReadMessageStream error = %v, want ErrProtocolError", err)
+		t.Fatalf("ReadMessageReader error = %v, want ErrProtocolError", err)
 	}
 }
 
@@ -88,9 +88,9 @@ func TestSetReadLimitZeroRestoresDefault(t *testing.T) {
 		t.Fatalf("read limit = %d, want default %d", got, defaultReadLimit)
 	}
 
-	_, reader, err := c.ReadMessageStream()
+	_, reader, err := c.ReadMessageReader()
 	if err != nil {
-		t.Fatalf("ReadMessageStream error = %v", err)
+		t.Fatalf("ReadMessageReader error = %v", err)
 	}
 	if err := reader.Close(); err != nil {
 		t.Fatalf("reader.Close error = %v", err)

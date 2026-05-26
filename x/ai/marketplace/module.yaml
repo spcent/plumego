@@ -1,0 +1,103 @@
+name: x/ai/marketplace
+path: x/ai/marketplace
+layer: extension
+status: experimental
+owner: ai-gateway
+risk: high
+summary: Agent registry and installer for distributing and loading reusable AI agents from local registries; installation and rating APIs are not yet stable.
+
+parent_family: x/ai
+
+entrypoint_reads:
+  - AGENTS.md
+  - docs/CANONICAL_STYLE_GUIDE.md
+  - specs/repo.yaml
+  - specs/task-routing.yaml
+  - specs/dependency-rules.yaml
+  - x/ai/module.yaml
+  - docs/modules/x-ai/README.md
+
+responsibilities:
+  - AgentMetadata value type and category taxonomy
+  - Registry interface and local file-based registry
+  - Installer for loading and validating agents from registry entries
+  - Validator for agent metadata and schema correctness
+  - Manager orchestrating registry, installer, and lifecycle
+
+non_goals:
+  - Provider adapter or routing (owned by x/ai/provider)
+  - Session lifecycle (owned by x/ai/session)
+  - Workflow execution (owned by x/ai/orchestration)
+  - Remote registry hosting or cloud distribution
+  - App bootstrap or HTTP endpoint ownership
+
+public_entrypoints:
+  - AgentMetadata
+  - AgentCategory
+  - Registry
+  - LocalRegistry
+  - Installer
+  - Validator
+  - Manager
+  - NewLocalRegistry
+  - NewInstaller
+  - NewManager
+
+allowed_imports:
+  - stdlib
+  - x/ai/provider
+  - x/ai/orchestration
+
+forbidden_imports:
+  - core/**
+  - router/**
+  - middleware/**
+  - security/**
+  - store/**
+  - metrics/**
+  - contract/**
+  - x/data/**
+  - x/fileapi/**
+  - x/frontend/**
+  - x/gateway/**
+  - x/messaging/**
+  - x/observability/**
+  - x/openapi/**
+  - x/resilience/**
+  - x/rest/**
+  - x/rpc/**
+  - x/tenant/**
+  - x/validate/**
+  - x/websocket/**
+
+test_commands:
+  - go test -race -timeout 60s ./x/ai/marketplace/...
+  - go test -timeout 20s ./x/ai/marketplace/...
+  - go vet ./x/ai/marketplace/...
+
+doc_paths:
+  - docs/modules/x-ai/README.md
+
+change_risks:
+  - AgentMetadata struct changes break existing registry files and serialized entries
+  - Registry interface changes break local and future remote registry implementations
+  - Installer validation logic changes alter which agents can be loaded
+
+review_checklist:
+  - Keep AgentMetadata as a plain value type without hidden execution behavior
+  - Keep installation idempotent; loading the same agent twice should not duplicate state
+  - Keep Validator logic explicit and testable without network access
+  - Do not add remote network calls inside Registry or Installer; keep them caller-wired
+
+agent_hints:
+  - Keep the marketplace experimental until the rating and remote distribution APIs stabilize
+  - Use NewLocalRegistry for file-backed registries; wire remote adapters at the app level
+  - Keep agent loading deterministic; document any loading-order dependencies
+
+landing_zones:
+  metadata: types.go
+  registry: registry.go
+  local_registry: registry_local.go
+  installer: installer.go
+  validator: validator.go
+  manager: manager.go

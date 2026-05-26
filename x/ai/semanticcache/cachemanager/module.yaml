@@ -1,0 +1,88 @@
+name: x/ai/semanticcache/cachemanager
+path: x/ai/semanticcache/cachemanager
+layer: extension
+status: experimental
+owner: ai-gateway
+risk: low
+summary: Cache lifecycle orchestration over vectorstore backends, including cache warming, eviction coordination, and statistics management.
+
+parent_family: x/ai
+
+entrypoint_reads:
+  - AGENTS.md
+  - docs/CANONICAL_STYLE_GUIDE.md
+  - specs/repo.yaml
+  - specs/task-routing.yaml
+  - specs/dependency-rules.yaml
+  - x/ai/module.yaml
+  - x/ai/semanticcache/module.yaml
+  - docs/modules/x-ai/README.md
+
+responsibilities:
+  - Manager for cache lifecycle over vectorstore.Backend
+  - CacheStats aggregation from backend stats
+  - Warmer for pre-populating the vector store from a corpus
+
+non_goals:
+  - Vector storage implementation (owned by x/ai/semanticcache/vectorstore)
+  - Embedding generation (owned by x/ai/semanticcache/embedding)
+  - Semantic similarity matching logic (owned by parent x/ai/semanticcache)
+  - Distributed cache coordination or replication
+
+public_entrypoints:
+  - Manager
+  - CacheStats
+  - Warmer
+  - NewManager
+  - ErrUnsupportedMaintenance
+
+allowed_imports:
+  - stdlib
+  - x/ai/semanticcache/embedding
+  - x/ai/semanticcache/vectorstore
+
+forbidden_imports:
+  - core/**
+  - router/**
+  - middleware/**
+  - security/**
+  - store/**
+  - metrics/**
+  - contract/**
+  - x/data/**
+  - x/fileapi/**
+  - x/frontend/**
+  - x/gateway/**
+  - x/messaging/**
+  - x/observability/**
+  - x/openapi/**
+  - x/resilience/**
+  - x/rest/**
+  - x/rpc/**
+  - x/tenant/**
+  - x/validate/**
+  - x/websocket/**
+
+test_commands:
+  - go test -race -timeout 60s ./x/ai/semanticcache/cachemanager/...
+  - go test -timeout 20s ./x/ai/semanticcache/cachemanager/...
+  - go vet ./x/ai/semanticcache/cachemanager/...
+
+doc_paths:
+  - docs/modules/x-ai/README.md
+
+change_risks:
+  - Warmer corpus format change breaks existing warm-up scripts
+
+review_checklist:
+  - Keep Manager operations context-cancellable
+  - Keep Warmer idempotent; repeated warm-up should not corrupt existing entries
+  - Do not add business logic to the manager; keep lifecycle operations generic
+
+agent_hints:
+  - Use Warmer to pre-populate the vector store before serving live traffic
+  - Wire Manager at the app bootstrap layer, not inside the semantic cache chain
+
+landing_zones:
+  manager: manager.go
+  warmer: warmer.go

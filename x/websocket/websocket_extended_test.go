@@ -397,12 +397,12 @@ func (failingWriter) Write([]byte) (int, error) {
 }
 
 func TestWriteCloseReturnsFrameWriteError(t *testing.T) {
-	conn, err := NewConnE(&simpleMockConn{
+	conn, err := NewConn(&simpleMockConn{
 		reader: bytes.NewReader(nil),
 		writer: failingWriter{},
 	}, 1, time.Second, SendDrop)
 	if err != nil {
-		t.Fatalf("NewConnE: %v", err)
+		t.Fatalf("NewConn: %v", err)
 	}
 
 	err = conn.WriteClose(CloseNormalClosure, "bye")
@@ -416,9 +416,9 @@ func TestWriteCloseReturnsFrameWriteError(t *testing.T) {
 
 func TestWriteCloseSetsWriteDeadline(t *testing.T) {
 	rawConn := &deadlineRecordingConn{}
-	conn, err := NewConnE(rawConn, 1, time.Second, SendDrop)
+	conn, err := NewConn(rawConn, 1, time.Second, SendDrop)
 	if err != nil {
-		t.Fatalf("NewConnE: %v", err)
+		t.Fatalf("NewConn: %v", err)
 	}
 	if err := conn.SetWriteTimeout(25 * time.Millisecond); err != nil {
 		t.Fatalf("SetWriteTimeout: %v", err)
@@ -468,7 +468,7 @@ func TestWriteMessageUnknownBehavior(t *testing.T) {
 	assertErrorContains(t, err, "unknown")
 }
 
-func TestNewConnERejectsInvalidConfig(t *testing.T) {
+func TestNewConnRejectsInvalidConfig(t *testing.T) {
 	tests := []struct {
 		name      string
 		conn      net.Conn
@@ -500,7 +500,7 @@ func TestNewConnERejectsInvalidConfig(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			conn, err := NewConnE(tt.conn, tt.queueSize, time.Second, tt.behavior)
+			conn, err := NewConn(tt.conn, tt.queueSize, time.Second, tt.behavior)
 			if conn != nil {
 				_ = conn.Close()
 			}
@@ -511,9 +511,9 @@ func TestNewConnERejectsInvalidConfig(t *testing.T) {
 	}
 }
 
-func TestNewConnEInvalidConfigReturnsError(t *testing.T) {
-	if _, err := NewConnE(nil, 1, time.Second, SendDrop); !errors.Is(err, ErrNilNetConn) {
-		t.Fatalf("NewConnE invalid config error = %v, want %v", err, ErrNilNetConn)
+func TestNewConnInvalidConfigReturnsError(t *testing.T) {
+	if _, err := NewConn(nil, 1, time.Second, SendDrop); !errors.Is(err, ErrNilNetConn) {
+		t.Fatalf("NewConn invalid config error = %v, want %v", err, ErrNilNetConn)
 	}
 }
 

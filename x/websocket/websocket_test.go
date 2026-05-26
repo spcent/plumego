@@ -41,9 +41,9 @@ func mustSimpleHS256TokenAuth(t *testing.T, secret []byte) *SimpleHS256TokenAuth
 
 func mustNewHubConfig(t *testing.T, cfg HubConfig) *Hub {
 	t.Helper()
-	hub, err := NewHubWithConfigE(cfg)
+	hub, err := NewHubWithConfig(cfg)
 	if err != nil {
-		t.Fatalf("NewHubWithConfigE: %v", err)
+		t.Fatalf("NewHubWithConfig: %v", err)
 	}
 	return hub
 }

@@ -14,7 +14,6 @@
 // Status:
 //   - Core features: Production-ready ✓
 //   - Advanced features (transactions, persistence, DLQ): Stable ✓
-//   - Protocol support (MQTT, AMQP): Not implemented
 //   - Cluster mode: Interface defined, implementation pending
 //
 // Example usage:
@@ -103,7 +102,7 @@ func WithPanicHandler(handler PanicHandler) Option {
 }
 
 // WithConfig sets the broker configuration.
-// Validation happens in the constructor (NewInProcBroker / NewInProcBrokerE).
+// Validation happens in the constructor (NewInProcBroker).
 func WithConfig(cfg Config) Option {
 	return func(b *InProcBroker) {
 		b.config = cfg
@@ -196,25 +195,13 @@ func (b *InProcBroker) validateTTL(expiresAt time.Time) error {
 	return nil
 }
 
-// NewInProcBroker wraps the in-process pubsub implementation.
-//
-// Panics if configuration is invalid or persistence initialization fails.
-// Use NewInProcBrokerE to receive an error instead of a panic.
-func NewInProcBroker(ps pubsub.Broker, opts ...Option) *InProcBroker {
-	broker, err := newInProcBroker(ps, opts...)
-	if err != nil {
-		panic(err.Error())
-	}
-	return broker
-}
-
-// NewInProcBrokerE creates a broker and returns an error instead of panicking
-// on invalid configuration or persistence initialization failures.
-func NewInProcBrokerE(ps pubsub.Broker, opts ...Option) (*InProcBroker, error) {
+// NewInProcBroker wraps the in-process pubsub implementation and returns an
+// error if configuration is invalid or persistence initialization fails.
+func NewInProcBroker(ps pubsub.Broker, opts ...Option) (*InProcBroker, error) {
 	return newInProcBroker(ps, opts...)
 }
 
-// newInProcBroker is the shared constructor for NewInProcBroker and NewInProcBrokerE.
+// newInProcBroker is the shared constructor implementation.
 func newInProcBroker(ps pubsub.Broker, opts ...Option) (_ *InProcBroker, retErr error) {
 	if ps == nil {
 		ps = pubsub.New()

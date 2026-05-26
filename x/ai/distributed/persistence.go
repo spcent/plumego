@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	kv "github.com/spcent/plumego/store/kv"
 	"github.com/spcent/plumego/x/ai/orchestration"
 )
 
@@ -81,9 +80,18 @@ type WorkflowPersistence interface {
 	Close() error
 }
 
+// kvBackend is the narrow storage interface used by KVPersistence.
+// *store/kv.KVStore satisfies this interface at the call site.
+type kvBackend interface {
+	Set(key string, value []byte, ttl time.Duration) error
+	Get(key string) ([]byte, error)
+	Delete(key string) error
+	Close() error
+}
+
 // KVPersistence implements WorkflowPersistence using a key-value store.
 type KVPersistence struct {
-	store *kv.KVStore
+	store kvBackend
 }
 
 // Storage key prefixes
@@ -95,7 +103,7 @@ const (
 )
 
 // NewKVPersistence creates a new KV-based workflow persistence layer.
-func NewKVPersistence(store *kv.KVStore) *KVPersistence {
+func NewKVPersistence(store kvBackend) *KVPersistence {
 	return &KVPersistence{
 		store: store,
 	}

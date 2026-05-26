@@ -1,0 +1,92 @@
+name: x/ai/semanticcache/vectorstore
+path: x/ai/semanticcache/vectorstore
+layer: extension
+status: experimental
+owner: ai-gateway
+risk: medium
+summary: Vector storage backend interface and in-memory implementations (MemoryVectorStore, TieredVectorStore) for semantic similarity search.
+
+parent_family: x/ai
+
+entrypoint_reads:
+  - AGENTS.md
+  - docs/CANONICAL_STYLE_GUIDE.md
+  - specs/repo.yaml
+  - specs/task-routing.yaml
+  - specs/dependency-rules.yaml
+  - x/ai/module.yaml
+  - x/ai/semanticcache/module.yaml
+  - docs/modules/x-ai/README.md
+
+responsibilities:
+  - Backend interface for vector storage operations (Add, Search, Delete, Clear, Stats)
+  - MemoryVectorStore with LRU eviction and TTL expiry
+  - TieredVectorStore for hot/cold layered storage
+  - VectorEntry and SimilarityResult value types
+
+non_goals:
+  - Embedding generation (owned by x/ai/semanticcache/embedding)
+  - Cache lifecycle management and warm-up (owned by x/ai/semanticcache/cachemanager)
+  - Persistent distributed vector databases (caller-provided via Backend)
+  - HTTP endpoints or query APIs
+
+public_entrypoints:
+  - Backend
+  - VectorEntry
+  - SimilarityResult
+  - MemoryVectorStore
+  - NewMemoryVectorStore
+  - TieredVectorStore
+  - NewTieredVectorStore
+
+allowed_imports:
+  - stdlib
+
+forbidden_imports:
+  - core/**
+  - router/**
+  - middleware/**
+  - security/**
+  - store/**
+  - metrics/**
+  - contract/**
+  - x/data/**
+  - x/fileapi/**
+  - x/frontend/**
+  - x/gateway/**
+  - x/messaging/**
+  - x/observability/**
+  - x/openapi/**
+  - x/resilience/**
+  - x/rest/**
+  - x/rpc/**
+  - x/tenant/**
+  - x/validate/**
+  - x/websocket/**
+
+test_commands:
+  - go test -race -timeout 60s ./x/ai/semanticcache/vectorstore/...
+  - go test -timeout 20s ./x/ai/semanticcache/vectorstore/...
+  - go vet ./x/ai/semanticcache/vectorstore/...
+
+doc_paths:
+  - docs/modules/x-ai/README.md
+
+change_risks:
+  - Backend interface change breaks all store implementations including MemoryVectorStore and TieredVectorStore
+  - VectorEntry field change invalidates stored entries in running caches
+
+review_checklist:
+  - Keep Backend interface minimal; similarity search semantics belong in the interface, not in callers
+  - Keep MemoryVectorStore safe for concurrent access
+  - Keep TieredVectorStore promotion/demotion logic deterministic and testable
+
+agent_hints:
+  - Use MemoryVectorStore for local dev and unit tests
+  - Compose TieredVectorStore for hot/cold split without external dependencies
+  - Implement Backend for external vector database adapters (Pinecone, Weaviate, Qdrant) at the app level
+
+landing_zones:
+  interface: backend.go
+  memory_impl: memory.go
+  tiered_impl: tiered.go

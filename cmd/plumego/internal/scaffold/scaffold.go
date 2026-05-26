@@ -712,7 +712,7 @@ func (a *App) RegisterRoutes() error {
 		return err
 	}
 
-	proxy, err := gateway.NewGatewayE(gateway.GatewayConfig{
+	proxy, err := gateway.NewGateway(gateway.GatewayConfig{
 		Targets:     []string{gatewayLoopbackTarget(a.Cfg.Core.Addr)},
 		PathRewrite: gateway.ReplacePrefix("/edge", "/api/status"),
 		RetryCount:  0,
@@ -754,7 +754,7 @@ import (
 func (a *App) RegisterRoutes() error {
 	api := handler.APIHandler{}
 	health := handler.HealthHandler{ServiceName: "%s"}
-	hub, err := websocket.NewHubE(4, 1024)
+	hub, err := websocket.NewHub(4, 1024)
 	if err != nil {
 		return err
 	}
@@ -910,7 +910,11 @@ func (a *App) RegisterRoutes() error {
 	health := handler.HealthHandler{ServiceName: "%s"}
 	collector := observability.NewPrometheusCollector("app")
 	collector.ObserveHTTP(nil, "GET", "/healthz", http.StatusOK, 0, time.Millisecond)
-	metrics := observability.NewPrometheusExporter(collector).Handler()
+	metricsExporter, err := observability.NewPrometheusExporter(collector)
+	if err != nil {
+		return err
+	}
+	metrics := metricsExporter.Handler()
 	opsAuth, err := auth.Authenticate(authn.StaticToken(os.Getenv("OPS_TOKEN")), auth.WithAuthRealm("ops-service"))
 	if err != nil {
 		return err
@@ -1667,7 +1671,6 @@ const Name = "realtime"
 
 // Capabilities returns the optional Plumego capability families this profile uses.
 func Capabilities() []string {
-	_ = websocket.NewHubE
 	_ = messaging.New
 	return []string{"x/websocket", "x/messaging"}
 }

@@ -12,6 +12,15 @@ import (
 	stablemetrics "github.com/spcent/plumego/metrics"
 )
 
+// tags is a test-only helper wrapping TagsE for static balanced key-value pairs.
+func tags(kv ...string) []Tag {
+	t, err := Tags(kv...)
+	if err != nil {
+		panic(err)
+	}
+	return t
+}
+
 func TestNoOpCollector(t *testing.T) {
 	collector := &NoOpCollector{}
 
@@ -26,9 +35,9 @@ func TestMemoryCollector_Counter(t *testing.T) {
 	collector := NewMemoryCollector()
 
 	// Increment counter
-	collector.Counter("requests_total", 1, Tags("method", "GET", "status", "200")...)
-	collector.Counter("requests_total", 2, Tags("method", "GET", "status", "200")...)
-	collector.Counter("requests_total", 1, Tags("method", "POST", "status", "201")...)
+	collector.Counter("requests_total", 1, tags("method", "GET", "status", "200")...)
+	collector.Counter("requests_total", 2, tags("method", "GET", "status", "200")...)
+	collector.Counter("requests_total", 1, tags("method", "POST", "status", "201")...)
 
 	snapshot := collector.Snapshot()
 
@@ -53,9 +62,9 @@ func TestMemoryCollector_Gauge(t *testing.T) {
 	collector := NewMemoryCollector()
 
 	// Set gauge values
-	collector.Gauge("cpu_usage", 45.5, Tags("host", "server1")...)
-	collector.Gauge("cpu_usage", 67.8, Tags("host", "server1")...) // Overwrite
-	collector.Gauge("cpu_usage", 23.4, Tags("host", "server2")...)
+	collector.Gauge("cpu_usage", 45.5, tags("host", "server1")...)
+	collector.Gauge("cpu_usage", 67.8, tags("host", "server1")...) // Overwrite
+	collector.Gauge("cpu_usage", 23.4, tags("host", "server2")...)
 
 	snapshot := collector.Snapshot()
 
@@ -82,7 +91,7 @@ func TestMemoryCollector_Histogram(t *testing.T) {
 	// Record values
 	values := []float64{0.1, 0.2, 0.3, 0.4, 0.5}
 	for _, v := range values {
-		collector.Histogram("request_duration", v, Tags("endpoint", "/api")...)
+		collector.Histogram("request_duration", v, tags("endpoint", "/api")...)
 	}
 
 	snapshot := collector.Snapshot()
@@ -120,7 +129,7 @@ func TestMemoryCollector_Timing(t *testing.T) {
 	collector := NewMemoryCollector()
 
 	// Record timing
-	collector.Timing("function_duration", 100*time.Millisecond, Tags("function", "processRequest")...)
+	collector.Timing("function_duration", 100*time.Millisecond, tags("function", "processRequest")...)
 
 	snapshot := collector.Snapshot()
 
@@ -166,8 +175,8 @@ func TestMemoryCollector_Reset(t *testing.T) {
 	}
 }
 
-func TestTags(t *testing.T) {
-	tags := Tags("key1", "value1", "key2", "value2")
+func TestTagsHelper(t *testing.T) {
+	tags := tags("key1", "value1", "key2", "value2")
 
 	if len(tags) != 2 {
 		t.Errorf("Tags length = %v, want 2", len(tags))
@@ -182,13 +191,13 @@ func TestTags(t *testing.T) {
 	}
 }
 
-func TestTagsE(t *testing.T) {
-	tags, err := TagsE("key1", "value1", "key2", "value2")
+func TestTags(t *testing.T) {
+	tags, err := Tags("key1", "value1", "key2", "value2")
 	if err != nil {
-		t.Fatalf("TagsE error: %v", err)
+		t.Fatalf("Tags error: %v", err)
 	}
 	if len(tags) != 2 {
-		t.Fatalf("TagsE length = %v, want 2", len(tags))
+		t.Fatalf("Tags length = %v, want 2", len(tags))
 	}
 	if tags[0] != (Tag{Key: "key1", Value: "value1"}) {
 		t.Fatalf("Tag 0 = %+v, want {key1, value1}", tags[0])
@@ -197,8 +206,8 @@ func TestTagsE(t *testing.T) {
 		t.Fatalf("Tag 1 = %+v, want {key2, value2}", tags[1])
 	}
 
-	if _, err := TagsE("key1", "value1", "key2"); !errors.Is(err, ErrOddTagArguments) {
-		t.Fatalf("TagsE odd input error = %v, want ErrOddTagArguments", err)
+	if _, err := Tags("key1", "value1", "key2"); !errors.Is(err, ErrOddTagArguments) {
+		t.Fatalf("Tags odd input error = %v, want ErrOddTagArguments", err)
 	}
 }
 
@@ -218,13 +227,13 @@ func TestTags_Panic(t *testing.T) {
 		}
 	}()
 
-	Tags("key1", "value1", "key2") // Odd number
+	tags("key1", "value1", "key2") // Odd number
 }
 
 func TestTimer(t *testing.T) {
 	collector := NewMemoryCollector()
 
-	timer := NewTimer(collector, "test_duration", Tags("operation", "test")...)
+	timer := NewTimer(collector, "test_duration", tags("operation", "test")...)
 	time.Sleep(10 * time.Millisecond)
 	timer.Stop()
 
@@ -251,7 +260,7 @@ func TestObserveFunc(t *testing.T) {
 	err := ObserveFunc(t.Context(), collector, "test_func", func() error {
 		time.Sleep(5 * time.Millisecond)
 		return nil
-	}, Tags("func", "test")...)
+	}, tags("func", "test")...)
 
 	if err != nil {
 		t.Errorf("ObserveFunc error = %v, want nil", err)
@@ -421,7 +430,7 @@ func TestTagsToMap(t *testing.T) {
 
 func BenchmarkCounter(b *testing.B) {
 	collector := NewMemoryCollector()
-	tags := Tags("method", "GET", "status", "200")
+	tags := tags("method", "GET", "status", "200")
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -431,7 +440,7 @@ func BenchmarkCounter(b *testing.B) {
 
 func BenchmarkHistogram(b *testing.B) {
 	collector := NewMemoryCollector()
-	tags := Tags("endpoint", "/api")
+	tags := tags("endpoint", "/api")
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -460,8 +469,8 @@ func TestPrometheusExporter_Handler(t *testing.T) {
 	exporter := NewPrometheusExporter(collector, "test")
 
 	// Add some metrics
-	collector.Counter("requests_total", 100, Tags("method", "GET")...)
-	collector.Gauge("memory_usage", 1024.5, Tags("host", "server1")...)
+	collector.Counter("requests_total", 100, tags("method", "GET")...)
+	collector.Gauge("memory_usage", 1024.5, tags("host", "server1")...)
 	collector.Histogram("request_duration", 0.123)
 
 	// Create HTTP test
@@ -611,10 +620,10 @@ func TestAggregateCollectorAdapter(t *testing.T) {
 	recorder := &stubAggregateCollector{}
 	adapter := NewAggregateCollectorAdapter(recorder)
 
-	adapter.Counter("ai_requests_total", 3, Tags("provider", "openai")...)
-	adapter.Gauge("ai_queue_depth", 7, Tags("queue", "primary")...)
-	adapter.Histogram("ai_latency_seconds", 0.25, Tags("provider", "anthropic")...)
-	adapter.Timing("ai_duration_seconds", 150*time.Millisecond, Tags("operation", "complete")...)
+	adapter.Counter("ai_requests_total", 3, tags("provider", "openai")...)
+	adapter.Gauge("ai_queue_depth", 7, tags("queue", "primary")...)
+	adapter.Histogram("ai_latency_seconds", 0.25, tags("provider", "anthropic")...)
+	adapter.Timing("ai_duration_seconds", 150*time.Millisecond, tags("operation", "complete")...)
 
 	if len(recorder.records) != 4 {
 		t.Fatalf("record count = %d, want 4", len(recorder.records))

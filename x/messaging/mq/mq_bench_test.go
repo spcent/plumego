@@ -9,7 +9,10 @@ import (
 )
 
 func BenchmarkPublish(b *testing.B) {
-	broker := NewInProcBroker(pubsub.New())
+	broker, err := NewInProcBroker(pubsub.New())
+	if err != nil {
+		b.Fatal(err)
+	}
 	defer broker.Close()
 
 	ctx := b.Context()
@@ -24,7 +27,10 @@ func BenchmarkPublish(b *testing.B) {
 }
 
 func BenchmarkPublishBatch(b *testing.B) {
-	broker := NewInProcBroker(pubsub.New())
+	broker, err := NewInProcBroker(pubsub.New())
+	if err != nil {
+		b.Fatal(err)
+	}
 	defer broker.Close()
 
 	ctx := b.Context()
@@ -42,7 +48,10 @@ func BenchmarkPublishBatch(b *testing.B) {
 }
 
 func BenchmarkPublishPriority(b *testing.B) {
-	broker := NewInProcBroker(pubsub.New())
+	broker, err := NewInProcBroker(pubsub.New())
+	if err != nil {
+		b.Fatal(err)
+	}
 	defer broker.Close()
 
 	ctx := b.Context()
@@ -60,7 +69,10 @@ func BenchmarkPublishPriority(b *testing.B) {
 }
 
 func BenchmarkSubscribe(b *testing.B) {
-	broker := NewInProcBroker(pubsub.New())
+	broker, err := NewInProcBroker(pubsub.New())
+	if err != nil {
+		b.Fatal(err)
+	}
 	defer broker.Close()
 
 	ctx := b.Context()
@@ -76,7 +88,10 @@ func BenchmarkSubscribe(b *testing.B) {
 }
 
 func BenchmarkPublishSubscribe(b *testing.B) {
-	broker := NewInProcBroker(pubsub.New())
+	broker, err := NewInProcBroker(pubsub.New())
+	if err != nil {
+		b.Fatal(err)
+	}
 	defer broker.Close()
 
 	ctx := b.Context()
@@ -138,7 +153,10 @@ func BenchmarkValidateMessage(b *testing.B) {
 }
 
 func BenchmarkHealthCheck(b *testing.B) {
-	broker := NewInProcBroker(pubsub.New())
+	broker, err := NewInProcBroker(pubsub.New())
+	if err != nil {
+		b.Fatal(err)
+	}
 	defer broker.Close()
 
 	// Subscribe to some topics to make health check more realistic
@@ -155,7 +173,10 @@ func BenchmarkHealthCheck(b *testing.B) {
 }
 
 func BenchmarkMemoryUsage(b *testing.B) {
-	broker := NewInProcBroker(pubsub.New())
+	broker, err := NewInProcBroker(pubsub.New())
+	if err != nil {
+		b.Fatal(err)
+	}
 	defer broker.Close()
 
 	b.ResetTimer()
@@ -167,7 +188,10 @@ func BenchmarkMemoryUsage(b *testing.B) {
 func BenchmarkCheckMemoryLimit(b *testing.B) {
 	cfg := DefaultConfig()
 	cfg.MaxMemoryUsage = 1 << 30 // 1GB limit
-	broker := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	broker, err := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	if err != nil {
+		b.Fatal(err)
+	}
 	defer broker.Close()
 
 	b.ResetTimer()
@@ -180,7 +204,10 @@ func BenchmarkCheckMemoryLimit(b *testing.B) {
 
 // Benchmark parallel publishing
 func BenchmarkPublishParallel(b *testing.B) {
-	broker := NewInProcBroker(pubsub.New())
+	broker, err := NewInProcBroker(pubsub.New())
+	if err != nil {
+		b.Fatal(err)
+	}
 	defer broker.Close()
 
 	ctx := b.Context()
@@ -198,7 +225,10 @@ func BenchmarkPublishParallel(b *testing.B) {
 
 // Benchmark parallel subscribing
 func BenchmarkSubscribeParallel(b *testing.B) {
-	broker := NewInProcBroker(pubsub.New())
+	broker, err := NewInProcBroker(pubsub.New())
+	if err != nil {
+		b.Fatal(err)
+	}
 	defer broker.Close()
 
 	ctx := b.Context()
@@ -221,7 +251,10 @@ func BenchmarkSubscribeParallel(b *testing.B) {
 func BenchmarkPublishTTL(b *testing.B) {
 	cfg := DefaultConfig()
 	cfg.MessageTTL = 30 * time.Second
-	broker := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	broker, err := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	if err != nil {
+		b.Fatal(err)
+	}
 	defer broker.Close()
 
 	ctx := b.Context()
@@ -243,7 +276,10 @@ func BenchmarkPublishPriorityTTL(b *testing.B) {
 	cfg := DefaultConfig()
 	cfg.MessageTTL = 30 * time.Second
 	cfg.EnablePriorityQueue = true
-	broker := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	broker, err := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	if err != nil {
+		b.Fatal(err)
+	}
 	defer broker.Close()
 
 	ctx := b.Context()
@@ -266,7 +302,10 @@ func BenchmarkPublishWithAckTTL(b *testing.B) {
 	cfg := DefaultConfig()
 	cfg.MessageTTL = 30 * time.Second
 	cfg.EnableAckSupport = true
-	broker := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	broker, err := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	if err != nil {
+		b.Fatal(err)
+	}
 	defer broker.Close()
 
 	ctx := b.Context()
@@ -288,7 +327,10 @@ func BenchmarkPublishWithAckTTL(b *testing.B) {
 
 // Benchmark TTL validation
 func BenchmarkValidateTTL(b *testing.B) {
-	broker := NewInProcBroker(pubsub.New())
+	broker, err := NewInProcBroker(pubsub.New())
+	if err != nil {
+		b.Fatal(err)
+	}
 	defer broker.Close()
 
 	expiresAt := time.Now().Add(30 * time.Second)
@@ -305,7 +347,10 @@ func BenchmarkValidateTTL(b *testing.B) {
 func BenchmarkTTLTrackerTrack(b *testing.B) {
 	cfg := DefaultConfig()
 	cfg.MessageTTL = 30 * time.Second
-	broker := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	broker, err := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	if err != nil {
+		b.Fatal(err)
+	}
 	defer broker.Close()
 
 	expiresAt := time.Now().Add(30 * time.Second)
@@ -323,7 +368,10 @@ func BenchmarkTTLTrackerTrack(b *testing.B) {
 func BenchmarkTTLTrackerStats(b *testing.B) {
 	cfg := DefaultConfig()
 	cfg.MessageTTL = 30 * time.Second
-	broker := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	broker, err := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	if err != nil {
+		b.Fatal(err)
+	}
 	defer broker.Close()
 
 	// Add some tracked messages
@@ -342,7 +390,10 @@ func BenchmarkTTLTrackerStats(b *testing.B) {
 func BenchmarkPublishTTLParallel(b *testing.B) {
 	cfg := DefaultConfig()
 	cfg.MessageTTL = 30 * time.Second
-	broker := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	broker, err := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	if err != nil {
+		b.Fatal(err)
+	}
 	defer broker.Close()
 
 	ctx := b.Context()

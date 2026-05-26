@@ -28,6 +28,9 @@ non_goals:
   - Generic persistence abstractions
   - Business-specific prompt flows
 
+subordinate_families:
+  - x/ai/semanticcache
+
 # Stability tiers for subpackages.
 # stable   — API is covered by semantic versioning; breaking changes require a major version bump.
 # experimental — API may change in future releases without a deprecation period.
@@ -38,11 +41,19 @@ stability_tiers:
     - streaming     # Family tier index; package metadata lives in x/ai/streaming/module.yaml
     - tool          # Family tier index; package metadata lives in x/ai/tool/module.yaml
   experimental:
-    - orchestration  # Agent workflow engine; step types may evolve
-    - semanticcache  # Embedding-based caching; vector store backends in active development
-    - marketplace    # Agent/workflow registry; installation and rating APIs unfinished
-    - distributed    # Distributed execution; queue and persistence contracts not yet stable
-    - resilience     # Wrapper API may be consolidated with circuitbreaker/ratelimit
+    - orchestration   # Agent workflow engine; step types may evolve
+    - semanticcache   # Embedding-based caching; vector store backends in active development
+    - marketplace     # Agent/workflow registry; installation and rating APIs unfinished
+    - distributed     # Distributed execution; queue and persistence contracts not yet stable
+    - resilience      # Provider resilience decorator; package metadata lives in x/ai/resilience/module.yaml
+    - tokenizer       # Token counting utilities; package metadata lives in x/ai/tokenizer/module.yaml
+    - sse             # SSE transport primitive; package metadata lives in x/ai/sse/module.yaml
+    - filter          # Content filtering chain; package metadata lives in x/ai/filter/module.yaml
+    - metrics         # AI-specific metrics collector interface; package metadata lives in x/ai/metrics/module.yaml
+    - multimodal      # Extended multimodal content types; package metadata lives in x/ai/multimodal/module.yaml
+    - prompt          # Prompt template management; package metadata lives in x/ai/prompt/module.yaml
+    - llmcache        # LLM response cache interface and in-memory impl; package metadata lives in x/ai/llmcache/module.yaml
+    - instrumentation # Observability decorators for x/ai components; package metadata lives in x/ai/instrumentation/module.yaml
 
 public_entrypoints:
   - provider
@@ -107,3 +118,14 @@ landing_zones:
   tool: tool/
   orchestration: orchestration/
   resilience: resilience/
+  tokenizer: tokenizer/
+  sse: sse/
+  filter: filter/
+  metrics: metrics/
+  multimodal: multimodal/
+  prompt: prompt/
+  llmcache: llmcache/
+  instrumentation: instrumentation/
+  semanticcache: semanticcache/
+  marketplace: marketplace/
+  distributed: distributed/

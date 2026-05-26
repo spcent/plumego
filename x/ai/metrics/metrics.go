@@ -42,7 +42,7 @@ type Tag struct {
 
 // TagsE creates a slice of tags from key-value pairs and returns an error for
 // malformed runtime input.
-func TagsE(keyValues ...string) ([]Tag, error) {
+func Tags(keyValues ...string) ([]Tag, error) {
 	if len(keyValues)%2 != 0 {
 		return nil, ErrOddTagArguments
 	}
@@ -52,19 +52,6 @@ func TagsE(keyValues ...string) ([]Tag, error) {
 		tags = append(tags, Tag{Key: keyValues[i], Value: keyValues[i+1]})
 	}
 	return tags, nil
-}
-
-// Tags creates a slice of tags from static key-value pairs.
-//
-// Deprecated: prefer TagsE when tag input is built at runtime. Tags remains a
-// compatibility helper for trusted static call sites and panics on malformed
-// key-value input.
-func Tags(keyValues ...string) []Tag {
-	tags, err := TagsE(keyValues...)
-	if err != nil {
-		panic(err)
-	}
-	return tags
 }
 
 // NoOpCollector is a collector that does nothing (for testing/disabled metrics)

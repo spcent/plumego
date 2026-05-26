@@ -13,10 +13,10 @@ import (
 	storefile "github.com/spcent/plumego/store/file"
 )
 
-func TestNewDBMetadataManagerERejectsNilDB(t *testing.T) {
-	m, err := NewDBMetadataManagerE(nil)
+func TestNewDBMetadataManager_RejectsNilDB(t *testing.T) {
+	m, err := NewDBMetadataManager(nil)
 	if !errors.Is(err, ErrNilMetadataDB) {
-		t.Fatalf("NewDBMetadataManagerE error = %v, want ErrNilMetadataDB", err)
+		t.Fatalf("NewDBMetadataManager error = %v, want ErrNilMetadataDB", err)
 	}
 	if m != nil {
 		t.Fatalf("manager = %#v, want nil", m)
@@ -24,7 +24,7 @@ func TestNewDBMetadataManagerERejectsNilDB(t *testing.T) {
 }
 
 func TestDBMetadataManagerNilDBMethodsReturnSentinel(t *testing.T) {
-	m := NewDBMetadataManager(nil).(*DBMetadataManager)
+	m := &DBMetadataManager{}
 	ctx := t.Context()
 	file := &File{ID: "f-1", Metadata: map[string]any{}}
 
@@ -56,9 +56,9 @@ func TestDBMetadataManagerUsesConfiguredClockForMutations(t *testing.T) {
 	defer db.Close()
 
 	fixed := time.Date(2026, 4, 25, 12, 30, 0, 0, time.UTC)
-	m, err := NewDBMetadataManagerE(db, WithMetadataClock(func() time.Time { return fixed }))
+	m, err := NewDBMetadataManager(db, WithMetadataClock(func() time.Time { return fixed }))
 	if err != nil {
-		t.Fatalf("NewDBMetadataManagerE error = %v", err)
+		t.Fatalf("NewDBMetadataManager error = %v", err)
 	}
 
 	if err := m.Delete(t.Context(), "tenant-1", "f-1"); err != nil {
@@ -90,9 +90,9 @@ func TestDBMetadataManagerTenantScopedPredicates(t *testing.T) {
 	db := sql.OpenDB(metadataConnector{rec: rec})
 	defer db.Close()
 
-	m, err := NewDBMetadataManagerE(db)
+	m, err := NewDBMetadataManager(db)
 	if err != nil {
-		t.Fatalf("NewDBMetadataManagerE error = %v", err)
+		t.Fatalf("NewDBMetadataManager error = %v", err)
 	}
 	ctx := t.Context()
 
@@ -137,9 +137,9 @@ func TestDBMetadataManagerListRequiresTenant(t *testing.T) {
 	db := sql.OpenDB(metadataConnector{rec: rec})
 	defer db.Close()
 
-	m, err := NewDBMetadataManagerE(db)
+	m, err := NewDBMetadataManager(db)
 	if err != nil {
-		t.Fatalf("NewDBMetadataManagerE error = %v", err)
+		t.Fatalf("NewDBMetadataManager error = %v", err)
 	}
 
 	_, _, err = m.List(t.Context(), Query{})
@@ -156,9 +156,9 @@ func TestDBMetadataManagerRejectsInvalidDirectInputs(t *testing.T) {
 	db := sql.OpenDB(metadataConnector{rec: rec})
 	defer db.Close()
 
-	m, err := NewDBMetadataManagerE(db)
+	m, err := NewDBMetadataManager(db)
 	if err != nil {
-		t.Fatalf("NewDBMetadataManagerE error = %v", err)
+		t.Fatalf("NewDBMetadataManager error = %v", err)
 	}
 	ctx := t.Context()
 
@@ -229,9 +229,9 @@ func TestDBMetadataManagerListScopesByTenant(t *testing.T) {
 	db := sql.OpenDB(metadataConnector{rec: rec})
 	defer db.Close()
 
-	m, err := NewDBMetadataManagerE(db)
+	m, err := NewDBMetadataManager(db)
 	if err != nil {
-		t.Fatalf("NewDBMetadataManagerE error = %v", err)
+		t.Fatalf("NewDBMetadataManager error = %v", err)
 	}
 
 	_, _, _ = m.List(t.Context(), Query{TenantID: " tenant-1 "})
@@ -251,9 +251,9 @@ func TestDBMetadataManagerListAllAllowsAdminGlobalQuery(t *testing.T) {
 	db := sql.OpenDB(metadataConnector{rec: rec})
 	defer db.Close()
 
-	m, err := NewDBMetadataManagerE(db)
+	m, err := NewDBMetadataManager(db)
 	if err != nil {
-		t.Fatalf("NewDBMetadataManagerE error = %v", err)
+		t.Fatalf("NewDBMetadataManager error = %v", err)
 	}
 
 	_, _, _ = m.ListAll(t.Context(), Query{})

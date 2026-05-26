@@ -27,7 +27,7 @@ func (ie *InstrumentedEngine) RegisterWorkflow(wf *orchestration.Workflow) {
 	ie.engine.RegisterWorkflow(wf)
 
 	// Record workflow registration
-	tags := metrics.Tags("workflow_id", wf.ID, "workflow_name", wf.Name)
+	tags, _ := metrics.Tags("workflow_id", wf.ID, "workflow_name", wf.Name)
 	ie.collector.Counter("ai_workflows_registered_total", 1, tags...)
 	ie.collector.Gauge("ai_workflow_steps_count", float64(len(wf.Steps)), tags...)
 }
@@ -39,7 +39,7 @@ func (ie *InstrumentedEngine) GetWorkflow(id string) (*orchestration.Workflow, e
 	wf, err := ie.engine.GetWorkflow(id)
 
 	duration := time.Since(start)
-	tags := metrics.Tags("workflow_id", id)
+	tags, _ := metrics.Tags("workflow_id", id)
 	ie.collector.Timing("ai_workflow_get_duration_seconds", duration, tags...)
 
 	return wf, err
@@ -49,7 +49,7 @@ func (ie *InstrumentedEngine) GetWorkflow(id string) (*orchestration.Workflow, e
 func (ie *InstrumentedEngine) Execute(ctx context.Context, workflowID string, initialState map[string]any) ([]*orchestration.AgentResult, error) {
 	start := time.Now()
 
-	tags := metrics.Tags("workflow_id", workflowID)
+	tags, _ := metrics.Tags("workflow_id", workflowID)
 
 	// Increment execution counter
 	ie.collector.Counter("ai_workflow_executions_total", 1, tags...)
@@ -79,7 +79,7 @@ func (ie *InstrumentedEngine) Execute(ctx context.Context, workflowID string, in
 			totalTokens += int64(result.TokenUsage.TotalTokens)
 
 			// Record per-agent metrics
-			agentTags := metrics.Tags(
+			agentTags, _ := metrics.Tags(
 				"workflow_id", workflowID,
 				"agent_id", result.AgentID,
 			)
@@ -111,7 +111,7 @@ func NewInstrumentedStep(step orchestration.Step, collector metrics.Collector) *
 func (is *InstrumentedStep) Execute(ctx context.Context, wf *orchestration.Workflow) (*orchestration.AgentResult, error) {
 	start := time.Now()
 
-	tags := metrics.Tags(
+	tags, _ := metrics.Tags(
 		"workflow_id", wf.ID,
 		"step_name", is.step.Name(),
 	)

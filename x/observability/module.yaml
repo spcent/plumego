@@ -46,7 +46,7 @@ public_entrypoints:
   - NewPrometheusCollector
   - PrometheusExporter
   - NewPrometheusExporter
-  - NewPrometheusExporterE
+  - NewPrometheusExporter
   - OpenTelemetryTracer
   - NewOpenTelemetryTracer
   - Exporter

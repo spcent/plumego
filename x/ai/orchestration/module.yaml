@@ -1,0 +1,99 @@
+name: x/ai/orchestration
+path: x/ai/orchestration
+layer: extension
+status: experimental
+owner: ai-gateway
+risk: medium
+summary: Single-process agent workflow engine with sequential, parallel, conditional, and retry step types.
+
+parent_family: x/ai
+
+entrypoint_reads:
+  - AGENTS.md
+  - docs/CANONICAL_STYLE_GUIDE.md
+  - specs/repo.yaml
+  - specs/task-routing.yaml
+  - specs/dependency-rules.yaml
+  - x/ai/module.yaml
+  - docs/modules/x-ai/README.md
+
+responsibilities:
+  - Agent definition and Agent execution
+  - Workflow registration and state management
+  - Step interface contract
+  - SequentialStep, ParallelStep, ConditionalStep, RetryStep implementations
+  - Engine lifecycle (RegisterWorkflow, Execute)
+
+non_goals:
+  - Distributed or remote execution (owned by x/ai/distributed)
+  - Tool execution policy (owned by x/ai/tool)
+  - Agent marketplace and registry (owned by x/ai/marketplace)
+  - Session lifecycle or message history (owned by x/ai/session)
+  - Streaming workflow coordination (owned by x/ai/streaming)
+
+public_entrypoints:
+  - Agent
+  - AgentResult
+  - Workflow
+  - Step
+  - SequentialStep
+  - ParallelStep
+  - ConditionalStep
+  - RetryStep
+  - Engine
+  - NewEngine
+  - NewWorkflow
+
+allowed_imports:
+  - stdlib
+  - x/ai/provider
+  - x/ai/tokenizer
+
+forbidden_imports:
+  - core/**
+  - router/**
+  - middleware/**
+  - security/**
+  - store/**
+  - metrics/**
+  - contract/**
+  - x/data/**
+  - x/fileapi/**
+  - x/frontend/**
+  - x/gateway/**
+  - x/messaging/**
+  - x/observability/**
+  - x/openapi/**
+  - x/resilience/**
+  - x/rest/**
+  - x/rpc/**
+  - x/tenant/**
+  - x/validate/**
+  - x/websocket/**
+
+test_commands:
+  - go test -race -timeout 60s ./x/ai/orchestration/...
+  - go test -timeout 20s ./x/ai/orchestration/...
+  - go vet ./x/ai/orchestration/...
+
+doc_paths:
+  - docs/modules/x-ai/README.md
+
+change_risks:
+  - Step interface change breaks all step implementations and distributed engine
+  - Engine.Execute signature change breaks streaming and distributed callers
+  - Workflow.State mutation behavior change causes race conditions in parallel steps
+
+review_checklist:
+  - Keep Step interface minimal; new step behavior should compose existing types
+  - Keep Engine stateless between Execute calls; workflow state lives in Workflow.State
+  - Keep ParallelStep goroutine lifecycle bounded and context-cancelled
+  - Do not add provider-specific orchestration logic; keep provider interaction in Agent.Provider
+
+agent_hints:
+  - Use x/ai/orchestration for single-process workflows; use x/ai/distributed when durable queuing or remote steps are required
+  - Keep workflow state in Workflow.State, not in step implementations
+  - Compose RetryStep around any Step to add retry semantics without modifying the step
+
+landing_zones:
+  core: orchestration.go

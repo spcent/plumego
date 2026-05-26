@@ -4,7 +4,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/spcent/plumego/metrics"
 	"github.com/spcent/plumego/x/ai/llmcache"
 	"github.com/spcent/plumego/x/ai/provider"
 )
@@ -17,7 +16,7 @@ func TestIntegration_FullStack(t *testing.T) {
 	mockProvider := &MockProvider{responseText: "This is a response about AI"}
 	gen := NewSimpleEmbeddingGenerator(128)
 	vectorStore := NewMemoryVectorStore(1000, 1*time.Hour)
-	metricsCollector := metrics.NewNoopCollector()
+	metricsCollector := NoopMetricRecorder()
 
 	// Wrap vector store with instrumentation
 	instrumentedStore := NewInstrumentedVectorStore(vectorStore, metricsCollector)
@@ -31,12 +30,15 @@ func TestIntegration_FullStack(t *testing.T) {
 
 	// Create semantic caching provider with exact cache fallback
 	providerConfig := DefaultProviderConfig()
-	cachingProvider := NewSemanticCachingProvider(
+	cachingProvider, err := NewSemanticCachingProvider(
 		mockProvider,
 		semanticCache,
 		WithExactCache(exactCache),
 		WithProviderConfig(providerConfig),
 	)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Test 1: First request - cache miss, calls provider
 	t.Run("FirstRequest_CacheMiss", func(t *testing.T) {
@@ -169,7 +171,10 @@ func TestIntegration_MultipleQueries(t *testing.T) {
 	vectorStore := NewMemoryVectorStore(100, 1*time.Hour)
 	semanticCache := NewSemanticCache(gen, vectorStore, DefaultSemanticCacheConfig())
 
-	cachingProvider := NewSemanticCachingProvider(mockProvider, semanticCache)
+	cachingProvider, err := NewSemanticCachingProvider(mockProvider, semanticCache)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	queries := []string{
 		"What is machine learning?",
@@ -245,7 +250,10 @@ func TestIntegration_ConcurrentAccess(t *testing.T) {
 	vectorStore := NewMemoryVectorStore(1000, 1*time.Hour)
 	semanticCache := NewSemanticCache(gen, vectorStore, DefaultSemanticCacheConfig())
 
-	cachingProvider := NewSemanticCachingProvider(mockProvider, semanticCache)
+	cachingProvider, err := NewSemanticCachingProvider(mockProvider, semanticCache)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Run concurrent requests
 	numGoroutines := 10
@@ -303,7 +311,10 @@ func TestIntegration_TTLExpiration(t *testing.T) {
 		MaxSize:             100,
 	}
 	semanticCache := NewSemanticCache(gen, vectorStore, config)
-	cachingProvider := NewSemanticCachingProvider(mockProvider, semanticCache)
+	cachingProvider, err := NewSemanticCachingProvider(mockProvider, semanticCache)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	req := &provider.CompletionRequest{
 		Model: "test-model",
@@ -313,7 +324,7 @@ func TestIntegration_TTLExpiration(t *testing.T) {
 	}
 
 	// First request
-	_, err := cachingProvider.Complete(ctx, req)
+	_, err = cachingProvider.Complete(ctx, req)
 	if err != nil {
 		t.Fatalf("Complete failed: %v", err)
 	}

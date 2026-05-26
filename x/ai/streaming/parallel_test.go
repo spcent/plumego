@@ -15,7 +15,9 @@ func TestStreamingParallelStep(t *testing.T) {
 		w := httptest.NewRecorder()
 		ctx := t.Context()
 		stream, _ := sse.NewStream(ctx, w)
-		streamMgr.Register("workflow-1", stream)
+		if err := streamMgr.Register("workflow-1", stream); err != nil {
+			t.Fatal(err)
+		}
 
 		sps := NewStreamingParallelStep(
 			[]*orchestration.Agent{},
@@ -38,7 +40,9 @@ func TestStreamingParallelStep(t *testing.T) {
 		w := httptest.NewRecorder()
 		ctx := t.Context()
 		stream, _ := sse.NewStream(ctx, w)
-		streamMgr.Register("workflow-1", stream)
+		if err := streamMgr.Register("workflow-1", stream); err != nil {
+			t.Fatal(err)
+		}
 
 		mockProvider := &mockProvider{
 			output: "result-1",
@@ -75,7 +79,9 @@ func TestStreamingParallelStep(t *testing.T) {
 		w := httptest.NewRecorder()
 		ctx := t.Context()
 		stream, _ := sse.NewStream(ctx, w)
-		streamMgr.Register("workflow-1", stream)
+		if err := streamMgr.Register("workflow-1", stream); err != nil {
+			t.Fatal(err)
+		}
 
 		agents := []*orchestration.Agent{
 			{
@@ -130,7 +136,9 @@ func TestStreamingParallelStep(t *testing.T) {
 		w := httptest.NewRecorder()
 		ctx := t.Context()
 		stream, _ := sse.NewStream(ctx, w)
-		streamMgr.Register("workflow-1", stream)
+		if err := streamMgr.Register("workflow-1", stream); err != nil {
+			t.Fatal(err)
+		}
 
 		agents := []*orchestration.Agent{
 			{
@@ -173,7 +181,9 @@ func TestStreamingParallelStep(t *testing.T) {
 		w := httptest.NewRecorder()
 		ctx := t.Context()
 		stream, _ := sse.NewStream(ctx, w)
-		streamMgr.Register("workflow-1", stream)
+		if err := streamMgr.Register("workflow-1", stream); err != nil {
+			t.Fatal(err)
+		}
 
 		agentCount := 5
 		agents := make([]*orchestration.Agent, agentCount)
@@ -286,7 +296,9 @@ func TestConcurrentStreamingParallelStep(t *testing.T) {
 		w := httptest.NewRecorder()
 		ctx := t.Context()
 		stream, _ := sse.NewStream(ctx, w)
-		streamMgr.Register("workflow-1", stream)
+		if err := streamMgr.Register("workflow-1", stream); err != nil {
+			t.Fatal(err)
+		}
 
 		// Create many agents
 		agentCount := 20

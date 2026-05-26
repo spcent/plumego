@@ -1,0 +1,95 @@
+name: x/ai/instrumentation
+path: x/ai/instrumentation
+layer: extension
+status: experimental
+owner: ai-gateway
+risk: low
+summary: Observability wrappers for x/ai components that add metrics collection without modifying the wrapped types.
+
+parent_family: x/ai
+
+entrypoint_reads:
+  - AGENTS.md
+  - docs/CANONICAL_STYLE_GUIDE.md
+  - specs/repo.yaml
+  - specs/task-routing.yaml
+  - specs/dependency-rules.yaml
+  - x/ai/module.yaml
+  - docs/modules/x-ai/README.md
+
+responsibilities:
+  - InstrumentedProvider decorator for provider.Provider
+  - InstrumentedCache decorator for llmcache.Cache
+  - InstrumentedEngine decorator for orchestration.Engine
+  - InstrumentedStep decorator for orchestration steps
+  - Timing and counter emission via x/ai/metrics.Collector
+
+non_goals:
+  - Distributed tracing export (owned by x/observability)
+  - Log emission or structured event routing
+  - Provider adapter or session lifecycle ownership
+  - Metric backend wiring (use x/ai/metrics.AggregateCollectorAdapter)
+
+public_entrypoints:
+  - InstrumentedProvider
+  - InstrumentedCache
+  - InstrumentedEngine
+  - InstrumentedStep
+  - NewInstrumentedProvider
+  - NewInstrumentedCache
+  - NewInstrumentedEngine
+  - NewInstrumentedStep
+
+allowed_imports:
+  - stdlib
+  - x/ai/metrics
+  - x/ai/provider
+  - x/ai/llmcache
+  - x/ai/orchestration
+
+forbidden_imports:
+  - core/**
+  - router/**
+  - middleware/**
+  - security/**
+  - store/**
+  - metrics/**
+  - contract/**
+  - log/**
+  - x/data/**
+  - x/fileapi/**
+  - x/frontend/**
+  - x/gateway/**
+  - x/messaging/**
+  - x/observability/**
+  - x/resilience/**
+  - x/rest/**
+  - x/rpc/**
+  - x/tenant/**
+  - x/validate/**
+  - x/websocket/**
+
+test_commands:
+  - go test -race -timeout 60s ./x/ai/instrumentation/...
+  - go test -timeout 20s ./x/ai/instrumentation/...
+  - go vet ./x/ai/instrumentation/...
+
+doc_paths:
+  - docs/modules/x-ai/README.md
+
+change_risks:
+  - Decorator method set must stay in sync with wrapped interface; missed methods silently drop instrumentation
+
+review_checklist:
+  - Ensure each decorator fully implements the wrapped interface
+  - Keep metric names and tag keys stable across versions
+  - Do not add business logic to instrumentation wrappers
+
+agent_hints:
+  - Compose decorators at the handler or app-wiring layer, not inside providers or sessions
+  - Use x/ai/metrics.NoOpCollector in tests to silence metric emission
+
+landing_zones:
+  provider: provider.go
+  cache: cache.go
+  orchestration: orchestration.go

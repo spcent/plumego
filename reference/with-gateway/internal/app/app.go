@@ -44,9 +44,12 @@ func New(cfg config.Config) (*App, error) {
 		return nil, fmt.Errorf("register middleware: %w", err)
 	}
 
-	proxy := gateway.NewGateway(gateway.GatewayConfig{
+	proxy, err := gateway.NewGateway(gateway.GatewayConfig{
 		Targets: []string{cfg.GatewayBackend},
 	})
+	if err != nil {
+		return nil, fmt.Errorf("configure gateway proxy: %w", err)
+	}
 
 	return &App{Core: a, Cfg: cfg, Proxy: proxy}, nil
 }

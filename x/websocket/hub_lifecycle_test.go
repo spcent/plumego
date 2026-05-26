@@ -226,7 +226,7 @@ func TestHub_TryJoin_DuplicateWinsOverCapacity(t *testing.T) {
 	}
 }
 
-func TestNewHubWithConfigEValidation(t *testing.T) {
+func TestNewHubWithConfigValidation(t *testing.T) {
 	tests := []struct {
 		name    string
 		cfg     HubConfig
@@ -251,7 +251,7 @@ func TestNewHubWithConfigEValidation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			hub, err := NewHubWithConfigE(tt.cfg)
+			hub, err := NewHubWithConfig(tt.cfg)
 			if hub != nil {
 				hub.Stop()
 			}
@@ -262,10 +262,10 @@ func TestNewHubWithConfigEValidation(t *testing.T) {
 	}
 }
 
-func TestNewHubWithConfigENormalizesZeroDefaults(t *testing.T) {
-	hub, err := NewHubWithConfigE(HubConfig{})
+func TestNewHubWithConfigNormalizesZeroDefaults(t *testing.T) {
+	hub, err := NewHubWithConfig(HubConfig{})
 	if err != nil {
-		t.Fatalf("NewHubWithConfigE: %v", err)
+		t.Fatalf("NewHubWithConfig: %v", err)
 	}
 	defer hub.Stop()
 

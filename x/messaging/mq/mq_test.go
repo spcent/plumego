@@ -14,7 +14,10 @@ import (
 )
 
 func TestInProcBrokerPublishSubscribe(t *testing.T) {
-	broker := NewInProcBroker(pubsub.New())
+	broker, err := NewInProcBroker(pubsub.New())
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer broker.Close()
 
 	sub, err := broker.Subscribe(t.Context(), "topic", SubOptions{BufferSize: 1})
@@ -42,7 +45,10 @@ func TestInProcBrokerPublishSubscribe(t *testing.T) {
 }
 
 func TestInProcBrokerContextCancel(t *testing.T) {
-	broker := NewInProcBroker(pubsub.New())
+	broker, err := NewInProcBroker(pubsub.New())
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer broker.Close()
 
 	ctx, cancel := context.WithCancel(t.Context())
@@ -55,14 +61,17 @@ func TestInProcBrokerContextCancel(t *testing.T) {
 
 func TestInProcBrokerPanicRecovery(t *testing.T) {
 	called := false
-	broker := NewInProcBroker(panicPubSub{}, WithPanicHandler(func(ctx context.Context, op Operation, recovered any) {
+	broker, err := NewInProcBroker(panicPubSub{}, WithPanicHandler(func(ctx context.Context, op Operation, recovered any) {
 		called = true
 		if op != OpPublish {
 			t.Fatalf("expected panic handler op publish, got %s", op)
 		}
 	}))
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	err := broker.Publish(t.Context(), "topic", Message{ID: "test-1"})
+	err = broker.Publish(t.Context(), "topic", Message{ID: "test-1"})
 	if !errors.Is(err, ErrRecoveredPanic) {
 		t.Fatalf("expected ErrRecoveredPanic, got %v", err)
 	}
@@ -75,7 +84,10 @@ func TestInProcBrokerMetrics(t *testing.T) {
 	collector := &metricsCollector{
 		NoopCollector: metrics.NewNoopCollector(),
 	}
-	broker := NewInProcBroker(pubsub.New(), WithMetricsObserver(collector))
+	broker, err := NewInProcBroker(pubsub.New(), WithMetricsObserver(collector))
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer broker.Close()
 
 	if err := broker.Publish(t.Context(), "topic", Message{ID: "test-1"}); err != nil {
@@ -99,11 +111,14 @@ func TestInProcBrokerMetrics(t *testing.T) {
 }
 
 func TestInProcBrokerValidation(t *testing.T) {
-	broker := NewInProcBroker(pubsub.New())
+	broker, err := NewInProcBroker(pubsub.New())
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer broker.Close()
 
 	// Test empty topic
-	err := broker.Publish(t.Context(), "  ", Message{ID: "test-1"})
+	err = broker.Publish(t.Context(), "  ", Message{ID: "test-1"})
 	if !errors.Is(err, ErrInvalidTopic) {
 		t.Fatalf("expected ErrInvalidTopic for empty topic, got %v", err)
 	}
@@ -129,7 +144,10 @@ func TestInProcBrokerValidation(t *testing.T) {
 }
 
 func TestInProcBrokerConcurrent(t *testing.T) {
-	broker := NewInProcBroker(pubsub.New())
+	broker, err := NewInProcBroker(pubsub.New())
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer broker.Close()
 
 	// Subscribe with larger buffer
@@ -182,7 +200,10 @@ func TestInProcBrokerConcurrent(t *testing.T) {
 }
 
 func TestInProcBrokerIdempotentClose(t *testing.T) {
-	broker := NewInProcBroker(pubsub.New())
+	broker, err := NewInProcBroker(pubsub.New())
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// First close
 	if err := broker.Close(); err != nil {
@@ -201,20 +222,26 @@ func TestInProcBrokerIdempotentClose(t *testing.T) {
 }
 
 func TestInProcBrokerLongTopic(t *testing.T) {
-	broker := NewInProcBroker(pubsub.New())
+	broker, err := NewInProcBroker(pubsub.New())
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer broker.Close()
 
 	// Create a topic longer than 1024 characters
 	longTopic := strings.Repeat("a", 1025)
 
-	err := broker.Publish(t.Context(), longTopic, Message{ID: "test-1"})
+	err = broker.Publish(t.Context(), longTopic, Message{ID: "test-1"})
 	if !errors.Is(err, ErrInvalidTopic) {
 		t.Fatalf("expected ErrInvalidTopic for long topic, got %v", err)
 	}
 }
 
 func TestInProcBrokerHealthCheck(t *testing.T) {
-	broker := NewInProcBroker(pubsub.New())
+	broker, err := NewInProcBroker(pubsub.New())
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer broker.Close()
 
 	// Subscribe to a topic
@@ -249,7 +276,10 @@ func TestInProcBrokerHealthCheck(t *testing.T) {
 }
 
 func TestInProcBrokerConfig(t *testing.T) {
-	broker := NewInProcBroker(pubsub.New())
+	broker, err := NewInProcBroker(pubsub.New())
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer broker.Close()
 
 	// Get default config
@@ -287,7 +317,10 @@ func TestInProcBrokerConfig(t *testing.T) {
 }
 
 func TestInProcBrokerPublishBatch(t *testing.T) {
-	broker := NewInProcBroker(pubsub.New())
+	broker, err := NewInProcBroker(pubsub.New())
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer broker.Close()
 
 	// Subscribe
@@ -326,7 +359,10 @@ func TestInProcBrokerPublishBatch(t *testing.T) {
 }
 
 func TestInProcBrokerSubscribeBatch(t *testing.T) {
-	broker := NewInProcBroker(pubsub.New())
+	broker, err := NewInProcBroker(pubsub.New())
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer broker.Close()
 
 	// Subscribe to multiple topics
@@ -361,18 +397,13 @@ func TestInProcBrokerSubscribeBatch(t *testing.T) {
 }
 
 func TestInProcBrokerInvalidConfig(t *testing.T) {
-	// Test invalid config during creation
 	invalidCfg := DefaultConfig()
 	invalidCfg.DefaultBufferSize = 0
 
-	defer func() {
-		if r := recover(); r == nil {
-			t.Fatalf("expected panic for invalid config")
-		}
-	}()
-
-	// This should panic
-	_ = NewInProcBroker(pubsub.New(), WithConfig(invalidCfg))
+	_, err := NewInProcBroker(pubsub.New(), WithConfig(invalidCfg))
+	if err == nil {
+		t.Fatal("expected error for invalid config")
+	}
 }
 
 func TestConfigValidation(t *testing.T) {
@@ -488,39 +519,6 @@ func TestConfigValidation(t *testing.T) {
 			errMsg:  "TransactionTimeout cannot be negative",
 		},
 		{
-			name: "MQTT unsupported",
-			config: func() Config {
-				cfg := DefaultConfig()
-				cfg.EnableMQTT = true
-				cfg.MQTTPort = 0
-				return cfg
-			},
-			wantErr: true,
-			errMsg:  "MQTT protocol server is not implemented",
-		},
-		{
-			name: "MQTT unsupported even with valid port",
-			config: func() Config {
-				cfg := DefaultConfig()
-				cfg.EnableMQTT = true
-				cfg.MQTTPort = DefaultMQTTPort
-				return cfg
-			},
-			wantErr: true,
-			errMsg:  "MQTT protocol server is not implemented",
-		},
-		{
-			name: "AMQP unsupported",
-			config: func() Config {
-				cfg := DefaultConfig()
-				cfg.EnableAMQP = true
-				cfg.AMQPPort = -1
-				return cfg
-			},
-			wantErr: true,
-			errMsg:  "AMQP protocol server is not implemented",
-		},
-		{
 			name: "valid cluster config",
 			config: func() Config {
 				cfg := DefaultConfig()
@@ -569,7 +567,10 @@ func TestConfigValidation(t *testing.T) {
 }
 
 func TestInProcBrokerPriorityQueue(t *testing.T) {
-	broker := NewInProcBroker(pubsub.New())
+	broker, err := NewInProcBroker(pubsub.New())
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer broker.Close()
 
 	// Test priority message
@@ -578,7 +579,7 @@ func TestInProcBrokerPriorityQueue(t *testing.T) {
 		Priority: PriorityHigh,
 	}
 
-	err := broker.PublishPriority(t.Context(), "priority-topic", priorityMsg)
+	err = broker.PublishPriority(t.Context(), "priority-topic", priorityMsg)
 	if err != nil {
 		t.Fatalf("publish priority message error: %v", err)
 	}
@@ -592,7 +593,10 @@ func TestInProcBrokerPriorityQueue(t *testing.T) {
 
 func TestInProcBrokerAckSupport(t *testing.T) {
 	// Test with acknowledgment support disabled (default)
-	broker := NewInProcBroker(pubsub.New())
+	broker, err := NewInProcBroker(pubsub.New())
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer broker.Close()
 
 	cfg := broker.GetConfig()
@@ -603,7 +607,10 @@ func TestInProcBrokerAckSupport(t *testing.T) {
 	// Test with acknowledgment support enabled
 	ackCfg := DefaultConfig()
 	ackCfg.EnableAckSupport = true
-	brokerWithAck := NewInProcBroker(pubsub.New(), WithConfig(ackCfg))
+	brokerWithAck, err := NewInProcBroker(pubsub.New(), WithConfig(ackCfg))
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer brokerWithAck.Close()
 
 	// Test publishing with acknowledgment
@@ -613,7 +620,7 @@ func TestInProcBrokerAckSupport(t *testing.T) {
 		AckPolicy: AckRequired,
 	}
 
-	err := brokerWithAck.PublishWithAck(t.Context(), "ack-topic", ackMsg)
+	err = brokerWithAck.PublishWithAck(t.Context(), "ack-topic", ackMsg)
 	if err != nil {
 		t.Fatalf("publish with ack error: %v", err)
 	}
@@ -647,7 +654,10 @@ func TestInProcBrokerMemoryLimit(t *testing.T) {
 	// Test with memory limit
 	cfg := DefaultConfig()
 	cfg.MaxMemoryUsage = 1 << 30 // 1GB limit
-	broker := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	broker, err := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer broker.Close()
 
 	// Get memory usage
@@ -676,11 +686,14 @@ func TestInProcBrokerMemoryLimitExceeded(t *testing.T) {
 	// Test with very low memory limit
 	cfg := DefaultConfig()
 	cfg.MaxMemoryUsage = 1 // 1 byte limit - will definitely exceed
-	broker := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	broker, err := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer broker.Close()
 
 	// Try to publish a message - should fail due to memory limit
-	err := broker.Publish(t.Context(), "test-topic", Message{ID: "test-1", Data: "test"})
+	err = broker.Publish(t.Context(), "test-topic", Message{ID: "test-1", Data: "test"})
 	if !errors.Is(err, ErrMemoryLimitExceeded) {
 		t.Fatalf("expected ErrMemoryLimitExceeded, got %v", err)
 	}
@@ -697,7 +710,10 @@ func TestInProcBrokerMemoryLimitEnforced(t *testing.T) {
 	cfg.EnableTransactions = true
 	cfg.EnableDeadLetterQueue = true
 	cfg.DeadLetterTopic = "dlq" // Required when dead letter queue is enabled
-	broker := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	broker, err := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer broker.Close()
 
 	testCases := []struct {
@@ -768,7 +784,10 @@ func TestInProcBrokerTriePattern(t *testing.T) {
 	// Test Trie pattern configuration
 	cfg := DefaultConfig()
 	cfg.EnableTriePattern = true
-	broker := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	broker, err := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer broker.Close()
 
 	// Verify config
@@ -788,7 +807,10 @@ func TestInProcBrokerCluster(t *testing.T) {
 	cfg.ClusterNodeID = "node-1"
 	cfg.ClusterNodes = []string{"node-2@localhost:9000", "node-3@localhost:9001"}
 	cfg.ClusterReplicationFactor = 2
-	broker := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	broker, err := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer broker.Close()
 
 	// Verify config
@@ -810,7 +832,7 @@ func TestInProcBrokerCluster(t *testing.T) {
 	}
 
 	// Test cluster publish (should work even though cluster is not fully implemented)
-	err := broker.PublishToCluster(t.Context(), "cluster-topic", Message{ID: "cluster-1", Data: "cluster data"})
+	err = broker.PublishToCluster(t.Context(), "cluster-topic", Message{ID: "cluster-1", Data: "cluster data"})
 	if err != nil {
 		t.Fatalf("publish to cluster error: %v", err)
 	}
@@ -828,7 +850,10 @@ func TestInProcBrokerTransaction(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.EnableTransactions = true
 	cfg.TransactionTimeout = 60 * time.Second
-	broker := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	broker, err := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer broker.Close()
 
 	// Verify config
@@ -839,7 +864,7 @@ func TestInProcBrokerTransaction(t *testing.T) {
 
 	// Test transaction publish and commit
 	txID1 := "tx-1"
-	err := broker.PublishWithTransaction(t.Context(), "tx-topic", Message{ID: "tx-1", Data: "transaction data"}, txID1)
+	err = broker.PublishWithTransaction(t.Context(), "tx-topic", Message{ID: "tx-1", Data: "transaction data"}, txID1)
 	if err != nil {
 		t.Fatalf("publish with transaction error: %v", err)
 	}
@@ -869,7 +894,10 @@ func TestInProcBrokerDeadLetter(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.EnableDeadLetterQueue = true
 	cfg.DeadLetterTopic = "dlq"
-	broker := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	broker, err := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer broker.Close()
 
 	// Verify config
@@ -879,7 +907,7 @@ func TestInProcBrokerDeadLetter(t *testing.T) {
 	}
 
 	// Test dead letter publish
-	err := broker.PublishToDeadLetter(t.Context(), "original-topic", Message{ID: "dlq-1", Data: "dead letter data"}, "processing failed")
+	err = broker.PublishToDeadLetter(t.Context(), "original-topic", Message{ID: "dlq-1", Data: "dead letter data"}, "processing failed")
 	if err != nil {
 		t.Fatalf("publish to dead letter error: %v", err)
 	}
@@ -894,28 +922,15 @@ func TestInProcBrokerDeadLetter(t *testing.T) {
 	}
 }
 
-func TestInProcBrokerProtocolSupport(t *testing.T) {
-	cfg := DefaultConfig()
-	cfg.EnableMQTT = true
-	cfg.MQTTPort = 1883
-	if _, err := NewInProcBrokerE(pubsub.New(), WithConfig(cfg)); !errors.Is(err, ErrNotImplemented) {
-		t.Fatalf("NewInProcBrokerE with MQTT error = %v, want ErrNotImplemented", err)
-	}
-
-	cfg2 := DefaultConfig()
-	cfg2.EnableAMQP = true
-	cfg2.AMQPPort = 5672
-	if _, err := NewInProcBrokerE(pubsub.New(), WithConfig(cfg2)); !errors.Is(err, ErrNotImplemented) {
-		t.Fatalf("NewInProcBrokerE with AMQP error = %v, want ErrNotImplemented", err)
-	}
-}
-
 func TestInProcBrokerPersistence(t *testing.T) {
 	// Test persistence configuration
 	cfg := DefaultConfig()
 	cfg.EnablePersistence = true
 	cfg.PersistencePath = "/tmp/mq-data"
-	broker := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	broker, err := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer broker.Close()
 
 	// Verify config
@@ -929,11 +944,14 @@ func TestInProcBrokerPersistence(t *testing.T) {
 }
 
 func TestInProcBrokerClusterDisabled(t *testing.T) {
-	broker := NewInProcBroker(pubsub.New())
+	broker, err := NewInProcBroker(pubsub.New())
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer broker.Close()
 
 	// Test cluster operations when disabled
-	err := broker.PublishToCluster(t.Context(), "topic", Message{ID: "test-1", Data: "test"})
+	err = broker.PublishToCluster(t.Context(), "topic", Message{ID: "test-1", Data: "test"})
 	if !errors.Is(err, ErrClusterDisabled) {
 		t.Fatalf("expected ErrClusterDisabled, got %v", err)
 	}
@@ -946,11 +964,14 @@ func TestInProcBrokerClusterDisabled(t *testing.T) {
 }
 
 func TestInProcBrokerTransactionDisabled(t *testing.T) {
-	broker := NewInProcBroker(pubsub.New())
+	broker, err := NewInProcBroker(pubsub.New())
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer broker.Close()
 
 	// Test transaction operations when disabled
-	err := broker.PublishWithTransaction(t.Context(), "topic", Message{ID: "test-1", Data: "test"}, "tx-1")
+	err = broker.PublishWithTransaction(t.Context(), "topic", Message{ID: "test-1", Data: "test"}, "tx-1")
 	if !errors.Is(err, ErrTransactionNotSupported) {
 		t.Fatalf("expected ErrTransactionNotSupported, got %v", err)
 	}
@@ -967,11 +988,14 @@ func TestInProcBrokerTransactionDisabled(t *testing.T) {
 }
 
 func TestInProcBrokerDeadLetterDisabled(t *testing.T) {
-	broker := NewInProcBroker(pubsub.New())
+	broker, err := NewInProcBroker(pubsub.New())
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer broker.Close()
 
 	// Test dead letter operations when disabled
-	err := broker.PublishToDeadLetter(t.Context(), "topic", Message{ID: "test-1", Data: "test"}, "reason")
+	err = broker.PublishToDeadLetter(t.Context(), "topic", Message{ID: "test-1", Data: "test"}, "reason")
 	if !errors.Is(err, ErrDeadLetterNotSupported) {
 		t.Fatalf("expected ErrDeadLetterNotSupported, got %v", err)
 	}
@@ -980,23 +1004,6 @@ func TestInProcBrokerDeadLetterDisabled(t *testing.T) {
 	stats := broker.GetDeadLetterStats()
 	if stats.Enabled {
 		t.Fatalf("expected dead letter stats to be disabled")
-	}
-}
-
-func TestInProcBrokerProtocolDisabled(t *testing.T) {
-	broker := NewInProcBroker(pubsub.New())
-	defer broker.Close()
-
-	// Both MQTT and AMQP return ErrNotImplemented regardless of config,
-	// because the protocol servers are not yet implemented.
-	err := broker.StartMQTTServer()
-	if !errors.Is(err, ErrNotImplemented) {
-		t.Fatalf("expected ErrNotImplemented for StartMQTTServer, got %v", err)
-	}
-
-	err = broker.StartAMQPServer()
-	if !errors.Is(err, ErrNotImplemented) {
-		t.Fatalf("expected ErrNotImplemented for StartAMQPServer, got %v", err)
 	}
 }
 

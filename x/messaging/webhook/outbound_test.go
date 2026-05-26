@@ -77,29 +77,20 @@ func TestConfigFromEnv(t *testing.T) {
 	}
 }
 
-func TestConfigFromReaderERejectsNilReader(t *testing.T) {
-	cfg, err := ConfigFromReaderE(nil)
+func TestConfigFromReader_RejectsNilReader(t *testing.T) {
+	cfg, err := ConfigFromReader(nil)
 	if !errors.Is(err, ErrNilValueReader) {
-		t.Fatalf("ConfigFromReaderE error = %v, want ErrNilValueReader", err)
+		t.Fatalf("ConfigFromReader error = %v, want ErrNilValueReader", err)
 	}
 	if cfg != (Config{}) {
-		t.Fatalf("ConfigFromReaderE config = %+v, want zero value", cfg)
+		t.Fatalf("ConfigFromReader config = %+v, want zero value", cfg)
 	}
 }
 
-func TestConfigFromReaderPanicsForCompatibility(t *testing.T) {
-	defer func() {
-		if recovered := recover(); recovered == nil {
-			t.Fatal("expected ConfigFromReader(nil) to panic")
-		}
-	}()
-	_ = ConfigFromReader(nil)
-}
-
-func TestConfigFromReaderEValidReader(t *testing.T) {
-	cfg, err := ConfigFromReaderE(staticValueReader{})
+func TestConfigFromReader_ValidReader(t *testing.T) {
+	cfg, err := ConfigFromReader(staticValueReader{})
 	if err != nil {
-		t.Fatalf("ConfigFromReaderE error = %v", err)
+		t.Fatalf("ConfigFromReader error = %v", err)
 	}
 	if !cfg.Enabled || cfg.QueueSize != 2048 || cfg.Workers != 8 {
 		t.Fatalf("unexpected default config: %+v", cfg)

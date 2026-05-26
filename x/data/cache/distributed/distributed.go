@@ -188,13 +188,6 @@ func New(nodes []CacheNode, config *Config) *DistributedCache {
 	return dc
 }
 
-// NewE creates a new distributed cache and returns construction errors.
-//
-// Deprecated: use NewWithConfig.
-func NewE(nodes []CacheNode, config *Config) (*DistributedCache, error) {
-	return NewWithConfig(nodes, config)
-}
-
 // NewWithConfig creates a new distributed cache and returns construction errors.
 func NewWithConfig(nodes []CacheNode, config *Config) (*DistributedCache, error) {
 	if config == nil {

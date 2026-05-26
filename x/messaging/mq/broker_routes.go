@@ -92,32 +92,6 @@ func (b *InProcBroker) SubscribeFromCluster(ctx context.Context, topic string, o
 	return sub, err
 }
 
-// StartMQTTServer is not implemented. MQTT protocol bridging is planned but
-// not yet available. Callers should not set EnableMQTT in Config.
-//
-// Deprecated: this compatibility stub always returns ErrNotImplemented. Prefer
-// direct x/messaging/pubsub integration until a real protocol bridge lands or
-// the stub is removed.
-func (b *InProcBroker) StartMQTTServer() error {
-	if b == nil {
-		return ErrNotInitialized
-	}
-	return fmt.Errorf("%w: MQTT protocol server is not implemented", ErrNotImplemented)
-}
-
-// StartAMQPServer is not implemented. AMQP protocol bridging is planned but
-// not yet available. Callers should not set EnableAMQP in Config.
-//
-// Deprecated: this compatibility stub always returns ErrNotImplemented. Prefer
-// direct x/messaging/pubsub integration until a real protocol bridge lands or
-// the stub is removed.
-func (b *InProcBroker) StartAMQPServer() error {
-	if b == nil {
-		return ErrNotInitialized
-	}
-	return fmt.Errorf("%w: AMQP protocol server is not implemented", ErrNotImplemented)
-}
-
 // RecoverMessages recovers persisted messages for a topic.
 // This is useful for replaying messages after broker restart.
 func (b *InProcBroker) RecoverMessages(ctx context.Context, topic string, limit int) ([]Message, error) {

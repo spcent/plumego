@@ -748,6 +748,10 @@ func TestClusterNoReplicas(t *testing.T) {
 }
 
 func TestLoadBalancerNames(t *testing.T) {
+	weightedLB, err := NewWeightedBalancer([]int{1, 2})
+	if err != nil {
+		t.Fatal(err)
+	}
 	tests := []struct {
 		name string
 		lb   LoadBalancer
@@ -756,7 +760,7 @@ func TestLoadBalancerNames(t *testing.T) {
 		{"RoundRobin", NewRoundRobinBalancer(), "round_robin"},
 		{"Random", NewRandomBalancer(), "random"},
 		{"LeastConn", NewLeastConnBalancer(), "least_connections"},
-		{"Weighted", NewWeightedBalancer([]int{1, 2}), "weighted_round_robin"},
+		{"Weighted", weightedLB, "weighted_round_robin"},
 	}
 
 	for _, tt := range tests {

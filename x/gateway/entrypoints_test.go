@@ -55,34 +55,22 @@ func TestNewGateway_ReturnsProxy(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	p := NewGateway(GatewayConfig{Targets: []string{srv.URL}})
+	p, err := NewGateway(GatewayConfig{Targets: []string{srv.URL}})
+	if err != nil {
+		t.Fatalf("NewGateway: %v", err)
+	}
 	if p == nil {
 		t.Fatal("NewGateway returned nil")
 	}
 }
 
-func TestNewGatewayE_InvalidConfigReturnsError(t *testing.T) {
-	proxy, err := NewGatewayE(GatewayConfig{})
+func TestNewGateway_InvalidConfigReturnsError(t *testing.T) {
+	proxy, err := NewGateway(GatewayConfig{})
 	if err == nil {
-		t.Fatal("NewGatewayE returned nil error")
+		t.Fatal("NewGateway returned nil error")
 	}
 	if proxy != nil {
-		t.Fatal("NewGatewayE returned proxy for invalid config")
-	}
-}
-
-func TestNewGatewayE_ReturnsProxy(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	}))
-	defer srv.Close()
-
-	proxy, err := NewGatewayE(GatewayConfig{Targets: []string{srv.URL}})
-	if err != nil {
-		t.Fatalf("NewGatewayE: %v", err)
-	}
-	if proxy == nil {
-		t.Fatal("NewGatewayE returned nil")
+		t.Fatal("NewGateway returned proxy for invalid config")
 	}
 }
 
