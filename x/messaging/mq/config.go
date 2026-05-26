@@ -76,7 +76,6 @@ type Config struct {
 
 	// TransactionTimeout is the timeout for transactions (default: 30s)
 	TransactionTimeout time.Duration
-
 }
 
 // DefaultConfig returns the default configuration.

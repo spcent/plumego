@@ -486,8 +486,6 @@ func TestProxyCustomErrorHandler(t *testing.T) {
 	}
 }
 
-
-
 // TestProxyIsWebSocketRequest exercises the helper.
 func TestProxyIsWebSocketRequest(t *testing.T) {
 	tests := []struct {
