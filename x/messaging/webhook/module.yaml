@@ -2,6 +2,7 @@ name: x/messaging/webhook
 path: x/messaging/webhook
 layer: extension
 status: experimental
+suggested_gate_profile: single_module_behavior
 owner: integration
 risk: medium
 summary: Subordinate webhook ingress, egress, and bridge primitives within the broader messaging extension family.

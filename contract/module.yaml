@@ -2,6 +2,7 @@ name: contract
 path: contract
 layer: stable
 status: ga
+suggested_gate_profile: stable_root_change
 owner: transport
 risk: high
 summary: Request and response contracts, error model, and context helpers.
@@ -185,3 +186,10 @@ landing_zones:
   context_accessors: context_core.go
   request_id: request_id.go
   trace: trace.go
+
+docs_sync_contract:
+  on_api_change:
+    - docs/stable-api/snapshots/contract-head.snapshot
+    - docs/modules/contract/README.md
+  on_behavior_change:
+    - docs/modules/contract/README.md

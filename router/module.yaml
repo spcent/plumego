@@ -2,6 +2,7 @@ name: router
 path: router
 layer: stable
 status: ga
+suggested_gate_profile: stable_root_change
 owner: runtime
 risk: high
 summary: HTTP route matching, params, groups, and reverse routing.
@@ -113,3 +114,10 @@ landing_zones:
   registration: registration.go
   params: path.go
   reverse_routing: router.go
+
+docs_sync_contract:
+  on_api_change:
+    - docs/stable-api/snapshots/router-head.snapshot
+    - docs/modules/router/README.md
+  on_behavior_change:
+    - docs/modules/router/README.md

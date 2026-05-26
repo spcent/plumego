@@ -2,6 +2,8 @@ name: x/ai/metrics
 path: x/ai/metrics
 layer: extension
 status: experimental
+suggested_gate_profile: single_module_behavior
+stability_tier: experimental
 owner: ai-gateway
 risk: medium
 summary: AI-specific metrics collector interface and in-process implementations, with an adapter bridging to the stable metrics layer.

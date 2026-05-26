@@ -2,6 +2,7 @@ name: middleware
 path: middleware
 layer: stable
 status: ga
+suggested_gate_profile: stable_root_change
 owner: transport
 risk: high
 summary: Transport-only HTTP middleware, including request/response cross-cutting concerns and transport observability primitives.
@@ -122,3 +123,10 @@ landing_zones:
   security_headers: security/
   timeout: timeout/
   tracing: tracing/
+
+docs_sync_contract:
+  on_api_change:
+    - docs/stable-api/snapshots/middleware-head.snapshot
+    - docs/modules/middleware/README.md
+  on_behavior_change:
+    - docs/modules/middleware/README.md

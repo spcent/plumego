@@ -2,6 +2,9 @@ name: x/data/kvengine
 path: x/data/kvengine
 layer: extension
 status: experimental
+suggested_gate_profile: single_module_behavior
+parent_family: x/data
+stability_tier: experimental
 owner: persistence
 risk: medium
 summary: Durable embedded KV engine with WAL, snapshots, serializer selection, and engine tuning.

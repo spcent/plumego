@@ -1,0 +1,5 @@
+# Approved exceptions for panic-only New* constructors in extension packages.
+# Format: path/to/file.go:NewFoo
+# Add entries here only when a constructor genuinely cannot fail and panic is
+# the correct signal (e.g., programming error in test helpers). Production
+# constructors must return (T, error) instead.

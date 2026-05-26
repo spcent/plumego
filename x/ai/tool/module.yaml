@@ -2,6 +2,8 @@ name: x/ai/tool
 path: x/ai/tool
 layer: extension
 status: experimental
+suggested_gate_profile: single_module_behavior
+stability_tier: beta
 owner: ai-gateway
 risk: medium
 summary: Stable-tier AI tool contracts, registry, policy, and local builtin tools within the experimental x/ai family.

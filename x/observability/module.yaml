@@ -2,6 +2,7 @@ name: x/observability
 path: x/observability
 layer: extension
 status: beta
+suggested_gate_profile: single_module_behavior
 owner: observability
 risk: medium
 summary: The only app-facing entrypoint for broader observability adapters and export wiring; transport observability primitives remain in stable middleware packages.
@@ -113,3 +114,15 @@ landing_zones:
   exporter: exporter.go
   ops: ops/
   devtools: devtools/
+
+docs_sync_contract:
+  on_status_change:
+    - docs/EXTENSION_MATURITY.md
+    - docs/ROADMAP.md
+    - specs/extension-maturity.yaml
+  on_api_change:
+    - docs/modules/x-observability/README.md
+    - website/src/content/docs/docs/modules/x-observability.mdx
+    - website/src/content/docs/zh/docs/modules/x-observability.mdx
+  on_behavior_change:
+    - docs/modules/x-observability/README.md

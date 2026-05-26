@@ -2,6 +2,8 @@ name: x/ai/semanticcache/cachemanager
 path: x/ai/semanticcache/cachemanager
 layer: extension
 status: experimental
+suggested_gate_profile: single_module_behavior
+stability_tier: experimental
 owner: ai-gateway
 risk: low
 summary: Cache lifecycle orchestration over vectorstore backends, including cache warming, eviction coordination, and statistics management.

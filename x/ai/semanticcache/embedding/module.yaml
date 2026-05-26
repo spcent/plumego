@@ -2,6 +2,8 @@ name: x/ai/semanticcache/embedding
 path: x/ai/semanticcache/embedding
 layer: extension
 status: experimental
+suggested_gate_profile: single_module_behavior
+stability_tier: experimental
 owner: ai-gateway
 risk: medium
 summary: Embedding provider interface and HTTP-backed implementations (OpenAI, Cohere) for semantic cache text vectorization.

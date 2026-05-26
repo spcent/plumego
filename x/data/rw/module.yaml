@@ -2,6 +2,9 @@ name: x/data/rw
 path: x/data/rw
 layer: extension
 status: experimental
+suggested_gate_profile: single_module_behavior
+parent_family: x/data
+stability_tier: experimental
 owner: persistence
 risk: high
 summary: Primary-replica read-write cluster orchestration with explicit primary-routing escapes, optional replica health checking, and configurable fallback behavior.

@@ -2,6 +2,8 @@ name: x/ai/tokenizer
 path: x/ai/tokenizer
 layer: extension
 status: experimental
+suggested_gate_profile: single_module_behavior
+stability_tier: experimental
 owner: ai-gateway
 risk: low
 summary: Token counting primitives for AI models, used across provider, session, orchestration, and cache packages.

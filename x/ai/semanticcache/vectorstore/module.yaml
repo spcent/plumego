@@ -2,6 +2,8 @@ name: x/ai/semanticcache/vectorstore
 path: x/ai/semanticcache/vectorstore
 layer: extension
 status: experimental
+suggested_gate_profile: single_module_behavior
+stability_tier: experimental
 owner: ai-gateway
 risk: medium
 summary: Vector storage backend interface and in-memory implementations (MemoryVectorStore, TieredVectorStore) for semantic similarity search.

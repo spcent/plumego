@@ -2,6 +2,7 @@ name: x/rpc/gateway
 path: x/rpc/gateway
 layer: extension
 status: experimental
+suggested_gate_profile: single_module_behavior
 owner: rpc
 risk: medium
 summary: Dependency-free HTTP route adapter for caller-owned RPC handlers.

@@ -2,6 +2,8 @@ name: x/ai/semanticcache
 path: x/ai/semanticcache
 layer: extension
 status: experimental
+suggested_gate_profile: single_module_behavior
+stability_tier: experimental
 owner: ai-gateway
 risk: medium
 summary: Embedding-based semantic cache for AI provider responses; matches requests by vector similarity and optionally falls back to exact-key caching via x/ai/llmcache.

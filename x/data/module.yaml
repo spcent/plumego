@@ -2,6 +2,7 @@ name: x/data
 path: x/data
 layer: extension
 status: experimental
+suggested_gate_profile: single_module_behavior
 owner: persistence
 risk: medium
 summary: High-level data topology capabilities that should not live in the stable store layer.
@@ -16,22 +17,14 @@ entrypoint_reads:
   - docs/modules/x-data/README.md
 
 subordinate_families:
-  - package: x/data/cache
-    role: distributed cache with consistent hashing, replication, failover, and Redis adapter
-  - package: x/data/file
-    role: tenant-aware local/S3 file storage and PostgreSQL file metadata management
-  - package: x/data/kvengine
-    role: durable KV engine extending the stable store/kv primitive
-  - package: x/data/pgx
-    role: PostgreSQL-style driver interface wrapper for x/data callers
-  - package: x/data/sqlx
-    role: database/sql query and transaction interface wrapper for x/data callers
-  - package: x/data/migrate
-    role: migration runner interface wrapper for x/data callers
-  - package: x/data/rw
-    role: primary-replica read-write cluster orchestration with health checking and fallback
-  - package: x/data/sharding
-    role: database sharding router distributing SQL queries across rw.Cluster shards
+  - x/data/cache
+  - x/data/file
+  - x/data/kvengine
+  - x/data/pgx
+  - x/data/sqlx
+  - x/data/migrate
+  - x/data/rw
+  - x/data/sharding
 
 responsibilities:
   - Read-write splitting orchestration
@@ -121,3 +114,15 @@ landing_zones:
   sqlx: sqlx/
   rw_split: rw/
   topology: sharding/
+
+docs_sync_contract:
+  on_status_change:
+    - docs/EXTENSION_MATURITY.md
+    - docs/ROADMAP.md
+    - specs/extension-maturity.yaml
+  on_api_change:
+    - docs/modules/x-data/README.md
+    - website/src/content/docs/docs/modules/x-data.mdx
+    - website/src/content/docs/zh/docs/modules/x-data.mdx
+  on_behavior_change:
+    - docs/modules/x-data/README.md

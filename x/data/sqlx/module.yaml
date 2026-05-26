@@ -2,6 +2,8 @@ name: x/data/sqlx
 path: x/data/sqlx
 layer: extension
 status: experimental
+suggested_gate_profile: single_module_behavior
+stability_tier: experimental
 owner: persistence
 risk: medium
 summary: database/sql-backed query and transaction interfaces in the x/data family.
