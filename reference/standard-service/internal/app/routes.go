@@ -5,7 +5,6 @@ import (
 
 	"standard-service/internal/domain/item"
 	"standard-service/internal/handler"
-	appmiddleware "standard-service/internal/middleware"
 )
 
 // RegisterRoutes wires all HTTP routes for the reference application.
@@ -32,7 +31,7 @@ func (a *App) RegisterRoutes() error {
 	// service works out of the box without configuration.
 	// This demonstrates the per-route middleware wrapping pattern: only the
 	// handlers that mutate state are wrapped; read-only routes are unaffected.
-	writeGuard := appmiddleware.RequireWriteKey(a.Cfg.App.WriteKey, a.Core.Logger())
+	writeGuard := handler.RequireWriteKey(a.Cfg.App.WriteKey, a.Core.Logger())
 
 	// APIHandler carries Logger, ServiceName, and Version via constructor injection
 	// rather than reading from package-level variables. ServiceName is injected from

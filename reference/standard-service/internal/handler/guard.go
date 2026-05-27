@@ -1,5 +1,4 @@
-// Package appmiddleware contains per-route middleware for the reference application.
-package appmiddleware
+package handler
 
 import (
 	"crypto/subtle"
@@ -25,7 +24,7 @@ const codeAuthKeyInvalid = "auth.key.invalid"
 // Timing-safe comparison (crypto/subtle.ConstantTimeCompare) prevents attackers
 // from using response time to guess the key byte-by-byte.
 //
-//	writeGuard := appmiddleware.RequireWriteKey(cfg.App.WriteKey, a.Core.Logger())
+//	writeGuard := handler.RequireWriteKey(cfg.App.WriteKey, a.Core.Logger())
 //	v1.post("/items", writeGuard(http.HandlerFunc(items.Create)))
 func RequireWriteKey(key string, logger plumelog.StructuredLogger) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
@@ -36,13 +35,11 @@ func RequireWriteKey(key string, logger plumelog.StructuredLogger) func(http.Han
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			headerVal := r.Header.Get(WriteKeyHeader)
 			if subtle.ConstantTimeCompare([]byte(headerVal), []byte(key)) != 1 {
-				if err := contract.WriteError(w, r, contract.NewErrorBuilder().
+				logWriteErr(logger, contract.WriteError(w, r, contract.NewErrorBuilder().
 					Type(contract.TypeUnauthorized).
 					Code(codeAuthKeyInvalid).
 					Message("valid X-Write-Key header required").
-					Build()); err != nil {
-					logger.Warn("write response failed", plumelog.Fields{"error": err.Error()})
-				}
+					Build()))
 				return
 			}
 			next.ServeHTTP(w, r)

@@ -126,7 +126,7 @@
       "type": "TypeRequired"
     },
     {
-      "path": "reference/standard-service/internal/middleware/guard.go",
+      "path": "reference/standard-service/internal/handler/guard.go",
       "symbol": "codeAuthKeyInvalid",
       "type": "TypeUnauthorized"
     },

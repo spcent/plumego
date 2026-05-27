@@ -53,7 +53,6 @@ Canonical files:
 - `main.go`
 - `internal/app/app.go`
 - `internal/app/routes.go`
-- `internal/middleware/guard.go`
 - `internal/domain/item/item.go`
 - `internal/handler/api.go`
 - `internal/handler/health.go`
