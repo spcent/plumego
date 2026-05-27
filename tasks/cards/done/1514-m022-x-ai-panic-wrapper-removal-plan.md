@@ -12,7 +12,7 @@ Owned Files:
 - `x/ai/resilience/provider.go`
 - `x/ai/semanticcache/provider.go`
 - `x/ai/metrics/metrics.go`
-- `docs/modules/x-ai/README.md`
+- `docs/modules/x/ai/README.md`
 - `specs/deprecation-inventory.yaml`
 Depends On: 1511
 
@@ -25,7 +25,7 @@ Scope:
 - Add `Deprecated:` guidance to the verified compatibility wrappers.
 - Record each wrapper in `specs/deprecation-inventory.yaml` with a replacement
   and keep/remove decision.
-- Update `docs/modules/x-ai/README.md` so the error-returning alternatives are
+- Update `docs/modules/x/ai/README.md` so the error-returning alternatives are
   the documented preferred path.
 
 Non-goals:
@@ -40,7 +40,7 @@ Files:
 - `x/ai/resilience/provider.go`
 - `x/ai/semanticcache/provider.go`
 - `x/ai/metrics/metrics.go`
-- `docs/modules/x-ai/README.md`
+- `docs/modules/x/ai/README.md`
 - `specs/deprecation-inventory.yaml`
 
 Acceptance Tests:
@@ -51,7 +51,7 @@ Tests:
 - `go run ./internal/checks/deprecation-inventory -strict`
 
 Docs Sync:
-- `docs/modules/x-ai/README.md`
+- `docs/modules/x/ai/README.md`
 
 Validation:
 - `go test -timeout 20s ./x/ai/...`
@@ -72,7 +72,7 @@ Outcome:
 - Registered those wrappers in `specs/deprecation-inventory.yaml` with concrete
   replacements and explicit keep decisions so strict inventory checks now track
   the compatibility surface instead of leaving it undocumented.
-- Updated `docs/modules/x-ai/README.md` to steer callers toward `RegisterE`,
+- Updated `docs/modules/x/ai/README.md` to steer callers toward `RegisterE`,
   `New*E`, and `TagsE` as the preferred non-panicking APIs.
 - Validation:
   - `go test -timeout 20s ./x/ai/...`

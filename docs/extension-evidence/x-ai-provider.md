@@ -25,7 +25,7 @@ Evidence state: complete
 
 ## Primer And Boundary State
 
-- Primer: `docs/modules/x-ai/README.md`
+- Primer: `docs/modules/x/ai/README.md`
 - Manifest: `x/ai/module.yaml`
 - Boundary state: documented as a stable-tier AI subpackage with explicit
   provider selection and no package-global provider registry.

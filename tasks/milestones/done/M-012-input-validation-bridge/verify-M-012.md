@@ -6,7 +6,7 @@ Verified Cards: 1470, 1471, 1472
 
 ## Scope Check
 
-- In-scope files touched: `x/validate`, `reference/with-rest`, `docs/modules/x-validate/README.md`, and this verify artifact.
+- In-scope files touched: `x/validate`, `reference/with-rest`, `docs/modules/x/validate/README.md`, and this verify artifact.
 - Out-of-scope files touched: none identified.
 
 ## Ownership Check

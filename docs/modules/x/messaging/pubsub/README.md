@@ -1,10 +1,10 @@
 # x/messaging/pubsub — Publish-Subscribe
 
-> **Import path:** `github.com/spcent/plumego/x/messaging/pubsub` — sub-package of [`x/messaging`](../x-messaging/README.md). This primer lives under `docs/modules/x-pubsub/` following the `x-{subpkg}` convention.
+> **Import path:** `github.com/spcent/plumego/x/messaging/pubsub` — sub-package of [`x/messaging`](../README.md). This primer mirrors the package path under `docs/modules/x/`.
 
 **Purpose:** In-process publish-subscribe primitives within the `x/messaging` family. Provides a topic-based broker, persistent pub/sub with replay, distributed fan-out, backpressure control, and a zero-dependency Prometheus text exporter.
 
-**Status:** Experimental — API may change. Start app-facing messaging feature discovery from [`x/messaging`](../x-messaging/README.md) before opening this package directly.
+**Status:** Experimental — API may change. Start app-facing messaging feature discovery from [`x/messaging`](../README.md) before opening this package directly.
 
 ---
 

@@ -27,7 +27,7 @@ Evidence state: complete
 
 ## Primer And Boundary State
 
-- Primer: `docs/modules/x-ai/README.md`
+- Primer: `docs/modules/x/ai/README.md`
 - Manifest: `x/ai/module.yaml`
 - Boundary state: documented as streaming coordination for AI services, with
   HTTP error responses using canonical `contract.WriteError` behavior.

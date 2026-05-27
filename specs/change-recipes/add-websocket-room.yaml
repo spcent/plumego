@@ -1,7 +1,7 @@
 name: add-websocket-room
 scope: adding a new room type, room event, or connection policy to x/websocket
 steps:
-  - Read x/websocket/module.yaml and docs/modules/x-websocket/README.md.
+  - Read x/websocket/module.yaml and docs/modules/x/websocket/README.md.
   - Confirm the room or event type belongs in x/websocket and not in application code.
   - Add or extend the room type using the existing Hub and Room abstractions; do not introduce a parallel hub lifecycle.
   - Keep authentication and authorisation at the handler call site using context values from security or x/tenant middleware; do not embed policy inside the hub.

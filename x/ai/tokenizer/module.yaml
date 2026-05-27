@@ -17,7 +17,7 @@ entrypoint_reads:
   - specs/task-routing.yaml
   - specs/dependency-rules.yaml
   - x/ai/module.yaml
-  - docs/modules/x-ai/README.md
+  - docs/modules/x/ai/README.md
 
 responsibilities:
   - Tokenizer interface contract
@@ -71,7 +71,7 @@ test_commands:
   - go vet ./x/ai/tokenizer/...
 
 doc_paths:
-  - docs/modules/x-ai/README.md
+  - docs/modules/x/ai/README.md
 
 change_risks:
   - TokenUsage struct changes break provider, session, and orchestration consumers

@@ -18,7 +18,7 @@ entrypoint_reads:
   - specs/dependency-rules.yaml
   - x/ai/module.yaml
   - x/ai/semanticcache/module.yaml
-  - docs/modules/x-ai/README.md
+  - docs/modules/x/ai/README.md
 
 responsibilities:
   - Backend interface for vector storage operations (Add, Search, Delete, Clear, Stats)
@@ -72,7 +72,7 @@ test_commands:
   - go vet ./x/ai/semanticcache/vectorstore/...
 
 doc_paths:
-  - docs/modules/x-ai/README.md
+  - docs/modules/x/ai/README.md
 
 change_risks:
   - Backend interface change breaks all store implementations including MemoryVectorStore and TieredVectorStore

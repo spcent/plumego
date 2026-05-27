@@ -17,7 +17,7 @@ entrypoint_reads:
   - specs/task-routing.yaml
   - specs/dependency-rules.yaml
   - x/ai/module.yaml
-  - docs/modules/x-ai/README.md
+  - docs/modules/x/ai/README.md
 
 responsibilities:
   - Tool execution contract and result shape
@@ -85,7 +85,7 @@ test_commands:
   - go vet ./x/ai/tool/...
 
 doc_paths:
-  - docs/modules/x-ai/README.md
+  - docs/modules/x/ai/README.md
 
 change_risks:
   - tool policy regression

@@ -25,7 +25,7 @@ Evidence state: complete
 
 ## Primer And Boundary State
 
-- Primer: `docs/modules/x-ai/README.md`
+- Primer: `docs/modules/x/ai/README.md`
 - Manifest: `x/ai/module.yaml`
 - Boundary state: documented as explicit session ownership in the consuming
   service, not a hidden global session manager.

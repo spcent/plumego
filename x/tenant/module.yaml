@@ -15,7 +15,7 @@ entrypoint_reads:
   - specs/repo.yaml
   - specs/task-routing.yaml
   - specs/dependency-rules.yaml
-  - docs/modules/x-tenant/README.md
+  - docs/modules/x/tenant/README.md
 
 responsibilities:
   - Tenant resolution
@@ -61,7 +61,7 @@ test_commands:
   - go vet ./x/tenant/...
 
 doc_paths:
-  - docs/modules/x-tenant/README.md
+  - docs/modules/x/tenant/README.md
   - docs/architecture/X_TENANT_BLUEPRINT.md
 
 change_risks:

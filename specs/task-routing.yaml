@@ -177,7 +177,7 @@ tasks:
       - specs/change-recipes/tenant-policy-change.yaml
       - x/tenant/module.yaml
       - docs/architecture/X_TENANT_BLUEPRINT.md
-      - docs/modules/x-tenant/README.md
+      - docs/modules/x/tenant/README.md
     avoid:
       - middleware
       - store
@@ -212,7 +212,7 @@ tasks:
   file_api:
     start_with:
       - x/fileapi/module.yaml
-      - docs/modules/x-fileapi/README.md
+      - docs/modules/x/fileapi/README.md
       - x/fileapi/handler.go
     avoid:
       - store/file
@@ -278,7 +278,7 @@ tasks:
   resource_api_standardization:
     start_with:
       - x/rest/module.yaml
-      - docs/modules/x-rest/README.md
+      - docs/modules/x/rest/README.md
       - x/rest/spec.go
       - x/rest/entrypoints.go
     avoid:
@@ -307,7 +307,7 @@ tasks:
   tenant:
     start_with:
       - x/tenant/module.yaml
-      - docs/modules/x-tenant/README.md
+      - docs/modules/x/tenant/README.md
       - docs/architecture/X_TENANT_BLUEPRINT.md
     avoid:
       - middleware
@@ -317,7 +317,7 @@ tasks:
   websocket:
     start_with:
       - x/websocket/module.yaml
-      - docs/modules/x-websocket/README.md
+      - docs/modules/x/websocket/README.md
       - x/websocket/websocket.go
     avoid:
       - core
@@ -327,7 +327,7 @@ tasks:
     intent: Static asset policy, embedded frontend mounting, SPA fallback, cache/header policy, precompressed assets, and frontend MIME overrides.
     start_with:
       - x/frontend/module.yaml
-      - docs/modules/x-frontend/README.md
+      - docs/modules/x/frontend/README.md
       - reference/standard-service
     avoid:
       - core
@@ -379,7 +379,7 @@ tasks:
   ai:
     start_with:
       - x/ai/module.yaml
-      - docs/modules/x-ai/README.md
+      - docs/modules/x/ai/README.md
     avoid:
       - core
       - x/resilience

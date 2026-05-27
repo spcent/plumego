@@ -10,8 +10,8 @@ Owned Files:
 - `x/frontend/module.yaml`
 - `x/openapi/module.yaml`
 - `x/validate/module.yaml`
-- `docs/modules/x-frontend/README.md`
-- `docs/modules/x-openapi/README.md`
+- `docs/modules/x/frontend/README.md`
+- `docs/modules/x/openapi/README.md`
 Depends On: 1503
 
 Goal:
@@ -33,8 +33,8 @@ Files:
 - `x/frontend/module.yaml`
 - `x/openapi/module.yaml`
 - `x/validate/module.yaml`
-- `docs/modules/x-frontend/README.md`
-- `docs/modules/x-openapi/README.md`
+- `docs/modules/x/frontend/README.md`
+- `docs/modules/x/openapi/README.md`
 
 Acceptance Tests:
 <!-- none; manifest/docs card -->
@@ -44,8 +44,8 @@ Tests:
 - `go run ./internal/checks/public-entrypoints-sync`
 
 Docs Sync:
-- `docs/modules/x-frontend/README.md`
-- `docs/modules/x-openapi/README.md`
+- `docs/modules/x/frontend/README.md`
+- `docs/modules/x/openapi/README.md`
 
 Validation:
 - `go test -timeout 20s ./x/frontend/... ./x/openapi/... ./x/validate/...`

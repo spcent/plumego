@@ -11,7 +11,7 @@ Owned Files:
 - `x/data/migrate/module.yaml`
 - `x/data/pgx/module.yaml`
 - `x/data/sqlx/module.yaml`
-- `docs/modules/x-data/README.md`
+- `docs/modules/x/data/README.md`
 Depends On: 1503
 
 Goal:
@@ -35,7 +35,7 @@ Files:
 - `x/data/migrate/module.yaml`
 - `x/data/pgx/module.yaml`
 - `x/data/sqlx/module.yaml`
-- `docs/modules/x-data/README.md`
+- `docs/modules/x/data/README.md`
 
 Acceptance Tests:
 <!-- none; manifest/docs card -->
@@ -45,7 +45,7 @@ Tests:
 - `go run ./internal/checks/module-manifests`
 
 Docs Sync:
-- `docs/modules/x-data/README.md`
+- `docs/modules/x/data/README.md`
 
 Validation:
 - `go test -timeout 20s ./x/data/...`

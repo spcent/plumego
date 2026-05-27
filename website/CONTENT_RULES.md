@@ -20,7 +20,7 @@ Each documentation page must end with exactly **one** clear "next step" link. Do
 
 ## Rule 3 — Stability badge required on every x/* module page
 
-Every page under `docs/modules/x-*.mdx` must display its stability tier as the **first visible element** after the title. Use one of:
+Every page under `docs/modules/x/**/*.mdx` must display its stability tier as the **first visible element** after the title. Use one of:
 
 - `**Stable**` — long-term API target, part of v1 hardening scope
 - `**Experimental**` — API not frozen, compatibility not guaranteed

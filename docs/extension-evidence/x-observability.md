@@ -22,7 +22,7 @@ Evidence state: complete
 
 ## Primer And Boundary State
 
-- Primer: `docs/modules/x-observability/README.md`
+- Primer: `docs/modules/x/observability/README.md`
 - Manifest: `x/observability/module.yaml`
 - Boundary state: documented and aligned with keeping request-scoped transport
   observability in stable middleware while exporter and adapter wiring stays in

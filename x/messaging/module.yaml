@@ -14,7 +14,7 @@ entrypoint_reads:
   - specs/repo.yaml
   - specs/task-routing.yaml
   - specs/dependency-rules.yaml
-  - docs/modules/x-messaging/README.md
+  - docs/modules/x/messaging/README.md
 
 subordinate_families:
   - package: x/messaging/mq
@@ -67,7 +67,7 @@ test_commands:
   - go vet ./x/messaging/...
 
 doc_paths:
-  - docs/modules/x-messaging/README.md
+  - docs/modules/x/messaging/README.md
 
 change_risks:
   - delivery regression

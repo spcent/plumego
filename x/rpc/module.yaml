@@ -37,7 +37,7 @@ public_entrypoints:
   - gateway
 
 doc_paths:
-  - docs/modules/x-rpc/README.md
+  - docs/modules/x/rpc/README.md
   - reference/with-rpc
 
 allowed_imports:

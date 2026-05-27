@@ -14,7 +14,7 @@ entrypoint_reads:
   - specs/repo.yaml
   - specs/task-routing.yaml
   - specs/dependency-rules.yaml
-  - docs/modules/x-rest/README.md
+  - docs/modules/x/rest/README.md
 
 responsibilities:
   - REST resource helpers
@@ -52,7 +52,7 @@ test_commands:
   - go vet ./x/rest/...
 
 doc_paths:
-  - docs/modules/x-rest/README.md
+  - docs/modules/x/rest/README.md
 
 change_risks:
   - resource route regression

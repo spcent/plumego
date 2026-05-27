@@ -29,7 +29,7 @@ Do not use `x/tenant` for:
 ## Canonical Read Path
 
 1. `x/tenant/module.yaml`
-2. `docs/modules/x-tenant/README.md`
+2. `docs/modules/x/tenant/README.md`
 3. the owning package under `x/tenant/*`
 
 ## Typical Package Entry Points

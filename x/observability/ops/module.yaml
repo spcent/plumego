@@ -56,7 +56,7 @@ test_commands:
   - go vet ./x/observability/ops/...
 
 doc_paths:
-  - docs/modules/x-ops/README.md
+  - docs/modules/x/observability/ops/README.md
 
 review_checklist:
   - Keep ops endpoints explicit

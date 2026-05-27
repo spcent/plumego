@@ -54,7 +54,7 @@ test_commands:
   - go vet ./x/messaging/pubsub/...
 
 doc_paths:
-  - docs/modules/x-messaging/README.md
+  - docs/modules/x/messaging/README.md
 
 review_checklist:
   - Keep pubsub semantics explicit

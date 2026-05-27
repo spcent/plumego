@@ -48,7 +48,7 @@ test_commands:
   - go vet ./x/messaging/webhook/...
 
 doc_paths:
-  - docs/modules/x-messaging/README.md
+  - docs/modules/x/messaging/README.md
 
 change_risks:
   - signature verification regression

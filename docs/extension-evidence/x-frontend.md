@@ -62,7 +62,7 @@ Evidence state: complete
 
 ## Primer And Boundary State
 
-- Primer: `docs/modules/x-frontend/README.md`
+- Primer: `docs/modules/x/frontend/README.md`
 - Manifest: `x/frontend/module.yaml`
 - Boundary state: documented and aligned with keeping frontend asset policy in
   `x/frontend`, while stable `router` keeps only primitive static file mounts.

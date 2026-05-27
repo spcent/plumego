@@ -24,7 +24,7 @@ Evidence state: selected-surface complete
 
 ## Primer And Boundary State
 
-- Primer: `docs/modules/x-data/README.md`
+- Primer: `docs/modules/x/data/README.md`
 - Manifest: `x/data/module.yaml`
 - Boundary state: topology-heavy behavior is documented as extension-owned and
   kept outside stable `store`.

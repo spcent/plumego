@@ -4,7 +4,7 @@ Operating guide for AI coding agents working in this feature demo.
 
 Read `AGENTS.md` (repository root) for the full operating contract.
 Read `ARCHITECTURE.md` (this directory) for layout rationale.
-Read `docs/modules/x-websocket/README.md` for the `x/websocket` API.
+Read `docs/modules/x/websocket/README.md` for the `x/websocket` API.
 
 ---
 
@@ -83,7 +83,7 @@ make gates
 ## Non-goals
 
 - Do not use this demo as the starting point for room-based broadcast systems
-  without first reading `docs/modules/x-websocket/README.md`.
+  without first reading `docs/modules/x/websocket/README.md`.
 - Do not add business logic or domain models to this demo.
 - Do not use this demo to prototype authentication patterns — it intentionally
   leaves auth minimal for clarity.

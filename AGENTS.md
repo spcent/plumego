@@ -217,8 +217,9 @@ Also sync affected module primers under `docs/modules/`, `docs/EXTENSION_MATURIT
 `docs/ROADMAP.md`, or `docs/stable-api/` when that surface changes.
 
 The `docs/modules/` naming convention: stable roots use bare names (`core/`, `contract/`);
-top-level extensions use `x-{family}/` (`x-ai/`, `x-gateway/`); extension sub-packages also
-use `x-{subpkg}/` (`x-cache/` = `x/data/cache`, `x-mq/` = `x/messaging/mq`). See
+extension packages mirror the actual import path under a top-level `x/` directory
+(`x/ai/`, `x/gateway/`, `x/data/cache/`, `x/messaging/mq/`). The directory structure
+in `docs/modules/x/` is a 1:1 reflection of the `x/` source tree. See
 `docs/modules/INDEX.md` for the full mapping table.
 
 Document implemented behavior only.

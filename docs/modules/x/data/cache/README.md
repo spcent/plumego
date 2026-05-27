@@ -1,6 +1,6 @@
 # x/data/cache
 
-> **Import path:** `github.com/spcent/plumego/x/data/cache` — sub-package of [`x/data`](../x-data/README.md). This primer lives under `docs/modules/x-cache/` because the `docs/modules/` naming convention uses `x-{subpkg}` for both top-level extensions and their sub-packages.
+> **Import path:** `github.com/spcent/plumego/x/data/cache` — sub-package of [`x/data`](../README.md). This primer mirrors the package path under `docs/modules/x/`.
 
 ## Purpose
 

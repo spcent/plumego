@@ -21,7 +21,7 @@ Evidence state: complete
 
 ## Primer And Boundary State
 
-- Primer: `docs/modules/x-messaging/README.md`
+- Primer: `docs/modules/x/messaging/README.md`
 - Manifest: `x/messaging/module.yaml`
 - Boundary state: app-facing entrypoint is documented; subordinate primitive
   ownership still needs release observation before family promotion.

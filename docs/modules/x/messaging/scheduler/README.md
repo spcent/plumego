@@ -1,10 +1,10 @@
 # x/messaging/scheduler — Task Scheduling
 
-> **Import path:** `github.com/spcent/plumego/x/messaging/scheduler` — sub-package of [`x/messaging`](../x-messaging/README.md). This primer lives under `docs/modules/x-scheduler/` following the `x-{subpkg}` convention.
+> **Import path:** `github.com/spcent/plumego/x/messaging/scheduler` — sub-package of [`x/messaging`](../README.md). This primer mirrors the package path under `docs/modules/x/`.
 
 **Purpose:** In-process scheduling primitives within the `x/messaging` family. Provides cron parsing, delayed job execution, retry policies (fixed and exponential), in-memory and KV-backed job stores, and an admin HTTP handler.
 
-**Status:** Experimental — API may change. Start app-facing messaging feature discovery from [`x/messaging`](../x-messaging/README.md) before opening this package directly.
+**Status:** Experimental — API may change. Start app-facing messaging feature discovery from [`x/messaging`](../README.md) before opening this package directly.
 
 ---
 

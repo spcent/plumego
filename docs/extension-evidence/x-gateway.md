@@ -22,7 +22,7 @@ Evidence state: complete
 
 ## Primer And Boundary State
 
-- Primer: `docs/modules/x-gateway/README.md`
+- Primer: `docs/modules/x/gateway/README.md`
 - Manifest: `x/gateway/module.yaml`
 - Boundary state: documented and aligned with keeping gateway/edge transport in
   `x/gateway` and caller-owned discovery backend selection outside defaults.

@@ -202,5 +202,5 @@ go vet ./x/rpc/...
 ## Related
 
 - `reference/with-rpc/README.md` — canonical in-process gRPC + HTTP wiring example
-- `docs/modules/x-observability/README.md` — tracing primitives used by `TracingInterceptor`
+- `docs/modules/x/observability/README.md` — tracing primitives used by `TracingInterceptor`
 - `x/gateway/discovery` — dynamic backend lookup for client-side load balancing

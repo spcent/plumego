@@ -18,7 +18,7 @@ entrypoint_reads:
   - specs/dependency-rules.yaml
   - x/ai/module.yaml
   - x/ai/orchestration/module.yaml
-  - docs/modules/x-ai/README.md
+  - docs/modules/x/ai/README.md
 
 responsibilities:
   - DistributedEngine wrapping orchestration.Engine with durable execution
@@ -74,7 +74,7 @@ test_commands:
   - go vet ./x/ai/distributed/...
 
 doc_paths:
-  - docs/modules/x-ai/README.md
+  - docs/modules/x/ai/README.md
 
 change_risks:
   - TaskQueue interface change breaks all queue adapter implementations

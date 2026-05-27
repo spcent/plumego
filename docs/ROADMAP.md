@@ -72,7 +72,7 @@ Current state:
   InstallAgent error path, ListInstalledAgents, and install/uninstall
   round-trips; the previous `UpdateDownloadCount` deadlock and installation
   metadata round-trip bug are fixed
-- `docs/modules/x-ai/README.md` updated to list current test coverage
+- `docs/modules/x/ai/README.md` updated to list current test coverage
 
 Next work:
 
@@ -100,7 +100,7 @@ Current state:
 - tenant-aware `store/db` docs and tests now spell out the supported query-scoping subset and fail-closed misconfiguration behavior
 - quota, policy, and rate-limit coverage now includes `Retry-After`, canonical deny responses, and tenant-scoped isolation checks
 - `x/tenant/integration_test.go` covers the end-to-end resolve → policy → quota → ratelimit chain with tenant isolation verification
-- `docs/modules/x-tenant/README.md` updated to document integration test coverage
+- `docs/modules/x/tenant/README.md` updated to document integration test coverage
 
 Next work:
 
@@ -122,7 +122,7 @@ Current state:
 - Kubernetes backend uses the Endpoints API with in-cluster auto-detection
 - etcd backend uses the v3 HTTP gateway with explicit registration and health management
 - all four backends implement the `Discovery` interface via explicit constructors
-- `docs/modules/x-gateway/README.md` documents `x/gateway/discovery` backend selection guidance and standard validation
+- `docs/modules/x/gateway/README.md` documents `x/gateway/discovery` backend selection guidance and standard validation
 
 Next work:
 
@@ -143,8 +143,8 @@ Current state:
 - `x/fileapi` handler tests cover upload, download, cross-tenant isolation, info, delete, list, and signed URL paths
 - `x/data/file` helper and metadata tests cover `isPathSafe`, `mimeToExt`, `extToMime`, round-trip behavior, nil metadata database guards, metadata scan unmarshalling, and configurable metadata clocks
 - `x/data/rw`, `x/data/sharding`, `x/data/idempotency`, and `x/data/kvengine` all have tests
-- `docs/modules/x-data/README.md` documents failover, read-after-write, sharding strategies, and boundary rules
-- `docs/modules/x-fileapi/README.md` documents transport boundary and delegation to `x/data/file`
+- `docs/modules/x/data/README.md` documents failover, read-after-write, sharding strategies, and boundary rules
+- `docs/modules/x/fileapi/README.md` documents transport boundary and delegation to `x/data/file`
 - `store/file` boundary is documented in `docs/modules/store/README.md`
 
 Next work:
@@ -282,13 +282,13 @@ Work completed:
   net/http compatibility cost explanation
 - `docs/troubleshooting.md`: 14-category onboarding troubleshooting guide
 - `docs/getting-started_CN.md`: Chinese onboarding guide (complete)
-- `docs/modules/x-rpc/README.md`: expanded from 23 lines to full primer
+- `docs/modules/x/rpc/README.md`: expanded from 23 lines to full primer
   (server lifecycle, client pool, interceptors, gateway, wiring diagram)
-- `docs/modules/x-openapi/README.md`: expanded from 7 lines to full primer
+- `docs/modules/x/openapi/README.md`: expanded from 7 lines to full primer
   (CLI quick start, hint file format, Go API, serialisation, boundary rules)
-- `docs/modules/x-validate/README.md`: expanded from 18 lines to full primer
+- `docs/modules/x/validate/README.md`: expanded from 18 lines to full primer
   (BindJSON/Bind usage, Validator interface, adapter pattern, error shape)
-- `docs/modules/x-resilience/README.md`: usage examples added (circuit breaker,
+- `docs/modules/x/resilience/README.md`: usage examples added (circuit breaker,
   keyed rate limiter, HTTP middleware integration)
 - `docs/ADOPTION_PATH.md`: gRPC/RPC and OpenAPI entries added
 - `specs/change-recipes/`: three new recipes (add-websocket-room, add-ai-tool,

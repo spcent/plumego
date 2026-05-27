@@ -4,7 +4,7 @@ This package README is kept as a compatibility pointer.
 
 The canonical primer for `x/rest` now lives at:
 
-- `docs/modules/x-rest/README.md`
+- `docs/modules/x/rest/README.md`
 
 Use that document for:
 

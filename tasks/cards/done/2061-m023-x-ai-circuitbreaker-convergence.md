@@ -10,7 +10,7 @@ Owned Files:
 - `x/ai/resilience/provider.go`
 - `x/ai/resilience/provider_test.go`
 - `x/ai/circuitbreaker/adapter.go`
-- `docs/modules/x-ai/README.md`
+- `docs/modules/x/ai/README.md`
 - `specs/deprecation-inventory.yaml`
 Depends On: 2060
 
@@ -37,7 +37,7 @@ paths for the same behavior.
 - `x/ai/resilience/provider.go`
 - `x/ai/resilience/provider_test.go`
 - `x/ai/circuitbreaker/adapter.go`
-- `docs/modules/x-ai/README.md`
+- `docs/modules/x/ai/README.md`
 - `specs/deprecation-inventory.yaml`
 
 ## Acceptance Tests
@@ -52,7 +52,7 @@ paths for the same behavior.
 
 ## Docs Sync
 
-- `docs/modules/x-ai/README.md`
+- `docs/modules/x/ai/README.md`
 
 ## Validation
 

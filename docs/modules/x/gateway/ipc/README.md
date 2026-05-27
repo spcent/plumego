@@ -1,10 +1,10 @@
 # x/gateway/ipc — Inter-Process Communication
 
-> **Import path:** `github.com/spcent/plumego/x/gateway/ipc` — sub-package of [`x/gateway`](../x-gateway/README.md). This primer lives under `docs/modules/x-ipc/` following the `x-{subpkg}` convention.
+> **Import path:** `github.com/spcent/plumego/x/gateway/ipc` — sub-package of [`x/gateway`](../README.md). This primer mirrors the package path under `docs/modules/x/`.
 
 **Purpose:** IPC transport helpers within the `x/gateway` family. Provides framed client/server, connection pools, stream channels, heartbeat, and reconnect primitives for low-latency in-process or same-host communication.
 
-**Status:** Experimental — API may change. Start IPC-facing feature discovery from [`x/gateway`](../x-gateway/README.md) before opening this package directly.
+**Status:** Experimental — API may change. Start IPC-facing feature discovery from [`x/gateway`](../README.md) before opening this package directly.
 
 ---
 

@@ -10,7 +10,7 @@ Owned Files:
 - `x/ai/resilience/provider.go`
 - `x/ai/resilience/provider_test.go`
 - `x/resilience/ratelimit/ratelimit.go`
-- `docs/modules/x-ai/README.md`
+- `docs/modules/x/ai/README.md`
 Depends On: 1507
 
 Goal:
@@ -23,7 +23,7 @@ Scope:
   `x/resilience/ratelimit` primitives through explicit adapter fields.
 - Keep existing `x/ai` compatibility fields working unchanged.
 - Add the minimum `x/resilience/ratelimit` capability needed by the adapter.
-- Document the new preferred composition path in `docs/modules/x-ai/README.md`.
+- Document the new preferred composition path in `docs/modules/x/ai/README.md`.
 
 Non-goals:
 - Do not remove `x/ai/circuitbreaker` or `x/ai/ratelimit`.
@@ -34,7 +34,7 @@ Files:
 - `x/ai/resilience/provider.go`
 - `x/ai/resilience/provider_test.go`
 - `x/resilience/ratelimit/ratelimit.go`
-- `docs/modules/x-ai/README.md`
+- `docs/modules/x/ai/README.md`
 
 Acceptance Tests:
 - `go test -timeout 20s ./x/ai/resilience ./x/resilience/...`
@@ -44,7 +44,7 @@ Tests:
 - `go run ./internal/checks/dependency-rules`
 
 Docs Sync:
-- `docs/modules/x-ai/README.md`
+- `docs/modules/x/ai/README.md`
 
 Validation:
 - `go test -timeout 20s ./x/ai/... ./x/resilience/...`

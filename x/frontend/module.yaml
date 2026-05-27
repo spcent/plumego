@@ -20,7 +20,7 @@ entrypoint_reads:
   - specs/repo.yaml
   - specs/task-routing.yaml
   - specs/dependency-rules.yaml
-  - docs/modules/x-frontend/README.md
+  - docs/modules/x/frontend/README.md
 
 responsibilities:
   - Static asset mounting
@@ -77,7 +77,7 @@ test_commands:
   - go vet ./x/frontend/...
 
 doc_paths:
-  - docs/modules/x-frontend/README.md
+  - docs/modules/x/frontend/README.md
 
 change_risks:
   - asset fallback regression

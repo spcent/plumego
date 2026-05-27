@@ -387,7 +387,7 @@ func TestValidateModuleManifestsRequiresDeclaredDocPathsToExist(t *testing.T) {
 		t.Fatalf("expected no violations for existing doc_paths, got %v", violations)
 	}
 
-	writeFile(t, filepath.Join(repo, "x", "messaging", "webhook", "module.yaml"), validManifestWithDocPaths("x/messaging/webhook", "extension", "docs/modules/x-webhook/README.md"))
+	writeFile(t, filepath.Join(repo, "x", "messaging", "webhook", "module.yaml"), validManifestWithDocPaths("x/messaging/webhook", "extension", "docs/modules/x/messaging/webhook/README.md"))
 
 	violations, err = ValidateModuleManifests(repo)
 	if err != nil {
@@ -395,7 +395,7 @@ func TestValidateModuleManifestsRequiresDeclaredDocPathsToExist(t *testing.T) {
 	}
 
 	joined := strings.Join(violations, "\n")
-	if !strings.Contains(joined, `doc_paths target "docs/modules/x-webhook/README.md" does not exist`) {
+	if !strings.Contains(joined, `doc_paths target "docs/modules/x/messaging/webhook/README.md" does not exist`) {
 		t.Fatalf("expected missing doc_paths violation, got:\n%s", joined)
 	}
 }
@@ -643,8 +643,8 @@ func TestReadCanonicalExtensionEntrypointsParsesCanonicalRoots(t *testing.T) {
 
 func TestFindExtensionPrimerCoverageViolationsRequiresDocPaths(t *testing.T) {
 	repo := t.TempDir()
-	writeFile(t, filepath.Join(repo, "x", "gateway", "module.yaml"), validManifestWithDocPaths("x/gateway", "extension", "docs/modules/x-gateway/README.md"))
-	writeFile(t, filepath.Join(repo, "docs", "modules", "x-gateway", "README.md"), "# x/gateway\n")
+	writeFile(t, filepath.Join(repo, "x", "gateway", "module.yaml"), validManifestWithDocPaths("x/gateway", "extension", "docs/modules/x/gateway/README.md"))
+	writeFile(t, filepath.Join(repo, "docs", "modules", "x", "gateway", "README.md"), "# x/gateway\n")
 	writeFile(t, filepath.Join(repo, "x", "rest", "module.yaml"), validManifest("x/rest", "extension"))
 
 	violations, err := FindExtensionPrimerCoverageViolations(repo, []string{"x/gateway", "x/rest", "x/fileapi"})

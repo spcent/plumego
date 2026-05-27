@@ -14,7 +14,7 @@ entrypoint_reads:
   - specs/repo.yaml
   - specs/task-routing.yaml
   - specs/dependency-rules.yaml
-  - docs/modules/x-gateway/README.md
+  - docs/modules/x/gateway/README.md
 
 subordinate_families:
   - package: x/gateway/discovery
@@ -67,7 +67,7 @@ test_commands:
   - go vet ./x/gateway/...
 
 doc_paths:
-  - docs/modules/x-gateway/README.md
+  - docs/modules/x/gateway/README.md
 
 change_risks:
   - proxy rewrite regression

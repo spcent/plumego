@@ -15,7 +15,7 @@ signals:
     docs_signal: docs:primer
     coverage_signal: coverage:topology
   - module: x/data
-    recommended_entrypoint: "`docs/modules/x-data/README.md` before subordinate data packages"
+    recommended_entrypoint: "`docs/modules/x/data/README.md` before subordinate data packages"
     docs_signal: docs:primer
     coverage_signal: coverage:sub-surface-inventory
   - module: x/observability/devtools

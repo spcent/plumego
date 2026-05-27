@@ -242,14 +242,14 @@ app.Shutdown(ctx)          // 优雅关闭
 
 | 需求 | 第一个读的文档 |
 |---|---|
-| CRUD 资源约定 | `docs/modules/x-rest/README.md` |
-| 多租户：解析、策略、配额 | `docs/modules/x-tenant/README.md` |
-| 反向代理、负载均衡 | `docs/modules/x-gateway/README.md` |
-| WebSocket 实时功能 | `docs/modules/x-websocket/README.md` |
-| AI 服务接入 | `docs/modules/x-ai/README.md` |
-| 消息队列/Webhook | `docs/modules/x-messaging/README.md` |
-| gRPC 传输 | `docs/modules/x-rpc/README.md` |
-| Prometheus / OpenTelemetry | `docs/modules/x-observability/README.md` |
+| CRUD 资源约定 | `docs/modules/x/rest/README.md` |
+| 多租户：解析、策略、配额 | `docs/modules/x/tenant/README.md` |
+| 反向代理、负载均衡 | `docs/modules/x/gateway/README.md` |
+| WebSocket 实时功能 | `docs/modules/x/websocket/README.md` |
+| AI 服务接入 | `docs/modules/x/ai/README.md` |
+| 消息队列/Webhook | `docs/modules/x/messaging/README.md` |
+| gRPC 传输 | `docs/modules/x/rpc/README.md` |
+| Prometheus / OpenTelemetry | `docs/modules/x/observability/README.md` |
 
 不要从 `x/*` 包出发构建应用结构。扩展包是对规范应用结构的显式增量，不是另一套启动框架。
 

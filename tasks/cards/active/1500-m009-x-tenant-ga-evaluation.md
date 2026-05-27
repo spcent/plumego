@@ -52,7 +52,7 @@ Tests:
 
 Docs Sync:
 - Required: update `docs/EXTENSION_MATURITY.md`, `x/tenant/module.yaml` status,
-  `docs/ROADMAP.md` Phase 9, and `docs/modules/x-tenant/README.md` v-status table.
+  `docs/ROADMAP.md` Phase 9, and `docs/modules/x/tenant/README.md` v-status table.
 
 Done Definition:
 - `x/tenant` has `status: ga` in its module.yaml, OR
