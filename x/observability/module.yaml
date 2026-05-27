@@ -121,8 +121,8 @@ docs_sync_contract:
     - docs/ROADMAP.md
     - specs/extension-maturity.yaml
   on_api_change:
-    - docs/modules/x-observability/README.md
+    - docs/modules/x/observability/README.md
     - website/src/content/docs/docs/modules/x-observability.mdx
     - website/src/content/docs/zh/docs/modules/x-observability.mdx
   on_behavior_change:
-    - docs/modules/x-observability/README.md
+    - docs/modules/x/observability/README.md

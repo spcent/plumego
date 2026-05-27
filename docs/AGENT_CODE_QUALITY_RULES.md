@@ -7,63 +7,18 @@ contract. Use it with `AGENTS.md`, `docs/CODEX_WORKFLOW.md`,
 
 ## 1. Rule Levels
 
-### MUST
+All `AGENTS.md §2` non-negotiables are MUST rules. Additional MUST rules:
 
-Violations block handoff or merge readiness unless a documented exception
-exists.
-
-- Stable roots must not import `x/*`.
-- The main module must not add an unapproved non-stdlib dependency.
-- `net/http` compatibility must be preserved.
 - Behavior changes must include focused tests.
-- Auth, verification, signature, and policy failures must fail closed.
-- Secrets, tokens, signatures, and private keys must not be logged or returned.
-- Hidden globals, `init()` registration, and context service-locator flows are forbidden.
-- Exported symbol removal, rename, or behavior change must migrate every caller in the same change.
-- HTTP JSON APIs must use the canonical `contract.WriteResponse` and `contract.WriteError` paths.
+- HTTP JSON APIs must use `contract.WriteResponse` and `contract.WriteError`.
 
-### SHOULD
+**SHOULD**: one primary module per change; standard-library shapes; tests next to behavior; grep-friendly wiring; smallest safe context package; module checks first, boundary second, gates last; compact validation summaries.
 
-- Keep each change centered on one primary module.
-- Prefer standard-library shapes and existing local patterns.
-- Place tests next to changed behavior.
-- Keep route, handler, and middleware wiring grep-friendly.
-- Document implemented behavior only.
-- Run module checks first, boundary checks second, and repo-wide gates last.
-- Load the smallest safe context package.
-- Summarize validation output compactly.
-
-### MAY
-
-- Extract a small helper when local repetition is clear and stable.
-- Skip Go gates for docs-only changes.
-- Keep a compatibility layer only with an explicit migration window.
-- Split broad work into an analysis pass or task card before coding.
+**MAY**: extract helper when local repetition is clear; skip Go gates for docs-only; compatibility layer only with explicit migration window; split broad work into analysis pass first.
 
 ## 2. Preflight
 
-Before editing, answer:
-
-```text
-Context package:
-Owning module:
-Target module.yaml read:
-In-scope paths:
-Out-of-scope paths:
-Public API impact: none / yes
-Dependency impact: none / yes
-Behavior impact: none / yes
-Security impact: none / yes
-Docs impact: none / yes
-Validation plan:
-```
-
-Stop in analysis-only mode when ownership, dependency impact, stable public API
-impact, or cross-module boundaries are unclear.
-
-Use `docs/AGENT_CONTEXT_BUDGET.md` to choose `startup`, `implementation`,
-`review`, or `control-plane` before reading beyond the selected
-`specs/task-routing.yaml` `start_with` files.
+The preflight template is in `AGENTS.md §4`. Stop in analysis-only mode when ownership, dependency impact, stable public API impact, or cross-module boundaries are unclear. Use `docs/AGENT_CONTEXT_BUDGET.md` to choose the context package.
 
 ## 3. Module Quality Focus
 

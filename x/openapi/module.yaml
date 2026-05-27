@@ -113,8 +113,8 @@ docs_sync_contract:
     - docs/ROADMAP.md
     - specs/extension-maturity.yaml
   on_api_change:
-    - docs/modules/x-openapi/README.md
+    - docs/modules/x/openapi/README.md
     - website/src/content/docs/docs/modules/x-openapi.mdx
     - website/src/content/docs/zh/docs/modules/x-openapi.mdx
   on_behavior_change:
-    - docs/modules/x-openapi/README.md
+    - docs/modules/x/openapi/README.md

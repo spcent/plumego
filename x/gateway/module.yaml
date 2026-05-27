@@ -109,8 +109,8 @@ docs_sync_contract:
     - docs/ROADMAP.md
     - specs/extension-maturity.yaml
   on_api_change:
-    - docs/modules/x-gateway/README.md
+    - docs/modules/x/gateway/README.md
     - website/src/content/docs/docs/modules/x-gateway.mdx
     - website/src/content/docs/zh/docs/modules/x-gateway.mdx
   on_behavior_change:
-    - docs/modules/x-gateway/README.md
+    - docs/modules/x/gateway/README.md
