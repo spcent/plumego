@@ -15,7 +15,7 @@ import (
 // the demo compiles and runs without a real build directory. In a real service,
 // replace fstest.MapFS with your framework's build output (embed.FS or a dir).
 func (a *App) RegisterRoutes() error {
-	api := handler.APIHandler{}
+	api := handler.APIHandler{Logger: a.Core.Logger()}
 	if err := a.Core.Get(a.Cfg.APIPrefix+"/status", http.HandlerFunc(api.Status)); err != nil {
 		return err
 	}

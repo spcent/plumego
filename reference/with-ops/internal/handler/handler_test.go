@@ -6,9 +6,14 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	plumelog "github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/metrics"
 	"with-ops/internal/config"
 )
+
+func discardLogger() plumelog.StructuredLogger {
+	return plumelog.NewLogger(plumelog.LoggerConfig{Format: plumelog.LoggerFormatDiscard})
+}
 
 func newTestHandler(t *testing.T) *Handler {
 	t.Helper()
@@ -16,7 +21,7 @@ func newTestHandler(t *testing.T) *Handler {
 	if err != nil {
 		t.Fatalf("load config: %v", err)
 	}
-	return New(cfg, metrics.NewBaseMetricsCollector())
+	return New(cfg, metrics.NewBaseMetricsCollector(), discardLogger())
 }
 
 func TestRootResponseShape(t *testing.T) {

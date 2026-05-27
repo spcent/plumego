@@ -46,7 +46,7 @@ func New(cfg config.Config) (*App, error) {
 		Core:  app,
 		Cfg:   cfg,
 		Users: users,
-		Items: handler.NewCreateItem(playground.NewValidator()),
+		Items: handler.NewCreateItem(playground.NewValidator(), app.Logger()),
 	}, nil
 }
 

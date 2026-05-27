@@ -52,7 +52,7 @@ Read `ARCHITECTURE.md` (this directory) for layout rationale.
 **Handler method on APIHandler** (lifecycle dependencies already wired — Logger, ServiceName, Version):
 ```go
 func (h APIHandler) MyEndpoint(w http.ResponseWriter, r *http.Request) {
-    _ = contract.WriteResponse(w, r, http.StatusOK, response, nil)
+    logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusOK, response, nil))
 }
 ```
 
@@ -63,36 +63,42 @@ func (h APIHandler) MyEndpoint(w http.ResponseWriter, r *http.Request) {
 type WidgetRepository interface {
     Get(ctx context.Context, id string) (Widget, bool)
 }
-type WidgetHandler struct{ Repo WidgetRepository }
+type WidgetHandler struct {
+    Repo   WidgetRepository
+    Logger plumelog.StructuredLogger // pass a.Core.Logger() from routes.go
+}
 
 func (h WidgetHandler) GetByID(w http.ResponseWriter, r *http.Request) {
     id := router.Param(r, "id")
     widget, ok := h.Repo.Get(r.Context(), id)
     if !ok {
-        _ = contract.WriteError(w, r, contract.NewErrorBuilder().
-            Type(contract.TypeNotFound).Detail("id", id).Message("not found").Build())
+        logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+            Type(contract.TypeNotFound).Detail("id", id).Message("not found").Build()))
         return
     }
-    _ = contract.WriteResponse(w, r, http.StatusOK, widget, nil)
+    logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusOK, widget, nil))
 }
 
 // internal/domain/widget/store.go
 func NewMemoryStore() *MemoryStore { /* ... */ }
 
 // app/routes.go
-widgets := handler.WidgetHandler{Repo: widget.NewMemoryStore()}
+widgets := handler.WidgetHandler{Repo: widget.NewMemoryStore(), Logger: a.Core.Logger()}
 if err := a.Core.Get("/api/v1/widgets/:id", http.HandlerFunc(widgets.GetByID)); err != nil {
     return err
 }
 ```
+
+`logWriteErr` is defined in `internal/handler/write.go`. It logs the error at Warn
+level when the write fails (e.g., client disconnect after headers are sent).
 
 **POST with request body decode**:
 ```go
 func (h WidgetHandler) Create(w http.ResponseWriter, r *http.Request) {
     var req struct{ Name string `json:"name"` }
     if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-        _ = contract.WriteError(w, r, contract.NewErrorBuilder().
-            Type(contract.TypeBadRequest).Message("body must be valid JSON").Build())
+        logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+            Type(contract.TypeBadRequest).Message("body must be valid JSON").Build()))
         return
     }
     // validate, call repo, write 201
@@ -115,6 +121,7 @@ func (c *dbChecker) Check(ctx context.Context) error { return c.db.PingContext(c
 // Wire it in routes.go alongside the other handler dependencies.
 health := handler.HealthHandler{
     ServiceName: a.Cfg.App.ServiceName,
+    Logger:      a.Core.Logger(),
     Checkers: []health.ComponentChecker{
         &dbChecker{db: myDB},
     },
@@ -146,14 +153,14 @@ func (s *MemoryStore) Delete(_ context.Context, id string) bool { ... }
 
 // 3. Add handler methods in handler/widgets.go
 func (h WidgetHandler) List(w http.ResponseWriter, r *http.Request) {
-    _ = contract.WriteResponse(w, r, http.StatusOK, h.Repo.List(r.Context()), nil)
+    logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusOK, h.Repo.List(r.Context()), nil))
 }
 
 func (h WidgetHandler) Delete(w http.ResponseWriter, r *http.Request) {
     id := router.Param(r, "id")
     if !h.Repo.Delete(r.Context(), id) {
-        _ = contract.WriteError(w, r, contract.NewErrorBuilder().
-            Type(contract.TypeNotFound).Detail("id", id).Message("not found").Build())
+        logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+            Type(contract.TypeNotFound).Detail("id", id).Message("not found").Build()))
         return
     }
     w.WriteHeader(http.StatusNoContent)
@@ -181,29 +188,29 @@ func (h WidgetHandler) Create(w http.ResponseWriter, r *http.Request) {
         Color string `json:"color"`
     }
     if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-        _ = contract.WriteError(w, r, contract.NewErrorBuilder().
+        logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
             Type(contract.TypeBadRequest).
             Code("widget.create.invalid_json").
             Message("request body must be valid JSON").
-            Build())
+            Build()))
         return
     }
     if req.Name == "" {
-        _ = contract.WriteError(w, r, contract.NewErrorBuilder().
+        logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
             Type(contract.TypeRequired).
             Code("widget.name.required").
             Detail("field", "name").
             Message("name is required").
-            Build())
+            Build()))
         return
     }
     if req.Color == "" {
-        _ = contract.WriteError(w, r, contract.NewErrorBuilder().
+        logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
             Type(contract.TypeRequired).
             Code("widget.color.required").
             Detail("field", "color").
             Message("color is required").
-            Build())
+            Build()))
         return
     }
     // all fields valid — proceed
@@ -221,7 +228,8 @@ constant per distinct error code at the top of the handler file.
 2. Set a safe default in `Defaults()`.
 3. Read from `.env` in `applyEnvMap()` when local file support is needed.
 4. Read from environment in `applyEnv()`.
-5. Optionally expose as a flag in `applyFlags()`.
+5. Optionally expose as a flag in `applyFlags()` — no extra maintenance needed;
+   `filterFlagArgs` picks up the new flag automatically via `fs.VisitAll`.
 6. Use the field in `routes.go` or pass it to a handler constructor.
 
 ### Add middleware

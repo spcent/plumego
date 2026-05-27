@@ -8,7 +8,7 @@ import (
 )
 
 func TestAPIStatusShape(t *testing.T) {
-	h := APIHandler{}
+	h := APIHandler{Logger: nil}
 	req := httptest.NewRequest(http.MethodGet, "/api/status", nil)
 	rec := httptest.NewRecorder()
 

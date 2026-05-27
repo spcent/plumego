@@ -11,10 +11,17 @@ import (
 
 	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/health"
+	plumelog "github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/metrics"
 	tenantcore "github.com/spcent/plumego/x/tenant/core"
 	"production-service/internal/domain/tenant"
 )
+
+// discardLogger returns a StructuredLogger that silently discards all output.
+// Use it in tests that construct handlers to satisfy the non-nil Logger requirement.
+func discardLogger() plumelog.StructuredLogger {
+	return plumelog.NewLogger(plumelog.LoggerConfig{Format: plumelog.LoggerFormatDiscard})
+}
 
 // componentChecker adapts a name and check function to health.ComponentChecker.
 type componentChecker struct {
@@ -103,6 +110,7 @@ func decodeErrorDetails(t *testing.T, rec *httptest.ResponseRecorder) map[string
 func TestServiceHandlerRoot(t *testing.T) {
 	h := ServiceHandler{
 		ServiceName: "test-service",
+		Logger:      discardLogger(),
 		Features:    []string{"feature_a", "feature_b"},
 	}
 	rec := httptest.NewRecorder()
@@ -115,9 +123,6 @@ func TestServiceHandlerRoot(t *testing.T) {
 	if got.Service != "test-service" {
 		t.Fatalf("service = %q, want %q", got.Service, "test-service")
 	}
-	if got.Mode != "production-reference" {
-		t.Fatalf("mode = %q, want production-reference", got.Mode)
-	}
 	if got.Timestamp == "" {
 		t.Fatal("timestamp must not be empty")
 	}
@@ -127,7 +132,7 @@ func TestServiceHandlerRoot(t *testing.T) {
 }
 
 func TestServiceHandlerLive(t *testing.T) {
-	h := ServiceHandler{ServiceName: "test-service"}
+	h := ServiceHandler{ServiceName: "test-service", Logger: discardLogger()}
 	rec := httptest.NewRecorder()
 	h.Live(rec, httptest.NewRequest(http.MethodGet, "/healthz", nil))
 
@@ -150,7 +155,7 @@ func TestServiceHandlerLive(t *testing.T) {
 }
 
 func TestServiceHandlerReadyNoCheckers(t *testing.T) {
-	h := ServiceHandler{ServiceName: "test-service"}
+	h := ServiceHandler{ServiceName: "test-service", Logger: discardLogger()}
 	rec := httptest.NewRecorder()
 	h.Ready(rec, httptest.NewRequest(http.MethodGet, "/readyz", nil))
 
@@ -173,6 +178,7 @@ func TestServiceHandlerReadyWithCheckers(t *testing.T) {
 	t.Run("passing checker returns 200 with component map", func(t *testing.T) {
 		h := ServiceHandler{
 			ServiceName: "test-service",
+			Logger:      discardLogger(),
 			Checkers: []health.ComponentChecker{
 				componentChecker{name: "database", check: func(_ context.Context) error { return nil }},
 			},
@@ -192,9 +198,10 @@ func TestServiceHandlerReadyWithCheckers(t *testing.T) {
 		}
 	})
 
-	t.Run("failing checker returns 503 naming the component", func(t *testing.T) {
+	t.Run("failing checker returns 503 with component name as detail key", func(t *testing.T) {
 		h := ServiceHandler{
 			ServiceName: "test-service",
+			Logger:      discardLogger(),
 			Checkers: []health.ComponentChecker{
 				componentChecker{name: "database", check: func(_ context.Context) error {
 					return errors.New("connection refused")
@@ -208,17 +215,15 @@ func TestServiceHandlerReadyWithCheckers(t *testing.T) {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusServiceUnavailable)
 		}
 		details := decodeErrorDetails(t, rec)
-		if details["component"] != "database" {
-			t.Fatalf("error detail component = %v, want database", details["component"])
-		}
-		if details["reason"] != "connection refused" {
-			t.Fatalf("error detail reason = %v, want connection refused", details["reason"])
+		if details["database"] != "connection refused" {
+			t.Fatalf("error detail database = %v, want connection refused; all details: %v", details["database"], details)
 		}
 	})
 
-	t.Run("multiple checkers: first passes second fails returns 503 for second", func(t *testing.T) {
+	t.Run("first checker passes second fails returns 503 for failing component", func(t *testing.T) {
 		h := ServiceHandler{
 			ServiceName: "test-service",
+			Logger:      discardLogger(),
 			Checkers: []health.ComponentChecker{
 				componentChecker{name: "database", check: func(_ context.Context) error { return nil }},
 				componentChecker{name: "cache", check: func(_ context.Context) error {
@@ -233,14 +238,43 @@ func TestServiceHandlerReadyWithCheckers(t *testing.T) {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusServiceUnavailable)
 		}
 		details := decodeErrorDetails(t, rec)
-		if details["component"] != "cache" {
-			t.Fatalf("error detail component = %v, want cache", details["component"])
+		if details["cache"] != "cache offline" {
+			t.Fatalf("error detail cache = %v, want cache offline; all details: %v", details["cache"], details)
+		}
+	})
+
+	t.Run("both checkers failing returns 503 with all failing component details", func(t *testing.T) {
+		h := ServiceHandler{
+			ServiceName: "test-service",
+			Logger:      discardLogger(),
+			Checkers: []health.ComponentChecker{
+				componentChecker{name: "database", check: func(_ context.Context) error {
+					return errors.New("connection refused")
+				}},
+				componentChecker{name: "cache", check: func(_ context.Context) error {
+					return errors.New("cache offline")
+				}},
+			},
+		}
+		rec := httptest.NewRecorder()
+		h.Ready(rec, httptest.NewRequest(http.MethodGet, "/readyz", nil))
+
+		if rec.Code != http.StatusServiceUnavailable {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusServiceUnavailable)
+		}
+		details := decodeErrorDetails(t, rec)
+		if details["database"] != "connection refused" {
+			t.Fatalf("error detail database = %v, want connection refused; all details: %v", details["database"], details)
+		}
+		if details["cache"] != "cache offline" {
+			t.Fatalf("error detail cache = %v, want cache offline; all details: %v", details["cache"], details)
 		}
 	})
 
 	t.Run("all checkers passing returns component map with all true", func(t *testing.T) {
 		h := ServiceHandler{
 			ServiceName: "test-service",
+			Logger:      discardLogger(),
 			Checkers: []health.ComponentChecker{
 				componentChecker{name: "database", check: func(_ context.Context) error { return nil }},
 				componentChecker{name: "cache", check: func(_ context.Context) error { return nil }},
@@ -275,7 +309,7 @@ func TestProfileHandlerGetProfile(t *testing.T) {
 			},
 		},
 	}
-	h := ProfileHandler{Profiles: profiles}
+	h := ProfileHandler{Profiles: profiles, Logger: discardLogger()}
 
 	t.Run("known tenant returns 200 with profile", func(t *testing.T) {
 		req := tenantcore.RequestWithTenantID(
@@ -314,6 +348,7 @@ func TestOpsHandlerMetricStats(t *testing.T) {
 				TotalRecords: 42,
 			},
 		},
+		Logger: discardLogger(),
 	}
 	rec := httptest.NewRecorder()
 	h.MetricStats(rec, httptest.NewRequest(http.MethodGet, "/ops/metrics", nil))
@@ -329,6 +364,7 @@ func TestOpsHandlerMetricStats(t *testing.T) {
 
 func TestStatusHandlerStatus(t *testing.T) {
 	h := StatusHandler{
+		Logger: discardLogger(),
 		Cfg: StatusConfig{
 			ServiceName:    "test-service",
 			Environment:    "test",
@@ -340,7 +376,6 @@ func TestStatusHandlerStatus(t *testing.T) {
 				Kind:        "app_local_in_memory_reference",
 				Replacement: "replace Store",
 			},
-			Middleware: []string{"requestid", "recovery"},
 		},
 	}
 	rec := httptest.NewRecorder()
@@ -373,9 +408,6 @@ func TestStatusHandlerStatus(t *testing.T) {
 	}
 	if got.Storage.ProfileStore != "app_local_in_memory_reference" {
 		t.Fatalf("storage.profile_store = %q", got.Storage.ProfileStore)
-	}
-	if len(got.Middleware) != 2 {
-		t.Fatalf("middleware len = %d, want 2", len(got.Middleware))
 	}
 	if got.Timestamp == "" {
 		t.Fatal("timestamp must not be empty")

@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/spcent/plumego/contract"
+	plumelog "github.com/spcent/plumego/log"
 )
 
 // WriteKeyHeader is the request header that carries the write-operation key.
@@ -23,9 +24,9 @@ const codeAuthKeyInvalid = "auth.key.invalid"
 // Timing-safe comparison (crypto/subtle.ConstantTimeCompare) prevents attackers
 // from using response time to guess the key byte-by-byte.
 //
-//	writeGuard := handler.RequireWriteKey(cfg.App.WriteKey)
+//	writeGuard := handler.RequireWriteKey(cfg.App.WriteKey, a.Core.Logger())
 //	v1.post("/items", writeGuard(http.HandlerFunc(items.Create)))
-func RequireWriteKey(key string) func(http.Handler) http.Handler {
+func RequireWriteKey(key string, logger plumelog.StructuredLogger) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		if key == "" {
 			// Guard disabled — pass through without any header check.
@@ -34,11 +35,11 @@ func RequireWriteKey(key string) func(http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			headerVal := r.Header.Get(WriteKeyHeader)
 			if subtle.ConstantTimeCompare([]byte(headerVal), []byte(key)) != 1 {
-				_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+				logWriteErr(logger, contract.WriteError(w, r, contract.NewErrorBuilder().
 					Type(contract.TypeUnauthorized).
 					Code(codeAuthKeyInvalid).
 					Message("valid X-Write-Key header required").
-					Build())
+					Build()))
 				return
 			}
 			next.ServeHTTP(w, r)

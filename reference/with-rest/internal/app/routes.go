@@ -4,12 +4,16 @@ import (
 	"net/http"
 
 	"github.com/spcent/plumego/contract"
+	plumelog "github.com/spcent/plumego/log"
 )
 
 // RegisterRoutes wires all HTTP routes for the with-rest demo.
 func (a *App) RegisterRoutes() error {
+	logger := a.Core.Logger()
 	reg := newRouteReg(a.Core)
-	reg.get("/api/hello", http.HandlerFunc(hello))
+	reg.get("/api/hello", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hello(w, r, logger)
+	}))
 	// x/rest resource: list, get, create, update, delete
 	reg.get("/api/users", http.HandlerFunc(a.Users.Index))
 	reg.get("/api/users/:id", http.HandlerFunc(a.Users.Show))
@@ -20,10 +24,12 @@ func (a *App) RegisterRoutes() error {
 	return reg.err
 }
 
-func hello(w http.ResponseWriter, r *http.Request) {
-	_ = contract.WriteResponse(w, r, http.StatusOK, map[string]string{
+func hello(w http.ResponseWriter, r *http.Request, logger plumelog.StructuredLogger) {
+	if err := contract.WriteResponse(w, r, http.StatusOK, map[string]string{
 		"message": "hello from with-rest",
-	}, nil)
+	}, nil); err != nil && logger != nil {
+		logger.Warn("write response failed", plumelog.Fields{"error": err.Error()})
+	}
 }
 
 // routeAdder is the minimal interface shared by *core.App and *core.RouteGroup.

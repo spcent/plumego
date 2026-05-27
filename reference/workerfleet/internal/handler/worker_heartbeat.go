@@ -53,7 +53,7 @@ type HeartbeatWorkerResult struct {
 
 func (h *Handler) HeartbeatWorker(w http.ResponseWriter, r *http.Request) {
 	if h.service == nil {
-		writeNotImplemented(w, r, "heartbeat_service_not_configured", "worker heartbeat service not configured")
+		h.writeNotImplemented(w, r, "heartbeat_service_not_configured", "worker heartbeat service not configured")
 		return
 	}
 	if !h.requireWorkerIngressAuth(w, r) {
@@ -62,16 +62,16 @@ func (h *Handler) HeartbeatWorker(w http.ResponseWriter, r *http.Request) {
 
 	var req HeartbeatWorkerRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeInvalidJSON(w, r)
+		h.writeInvalidJSON(w, r)
 		return
 	}
 	if strings.TrimSpace(req.WorkerID) == "" {
-		writeRequiredJSONField(w, r, "worker_id")
+		h.writeRequiredJSONField(w, r, "worker_id")
 		return
 	}
 	for _, task := range req.ActiveTasks {
 		if strings.TrimSpace(task.TaskID) == "" {
-			writeRequiredJSONField(w, r, "task_id")
+			h.writeRequiredJSONField(w, r, "task_id")
 			return
 		}
 	}
@@ -109,11 +109,11 @@ func (h *Handler) HeartbeatWorker(w http.ResponseWriter, r *http.Request) {
 		ActiveTasks:    activeTasks,
 	})
 	if err != nil {
-		writeServiceError(w, r, err)
+		h.writeServiceError(w, r, err)
 		return
 	}
 
-	_ = contract.WriteResponse(w, r, http.StatusOK, heartbeatWorkerResultFromApp(result), nil)
+	logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusOK, heartbeatWorkerResultFromApp(result), nil))
 }
 
 func heartbeatWorkerResultFromApp(result workerapp.HeartbeatWorkerResult) HeartbeatWorkerResult {

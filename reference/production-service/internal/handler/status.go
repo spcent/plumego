@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/spcent/plumego/contract"
+	plumelog "github.com/spcent/plumego/log"
 )
 
 // StatusConfig carries all observable state needed to build the /api/status response.
@@ -18,7 +19,6 @@ type StatusConfig struct {
 	RateLimit      float64
 	RateBurst      int
 	Profiles       ProfilesSummary
-	Middleware     []string
 }
 
 // ProfilesSummary carries the observable storage policy for the /api/status response.
@@ -29,8 +29,10 @@ type ProfilesSummary struct {
 }
 
 // StatusHandler serves GET /api/status.
+// Logger must not be nil; pass a.Core.Logger() from routes.go.
 type StatusHandler struct {
-	Cfg StatusConfig
+	Cfg    StatusConfig
+	Logger plumelog.StructuredLogger
 }
 
 // StatusResponse is the /api/status response body.
@@ -38,9 +40,7 @@ type StatusHandler struct {
 type StatusResponse struct {
 	Status     string                 `json:"status"`
 	Service    string                 `json:"service"`
-	Profile    string                 `json:"profile"`
 	Timestamp  string                 `json:"timestamp"`
-	Middleware []string               `json:"middleware"`
 	Deployment StatusDeploymentPolicy `json:"deployment"`
 	Limits     StatusLimits           `json:"limits"`
 	Security   StatusSecurityPolicy   `json:"security"`
@@ -97,12 +97,10 @@ type StatusOpsPolicy struct {
 // Status responds with a full production configuration summary.
 // It surfaces implemented behavior only — no token values are included.
 func (h StatusHandler) Status(w http.ResponseWriter, r *http.Request) {
-	_ = contract.WriteResponse(w, r, http.StatusOK, StatusResponse{
-		Status:     "healthy",
-		Service:    h.Cfg.ServiceName,
-		Profile:    "production-reference",
-		Timestamp:  utcNow(),
-		Middleware: h.Cfg.Middleware,
+	logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusOK, StatusResponse{
+		Status:    "healthy",
+		Service:   h.Cfg.ServiceName,
+		Timestamp: utcNow(),
 		Deployment: StatusDeploymentPolicy{
 			Environment: h.Cfg.Environment,
 			Config:      "environment_and_flags",
@@ -136,5 +134,5 @@ func (h StatusHandler) Status(w http.ResponseWriter, r *http.Request) {
 			OpsAuth:      "bearer_token_required",
 			Devtools:     "not_mounted_by_default",
 		},
-	}, nil)
+	}, nil))
 }

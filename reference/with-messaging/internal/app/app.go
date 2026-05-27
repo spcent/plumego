@@ -50,7 +50,7 @@ func New(cfg config.Config) (*App, error) {
 	return &App{
 		Core:    a,
 		Cfg:     cfg,
-		Handler: handler.MessagingHandler{Broker: broker},
+		Handler: handler.MessagingHandler{Broker: broker, Logger: a.Logger()},
 	}, nil
 }
 

@@ -73,7 +73,7 @@ func New(cfg config.Config, deps Deps) (*App, error) {
 		Logger:    logger,
 		Bus:       bus,
 		Messaging: svc,
-		Orders:    order.NewHandler(publisher),
+		Orders:    order.NewHandler(publisher, logger),
 		Consumer:  consumer,
 		Webhooks:  webhooks,
 	}, nil

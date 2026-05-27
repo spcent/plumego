@@ -55,6 +55,14 @@ func New(cfg config.Config) (*App, error) {
 	); err != nil {
 		return nil, fmt.Errorf("register middleware: %w", err)
 	}
+	// Extension points: additional stable-root middleware available when needed.
+	// Add these to app.Use above at the appropriate position:
+	//   middleware/security    — security headers (CSP, HSTS, X-Frame-Options, …)
+	//   middleware/ratelimit   — token-bucket abuse guard per IP or API key
+	//   middleware/tracing     — distributed tracing span lifecycle
+	//   middleware/httpmetrics — request count, latency, and error-rate counters
+	//   middleware/cors        — cross-origin resource sharing
+	// See reference/production-service for a hardened baseline with these wired in.
 
 	return &App{
 		Core: app,

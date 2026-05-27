@@ -122,16 +122,18 @@ type ItemRepository interface {
 }
 
 type ItemHandler struct {
-    Repo ItemRepository
+    Repo   ItemRepository
+    Logger plumelog.StructuredLogger // must not be nil; pass a.Core.Logger() from routes.go
 }
 
 // routes.go wires the concrete implementation
-items := handler.ItemHandler{Repo: item.NewMemoryStore()}
+items := handler.ItemHandler{Repo: item.NewMemoryStore(), Logger: a.Core.Logger()}
 ```
 
 Handlers that depend on lifecycle dependencies (logger, config strings) rather than domain
 repositories use struct fields without a repository interface — see `APIHandler`.
-Logger must always be set; use `plumelog.LoggerFormatDiscard` in tests.
+All handler structs require a `Logger plumelog.StructuredLogger` field; pass
+`a.Core.Logger()` from routes.go and `plumelog.LoggerFormatDiscard` in tests.
 Both shapes use struct-field injection; choose the interface approach when the
 dependency has multiple implementations (real store vs. test stub).
 
@@ -156,6 +158,7 @@ func (c *dbChecker) Check(ctx context.Context) error { return c.db.PingContext(c
 // routes.go registers one checker per dependency
 health := handler.HealthHandler{
     ServiceName: a.Cfg.App.ServiceName,
+    Logger:      a.Core.Logger(),
     Checkers: []health.ComponentChecker{
         &dbChecker{db: myDB},
     },

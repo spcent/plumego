@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/spcent/plumego/contract"
+	plumelog "github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/x/messaging"
 )
 
@@ -14,6 +15,7 @@ import (
 // The Broker dependency is injected explicitly via the struct field.
 type MessagingHandler struct {
 	Broker *messaging.Broker
+	Logger plumelog.StructuredLogger
 }
 
 type publishResponse struct {
@@ -29,19 +31,19 @@ func (h MessagingHandler) Publish(w http.ResponseWriter, r *http.Request) {
 		Payload string `json:"payload"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeValidation).
 			Code(contract.CodeBadRequest).
 			Message("invalid JSON body").
-			Build())
+			Build()))
 		return
 	}
 	if body.Topic == "" {
-		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeValidation).
 			Code(contract.CodeBadRequest).
 			Message("topic is required").
-			Build())
+			Build()))
 		return
 	}
 
@@ -52,16 +54,16 @@ func (h MessagingHandler) Publish(w http.ResponseWriter, r *http.Request) {
 		Data:  body.Payload,
 	}
 	if err := h.Broker.Publish(body.Topic, msg); err != nil {
-		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeInternal).
 			Message("failed to publish event").
-			Build())
+			Build()))
 		return
 	}
 
-	_ = contract.WriteResponse(w, r, http.StatusAccepted, publishResponse{
+	logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusAccepted, publishResponse{
 		OK:        true,
 		Topic:     body.Topic,
 		Timestamp: time.Now().Format(time.RFC3339),
-	}, nil)
+	}, nil))
 }

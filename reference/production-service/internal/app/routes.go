@@ -18,6 +18,7 @@ import (
 func (a *App) RegisterRoutes() error {
 	svc := handler.ServiceHandler{
 		ServiceName: a.Cfg.App.ServiceName,
+		Logger:      a.Core.Logger(),
 		Features: []string{
 			"explicit_middleware",
 			"security_headers",
@@ -32,6 +33,7 @@ func (a *App) RegisterRoutes() error {
 	}
 
 	statusHandler := handler.StatusHandler{
+		Logger: a.Core.Logger(),
 		Cfg: handler.StatusConfig{
 			ServiceName:    a.Cfg.App.ServiceName,
 			Environment:    a.Cfg.App.Environment,
@@ -44,26 +46,12 @@ func (a *App) RegisterRoutes() error {
 				Replacement: a.Profiles.Replacement(),
 				Path:        a.Profiles.Path(),
 			},
-			// Middleware list must match the order in internal/app/app.go app.Use(…).
-			Middleware: []string{
-				"requestid",
-				"recovery",
-				"bodylimit",
-				"timeout",
-				"security_headers",
-				"abuse_guard",
-				"tracing",
-				"httpmetrics",
-				"accesslog",
-			},
 		},
 	}
 
-	profileHandler := handler.ProfileHandler{Profiles: a.Profiles}
-	opsHandler := handler.OpsHandler{Metrics: a.Metrics}
+	profileHandler := handler.ProfileHandler{Profiles: a.Profiles, Logger: a.Core.Logger()}
+	opsHandler := handler.OpsHandler{Metrics: a.Metrics, Logger: a.Core.Logger()}
 
-	// routeReg accumulates the first registration error so each route can be
-	// written on a single line without per-call error checks.
 	profileRoute, err := withTenantAPIAuth(a.Cfg.App.APIToken, http.HandlerFunc(profileHandler.GetProfile))
 	if err != nil {
 		return fmt.Errorf("configure tenant API route: %w", err)
@@ -73,6 +61,8 @@ func (a *App) RegisterRoutes() error {
 		return fmt.Errorf("configure ops metrics route: %w", err)
 	}
 
+	// routeReg accumulates the first registration error so each route can be
+	// written on a single line without per-call error checks.
 	reg := newRouteReg(a.Core)
 	reg.get("/", http.HandlerFunc(svc.Root))
 	reg.get("/healthz", http.HandlerFunc(svc.Live))
@@ -136,6 +126,8 @@ func (r *routeReg) get(path string, h http.Handler)    { r.record(r.adder.Get(pa
 func (r *routeReg) post(path string, h http.Handler)   { r.record(r.adder.Post(path, h)) }
 func (r *routeReg) put(path string, h http.Handler)    { r.record(r.adder.Put(path, h)) }
 func (r *routeReg) delete(path string, h http.Handler) { r.record(r.adder.Delete(path, h)) }
+
+// record stores the first non-nil error; subsequent errors are dropped.
 func (r *routeReg) record(err error) {
 	if r.err == nil {
 		r.err = err

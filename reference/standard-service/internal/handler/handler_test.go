@@ -16,7 +16,7 @@ import (
 )
 
 // discardLogger returns a StructuredLogger that silently discards all output.
-// Use it in tests that construct an APIHandler to satisfy the non-nil Logger requirement.
+// Use it in tests that construct handlers to satisfy the non-nil Logger requirement.
 func discardLogger() plumelog.StructuredLogger {
 	return plumelog.NewLogger(plumelog.LoggerConfig{Format: plumelog.LoggerFormatDiscard})
 }
@@ -88,7 +88,7 @@ func decodeErrorPayload(t *testing.T, rec *httptest.ResponseRecorder) errorField
 }
 
 func TestHealthHandlerLive(t *testing.T) {
-	h := HealthHandler{ServiceName: "svc"}
+	h := HealthHandler{ServiceName: "svc", Logger: discardLogger()}
 	rec := httptest.NewRecorder()
 	h.Live(rec, httptest.NewRequest(http.MethodGet, "/healthz", nil))
 
@@ -102,7 +102,7 @@ func TestHealthHandlerLive(t *testing.T) {
 }
 
 func TestHealthHandlerReadyNoCheckers(t *testing.T) {
-	h := HealthHandler{ServiceName: "svc"}
+	h := HealthHandler{ServiceName: "svc", Logger: discardLogger()}
 	rec := httptest.NewRecorder()
 	h.Ready(rec, httptest.NewRequest(http.MethodGet, "/readyz", nil))
 
@@ -125,6 +125,7 @@ func TestHealthHandlerReadyWithCheckers(t *testing.T) {
 	t.Run("passing checker returns 200 with component map", func(t *testing.T) {
 		h := HealthHandler{
 			ServiceName: "svc",
+			Logger:      discardLogger(),
 			Checkers: []health.ComponentChecker{
 				componentChecker{name: "database", check: func(_ context.Context) error { return nil }},
 			},
@@ -146,6 +147,7 @@ func TestHealthHandlerReadyWithCheckers(t *testing.T) {
 	t.Run("failing checker returns 503 with component name as detail key", func(t *testing.T) {
 		h := HealthHandler{
 			ServiceName: "svc",
+			Logger:      discardLogger(),
 			Checkers: []health.ComponentChecker{
 				componentChecker{name: "database", check: func(_ context.Context) error {
 					return errors.New("connection refused")
@@ -168,6 +170,7 @@ func TestHealthHandlerReadyWithCheckers(t *testing.T) {
 	t.Run("all checkers are probed even if an earlier one fails", func(t *testing.T) {
 		h := HealthHandler{
 			ServiceName: "svc",
+			Logger:      discardLogger(),
 			Checkers: []health.ComponentChecker{
 				componentChecker{name: "database", check: func(_ context.Context) error { return nil }},
 				componentChecker{name: "cache", check: func(_ context.Context) error {
@@ -194,6 +197,7 @@ func TestHealthHandlerReadyWithCheckers(t *testing.T) {
 	t.Run("multiple failing checkers all appear in error details", func(t *testing.T) {
 		h := HealthHandler{
 			ServiceName: "svc",
+			Logger:      discardLogger(),
 			Checkers: []health.ComponentChecker{
 				componentChecker{name: "database", check: func(_ context.Context) error {
 					return errors.New("connection refused")
@@ -220,6 +224,7 @@ func TestHealthHandlerReadyWithCheckers(t *testing.T) {
 	t.Run("all checkers passing returns component map with all true", func(t *testing.T) {
 		h := HealthHandler{
 			ServiceName: "svc",
+			Logger:      discardLogger(),
 			Checkers: []health.ComponentChecker{
 				componentChecker{name: "database", check: func(_ context.Context) error { return nil }},
 				componentChecker{name: "cache", check: func(_ context.Context) error { return nil }},
@@ -274,7 +279,7 @@ func TestAPIHandlerResponses(t *testing.T) {
 					t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
 				}
 				got := decodeReferenceData[helloResponse](t, rec)
-				if got.Service != "test-service" || got.Mode != "canonical" || got.Version != "test-version" {
+				if got.Service != "test-service" || got.Version != "test-version" {
 					t.Fatalf("unexpected hello response: %+v", got)
 				}
 				// Endpoints must be a non-empty slice with all required fields.
@@ -335,7 +340,7 @@ func TestAPIHandlerResponses(t *testing.T) {
 					t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
 				}
 				got := decodeReferenceData[infoResponse](t, rec)
-				if got.Mode != "canonical" || len(got.Modules) == 0 {
+				if got.Service == "" || got.Version == "" || got.Timestamp == "" {
 					t.Fatalf("unexpected info response: %+v", got)
 				}
 				if got.Version != "test-version" {
@@ -358,7 +363,7 @@ func TestAPIHandlerResponses(t *testing.T) {
 }
 
 func TestItemHandlerCreate(t *testing.T) {
-	h := ItemHandler{Repo: item.NewMemoryStore()}
+	h := ItemHandler{Repo: item.NewMemoryStore(), Logger: discardLogger()}
 
 	t.Run("valid body returns 201 with item", func(t *testing.T) {
 		body := bytes.NewBufferString(`{"name":"widget","description":"a widget"}`)
@@ -457,7 +462,7 @@ func TestItemHandlerCreate(t *testing.T) {
 
 func TestItemHandlerList(t *testing.T) {
 	t.Run("empty store returns empty data with zero total in meta", func(t *testing.T) {
-		h := ItemHandler{Repo: item.NewMemoryStore()}
+		h := ItemHandler{Repo: item.NewMemoryStore(), Logger: discardLogger()}
 		rec := httptest.NewRecorder()
 		h.List(rec, httptest.NewRequest(http.MethodGet, "/api/v1/items", nil))
 		if rec.Code != http.StatusOK {
@@ -478,7 +483,7 @@ func TestItemHandlerList(t *testing.T) {
 		store := item.NewMemoryStore()
 		store.Create(context.Background(), "alpha", "alpha item")
 		store.Create(context.Background(), "beta", "beta item")
-		h := ItemHandler{Repo: store}
+		h := ItemHandler{Repo: store, Logger: discardLogger()}
 
 		rec := httptest.NewRecorder()
 		h.List(rec, httptest.NewRequest(http.MethodGet, "/api/v1/items", nil))
@@ -506,7 +511,7 @@ func TestItemHandlerList(t *testing.T) {
 		for _, name := range []string{"a", "b", "c", "d", "e"} {
 			store.Create(context.Background(), name, name+" item")
 		}
-		h := ItemHandler{Repo: store}
+		h := ItemHandler{Repo: store, Logger: discardLogger()}
 
 		rec := httptest.NewRecorder()
 		h.List(rec, httptest.NewRequest(http.MethodGet, "/api/v1/items?limit=3", nil))
@@ -527,12 +532,12 @@ func TestItemHandlerList(t *testing.T) {
 		}
 	})
 
-	t.Run("offset beyond total clamps and returns empty page", func(t *testing.T) {
+	t.Run("offset beyond total returns empty page with requested offset in meta", func(t *testing.T) {
 		store := item.NewMemoryStore()
 		store.Create(context.Background(), "a", "a item")
 		store.Create(context.Background(), "b", "b item")
 		store.Create(context.Background(), "c", "c item")
-		h := ItemHandler{Repo: store}
+		h := ItemHandler{Repo: store, Logger: discardLogger()}
 
 		rec := httptest.NewRecorder()
 		h.List(rec, httptest.NewRequest(http.MethodGet, "/api/v1/items?offset=10", nil))
@@ -547,8 +552,9 @@ func TestItemHandlerList(t *testing.T) {
 		if len(items) != 0 {
 			t.Fatalf("items = %v, want empty (offset beyond total)", items)
 		}
-		// total is 3; offset was clamped to 3.
-		assertMeta(t, env.Meta, 3, 20, 3)
+		// total is 3; meta carries the requested offset (10), not an internal
+		// clamped value, so clients know exactly where their page was requested.
+		assertMeta(t, env.Meta, 3, 20, 10)
 	})
 
 	t.Run("offset param skips items in creation order", func(t *testing.T) {
@@ -556,7 +562,7 @@ func TestItemHandlerList(t *testing.T) {
 		for _, name := range []string{"a", "b", "c", "d", "e"} {
 			store.Create(context.Background(), name, name+" item")
 		}
-		h := ItemHandler{Repo: store}
+		h := ItemHandler{Repo: store, Logger: discardLogger()}
 
 		rec := httptest.NewRecorder()
 		h.List(rec, httptest.NewRequest(http.MethodGet, "/api/v1/items?offset=3", nil))
@@ -578,7 +584,7 @@ func TestItemHandlerList(t *testing.T) {
 	})
 
 	t.Run("invalid limit returns 400 TypeBadRequest", func(t *testing.T) {
-		h := ItemHandler{Repo: item.NewMemoryStore()}
+		h := ItemHandler{Repo: item.NewMemoryStore(), Logger: discardLogger()}
 		rec := httptest.NewRecorder()
 		h.List(rec, httptest.NewRequest(http.MethodGet, "/api/v1/items?limit=abc", nil))
 		if rec.Code != http.StatusBadRequest {
@@ -590,7 +596,7 @@ func TestItemHandlerList(t *testing.T) {
 	})
 
 	t.Run("invalid offset returns 400 TypeBadRequest", func(t *testing.T) {
-		h := ItemHandler{Repo: item.NewMemoryStore()}
+		h := ItemHandler{Repo: item.NewMemoryStore(), Logger: discardLogger()}
 		rec := httptest.NewRecorder()
 		h.List(rec, httptest.NewRequest(http.MethodGet, "/api/v1/items?offset=xyz", nil))
 		if rec.Code != http.StatusBadRequest {
@@ -602,7 +608,7 @@ func TestItemHandlerList(t *testing.T) {
 	})
 
 	t.Run("negative limit returns 400 TypeBadRequest", func(t *testing.T) {
-		h := ItemHandler{Repo: item.NewMemoryStore()}
+		h := ItemHandler{Repo: item.NewMemoryStore(), Logger: discardLogger()}
 		rec := httptest.NewRecorder()
 		h.List(rec, httptest.NewRequest(http.MethodGet, "/api/v1/items?limit=-1", nil))
 		if rec.Code != http.StatusBadRequest {
@@ -614,7 +620,7 @@ func TestItemHandlerList(t *testing.T) {
 func TestItemHandlerGetByID(t *testing.T) {
 	store := item.NewMemoryStore()
 	created := store.Create(context.Background(), "gadget", "a gadget")
-	h := ItemHandler{Repo: store}
+	h := ItemHandler{Repo: store, Logger: discardLogger()}
 
 	t.Run("existing id returns 200 with item", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/api/v1/items/"+created.ID, nil)
@@ -650,7 +656,7 @@ func TestItemHandlerUpdate(t *testing.T) {
 	t.Run("existing id returns 200 with fully updated item", func(t *testing.T) {
 		store := item.NewMemoryStore()
 		created := store.Create(context.Background(), "original", "an original item")
-		h := ItemHandler{Repo: store}
+		h := ItemHandler{Repo: store, Logger: discardLogger()}
 
 		body := bytes.NewBufferString(`{"name":"renamed","description":"updated description"}`)
 		req := httptest.NewRequest(http.MethodPut, "/api/v1/items/"+created.ID, body)
@@ -673,7 +679,7 @@ func TestItemHandlerUpdate(t *testing.T) {
 	t.Run("description is replaced by put", func(t *testing.T) {
 		store := item.NewMemoryStore()
 		created := store.Create(context.Background(), "widget", "old description")
-		h := ItemHandler{Repo: store}
+		h := ItemHandler{Repo: store, Logger: discardLogger()}
 
 		body := bytes.NewBufferString(`{"name":"widget","description":"new description"}`)
 		req := httptest.NewRequest(http.MethodPut, "/api/v1/items/"+created.ID, body)
@@ -692,7 +698,7 @@ func TestItemHandlerUpdate(t *testing.T) {
 	})
 
 	t.Run("missing id returns 404 TypeNotFound", func(t *testing.T) {
-		h := ItemHandler{Repo: item.NewMemoryStore()}
+		h := ItemHandler{Repo: item.NewMemoryStore(), Logger: discardLogger()}
 		body := bytes.NewBufferString(`{"name":"anything","description":"anything"}`)
 		req := httptest.NewRequest(http.MethodPut, "/api/v1/items/no-such-item", body)
 		ctx := contract.WithRequestContext(req.Context(), contract.RequestContext{
@@ -708,7 +714,7 @@ func TestItemHandlerUpdate(t *testing.T) {
 	t.Run("both name and description missing returns 400 with both field details", func(t *testing.T) {
 		store := item.NewMemoryStore()
 		created := store.Create(context.Background(), "original", "an original item")
-		h := ItemHandler{Repo: store}
+		h := ItemHandler{Repo: store, Logger: discardLogger()}
 
 		body := bytes.NewBufferString(`{}`)
 		req := httptest.NewRequest(http.MethodPut, "/api/v1/items/"+created.ID, body)
@@ -735,7 +741,7 @@ func TestItemHandlerUpdate(t *testing.T) {
 	t.Run("missing name only returns 400 with name detail", func(t *testing.T) {
 		store := item.NewMemoryStore()
 		created := store.Create(context.Background(), "original", "an original item")
-		h := ItemHandler{Repo: store}
+		h := ItemHandler{Repo: store, Logger: discardLogger()}
 
 		body := bytes.NewBufferString(`{"name":"","description":"some desc"}`)
 		req := httptest.NewRequest(http.MethodPut, "/api/v1/items/"+created.ID, body)
@@ -762,7 +768,7 @@ func TestItemHandlerUpdate(t *testing.T) {
 	t.Run("empty body returns 400 TypeRequired with body_required code", func(t *testing.T) {
 		store := item.NewMemoryStore()
 		created := store.Create(context.Background(), "original", "an original item")
-		h := ItemHandler{Repo: store}
+		h := ItemHandler{Repo: store, Logger: discardLogger()}
 
 		req := httptest.NewRequest(http.MethodPut, "/api/v1/items/"+created.ID, http.NoBody)
 		ctx := contract.WithRequestContext(req.Context(), contract.RequestContext{
@@ -781,7 +787,7 @@ func TestItemHandlerUpdate(t *testing.T) {
 	t.Run("invalid JSON returns 400 TypeBadRequest", func(t *testing.T) {
 		store := item.NewMemoryStore()
 		created := store.Create(context.Background(), "original", "an original item")
-		h := ItemHandler{Repo: store}
+		h := ItemHandler{Repo: store, Logger: discardLogger()}
 
 		body := bytes.NewBufferString(`not-json`)
 		req := httptest.NewRequest(http.MethodPut, "/api/v1/items/"+created.ID, body)
@@ -798,7 +804,7 @@ func TestItemHandlerUpdate(t *testing.T) {
 	t.Run("put is idempotent", func(t *testing.T) {
 		store := item.NewMemoryStore()
 		created := store.Create(context.Background(), "original", "an original item")
-		h := ItemHandler{Repo: store}
+		h := ItemHandler{Repo: store, Logger: discardLogger()}
 
 		for i := 0; i < 3; i++ {
 			body := bytes.NewBufferString(`{"name":"stable","description":"stable desc"}`)
@@ -822,7 +828,7 @@ func TestItemHandlerUpdate(t *testing.T) {
 func TestItemHandlerDelete(t *testing.T) {
 	store := item.NewMemoryStore()
 	created := store.Create(context.Background(), "gadget", "a gadget")
-	h := ItemHandler{Repo: store}
+	h := ItemHandler{Repo: store, Logger: discardLogger()}
 
 	t.Run("missing id returns 404 TypeNotFound", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodDelete, "/api/v1/items/no-such-item", nil)
@@ -870,7 +876,7 @@ func TestRequireWriteKey(t *testing.T) {
 	})
 
 	t.Run("empty key is a no-op — all requests pass", func(t *testing.T) {
-		mw := RequireWriteKey("")(okHandler)
+		mw := RequireWriteKey("", discardLogger())(okHandler)
 		rec := httptest.NewRecorder()
 		mw.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/", nil))
 		if rec.Code != http.StatusOK {
@@ -879,7 +885,7 @@ func TestRequireWriteKey(t *testing.T) {
 	})
 
 	t.Run("correct key passes through to handler", func(t *testing.T) {
-		mw := RequireWriteKey("secret")(okHandler)
+		mw := RequireWriteKey("secret", discardLogger())(okHandler)
 		req := httptest.NewRequest(http.MethodPost, "/", nil)
 		req.Header.Set(WriteKeyHeader, "secret")
 		rec := httptest.NewRecorder()
@@ -890,7 +896,7 @@ func TestRequireWriteKey(t *testing.T) {
 	})
 
 	t.Run("missing header returns 401", func(t *testing.T) {
-		mw := RequireWriteKey("secret")(okHandler)
+		mw := RequireWriteKey("secret", discardLogger())(okHandler)
 		rec := httptest.NewRecorder()
 		mw.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/", nil))
 		if rec.Code != http.StatusUnauthorized {
@@ -899,7 +905,7 @@ func TestRequireWriteKey(t *testing.T) {
 	})
 
 	t.Run("wrong key returns 401", func(t *testing.T) {
-		mw := RequireWriteKey("secret")(okHandler)
+		mw := RequireWriteKey("secret", discardLogger())(okHandler)
 		req := httptest.NewRequest(http.MethodPost, "/", nil)
 		req.Header.Set(WriteKeyHeader, "wrong")
 		rec := httptest.NewRecorder()

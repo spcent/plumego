@@ -9,6 +9,7 @@ import (
 	"strconv"
 
 	"github.com/spcent/plumego/contract"
+	plumelog "github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/router"
 	"standard-service/internal/domain/item"
 )
@@ -38,8 +39,12 @@ type ItemRepository interface {
 
 // ItemHandler demonstrates constructor injection: declare the dependency as an
 // interface field and wire the concrete implementation in routes.go.
+//
+// Logger must not be nil; pass a.Core.Logger() from routes.go.
+// Use plumelog.NewLogger(plumelog.LoggerConfig{Format: plumelog.LoggerFormatDiscard}) in tests.
 type ItemHandler struct {
-	Repo ItemRepository
+	Repo   ItemRepository
+	Logger plumelog.StructuredLogger
 }
 
 type createItemReq struct {
@@ -70,18 +75,18 @@ func (h ItemHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var req createItemReq
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		if errors.Is(err, io.EOF) {
-			_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+			logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
 				Type(contract.TypeRequired).
 				Code(codeItemCreateBodyRequired).
 				Message("request body is required").
-				Build())
+				Build()))
 			return
 		}
-		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeBadRequest).
 			Code(codeItemCreateInvalidJSON).
 			Message("request body must be valid JSON").
-			Build())
+			Build()))
 		return
 	}
 
@@ -102,12 +107,12 @@ func (h ItemHandler) Create(w http.ResponseWriter, r *http.Request) {
 		valid = false
 	}
 	if !valid {
-		_ = contract.WriteError(w, r, eb.Build())
+		logWriteErr(h.Logger, contract.WriteError(w, r, eb.Build()))
 		return
 	}
 
 	created := h.Repo.Create(r.Context(), req.Name, req.Description)
-	_ = contract.WriteResponse(w, r, http.StatusCreated, created, nil)
+	logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusCreated, created, nil))
 }
 
 // noLimit is the sentinel value for parseQueryInt's maxVal parameter.
@@ -118,10 +123,13 @@ const noLimit = -1
 // Items are returned in stable creation order.
 // Pagination metadata (total, limit, offset) is carried in the response meta field,
 // not embedded in the data payload, demonstrating the canonical meta parameter usage.
+// The meta offset field reflects the requested offset, not a clamped internal value,
+// so clients always know exactly where their page begins relative to the full list.
 //
 //	GET /api/v1/items                    → 200 data:[…] meta:{total:N,limit:20,offset:0}
 //	GET /api/v1/items?limit=5            → first 5 items; limit capped at 100
 //	GET /api/v1/items?limit=5&offset=10  → items 11-15
+//	GET /api/v1/items?offset=999         → empty data; meta:{total:N,limit:20,offset:999}
 //	GET /api/v1/items?limit=abc          → 400 TypeBadRequest item.list.invalid_param
 func (h ItemHandler) List(w http.ResponseWriter, r *http.Request) {
 	const defaultLimit = 20
@@ -129,41 +137,44 @@ func (h ItemHandler) List(w http.ResponseWriter, r *http.Request) {
 
 	limit, ok := parseQueryInt(r, "limit", defaultLimit, 1, maxLimit)
 	if !ok {
-		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeBadRequest).
 			Code(codeItemListInvalidParam).
 			Detail("field", "limit").
 			Message("limit must be a positive integer").
-			Build())
+			Build()))
 		return
 	}
 
 	offset, ok := parseQueryInt(r, "offset", 0, 0, noLimit)
 	if !ok {
-		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeBadRequest).
 			Code(codeItemListInvalidParam).
 			Detail("field", "offset").
 			Message("offset must be a non-negative integer").
-			Build())
+			Build()))
 		return
 	}
 
 	all := h.Repo.List(r.Context())
 	total := len(all)
-	if offset > len(all) {
-		offset = len(all)
+	// start is the clamped slice index; offset is preserved for the meta field
+	// so callers always see the offset they requested, not an internal adjustment.
+	start := offset
+	if start > len(all) {
+		start = len(all)
 	}
-	page := all[offset:]
+	page := all[start:]
 	if len(page) > limit {
 		page = page[:limit]
 	}
 
-	_ = contract.WriteResponse(w, r, http.StatusOK, page, map[string]any{
+	logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusOK, page, map[string]any{
 		"total":  total,
 		"limit":  limit,
 		"offset": offset,
-	})
+	}))
 }
 
 // parseQueryInt parses an integer query parameter.
@@ -196,15 +207,15 @@ func (h ItemHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 	id := router.Param(r, "id")
 	found, ok := h.Repo.Get(r.Context(), id)
 	if !ok {
-		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeNotFound).
 			Code(codeItemNotFound).
 			Detail("id", id).
 			Message("item not found").
-			Build())
+			Build()))
 		return
 	}
-	_ = contract.WriteResponse(w, r, http.StatusOK, found, nil)
+	logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusOK, found, nil))
 }
 
 // Update handles PUT /api/v1/items/:id.
@@ -223,18 +234,18 @@ func (h ItemHandler) Update(w http.ResponseWriter, r *http.Request) {
 	var req updateItemReq
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		if errors.Is(err, io.EOF) {
-			_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+			logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
 				Type(contract.TypeRequired).
 				Code(codeItemUpdateBodyRequired).
 				Message("request body is required").
-				Build())
+				Build()))
 			return
 		}
-		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeBadRequest).
 			Code(codeItemUpdateInvalidJSON).
 			Message("request body must be valid JSON").
-			Build())
+			Build()))
 		return
 	}
 
@@ -252,21 +263,21 @@ func (h ItemHandler) Update(w http.ResponseWriter, r *http.Request) {
 		valid = false
 	}
 	if !valid {
-		_ = contract.WriteError(w, r, eb.Build())
+		logWriteErr(h.Logger, contract.WriteError(w, r, eb.Build()))
 		return
 	}
 
 	updated, ok := h.Repo.Update(r.Context(), id, req.Name, req.Description)
 	if !ok {
-		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeNotFound).
 			Code(codeItemNotFound).
 			Detail("id", id).
 			Message("item not found").
-			Build())
+			Build()))
 		return
 	}
-	_ = contract.WriteResponse(w, r, http.StatusOK, updated, nil)
+	logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusOK, updated, nil))
 }
 
 // Delete handles DELETE /api/v1/items/:id.
@@ -277,12 +288,12 @@ func (h ItemHandler) Update(w http.ResponseWriter, r *http.Request) {
 func (h ItemHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	id := router.Param(r, "id")
 	if !h.Repo.Delete(r.Context(), id) {
-		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeNotFound).
 			Code(codeItemNotFound).
 			Detail("id", id).
 			Message("item not found").
-			Build())
+			Build()))
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)

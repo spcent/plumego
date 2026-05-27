@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/spcent/plumego/contract"
+	plumelog "github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/router"
 )
 
@@ -26,30 +27,31 @@ type Order struct {
 
 type Handler struct {
 	publisher *OrderPublisher
+	Logger    plumelog.StructuredLogger
 	mu        sync.RWMutex
 	orders    map[string]Order
 }
 
-func NewHandler(publisher *OrderPublisher) *Handler {
-	return &Handler{publisher: publisher, orders: make(map[string]Order)}
+func NewHandler(publisher *OrderPublisher, logger plumelog.StructuredLogger) *Handler {
+	return &Handler{publisher: publisher, Logger: logger, orders: make(map[string]Order)}
 }
 
 func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	var req CreateOrderRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeValidation).
 			Code(contract.CodeInvalidJSON).
 			Message("invalid request body").
-			Build())
+			Build()))
 		return
 	}
 	if strings.TrimSpace(req.ID) == "" || strings.TrimSpace(req.CustomerID) == "" || req.TotalCents <= 0 {
-		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeValidation).
 			Code(contract.CodeValidationError).
 			Message("invalid order").
-			Build())
+			Build()))
 		return
 	}
 
@@ -65,14 +67,14 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		TotalCents: order.TotalCents,
 		CreatedAt:  time.Now().UTC(),
 	}); err != nil {
-		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeInternal).
 			Message("publish order event failed").
-			Build())
+			Build()))
 		return
 	}
 
-	_ = contract.WriteResponse(w, r, http.StatusAccepted, order, nil)
+	logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusAccepted, order, nil))
 }
 
 func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
@@ -84,5 +86,5 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		order = Order{ID: id, Status: "stub"}
 	}
-	_ = contract.WriteResponse(w, r, http.StatusOK, order, nil)
+	logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusOK, order, nil))
 }

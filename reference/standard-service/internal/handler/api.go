@@ -40,7 +40,6 @@ type endpointInfo struct {
 type helloResponse struct {
 	Message   string         `json:"message"`
 	Service   string         `json:"service"`
-	Mode      string         `json:"mode"`
 	Timestamp string         `json:"timestamp"`
 	Version   string         `json:"version"`
 	Endpoints []endpointInfo `json:"endpoints"`
@@ -51,20 +50,18 @@ type greetResponse struct {
 }
 
 type infoResponse struct {
-	Mode      string   `json:"mode"`
-	Service   string   `json:"service"`
-	Version   string   `json:"version"`
-	Timestamp string   `json:"timestamp"`
-	Modules   []string `json:"modules"`
+	Service   string `json:"service"`
+	Version   string `json:"version"`
+	Timestamp string `json:"timestamp"`
 }
 
 // Root responds with minimal service identity. For the full endpoint listing use GET /api/hello.
 func (h APIHandler) Root(w http.ResponseWriter, r *http.Request) {
-	_ = contract.WriteResponse(w, r, http.StatusOK, rootResponse{
+	logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusOK, rootResponse{
 		Service: h.ServiceName,
 		Version: h.Version,
 		Docs:    "/api/hello",
-	}, nil)
+	}, nil))
 }
 
 // Hello responds with service metadata and the canonical endpoint list.
@@ -77,10 +74,9 @@ func (h APIHandler) Root(w http.ResponseWriter, r *http.Request) {
 // Ordered by method (DELETE < GET < POST < PUT) then path — matching
 // the sort order returned by a.Core.Routes().
 func (h APIHandler) Hello(w http.ResponseWriter, r *http.Request) {
-	_ = contract.WriteResponse(w, r, http.StatusOK, helloResponse{
+	logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusOK, helloResponse{
 		Message:   "hello from plumego standard-service",
 		Service:   h.ServiceName,
-		Mode:      "canonical",
 		Timestamp: time.Now().Format(time.RFC3339),
 		Version:   h.Version,
 		Endpoints: []endpointInfo{
@@ -96,7 +92,7 @@ func (h APIHandler) Hello(w http.ResponseWriter, r *http.Request) {
 			{Name: "items_create", Method: http.MethodPost, Path: "/api/v1/items", Description: "create an item"},
 			{Name: "items_update", Method: http.MethodPut, Path: "/api/v1/items/:id", Description: "update an item"},
 		},
-	}, nil)
+	}, nil))
 }
 
 // Greet demonstrates the canonical error response pattern.
@@ -110,42 +106,34 @@ func (h APIHandler) Hello(w http.ResponseWriter, r *http.Request) {
 func (h APIHandler) Greet(w http.ResponseWriter, r *http.Request) {
 	name := r.URL.Query().Get("name")
 	if name == "" {
-		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeRequired).
 			Code(codeGreetNameRequired).
 			Detail("field", "name").
 			Message("name is required").
-			Build())
+			Build()))
 		return
 	}
-	_ = contract.WriteResponse(w, r, http.StatusOK, greetResponse{Message: "hello, " + name}, nil)
+	logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusOK, greetResponse{Message: "hello, " + name}, nil))
 }
 
-// Info responds with application wiring information and the list of active modules.
+// Info responds with application identity information.
 // It demonstrates two structured-logging patterns:
 //   - WithFields attaches fixed fields to every subsequent log call.
 //   - contract.RequestIDFromContext extracts the correlation ID stamped by
 //     the requestid middleware so log lines are linkable to the inbound request.
 //
-// This is an informational endpoint about how the service is assembled, not a
-// health probe. Use /healthz for liveness and /readyz for readiness.
+// This is an informational endpoint about the running service, not a health
+// probe. Use /healthz for liveness and /readyz for readiness.
 func (h APIHandler) Info(w http.ResponseWriter, r *http.Request) {
 	requestID := contract.RequestIDFromContext(r.Context())
 	h.Logger.WithFields(plumelog.Fields{
 		"endpoint":   "info",
 		"request_id": requestID,
 	}).Info("info request handled")
-	_ = contract.WriteResponse(w, r, http.StatusOK, infoResponse{
-		Mode:      "canonical",
+	logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusOK, infoResponse{
 		Service:   h.ServiceName,
 		Version:   h.Version,
 		Timestamp: time.Now().Format(time.RFC3339),
-		Modules: []string{
-			"core",
-			"router",
-			"contract",
-			"middleware",
-			"log",
-		},
-	}, nil)
+	}, nil))
 }

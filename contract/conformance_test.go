@@ -298,9 +298,9 @@ func TestExternalTypedErrorsUseCanonicalContractCodes(t *testing.T) {
 	var violations []string
 	registeredCustomCodes := loadContractErrorCodeRegistry(t, repoRoot)
 	allowedDynamicCustomCodes := map[string]int{
-		"reference/workerfleet/internal/handler/worker_register.go#writeNotImplemented": 1,
-		"x/observability/ops/ops.go#Handler.writeHookError":                             1,
-		"x/observability/ops/ops.go#writeNotImplemented":                                1,
+		"reference/workerfleet/internal/handler/worker_register.go#Handler.writeNotImplemented": 1,
+		"x/observability/ops/ops.go#Handler.writeHookError":                                     1,
+		"x/observability/ops/ops.go#writeNotImplemented":                                        1,
 	}
 	actualDynamicCustomCodes := map[string]int{}
 	fset := token.NewFileSet()

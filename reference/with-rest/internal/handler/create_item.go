@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/spcent/plumego/contract"
+	plumelog "github.com/spcent/plumego/log"
 	plumego "github.com/spcent/plumego/x/validate"
 	"with-rest/internal/validation/playground"
 )
@@ -23,39 +24,40 @@ type CreateItemResponse struct {
 // CreateItem handles POST /api/items with explicit binding and validation.
 type CreateItem struct {
 	validator plumego.Validator
+	Logger    plumelog.StructuredLogger
 }
 
 // NewCreateItem constructs the handler with its validator dependency visible.
-func NewCreateItem(validator plumego.Validator) *CreateItem {
-	return &CreateItem{validator: validator}
+func NewCreateItem(validator plumego.Validator, logger plumelog.StructuredLogger) *CreateItem {
+	return &CreateItem{validator: validator, Logger: logger}
 }
 
 // ServeHTTP implements http.Handler.
 func (h *CreateItem) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	req, err := plumego.Bind[CreateItemRequest](r, h.validator)
 	if err != nil {
-		writeBindError(w, r, err)
+		h.writeBindError(w, r, err)
 		return
 	}
 
-	_ = contract.WriteResponse(w, r, http.StatusCreated, CreateItemResponse{
+	logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusCreated, CreateItemResponse{
 		ID:   "demo-item",
 		Name: req.Name,
-	}, nil)
+	}, nil))
 }
 
-func writeBindError(w http.ResponseWriter, r *http.Request, err error) {
+func (h *CreateItem) writeBindError(w http.ResponseWriter, r *http.Request, err error) {
 	var validationErr plumego.ValidationError
 	if errors.As(err, &validationErr) {
-		_ = contract.WriteError(w, r, validationAPIError(validationErr))
+		logWriteErr(h.Logger, contract.WriteError(w, r, validationAPIError(validationErr)))
 		return
 	}
 
-	_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+	logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
 		Type(contract.TypeBadRequest).
 		Code(contract.CodeInvalidJSON).
 		Message("invalid request body").
-		Build())
+		Build()))
 }
 
 func validationAPIError(err plumego.ValidationError) contract.APIError {

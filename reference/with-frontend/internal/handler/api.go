@@ -5,15 +5,18 @@ import (
 	"net/http"
 
 	"github.com/spcent/plumego/contract"
+	plumelog "github.com/spcent/plumego/log"
 )
 
 // APIHandler serves a minimal JSON API alongside the static frontend.
-type APIHandler struct{}
+type APIHandler struct {
+	Logger plumelog.StructuredLogger
+}
 
 // Status reports that the API is healthy.
 func (h APIHandler) Status(w http.ResponseWriter, r *http.Request) {
-	_ = contract.WriteResponse(w, r, http.StatusOK, map[string]any{
+	logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusOK, map[string]any{
 		"status":  "ok",
 		"service": "with-frontend",
-	}, nil)
+	}, nil))
 }

@@ -1,0 +1,10 @@
+package order
+
+import plumelog "github.com/spcent/plumego/log"
+
+func logWriteErr(logger plumelog.StructuredLogger, err error) {
+	if err == nil || logger == nil {
+		return
+	}
+	logger.Warn("write response failed", plumelog.Fields{"error": err.Error()})
+}

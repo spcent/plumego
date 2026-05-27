@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/spcent/plumego/contract"
+	plumelog "github.com/spcent/plumego/log"
 )
 
 type healthResponse struct {
@@ -14,10 +15,12 @@ type healthResponse struct {
 }
 
 // WriteHealthResponse writes a standard health check response with status "ok".
-func WriteHealthResponse(w http.ResponseWriter, r *http.Request, service string) {
-	_ = contract.WriteResponse(w, r, http.StatusOK, healthResponse{
+func WriteHealthResponse(w http.ResponseWriter, r *http.Request, service string, logger plumelog.StructuredLogger) {
+	if err := contract.WriteResponse(w, r, http.StatusOK, healthResponse{
 		Status:    "ok",
 		Service:   service,
 		Timestamp: time.Now().UTC(),
-	}, nil)
+	}, nil); err != nil && logger != nil {
+		logger.Warn("write response failed", plumelog.Fields{"error": err.Error()})
+	}
 }

@@ -11,7 +11,7 @@ func TestModelsResponseShape(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/api/models", nil)
 	rec := httptest.NewRecorder()
 
-	ModelsHandler(rec, req)
+	NewModelsHandler(nil).ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200", rec.Code)

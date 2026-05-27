@@ -10,8 +10,12 @@ import (
 
 func RegisterServiceRoutes(app *core.App, deps workerapp.RouteDependencies) error {
 	return RegisterRoutes(app, RouteDependencies{
-		Workers: New(deps.Service, WithWorkerIngressAuth(deps.WorkerAuth), WithAdminAuth(deps.AdminAuth)),
-		Health:  NewHealthHandler(deps.Ready),
+		Workers: New(deps.Service,
+			WithWorkerIngressAuth(deps.WorkerAuth),
+			WithAdminAuth(deps.AdminAuth),
+			WithLogger(app.Logger()),
+		),
+		Health:  NewHealthHandler(deps.Ready, app.Logger()),
 		Metrics: deps.Metrics,
 	})
 }

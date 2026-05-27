@@ -15,7 +15,7 @@ func TestMessagingHandlerPublishResponse(t *testing.T) {
 	broker := messaging.NewInProcBroker()
 	defer broker.Close()
 
-	handler := MessagingHandler{Broker: broker}
+	handler := MessagingHandler{Broker: broker, Logger: nil}
 	req := httptest.NewRequest(http.MethodPost, "/events/publish", strings.NewReader(`{"topic":"demo","payload":"hello"}`))
 	rec := httptest.NewRecorder()
 

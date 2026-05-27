@@ -8,7 +8,7 @@ import (
 
 // RegisterRoutes wires all HTTP routes for the with-ai demo.
 func (a *App) RegisterRoutes() error {
-	ai := handler.NewAIHandler()
+	ai := handler.NewAIHandler(a.Core.Logger())
 
 	if err := a.Core.Post("/api/chat", http.HandlerFunc(ai.Chat)); err != nil {
 		return err

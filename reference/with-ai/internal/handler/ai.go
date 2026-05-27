@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/spcent/plumego/contract"
+	plumelog "github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/x/ai/provider"
 	"github.com/spcent/plumego/x/ai/session"
 	"github.com/spcent/plumego/x/ai/streaming"
@@ -19,12 +20,13 @@ type AIHandler struct {
 	Sessions *session.Manager
 	Streams  *streaming.StreamManager
 	Tools    *tool.Registry
+	Logger   plumelog.StructuredLogger
 }
 
 // NewAIHandler constructs an AIHandler with offline mock implementations of
 // every x/ai extension. Replace the mock provider with a real one (e.g. OpenAI)
 // by swapping the constructor argument — no handler changes required.
-func NewAIHandler() *AIHandler {
+func NewAIHandler(logger plumelog.StructuredLogger) *AIHandler {
 	registry := tool.NewRegistry(tool.WithPolicy(tool.NewAllowListPolicy([]string{"echo"})))
 	_ = registry.Register(tool.NewEchoTool())
 	_ = registry.Register(tool.NewCalculatorTool())
@@ -34,6 +36,7 @@ func NewAIHandler() *AIHandler {
 		Sessions: session.NewManager(session.NewMemoryStorage()),
 		Streams:  streaming.NewStreamManager(),
 		Tools:    registry,
+		Logger:   logger,
 	}
 }
 
@@ -53,19 +56,19 @@ type chatResponse struct {
 func (h *AIHandler) Chat(w http.ResponseWriter, r *http.Request) {
 	var req chatRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeValidation).
 			Code(contract.CodeInvalidJSON).
 			Message("invalid request body").
-			Build())
+			Build()))
 		return
 	}
 	if req.Message == "" {
-		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeRequired).
 			Detail("field", "message").
 			Message("message is required").
-			Build())
+			Build()))
 		return
 	}
 
@@ -76,7 +79,7 @@ func (h *AIHandler) Chat(w http.ResponseWriter, r *http.Request) {
 		Model:    "mock-model",
 	})
 	if err != nil {
-		writeInternal(w, r)
+		h.writeInternal(w, r)
 		return
 	}
 	_ = h.Sessions.AppendMessage(ctx, s.ID, provider.NewTextMessage(provider.RoleUser, req.Message))
@@ -92,39 +95,39 @@ func (h *AIHandler) Chat(w http.ResponseWriter, r *http.Request) {
 		Messages: []provider.Message{provider.NewTextMessage(provider.RoleUser, req.Message)},
 	})
 	if err != nil {
-		writeInternal(w, r)
+		h.writeInternal(w, r)
 		return
 	}
 
 	toolResult, err := h.Tools.Execute(ctx, "echo", map[string]any{"message": req.Message})
 	if err != nil {
-		writeInternal(w, r)
+		h.writeInternal(w, r)
 		return
 	}
 	toolOutput, _ := toolResult.Output.(map[string]any)
 
-	_ = contract.WriteResponse(w, r, http.StatusOK, chatResponse{
+	logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusOK, chatResponse{
 		SessionID:   s.ID,
 		Reply:       resp.GetText(),
 		ToolOutput:  toolOutput,
 		StreamCount: h.Streams.Count(),
-	}, nil)
+	}, nil))
 }
 
 // Status reports the current state of all x/ai subpackages.
 func (h *AIHandler) Status(w http.ResponseWriter, r *http.Request) {
-	_ = contract.WriteResponse(w, r, http.StatusOK, map[string]any{
+	logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusOK, map[string]any{
 		"provider":     h.Provider.Name(),
 		"sessions":     "memory",
 		"tools":        len(h.Tools.ToProviderTools(r.Context())),
 		"stream_count": h.Streams.Count(),
 		"live_network": false,
-	}, nil)
+	}, nil))
 }
 
-func writeInternal(w http.ResponseWriter, r *http.Request) {
-	_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+func (h *AIHandler) writeInternal(w http.ResponseWriter, r *http.Request) {
+	logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
 		Type(contract.TypeInternal).
 		Message("internal error").
-		Build())
+		Build()))
 }

@@ -6,10 +6,16 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	plumelog "github.com/spcent/plumego/log"
 )
 
+func discardLogger() plumelog.StructuredLogger {
+	return plumelog.NewLogger(plumelog.LoggerConfig{Format: plumelog.LoggerFormatDiscard})
+}
+
 func TestChatMissingMessage(t *testing.T) {
-	h := NewAIHandler()
+	h := NewAIHandler(discardLogger())
 	body := bytes.NewBufferString(`{}`)
 	req := httptest.NewRequest(http.MethodPost, "/api/chat", body)
 	req.Header.Set("Content-Type", "application/json")
@@ -34,7 +40,7 @@ func TestChatMissingMessage(t *testing.T) {
 }
 
 func TestChatInvalidJSON(t *testing.T) {
-	h := NewAIHandler()
+	h := NewAIHandler(discardLogger())
 	body := bytes.NewBufferString(`{bad json}`)
 	req := httptest.NewRequest(http.MethodPost, "/api/chat", body)
 	req.Header.Set("Content-Type", "application/json")
@@ -48,7 +54,7 @@ func TestChatInvalidJSON(t *testing.T) {
 }
 
 func TestChatSuccess(t *testing.T) {
-	h := NewAIHandler()
+	h := NewAIHandler(discardLogger())
 	body := bytes.NewBufferString(`{"message":"hello"}`)
 	req := httptest.NewRequest(http.MethodPost, "/api/chat", body)
 	req.Header.Set("Content-Type", "application/json")
@@ -74,7 +80,7 @@ func TestChatSuccess(t *testing.T) {
 }
 
 func TestStatusResponseShape(t *testing.T) {
-	h := NewAIHandler()
+	h := NewAIHandler(discardLogger())
 	req := httptest.NewRequest(http.MethodGet, "/api/ai/status", nil)
 	rec := httptest.NewRecorder()
 

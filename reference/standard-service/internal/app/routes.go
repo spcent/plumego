@@ -15,17 +15,23 @@ func (a *App) RegisterRoutes() error {
 	// HealthHandler receives no Checkers here because the reference has no real
 	// dependencies to probe. In a production service, pass one health.ComponentChecker
 	// per dependency (database, cache, downstream) so /readyz reflects real state.
-	health := handler.HealthHandler{ServiceName: a.Cfg.App.ServiceName}
+	health := handler.HealthHandler{
+		ServiceName: a.Cfg.App.ServiceName,
+		Logger:      a.Core.Logger(),
+	}
 	// ItemHandler demonstrates constructor injection: the concrete domain store
 	// is created here and passed through the interface the handler declared.
-	items := handler.ItemHandler{Repo: item.NewMemoryStore()}
+	items := handler.ItemHandler{
+		Repo:   item.NewMemoryStore(),
+		Logger: a.Core.Logger(),
+	}
 
 	// RequireWriteKey is a per-route middleware that gates mutating operations.
 	// When APP_WRITE_KEY is empty (the default) the guard is a no-op, so the
 	// service works out of the box without configuration.
 	// This demonstrates the per-route middleware wrapping pattern: only the
 	// handlers that mutate state are wrapped; read-only routes are unaffected.
-	writeGuard := handler.RequireWriteKey(a.Cfg.App.WriteKey)
+	writeGuard := handler.RequireWriteKey(a.Cfg.App.WriteKey, a.Core.Logger())
 
 	// APIHandler carries Logger, ServiceName, and Version via constructor injection
 	// rather than reading from package-level variables. ServiceName is injected from
@@ -77,6 +83,8 @@ type routeAdder interface {
 // routeReg wraps a routeAdder and records the first registration error.
 // This lets the route table be written one route per line without per-call
 // error checks; inspect reg.err once after all registrations.
+// Only the first error is retained — route conflicts are programming mistakes
+// that surface one at a time; fix the first one to unblock the rest.
 type routeReg struct {
 	adder routeAdder
 	err   error
@@ -88,6 +96,8 @@ func (r *routeReg) get(path string, h http.Handler)    { r.record(r.adder.Get(pa
 func (r *routeReg) post(path string, h http.Handler)   { r.record(r.adder.Post(path, h)) }
 func (r *routeReg) put(path string, h http.Handler)    { r.record(r.adder.Put(path, h)) }
 func (r *routeReg) delete(path string, h http.Handler) { r.record(r.adder.Delete(path, h)) }
+
+// record stores the first non-nil error; subsequent errors are dropped.
 func (r *routeReg) record(err error) {
 	if r.err == nil {
 		r.err = err

@@ -15,7 +15,7 @@ func TestWriteHealthResponseShape(t *testing.T) {
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/healthz", nil)
 
-	handler.WriteHealthResponse(rec, req, "with-messaging")
+	handler.WriteHealthResponse(rec, req, "with-messaging", nil)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
