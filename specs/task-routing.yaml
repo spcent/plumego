@@ -210,6 +210,7 @@ tasks:
       - specs/task-routing.yaml
 
   file_api:
+    intent: Change HTTP file upload, download, or storage transport over x/fileapi.
     start_with:
       - x/fileapi/module.yaml
       - docs/modules/x/fileapi/README.md
@@ -219,6 +220,7 @@ tasks:
       - x/data/file
 
   app_bootstrap:
+    intent: Change application bootstrap shape, main.go wiring, or core server construction.
     start_with:
       - docs/CANONICAL_STYLE_GUIDE.md
       - specs/repo.yaml
@@ -231,6 +233,7 @@ tasks:
       - x/messaging/webhook
 
   http_endpoint:
+    intent: Add or change an HTTP route, handler, or route-group registration.
     start_with:
       - docs/CANONICAL_STYLE_GUIDE.md
       - reference/standard-service/internal/app/routes.go
@@ -240,6 +243,7 @@ tasks:
       - middleware
 
   middleware:
+    intent: Add, change, or fix a stable transport middleware (accesslog, bodylimit, cors, recovery, requestid, security, timeout, tracing, httpmetrics).
     start_with:
       - middleware/module.yaml
       - docs/modules/middleware/README.md
@@ -249,6 +253,7 @@ tasks:
       - contract
 
   security:
+    intent: Change authentication primitives, JWT handling, abuse guards, security headers, or input validation in the stable security package.
     start_with:
       - security/module.yaml
       - docs/modules/security/README.md
@@ -258,6 +263,7 @@ tasks:
       - x/tenant
 
   store:
+    intent: Change stable storage primitives — DB helpers, in-memory cache, file storage, KV, or idempotency contracts.
     start_with:
       - store/module.yaml
       - docs/modules/store/README.md
@@ -267,6 +273,7 @@ tasks:
       - x/data
 
   gateway_edge_transport:
+    intent: Change reverse proxy, load balancing, rewrite, cache, or edge transport behavior in x/gateway.
     start_with:
       - x/gateway/module.yaml
       - x/gateway/entrypoints.go
@@ -276,6 +283,7 @@ tasks:
       - reference/standard-service
 
   resource_api_standardization:
+    intent: Change REST resource controllers, CRUD route conventions, or resource interface contracts in x/rest.
     start_with:
       - x/rest/module.yaml
       - docs/modules/x/rest/README.md
@@ -286,6 +294,7 @@ tasks:
       - x/gateway
 
   rpc_transport:
+    intent: Change gRPC server, client pool, or HTTP-to-gRPC transcoding behavior in x/rpc.
     start_with:
       - x/rpc/module.yaml
       - x/rpc/server/module.yaml
@@ -295,6 +304,7 @@ tasks:
       - middleware
 
   messaging:
+    intent: Change app-facing messaging service, delivery orchestration, or provider abstraction in x/messaging.
     start_with:
       - x/messaging/module.yaml
       - x/messaging/entrypoints.go
@@ -305,6 +315,7 @@ tasks:
       - x/messaging/webhook
 
   tenant:
+    intent: Change tenant resolution, policy enforcement, quota, rate limiting, or tenant session behavior in x/tenant.
     start_with:
       - x/tenant/module.yaml
       - docs/modules/x/tenant/README.md
@@ -315,6 +326,7 @@ tasks:
       - core
 
   websocket:
+    intent: Change WebSocket hub lifecycle, room management, broadcast, or connection handling in x/websocket.
     start_with:
       - x/websocket/module.yaml
       - docs/modules/x/websocket/README.md
@@ -334,6 +346,7 @@ tasks:
       - router
 
   devtools_local_debug:
+    intent: Change local-only debug endpoints, inspector surfaces, or development tooling in x/observability/devtools.
     start_with:
       - x/observability/devtools/module.yaml
       - x/observability/devtools/devtools.go
@@ -343,6 +356,7 @@ tasks:
       - reference/standard-service
 
   service_discovery:
+    intent: Change service instance discovery, resolver helpers, or discovery backends in x/gateway/discovery.
     start_with:
       - x/gateway/discovery/module.yaml
       - specs/extension-taxonomy.yaml
@@ -352,6 +366,7 @@ tasks:
       - store
 
   ops_admin_surface:
+    intent: Change protected admin routes, runtime diagnostics, or health orchestration surfaces in x/observability/ops.
     start_with:
       - x/observability/ops/module.yaml
       - x/observability/module.yaml
@@ -361,6 +376,7 @@ tasks:
       - core
 
   observability_admin:
+    intent: Change exporter wiring, tracer configuration, metric collector adapters, or Prometheus/OpenTelemetry integration in x/observability.
     start_with:
       - x/observability/module.yaml
       - x/observability/ops/module.yaml
@@ -369,6 +385,7 @@ tasks:
       - health
 
   resilience:
+    intent: Change circuit breaker, rate-limit primitives, or cross-family resilience patterns in x/resilience.
     start_with:
       - x/resilience/module.yaml
       - specs/extension-taxonomy.yaml
@@ -377,6 +394,7 @@ tasks:
       - core
 
   ai:
+    intent: Change AI provider adapters, session management, streaming, tool invocation, or LLM orchestration in x/ai.
     start_with:
       - x/ai/module.yaml
       - docs/modules/x/ai/README.md
@@ -395,6 +413,7 @@ tasks:
       - reference/with-gateway
 
   scaffold:
+    intent: Change the plumego CLI scaffold templates, generated project layout, or new-project command behavior.
     start_with:
       - cmd/plumego/commands/new.go
       - cmd/plumego/internal/scaffold/scaffold.go
