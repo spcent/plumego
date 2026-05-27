@@ -1,16 +1,17 @@
-# AGENTS.md - reference/workerfleet
+# AGENTS.md - use-cases/workerfleet
 
-Operational guide for agents working in `reference/workerfleet`.
+Operational guide for agents working in `use-cases/workerfleet`.
 
-Workerfleet is an app-local monitoring reference service built on Plumego. It is
-not the canonical Plumego application template and it is not a stable root
-package. Use this file together with the repository root `AGENTS.md`; when the
-two conflict, the root security and boundary rules still win.
+Workerfleet is a production-scale use-case application built on Plumego for
+worker fleet monitoring. It is not the canonical Plumego application template
+and it is not a stable root package. Use this file together with the repository
+root `AGENTS.md`; when the two conflict, the root security and boundary rules
+still win.
 
 ## 1. Current Shape
 
 - Module path: `workerfleet`.
-- Location: `reference/workerfleet`.
+- Location: `use-cases/workerfleet`.
 - Plumego dependency: `replace github.com/spcent/plumego => ../..`.
 - Canonical app reference remains `reference/standard-service`; workerfleet is a
   work-in-progress reference for worker monitoring rather than a production-readiness template.
