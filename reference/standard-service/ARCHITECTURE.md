@@ -10,11 +10,12 @@ application. It supplements the README rather than repeating it.
 ```
 main.go
 internal/
-  config/   config.go
-  app/      app.go, routes.go
+  config/     config.go
+  app/        app.go, routes.go
   domain/
-    item/   item.go
-  handler/  api.go, health.go, items.go, handler_test.go
+    item/     item.go
+  handler/    api.go, health.go, items.go, handler_test.go
+  middleware/ guard.go
 ```
 
 This is the canonical Plumego application shape. Every scaffold and getting-
@@ -104,6 +105,26 @@ Tests live next to the handlers they test (`handler_test.go`).
 `internal/domain/item` owns the sample item model and in-memory repository. This
 keeps the transport package focused on HTTP adaptation while still showing where
 real business and persistence code belongs in an application.
+
+---
+
+## `internal/middleware/` — per-route middleware
+
+App-local middleware that wraps individual routes (rather than the whole stack)
+lives in `internal/middleware`. The package name is `appmiddleware` to avoid
+collision with the imported `middleware` package from plumego.
+
+`guard.go` implements `RequireWriteKey`, a per-route middleware that gates
+mutating endpoints behind a static bearer key. It is wired in `routes.go` using
+the per-route wrapping pattern:
+
+```go
+writeGuard := appmiddleware.RequireWriteKey(cfg.App.WriteKey, logger)
+v1.post("/items", writeGuard(http.HandlerFunc(items.Create)))
+```
+
+Global middleware (running on every request) belongs in `internal/app/app.go`.
+Per-route middleware belongs here.
 
 ### Constructor injection
 
@@ -236,13 +257,15 @@ mistakes; there is at most one at a time and the first one is the one to fix.
 ```
 main.go
   → internal/config
-  → internal/app          (imports internal/config, internal/handler)
+  → internal/app               (imports internal/config, internal/handler, internal/middleware)
       → internal/domain/item
-      → internal/handler  (imports contract, router, internal/domain/item)
+      → internal/handler       (imports contract, router, internal/domain/item)
+      → internal/middleware    (imports contract, log)
 ```
 
-`internal/handler` has no upward imports. It does not import `internal/app`
-or `internal/config`. This keeps handlers independently testable.
+`internal/handler` and `internal/middleware` have no upward imports. They do
+not import `internal/app` or `internal/config`. This keeps them independently
+testable.
 
 ---
 
