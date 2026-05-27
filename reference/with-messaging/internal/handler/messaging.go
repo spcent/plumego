@@ -14,8 +14,8 @@ import (
 // MessagingHandler handles pub/sub event endpoints.
 // The Broker dependency is injected explicitly via the struct field.
 type MessagingHandler struct {
-	Broker  *messaging.Broker
-	Logger  plumelog.StructuredLogger
+	Broker *messaging.Broker
+	Logger plumelog.StructuredLogger
 }
 
 type publishResponse struct {
