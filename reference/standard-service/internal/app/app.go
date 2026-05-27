@@ -11,10 +11,14 @@ import (
 
 	"github.com/spcent/plumego/core"
 	plumelog "github.com/spcent/plumego/log"
+	"github.com/spcent/plumego/metrics"
 	"github.com/spcent/plumego/middleware/accesslog"
 	"github.com/spcent/plumego/middleware/bodylimit"
+	"github.com/spcent/plumego/middleware/cors"
+	"github.com/spcent/plumego/middleware/httpmetrics"
 	"github.com/spcent/plumego/middleware/recovery"
 	"github.com/spcent/plumego/middleware/requestid"
+	midsecurity "github.com/spcent/plumego/middleware/security"
 	"github.com/spcent/plumego/middleware/timeout"
 	"standard-service/internal/config"
 )
@@ -28,6 +32,10 @@ type App struct {
 // New constructs the App with explicit stable-root wiring only.
 func New(cfg config.Config) (*App, error) {
 	app := core.New(cfg.Core, core.AppDependencies{Logger: plumelog.NewLogger()})
+	securityMw, err := midsecurity.Middleware(midsecurity.Config{})
+	if err != nil {
+		return nil, fmt.Errorf("configure security headers middleware: %w", err)
+	}
 	recoveryMw, err := recovery.Middleware(recovery.Config{Logger: app.Logger()})
 	if err != nil {
 		return nil, fmt.Errorf("configure recovery middleware: %w", err)
@@ -39,30 +47,28 @@ func New(cfg config.Config) (*App, error) {
 	timeoutMw := timeout.Middleware(timeout.Config{Timeout: 30 * time.Second})
 	// Middleware order — outermost to innermost (first registered runs first on inbound requests):
 	//   requestid  → stamps correlation ID before any logging or error handling
-	//   recovery   → converts panics to 500 responses; runs inside requestid so ID is in the response
-	//   accesslog  → logs every request/response at transport level; runs after requestid and recovery
-	//   bodylimit  → rejects oversized bodies with 413; placed after accesslog so the 413 is logged
-	//   timeout    → enforces per-request wall-clock limit; innermost so only handler time is counted
+	//   security   → security headers (X-Frame-Options, X-Content-Type-Options, …) on all responses
+	//   cors       → CORS preflight and headers; use cors.StrictDefaultOptions in production
+	//   recovery   → converts panics to 500 responses; inside cors/security so headers still apply
+	//   accesslog  → logs every request/response; after recovery so panics appear as 500
+	//   bodylimit  → rejects oversized bodies with 413; after accesslog so the 413 is logged
+	//   httpmetrics→ measures handler latency and status; swap NewNoopCollector for a real collector
+	//   timeout    → per-request wall-clock limit; innermost so only handler time is counted
 	if err := app.Use(
 		requestid.Middleware(),
+		securityMw,
+		cors.Middleware(cors.CORSOptions{}),
 		recoveryMw,
 		accesslogMw,
 		bodylimit.Middleware(bodylimit.Config{
 			MaxBytes: cfg.App.MaxBodyBytes,
 			Logger:   app.Logger(),
 		}),
+		httpmetrics.Middleware(metrics.NewNoopCollector()),
 		timeoutMw,
 	); err != nil {
 		return nil, fmt.Errorf("register middleware: %w", err)
 	}
-	// Extension points: additional stable-root middleware available when needed.
-	// Add these to app.Use above at the appropriate position:
-	//   middleware/security    — security headers (CSP, HSTS, X-Frame-Options, …)
-	//   middleware/ratelimit   — token-bucket abuse guard per IP or API key
-	//   middleware/tracing     — distributed tracing span lifecycle
-	//   middleware/httpmetrics — request count, latency, and error-rate counters
-	//   middleware/cors        — cross-origin resource sharing
-	// See reference/production-service for a hardened baseline with these wired in.
 
 	return &App{
 		Core: app,
