@@ -6,13 +6,18 @@ import (
 	"strings"
 	"testing"
 
+	plumelog "github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/x/messaging/pubsub"
 )
+
+func discardLogger() plumelog.StructuredLogger {
+	return plumelog.NewLogger(plumelog.LoggerConfig{Format: plumelog.LoggerFormatDiscard})
+}
 
 func TestCreateOrderReturnsAccepted(t *testing.T) {
 	bus := pubsub.New()
 	defer bus.Close()
-	handler := NewHandler(NewPublisher(bus, NewMemoryIdempotencyStore()))
+	handler := NewHandler(NewPublisher(bus, NewMemoryIdempotencyStore()), discardLogger())
 
 	req := httptest.NewRequest(http.MethodPost, "/orders", strings.NewReader(`{"id":"ord-1","customer_id":"cust-1","total_cents":1200}`))
 	rec := httptest.NewRecorder()
@@ -27,7 +32,7 @@ func TestCreateOrderReturnsAccepted(t *testing.T) {
 func TestCreateOrderEmptyBodyReturnsBadRequest(t *testing.T) {
 	bus := pubsub.New()
 	defer bus.Close()
-	handler := NewHandler(NewPublisher(bus, NewMemoryIdempotencyStore()))
+	handler := NewHandler(NewPublisher(bus, NewMemoryIdempotencyStore()), discardLogger())
 
 	req := httptest.NewRequest(http.MethodPost, "/orders", strings.NewReader(""))
 	rec := httptest.NewRecorder()

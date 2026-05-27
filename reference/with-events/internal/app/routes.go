@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/spcent/plumego/contract"
+	plumelog "github.com/spcent/plumego/log"
 )
 
 type placeholderResponse struct {
@@ -13,20 +14,23 @@ type placeholderResponse struct {
 
 // RegisterRoutes wires placeholder route groups for later event-flow cards.
 func (a *App) RegisterRoutes() error {
+	logger := a.Core.Logger()
 	reg := newRouteReg(a.Core)
 	reg.post("/orders", http.HandlerFunc(a.Orders.Create))
 	reg.get("/orders/:id", http.HandlerFunc(a.Orders.Get))
-	reg.post("/scheduler/retry", placeholder("scheduler"))
-	reg.post("/webhook/send", placeholder("webhook"))
+	reg.post("/scheduler/retry", placeholder("scheduler", logger))
+	reg.post("/webhook/send", placeholder("webhook", logger))
 	return reg.err
 }
 
-func placeholder(group string) http.HandlerFunc {
+func placeholder(group string, logger plumelog.StructuredLogger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		_ = contract.WriteResponse(w, r, http.StatusOK, placeholderResponse{
+		if err := contract.WriteResponse(w, r, http.StatusOK, placeholderResponse{
 			Status: "placeholder",
 			Group:  group,
-		}, nil)
+		}, nil); err != nil && logger != nil {
+			logger.Warn("write response failed", plumelog.Fields{"error": err.Error()})
+		}
 	}
 }
 

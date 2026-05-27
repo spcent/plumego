@@ -8,8 +8,9 @@ import (
 
 // RegisterRoutes wires all HTTP routes for the with-websocket demo.
 func (a *App) RegisterRoutes() error {
+	logger := a.Core.Logger()
 	if err := a.Core.Get("/healthz", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		handler.WriteHealthResponse(w, r, "with-websocket")
+		handler.WriteHealthResponse(w, r, "with-websocket", logger)
 	})); err != nil {
 		return err
 	}

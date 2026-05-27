@@ -8,9 +8,10 @@ import (
 
 // RegisterRoutes wires all HTTP routes for the with-messaging demo.
 func (a *App) RegisterRoutes() error {
+	logger := a.Core.Logger()
 	reg := newRouteReg(a.Core)
 	reg.get("/healthz", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		handler.WriteHealthResponse(w, r, "with-messaging")
+		handler.WriteHealthResponse(w, r, "with-messaging", logger)
 	}))
 	reg.post("/events/publish", http.HandlerFunc(a.Handler.Publish))
 	return reg.err

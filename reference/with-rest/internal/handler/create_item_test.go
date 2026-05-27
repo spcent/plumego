@@ -8,14 +8,19 @@ import (
 	"testing"
 
 	"github.com/spcent/plumego/contract"
+	plumelog "github.com/spcent/plumego/log"
 	"with-rest/internal/validation/playground"
 )
+
+func discardLogger() plumelog.StructuredLogger {
+	return plumelog.NewLogger(plumelog.LoggerConfig{Format: plumelog.LoggerFormatDiscard})
+}
 
 func TestCreateItemValidRequestPasses(t *testing.T) {
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "/api/items", strings.NewReader(`{"name":"widget"}`))
 
-	NewCreateItem(playground.NewValidator()).ServeHTTP(rec, req)
+	NewCreateItem(playground.NewValidator(), discardLogger()).ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusCreated, rec.Body.String())
@@ -35,7 +40,7 @@ func TestCreateItemMissingRequiredFieldReturnsStructuredError(t *testing.T) {
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "/api/items", strings.NewReader(`{}`))
 
-	NewCreateItem(playground.NewValidator()).ServeHTTP(rec, req)
+	NewCreateItem(playground.NewValidator(), discardLogger()).ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusBadRequest, rec.Body.String())
@@ -71,7 +76,7 @@ func TestCreateItemMalformedJSONReturnsBadRequest(t *testing.T) {
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "/api/items", strings.NewReader(`{"name":`))
 
-	NewCreateItem(playground.NewValidator()).ServeHTTP(rec, req)
+	NewCreateItem(playground.NewValidator(), discardLogger()).ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusBadRequest, rec.Body.String())

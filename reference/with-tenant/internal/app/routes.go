@@ -1,8 +1,6 @@
 package app
 
 import (
-	"net/http"
-
 	"github.com/spcent/plumego/middleware"
 	tenantcore "github.com/spcent/plumego/x/tenant/core"
 	"github.com/spcent/plumego/x/tenant/policy"
@@ -31,5 +29,5 @@ func (a *App) RegisterRoutes() error {
 		}),
 	)
 
-	return a.Core.Get("/api/models", tenantChain.Build(http.HandlerFunc(handler.ModelsHandler)))
+	return a.Core.Get("/api/models", tenantChain.Build(handler.NewModelsHandler(a.Core.Logger())))
 }

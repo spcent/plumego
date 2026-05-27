@@ -52,21 +52,23 @@ func applyFlags(cfg *Config, args []string) error {
 	if len(args) == 0 {
 		return fs.Parse(nil)
 	}
-	return fs.Parse(configFlagArgs(args[1:]))
+	known := make(map[string]bool)
+	fs.VisitAll(func(f *flag.Flag) { known[f.Name] = true })
+	return fs.Parse(filterFlagArgs(args[1:], known))
 }
 
-func configFlagArgs(args []string) []string {
+func filterFlagArgs(args []string, known map[string]bool) []string {
 	out := make([]string, 0, len(args))
 	for i := 0; i < len(args); i++ {
 		arg := args[i]
 		name, hasValue := flagName(arg)
-		switch name {
-		case "addr", "log-level", "webhook-target-url":
-			out = append(out, arg)
-			if !hasValue && i+1 < len(args) {
-				i++
-				out = append(out, args[i])
-			}
+		if !known[name] {
+			continue
+		}
+		out = append(out, arg)
+		if !hasValue && i+1 < len(args) {
+			i++
+			out = append(out, args[i])
 		}
 	}
 	return out

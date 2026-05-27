@@ -12,7 +12,7 @@ import (
 // RegisterRoutes wires all HTTP routes for the with-ops demo.
 // Stable app routes come first; then the ops handler registers its own paths.
 func (a *App) RegisterRoutes() error {
-	h := handler.New(a.Cfg, a.Collector)
+	h := handler.New(a.Cfg, a.Collector, a.Core.Logger())
 
 	root := newRouteReg(a.Core)
 	root.get("/", http.HandlerFunc(h.Root))

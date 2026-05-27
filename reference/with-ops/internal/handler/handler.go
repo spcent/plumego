@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/spcent/plumego/contract"
+	plumelog "github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/metrics"
 	"with-ops/internal/config"
 )
@@ -13,23 +14,24 @@ import (
 type Handler struct {
 	cfg       config.Config
 	collector *metrics.BaseMetricsCollector
+	Logger    plumelog.StructuredLogger
 }
 
 // New constructs a Handler with the given config and metrics collector.
-func New(cfg config.Config, collector *metrics.BaseMetricsCollector) *Handler {
-	return &Handler{cfg: cfg, collector: collector}
+func New(cfg config.Config, collector *metrics.BaseMetricsCollector, logger plumelog.StructuredLogger) *Handler {
+	return &Handler{cfg: cfg, collector: collector, Logger: logger}
 }
 
 // Root serves the application index with links to available endpoints.
 func (h *Handler) Root(w http.ResponseWriter, r *http.Request) {
-	_ = contract.WriteResponse(w, r, http.StatusOK, map[string]any{
+	logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusOK, map[string]any{
 		"service": "with-ops",
 		"ops":     h.cfg.OpsBasePath,
 		"metrics": "/metrics",
-	}, nil)
+	}, nil))
 }
 
 // Metrics serves raw application metrics from the collector.
 func (h *Handler) Metrics(w http.ResponseWriter, r *http.Request) {
-	_ = contract.WriteResponse(w, r, http.StatusOK, h.collector.GetStats(), nil)
+	logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusOK, h.collector.GetStats(), nil))
 }
