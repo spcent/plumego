@@ -11,30 +11,37 @@ Each item is a conscious decision, not a default assumption.
   `cfg.Core.ReadTimeout`, `cfg.Core.WriteTimeout`, `cfg.Core.IdleTimeout`.
   Defaults are permissive for local development. Set explicit values for production.
 
-- [ ] **Body size limit** middleware is in the middleware stack.
-  Add `middleware.BodyLimit(maxBytes)` before handlers that accept request bodies.
-  The default unbounded body allows memory exhaustion attacks.
+- [ ] **Body size limit** is configured for your traffic profile.
+  `bodylimit.Middleware` is wired in `internal/app/app.go` and reads
+  `cfg.App.MaxBodyBytes`. The default is 1 MiB; adjust it for your largest
+  expected request body.
 
-- [ ] **Request timeout** middleware is configured.
-  Add `middleware.Timeout(duration)` to enforce a per-request wall-clock limit.
+- [ ] **Request timeout** is configured for your p99 latency budget.
+  `timeout.Middleware` is wired in `internal/app/app.go` and defaults to 30s.
+  Set it to the maximum acceptable wall-clock time for any single request.
 
 - [ ] **TLS is enabled** or the service runs behind a TLS-terminating proxy.
   If self-terminating, set `cfg.Core.TLS.Enabled = true` and provide cert/key paths.
 
-- [ ] **CORS policy** is defined if the API is consumed by browser clients.
-  Add `middleware.CORS(config)` with explicit allowed origins. Do not use wildcard
-  origins for authenticated APIs.
+- [ ] **CORS policy** is tightened if the API is consumed by browser clients.
+  `cors.Middleware` is wired in `internal/app/app.go` with permissive defaults.
+  Replace `cors.CORSOptions{}` with `cors.StrictDefaultOptions(origins...)` and
+  enumerate the allowed origins explicitly. Do not use wildcard origins for
+  authenticated APIs.
 
 ---
 
 ## Security
 
-- [ ] **Security headers** middleware is in the stack.
-  Add `middleware.SecureHeaders()` to set `X-Content-Type-Options`,
-  `X-Frame-Options`, `Strict-Transport-Security`, and related headers.
+- [ ] **Security headers** are wired and cover your deployment requirements.
+  `middleware/security` is wired in `internal/app/app.go` and sets
+  `X-Frame-Options`, `X-Content-Type-Options`, and `Referrer-Policy`.
+  Review the defaults against your Content Security Policy and HSTS requirements;
+  extend `midsecurity.Config{}` if stricter headers are needed.
 
 - [ ] **Rate limiting** is configured for public endpoints.
-  Add `middleware.RateLimit(config)` to protect high-traffic or unauthenticated routes.
+  Add `security/abuse` or `x/resilience/ratelimit` middleware to protect
+  high-traffic or unauthenticated routes.
 
 - [ ] **Authentication** is enforced on all non-public endpoints.
   There is no default authentication. Every protected route must have an explicit

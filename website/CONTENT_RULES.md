@@ -180,9 +180,9 @@ or reference-app doc page.
 (EXAMPLES_COPY referenceMatrix).
 
 **Verification:** Run `node scripts/check-content-contracts.mjs`. Every subdirectory except
-`standard-service` (covered by the canonical reference-app page), `workerfleet` (covered by its
-dedicated examples section), and `benchmark` (not a service reference app) must appear in
-`referenceMatrix`.
+`standard-service` (covered by the canonical reference-app page) and `benchmark` (not a service
+reference app) must appear in `referenceMatrix`. `workerfleet` lives under `use-cases/` and is
+covered by its dedicated examples section.
 
 ---
 

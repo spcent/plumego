@@ -19,7 +19,7 @@ Conflict order: (1) security/boundary rules here → (2) `docs/CANONICAL_STYLE_G
 - Preserve `net/http` compatibility.
 - Keep the main module dependency-free beyond the standard library unless explicitly approved.
 - Do not add `go.mod` anywhere under `x/**`; extension packages remain part of the main module.
-- Reference apps under `reference/` MAY have an independent `go.mod` for external deps (e.g. `reference/workerfleet` for MongoDB); use a `replace` directive and document the rationale.
+- Reference apps under `reference/` MAY have an independent `go.mod` for external deps; use a `replace` directive and document the rationale. Use-case apps under `use-cases/` follow the same rule (e.g. `use-cases/workerfleet` for MongoDB).
 - Stable roots must not import `x/*`.
 - Do not introduce hidden globals, `init()` registration, or context service-locator patterns.
 - Never log secrets, tokens, signatures, or private keys.

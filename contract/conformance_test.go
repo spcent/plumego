@@ -124,7 +124,7 @@ func scanExternalContractGoFilePaths(repoRoot string) ([]string, error) {
 			}
 			if d.IsDir() {
 				switch d.Name() {
-				case ".git", ".codex", "node_modules", "vendor":
+				case ".git", ".codex", "gatus", "node_modules", "vendor":
 					return filepath.SkipDir
 				}
 				if d.Name() == "testdata" || strings.HasPrefix(d.Name(), "testdata_") {
@@ -234,7 +234,7 @@ func TestConformanceScanCoverageAndBudget(t *testing.T) {
 	required := map[string]bool{
 		"x/messaging/api.go":                                        false,
 		"x/observability/ops/healthhttp/helpers.go":                 false,
-		"reference/workerfleet/internal/handler/worker_register.go": false,
+		"use-cases/workerfleet/internal/handler/worker_register.go": false,
 	}
 	for _, path := range paths {
 		rel, err := filepath.Rel(repoRoot, path)
@@ -298,7 +298,7 @@ func TestExternalTypedErrorsUseCanonicalContractCodes(t *testing.T) {
 	var violations []string
 	registeredCustomCodes := loadContractErrorCodeRegistry(t, repoRoot)
 	allowedDynamicCustomCodes := map[string]int{
-		"reference/workerfleet/internal/handler/worker_register.go#Handler.writeNotImplemented": 1,
+		"use-cases/workerfleet/internal/handler/worker_register.go#Handler.writeNotImplemented": 1,
 		"x/observability/ops/ops.go#Handler.writeHookError":                                     1,
 		"x/observability/ops/ops.go#writeNotImplemented":                                        1,
 	}

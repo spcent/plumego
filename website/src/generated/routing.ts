@@ -6,7 +6,7 @@ export const ROUTING_SCENARIOS = {
       "chipLabel": "Add inbound rate limiting",
       "taskDescription": "Add rate limiting to an inbound HTTP endpoint (e.g. the greet route).",
       "ruleName": "middleware",
-      "intent": "Add rate limiting to an inbound HTTP endpoint (e.g. the greet route).",
+      "intent": "Add, change, or fix a stable transport middleware (accesslog, bodylimit, cors, recovery, requestid, security, timeout, tracing, httpmetrics).",
       "destination": "middleware/",
       "startWith": [
         "middleware/module.yaml",
@@ -89,7 +89,7 @@ export const ROUTING_SCENARIOS = {
       "chipLabel": "Add WebSocket support",
       "taskDescription": "Add WebSocket upgrade handling to an existing HTTP server.",
       "ruleName": "websocket",
-      "intent": "Add WebSocket upgrade handling to an existing HTTP server.",
+      "intent": "Change WebSocket hub lifecycle, room management, broadcast, or connection handling in x/websocket.",
       "destination": "x/websocket/",
       "startWith": [
         "x/websocket/module.yaml",
@@ -108,7 +108,7 @@ export const ROUTING_SCENARIOS = {
       "chipLabel": "Set up API gateway proxy",
       "taskDescription": "Add reverse proxy, upstream routing, or load balancing at the edge.",
       "ruleName": "gateway_edge_transport",
-      "intent": "Add reverse proxy, upstream routing, or load balancing at the edge.",
+      "intent": "Change reverse proxy, load balancing, rewrite, cache, or edge transport behavior in x/gateway.",
       "destination": "x/gateway/",
       "startWith": [
         "x/gateway/module.yaml",
@@ -127,7 +127,7 @@ export const ROUTING_SCENARIOS = {
       "chipLabel": "Add file upload endpoint",
       "taskDescription": "Add multipart file upload and download handling.",
       "ruleName": "file_api",
-      "intent": "Add multipart file upload and download handling.",
+      "intent": "Change HTTP file upload, download, or storage transport over x/fileapi.",
       "destination": "x/fileapi/",
       "startWith": [
         "x/fileapi/module.yaml",
@@ -216,7 +216,7 @@ export const ROUTING_SCENARIOS = {
       "chipLabel": "加入入站限流",
       "taskDescription": "给某个入站 HTTP 端点加入限流（如 greet 路由）。",
       "ruleName": "middleware",
-      "intent": "给某个入站 HTTP 端点加入限流（如 greet 路由）。",
+      "intent": "Add, change, or fix a stable transport middleware (accesslog, bodylimit, cors, recovery, requestid, security, timeout, tracing, httpmetrics).",
       "destination": "middleware/",
       "startWith": [
         "middleware/module.yaml",
@@ -299,7 +299,7 @@ export const ROUTING_SCENARIOS = {
       "chipLabel": "加入 WebSocket 支持",
       "taskDescription": "在现有 HTTP 服务中加入 WebSocket 升级处理。",
       "ruleName": "websocket",
-      "intent": "在现有 HTTP 服务中加入 WebSocket 升级处理。",
+      "intent": "Change WebSocket hub lifecycle, room management, broadcast, or connection handling in x/websocket.",
       "destination": "x/websocket/",
       "startWith": [
         "x/websocket/module.yaml",
@@ -318,7 +318,7 @@ export const ROUTING_SCENARIOS = {
       "chipLabel": "API 网关反向代理",
       "taskDescription": "在边缘加入反向代理、上游路由或负载均衡。",
       "ruleName": "gateway_edge_transport",
-      "intent": "在边缘加入反向代理、上游路由或负载均衡。",
+      "intent": "Change reverse proxy, load balancing, rewrite, cache, or edge transport behavior in x/gateway.",
       "destination": "x/gateway/",
       "startWith": [
         "x/gateway/module.yaml",
@@ -337,7 +337,7 @@ export const ROUTING_SCENARIOS = {
       "chipLabel": "加入文件上传接口",
       "taskDescription": "加入 multipart 文件上传和下载处理。",
       "ruleName": "file_api",
-      "intent": "加入 multipart 文件上传和下载处理。",
+      "intent": "Change HTTP file upload, download, or storage transport over x/fileapi.",
       "destination": "x/fileapi/",
       "startWith": [
         "x/fileapi/module.yaml",

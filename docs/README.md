@@ -103,7 +103,7 @@ Related execution surfaces live outside `docs/`:
 - `../reference/with-ops/README.md` — explicit observability and protected admin surface mounting pattern
 - `../reference/with-messaging/README.md` — explicit app-facing messaging mounting pattern
 - `../reference/with-webhook/README.md` — explicit webhook ingress and outbound delivery mounting pattern
-- `../reference/workerfleet/README.md` — separate worker-oriented reference, not part of the canonical web-service path
+- `../use-cases/workerfleet/README.md` — worker-fleet monitoring use-case, not part of the canonical web-service path
 
 ## Reference Assets
 

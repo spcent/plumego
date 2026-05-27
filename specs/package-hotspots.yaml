@@ -331,6 +331,97 @@ packages:
       - core
     summary: Cache topology and provider implementations under x/data; stable cache contracts stay in store/cache.
 
+  x/data/idempotency:
+    module: x/data
+    layer: extension
+    role: implementation
+    task_families:
+      - store
+    start_with:
+      - x/data/idempotency/module.yaml
+      - x/data/idempotency/store.go
+    avoid:
+      - core
+    summary: Durable idempotency providers backed by SQL or KV; prevents duplicate effect on retried requests.
+
+  x/data/kvengine:
+    module: x/data
+    layer: extension
+    role: implementation
+    task_families:
+      - store
+    start_with:
+      - x/data/kvengine/module.yaml
+      - x/data/kvengine/kv.go
+    avoid:
+      - core
+    summary: Embedded durable KV engine with WAL and LRU snapshot support.
+
+  x/data/migrate:
+    module: x/data
+    layer: extension
+    role: implementation
+    task_families:
+      - store
+    start_with:
+      - x/data/migrate/module.yaml
+      - x/data/migrate/migrate.go
+    avoid:
+      - core
+    summary: Dependency-free schema migration runner for SQL databases.
+
+  x/data/pgx:
+    module: x/data
+    layer: extension
+    role: adapter
+    task_families:
+      - store
+    start_with:
+      - x/data/pgx/module.yaml
+      - x/data/pgx/adapter.go
+    avoid:
+      - core
+    summary: PostgreSQL pgx adapter for use with x/data connection patterns.
+
+  x/data/rw:
+    module: x/data
+    layer: extension
+    role: implementation
+    task_families:
+      - store
+    start_with:
+      - x/data/rw/module.yaml
+      - x/data/rw/cluster.go
+    avoid:
+      - core
+    summary: Primary-replica read-write splitting with configurable load balancing and health checks.
+
+  x/data/sharding:
+    module: x/data
+    layer: extension
+    role: implementation
+    task_families:
+      - store
+    start_with:
+      - x/data/sharding/module.yaml
+      - x/data/sharding/router.go
+    avoid:
+      - core
+    summary: Database sharding router with Hash/Mod/Range/List/Custom strategies.
+
+  x/data/sqlx:
+    module: x/data
+    layer: extension
+    role: adapter
+    task_families:
+      - store
+    start_with:
+      - x/data/sqlx/module.yaml
+      - x/data/sqlx/adapter.go
+    avoid:
+      - core
+    summary: database/sql adapter for use with x/data connection patterns.
+
   x/tenant/core:
     module: x/tenant
     layer: extension

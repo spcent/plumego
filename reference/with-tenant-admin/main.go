@@ -1,3 +1,7 @@
+// Example: with-tenant-admin
+//
+// This demo shows tenant lifecycle operations, quota administration, usage
+// recording, and fail-closed admin authentication using x/tenant primitives.
 package main
 
 import (

@@ -19,6 +19,7 @@ entrypoint_reads:
 subordinate_families:
   - x/data/cache
   - x/data/file
+  - x/data/idempotency
   - x/data/kvengine
   - x/data/pgx
   - x/data/sqlx

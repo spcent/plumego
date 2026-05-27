@@ -56,6 +56,7 @@ var allowedTopLevelDirs = []string{
 	"store",
 	"scripts",
 	"tasks",
+	"use-cases",
 	"website",
 	"x",
 }

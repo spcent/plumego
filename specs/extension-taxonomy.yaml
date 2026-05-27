@@ -77,6 +77,14 @@ families:
     roots:
       - x/data
       - x/data/cache
+      - x/data/file
+      - x/data/kvengine
+      - x/data/pgx
+      - x/data/sqlx
+      - x/data/migrate
+      - x/data/rw
+      - x/data/sharding
+      - x/data/idempotency
 
   ai:
     canonical_root: x/ai

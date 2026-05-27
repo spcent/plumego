@@ -27,3 +27,6 @@ dist/
 build/
 website/node_modules/
 website/.astro/
+
+.playwright-cli/
+.claude/

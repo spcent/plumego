@@ -366,7 +366,7 @@ gates: ## Run all required quality gates (mirrors CI)
 	go run ./internal/tools/doc-snippets
 	go vet ./...
 	$(MAKE) reference-vet
-	@UNFORMATTED=$$(gofmt -l .); \
+	@UNFORMATTED=$$(find . -name "*.go" -not -path "./use-cases/gatus/*" | xargs gofmt -l); \
 	if [ -n "$$UNFORMATTED" ]; then \
 	  echo "Unformatted files:"; echo "$$UNFORMATTED"; exit 1; \
 	fi

@@ -20,8 +20,20 @@ The primer path is always `docs/modules/<import-path>/README.md`.
 | Import path | Primer |
 |---|---|
 | `x/ai` | [`x/ai/README.md`](x/ai/README.md) |
+| `x/ai/provider` | [`x/ai/provider/README.md`](x/ai/provider/README.md) |
+| `x/ai/session` | [`x/ai/session/README.md`](x/ai/session/README.md) |
+| `x/ai/streaming` | [`x/ai/streaming/README.md`](x/ai/streaming/README.md) |
+| `x/ai/tool` | [`x/ai/tool/README.md`](x/ai/tool/README.md) |
 | `x/data` | [`x/data/README.md`](x/data/README.md) |
 | `x/data/cache` | [`x/data/cache/README.md`](x/data/cache/README.md) |
+| `x/data/file` | [`x/data/file/README.md`](x/data/file/README.md) |
+| `x/data/idempotency` | [`x/data/idempotency/README.md`](x/data/idempotency/README.md) |
+| `x/data/kvengine` | [`x/data/kvengine/README.md`](x/data/kvengine/README.md) |
+| `x/data/migrate` | [`x/data/migrate/README.md`](x/data/migrate/README.md) |
+| `x/data/pgx` | [`x/data/pgx/README.md`](x/data/pgx/README.md) |
+| `x/data/rw` | [`x/data/rw/README.md`](x/data/rw/README.md) |
+| `x/data/sharding` | [`x/data/sharding/README.md`](x/data/sharding/README.md) |
+| `x/data/sqlx` | [`x/data/sqlx/README.md`](x/data/sqlx/README.md) |
 | `x/fileapi` | [`x/fileapi/README.md`](x/fileapi/README.md) |
 | `x/frontend` | [`x/frontend/README.md`](x/frontend/README.md) |
 | `x/gateway` | [`x/gateway/README.md`](x/gateway/README.md) |
