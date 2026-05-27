@@ -4,10 +4,16 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	plumelog "github.com/spcent/plumego/log"
 )
 
+func discardLogger() plumelog.StructuredLogger {
+	return plumelog.NewLogger(plumelog.LoggerConfig{Format: plumelog.LoggerFormatDiscard})
+}
+
 func TestRequireAdminTokenRejectsMissingHeader(t *testing.T) {
-	mw := RequireAdminToken("secret")
+	mw := RequireAdminToken("secret", discardLogger())
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/admin/tenants", nil)
 
@@ -21,7 +27,7 @@ func TestRequireAdminTokenRejectsMissingHeader(t *testing.T) {
 }
 
 func TestRequireAdminTokenAllowsMatchingHeader(t *testing.T) {
-	mw := RequireAdminToken("secret")
+	mw := RequireAdminToken("secret", discardLogger())
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/admin/tenants", nil)
 	req.Header.Set(HeaderAdminToken, "secret")

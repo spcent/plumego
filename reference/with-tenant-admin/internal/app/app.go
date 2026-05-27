@@ -84,9 +84,9 @@ func New(cfg config.Config, deps Deps) (*App, error) {
 		TenantConfig: tenantConfig,
 		QuotaManager: quotaManager,
 		QuotaStore:   quotaStore,
-		Tenants:      tenantadmin.NewHandler(tenantStore),
-		Quotas:       quotaadmin.NewHandler(tenantStore, tenantConfig, quotaStore),
-		Usage:        usage.NewHandler(tenantStore, usageStore),
+		Tenants:      tenantadmin.NewHandler(tenantStore, logger),
+		Quotas:       quotaadmin.NewHandler(tenantStore, tenantConfig, quotaStore, logger),
+		Usage:        usage.NewHandler(tenantStore, usageStore, logger),
 	}, nil
 }
 

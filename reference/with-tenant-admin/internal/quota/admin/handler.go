@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/spcent/plumego/contract"
+	plumelog "github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/router"
 	tenantcore "github.com/spcent/plumego/x/tenant/core"
 	tenantadmin "with-tenant-admin/internal/tenant/admin"
@@ -17,11 +18,14 @@ type TenantLookup interface {
 	Get(context.Context, string) (tenantadmin.TenantRecord, error)
 }
 
+// Handler serves the quota admin endpoints.
+// Logger must not be nil; pass app.Core.Logger() from app.New.
 type Handler struct {
 	tenants    TenantLookup
 	configs    *tenantcore.InMemoryConfigManager
 	quotaStore *tenantcore.InMemoryQuotaStore
 	now        func() time.Time
+	Logger     plumelog.StructuredLogger
 }
 
 type SetQuotaRequest struct {
@@ -35,7 +39,7 @@ type QuotaResponse struct {
 	Remaining int64  `json:"remaining"`
 }
 
-func NewHandler(tenants TenantLookup, configs *tenantcore.InMemoryConfigManager, quotaStore *tenantcore.InMemoryQuotaStore) *Handler {
+func NewHandler(tenants TenantLookup, configs *tenantcore.InMemoryConfigManager, quotaStore *tenantcore.InMemoryQuotaStore, logger plumelog.StructuredLogger) *Handler {
 	if configs == nil {
 		configs = tenantcore.NewInMemoryConfigManager()
 	}
@@ -47,44 +51,45 @@ func NewHandler(tenants TenantLookup, configs *tenantcore.InMemoryConfigManager,
 		configs:    configs,
 		quotaStore: quotaStore,
 		now:        func() time.Time { return time.Now().UTC() },
+		Logger:     logger,
 	}
 }
 
 func (h *Handler) GetQuota(w http.ResponseWriter, r *http.Request) {
 	tenantID := router.Param(r, "tenantID")
 	if err := h.requireTenant(r.Context(), tenantID); err != nil {
-		writeError(w, r, contract.TypeNotFound, "tenant not found")
+		h.writeError(w, r, contract.TypeNotFound, "tenant not found")
 		return
 	}
 
 	response, err := h.quotaResponse(r.Context(), tenantID)
 	if err != nil {
-		writeError(w, r, contract.TypeInternal, "get quota failed")
+		h.writeError(w, r, contract.TypeInternal, "get quota failed")
 		return
 	}
-	_ = contract.WriteResponse(w, r, http.StatusOK, response, nil)
+	logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusOK, response, nil))
 }
 
 func (h *Handler) SetQuota(w http.ResponseWriter, r *http.Request) {
 	tenantID := router.Param(r, "tenantID")
 	if err := h.requireTenant(r.Context(), tenantID); err != nil {
-		writeError(w, r, contract.TypeNotFound, "tenant not found")
+		h.writeError(w, r, contract.TypeNotFound, "tenant not found")
 		return
 	}
 
 	var req SetQuotaRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, r, contract.TypeValidation, "invalid request body")
+		h.writeError(w, r, contract.TypeValidation, "invalid request body")
 		return
 	}
 	if req.Limit < 0 {
-		writeError(w, r, contract.TypeValidation, "quota limit must be non-negative")
+		h.writeError(w, r, contract.TypeValidation, "quota limit must be non-negative")
 		return
 	}
 
 	cfg, err := h.tenantConfig(r.Context(), tenantID)
 	if err != nil {
-		writeError(w, r, contract.TypeInternal, "set quota failed")
+		h.writeError(w, r, contract.TypeInternal, "set quota failed")
 		return
 	}
 	cfg.Quota = tenantcore.QuotaConfig{
@@ -97,16 +102,16 @@ func (h *Handler) SetQuota(w http.ResponseWriter, r *http.Request) {
 
 	response, err := h.quotaResponse(r.Context(), tenantID)
 	if err != nil {
-		writeError(w, r, contract.TypeInternal, "set quota failed")
+		h.writeError(w, r, contract.TypeInternal, "set quota failed")
 		return
 	}
-	_ = contract.WriteResponse(w, r, http.StatusOK, response, nil)
+	logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusOK, response, nil))
 }
 
 func (h *Handler) ResetQuota(w http.ResponseWriter, r *http.Request) {
 	tenantID := router.Param(r, "tenantID")
 	if err := h.requireTenant(r.Context(), tenantID); err != nil {
-		writeError(w, r, contract.TypeNotFound, "tenant not found")
+		h.writeError(w, r, contract.TypeNotFound, "tenant not found")
 		return
 	}
 
@@ -119,17 +124,17 @@ func (h *Handler) ResetQuota(w http.ResponseWriter, r *http.Request) {
 			DeltaRequests: usage.Requests,
 			DeltaTokens:   usage.Tokens,
 		}); err != nil {
-			writeError(w, r, contract.TypeInternal, "reset quota failed")
+			h.writeError(w, r, contract.TypeInternal, "reset quota failed")
 			return
 		}
 	}
 
 	response, err := h.quotaResponse(r.Context(), tenantID)
 	if err != nil {
-		writeError(w, r, contract.TypeInternal, "reset quota failed")
+		h.writeError(w, r, contract.TypeInternal, "reset quota failed")
 		return
 	}
-	_ = contract.WriteResponse(w, r, http.StatusOK, response, nil)
+	logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusOK, response, nil))
 }
 
 func (h *Handler) requireTenant(ctx context.Context, tenantID string) error {
@@ -180,6 +185,20 @@ func (h *Handler) windowStart() time.Time {
 	return now().UTC().Truncate(time.Minute)
 }
 
+func (h *Handler) writeError(w http.ResponseWriter, r *http.Request, typ contract.ErrorType, message string) {
+	logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+		Type(typ).
+		Message(message).
+		Build()))
+}
+
+func logWriteErr(logger plumelog.StructuredLogger, err error) {
+	if err == nil || logger == nil {
+		return
+	}
+	logger.Warn("write response failed", plumelog.Fields{"error": err.Error()})
+}
+
 func quotaLimit(cfg tenantcore.QuotaConfig) int64 {
 	for _, limit := range cfg.Limits {
 		if limit.Window == tenantcore.QuotaWindowMinute {
@@ -197,11 +216,4 @@ func remaining(limit, used int64) int64 {
 		return 0
 	}
 	return limit - used
-}
-
-func writeError(w http.ResponseWriter, r *http.Request, typ contract.ErrorType, message string) {
-	_ = contract.WriteError(w, r, contract.NewErrorBuilder().
-		Type(typ).
-		Message(message).
-		Build())
 }

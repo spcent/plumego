@@ -8,11 +8,16 @@ import (
 	"testing"
 
 	"github.com/spcent/plumego/contract"
+	plumelog "github.com/spcent/plumego/log"
 	"with-tenant-admin/internal/auth"
 )
 
+func discardLogger() plumelog.StructuredLogger {
+	return plumelog.NewLogger(plumelog.LoggerConfig{Format: plumelog.LoggerFormatDiscard})
+}
+
 func TestCreateTenantReturnsCreatedWithID(t *testing.T) {
-	h := NewHandler(NewInMemoryStore())
+	h := NewHandler(NewInMemoryStore(), discardLogger())
 	rec := serveTenantAdmin(t, h.CreateTenant, http.MethodPost, "/admin/tenants", `{"name":"Acme"}`, true)
 
 	if rec.Code != http.StatusCreated {
@@ -30,7 +35,7 @@ func TestCreateTenantReturnsCreatedWithID(t *testing.T) {
 func TestGetTenantExistingReturnsRecord(t *testing.T) {
 	store := NewInMemoryStore()
 	record, _ := store.Create(t.Context(), TenantRecord{ID: "tenant-1", Name: "Acme"})
-	h := NewHandler(store)
+	h := NewHandler(store, discardLogger())
 
 	rec := serveTenantAdmin(t, h.GetTenant, http.MethodGet, "/admin/tenants/"+record.ID, "", true, map[string]string{"id": record.ID})
 
@@ -44,7 +49,7 @@ func TestGetTenantExistingReturnsRecord(t *testing.T) {
 }
 
 func TestGetTenantUnknownReturnsNotFound(t *testing.T) {
-	h := NewHandler(NewInMemoryStore())
+	h := NewHandler(NewInMemoryStore(), discardLogger())
 	rec := serveTenantAdmin(t, h.GetTenant, http.MethodGet, "/admin/tenants/missing", "", true, map[string]string{"id": "missing"})
 
 	if rec.Code != http.StatusNotFound {
@@ -55,7 +60,7 @@ func TestGetTenantUnknownReturnsNotFound(t *testing.T) {
 func TestSuspendTenantTransitionsStatus(t *testing.T) {
 	store := NewInMemoryStore()
 	record, _ := store.Create(t.Context(), TenantRecord{ID: "tenant-1", Name: "Acme"})
-	h := NewHandler(store)
+	h := NewHandler(store, discardLogger())
 
 	rec := serveTenantAdmin(t, h.SuspendTenant, http.MethodPost, "/admin/tenants/"+record.ID+"/suspend", "", true, map[string]string{"id": record.ID})
 
@@ -71,7 +76,7 @@ func TestSuspendTenantTransitionsStatus(t *testing.T) {
 func TestDeleteTenantRemovesRecord(t *testing.T) {
 	store := NewInMemoryStore()
 	record, _ := store.Create(t.Context(), TenantRecord{ID: "tenant-1", Name: "Acme"})
-	h := NewHandler(store)
+	h := NewHandler(store, discardLogger())
 
 	rec := serveTenantAdmin(t, h.DeleteTenant, http.MethodDelete, "/admin/tenants/"+record.ID, "", true, map[string]string{"id": record.ID})
 	if rec.Code != http.StatusNoContent {
@@ -85,7 +90,7 @@ func TestDeleteTenantRemovesRecord(t *testing.T) {
 }
 
 func TestUnauthenticatedTenantAdminReturnsUnauthorized(t *testing.T) {
-	h := NewHandler(NewInMemoryStore())
+	h := NewHandler(NewInMemoryStore(), discardLogger())
 	rec := serveTenantAdmin(t, h.CreateTenant, http.MethodPost, "/admin/tenants", `{"name":"Acme"}`, false)
 
 	if rec.Code != http.StatusUnauthorized {
@@ -107,7 +112,7 @@ func serveTenantAdmin(t *testing.T, handler http.HandlerFunc, method, path, body
 	if authenticated {
 		req.Header.Set(auth.HeaderAdminToken, "secret")
 	}
-	auth.RequireAdminToken("secret")(handler).ServeHTTP(rec, req)
+	auth.RequireAdminToken("secret", discardLogger())(handler).ServeHTTP(rec, req)
 	return rec
 }
 

@@ -8,9 +8,14 @@ import (
 	"testing"
 
 	"github.com/spcent/plumego/contract"
+	plumelog "github.com/spcent/plumego/log"
 	"with-tenant-admin/internal/auth"
 	tenantadmin "with-tenant-admin/internal/tenant/admin"
 )
+
+func discardLogger() plumelog.StructuredLogger {
+	return plumelog.NewLogger(plumelog.LoggerConfig{Format: plumelog.LoggerFormatDiscard})
+}
 
 func TestRecordUsageAndGetUsageReport(t *testing.T) {
 	h := newTestHandler(t, "tenant-1")
@@ -88,7 +93,7 @@ func newTestHandler(t *testing.T, tenantID string) *Handler {
 	if tenantID != "" {
 		_, _ = tenantStore.Create(t.Context(), tenantadmin.TenantRecord{ID: tenantID, Name: "Acme"})
 	}
-	return NewHandler(tenantStore, NewInMemoryUsageStore())
+	return NewHandler(tenantStore, NewInMemoryUsageStore(), discardLogger())
 }
 
 // serveUsageAdmin calls handler directly — bypassing the router — with the
@@ -106,7 +111,7 @@ func serveUsageAdmin(t *testing.T, handler http.HandlerFunc, method string, path
 	if authenticated {
 		req.Header.Set(auth.HeaderAdminToken, "secret")
 	}
-	auth.RequireAdminToken("secret")(handler).ServeHTTP(rec, req)
+	auth.RequireAdminToken("secret", discardLogger())(handler).ServeHTTP(rec, req)
 	return rec
 }
 

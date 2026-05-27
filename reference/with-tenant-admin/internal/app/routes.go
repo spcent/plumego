@@ -9,7 +9,7 @@ import (
 // RegisterRoutes wires all HTTP routes for the with-tenant-admin demo.
 // One method, one path, one handler per line — full route table visible at a glance.
 func (a *App) RegisterRoutes() error {
-	admin := auth.RequireAdminToken(a.Cfg.AdminToken)
+	admin := auth.RequireAdminToken(a.Cfg.AdminToken, a.Core.Logger())
 	reg := newRouteReg(a.Core)
 
 	// Tenant admin

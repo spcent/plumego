@@ -9,10 +9,15 @@ import (
 	"time"
 
 	"github.com/spcent/plumego/contract"
+	plumelog "github.com/spcent/plumego/log"
 	tenantcore "github.com/spcent/plumego/x/tenant/core"
 	"with-tenant-admin/internal/auth"
 	tenantadmin "with-tenant-admin/internal/tenant/admin"
 )
+
+func discardLogger() plumelog.StructuredLogger {
+	return plumelog.NewLogger(plumelog.LoggerConfig{Format: plumelog.LoggerFormatDiscard})
+}
 
 func TestGetQuotaExistingTenantReturnsLimitAndRemaining(t *testing.T) {
 	h, quotaStore, now := newTestHandler(t, "tenant-1", 5)
@@ -110,7 +115,7 @@ func newTestHandler(t *testing.T, tenantID string, limit int64) (*Handler, *tena
 		})
 	}
 	quotaStore := tenantcore.NewInMemoryQuotaStore()
-	h := NewHandler(tenantStore, configs, quotaStore)
+	h := NewHandler(tenantStore, configs, quotaStore, discardLogger())
 	now := time.Date(2026, 5, 18, 10, 11, 12, 0, time.UTC)
 	h.now = func() time.Time { return now }
 	return h, quotaStore, now
@@ -150,7 +155,7 @@ func serveQuotaAdmin(t *testing.T, handler http.HandlerFunc, method, path, body 
 	if authenticated {
 		req.Header.Set(auth.HeaderAdminToken, "secret")
 	}
-	auth.RequireAdminToken("secret")(handler).ServeHTTP(rec, req)
+	auth.RequireAdminToken("secret", discardLogger())(handler).ServeHTTP(rec, req)
 	return rec
 }
 
