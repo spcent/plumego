@@ -4,7 +4,7 @@ Operating guide for AI coding agents working in this feature demo.
 
 Read `AGENTS.md` (repository root) for the full operating contract.
 Read `ARCHITECTURE.md` (this directory) for layout rationale.
-Read `docs/modules/x-ops/README.md` for the `x/observability/ops` API.
+Read `docs/modules/x/observability/ops/README.md` for the `x/observability/ops` API.
 
 ---
 
@@ -50,7 +50,7 @@ opsHandler := ops.New(ops.Options{
 })
 ```
 
-See `docs/modules/x-ops/README.md` for the full list of available hooks.
+See `docs/modules/x/observability/ops/README.md` for the full list of available hooks.
 
 ### Add a custom ops-adjacent route
 

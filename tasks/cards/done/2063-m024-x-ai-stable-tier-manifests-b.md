@@ -10,7 +10,7 @@ Owned Files:
 - `x/ai/streaming/module.yaml`
 - `x/ai/tool/module.yaml`
 - `x/ai/module.yaml`
-- `docs/modules/x-ai/README.md`
+- `docs/modules/x/ai/README.md`
 - `docs/EXTENSION_MATURITY.md`
 Depends On: 2062
 
@@ -35,7 +35,7 @@ docs so the stable-tier evidence no longer relies on root `x/ai` prose alone.
 - `x/ai/streaming/module.yaml`
 - `x/ai/tool/module.yaml`
 - `x/ai/module.yaml`
-- `docs/modules/x-ai/README.md`
+- `docs/modules/x/ai/README.md`
 - `docs/EXTENSION_MATURITY.md`
 
 ## Acceptance Tests
@@ -49,7 +49,7 @@ docs so the stable-tier evidence no longer relies on root `x/ai` prose alone.
 
 ## Docs Sync
 
-- `docs/modules/x-ai/README.md`
+- `docs/modules/x/ai/README.md`
 - `docs/EXTENSION_MATURITY.md`
 
 ## Validation

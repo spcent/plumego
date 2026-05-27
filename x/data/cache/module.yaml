@@ -46,7 +46,7 @@ test_commands:
   - go vet ./x/data/cache/...
 
 doc_paths:
-  - docs/modules/x-cache/README.md
+  - docs/modules/x/data/cache/README.md
   - docs/extension-evidence/x-cache.md
 
 change_risks:

@@ -14,7 +14,7 @@ entrypoint_reads:
   - specs/repo.yaml
   - specs/task-routing.yaml
   - specs/dependency-rules.yaml
-  - docs/modules/x-data/README.md
+  - docs/modules/x/data/README.md
 
 subordinate_families:
   - x/data/cache
@@ -75,7 +75,7 @@ test_commands:
   - go vet ./x/data/...
 
 doc_paths:
-  - docs/modules/x-data/README.md
+  - docs/modules/x/data/README.md
 
 change_risks:
   - topology regression

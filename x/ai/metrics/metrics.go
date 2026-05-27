@@ -1,11 +1,16 @@
-// Package metrics provides observability interfaces and implementations
-// for the AI Agent Gateway.
+// Package metrics provides AI-specific observability interfaces for the x/ai
+// extension family. Its [Collector] interface uses a Counter/Gauge/Histogram/Timing
+// method set optimised for AI provider telemetry (model, latency, token counts).
 //
-// Design Philosophy:
-// - Interface-first design for flexibility
-// - Zero third-party dependencies by default
-// - Optional integration with Prometheus/OpenTelemetry via interface implementation
-// - Thread-safe concurrent access
+// This interface is intentionally distinct from the stable [metrics.AggregateCollector]
+// in the root metrics package, which uses a Record(ctx, MetricRecord) model suited
+// for general HTTP and app-level metrics. The two interfaces serve different
+// collection shapes and are not interchangeable. Callers that need both should
+// inject each through separate fields.
+//
+// M-022 card 1512 tracks the question of whether these surfaces should converge
+// or remain separate. Until that decision lands, treat x/ai/metrics as an
+// AI-scoped adapter boundary and do not embed it in stable-root types.
 package metrics
 
 import (

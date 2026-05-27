@@ -6,7 +6,7 @@ Priority: P2
 State: active
 Primary Module: x/openapi
 Owned Files:
-- `docs/modules/x-openapi/README.md`
+- `docs/modules/x/openapi/README.md`
 - `x/openapi/module.yaml`
 
 Goal:
@@ -57,4 +57,4 @@ Done Definition:
 Notes:
 - `plumego generate spec --format json|yaml --output path` is the canonical CLI.
 - The hints file is `plumego.spec.yaml` in the project root (optional).
-- See `docs/modules/x-openapi/README.md` for the full API surface documentation.
+- See `docs/modules/x/openapi/README.md` for the full API surface documentation.

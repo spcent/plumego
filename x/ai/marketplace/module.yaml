@@ -17,7 +17,7 @@ entrypoint_reads:
   - specs/task-routing.yaml
   - specs/dependency-rules.yaml
   - x/ai/module.yaml
-  - docs/modules/x-ai/README.md
+  - docs/modules/x/ai/README.md
 
 responsibilities:
   - AgentMetadata value type and category taxonomy
@@ -78,7 +78,7 @@ test_commands:
   - go vet ./x/ai/marketplace/...
 
 doc_paths:
-  - docs/modules/x-ai/README.md
+  - docs/modules/x/ai/README.md
 
 change_risks:
   - AgentMetadata struct changes break existing registry files and serialized entries

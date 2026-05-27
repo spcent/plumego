@@ -33,9 +33,11 @@ non_goals:
 
 public_entrypoints:
   - server
+  - client
+  - gateway
 
 doc_paths:
-  - docs/modules/x-rpc/README.md
+  - docs/modules/x/rpc/README.md
   - reference/with-rpc
 
 allowed_imports:

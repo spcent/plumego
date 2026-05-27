@@ -48,7 +48,7 @@ Files:
 - `docs/extension-evidence/x-ai.md`
 - `docs/EXTENSION_MATURITY.md`
 - `x/ai/module.yaml`
-- `docs/modules/x-ai/README.md`
+- `docs/modules/x/ai/README.md`
 - `docs/ROADMAP.md`
 
 Tests:
@@ -61,7 +61,7 @@ Tests:
 
 Docs Sync:
 - Required per promoted subpackage: update `docs/EXTENSION_MATURITY.md` selected-beta-surfaces
-  table, `x/ai/module.yaml` subpackage status, `docs/modules/x-ai/README.md` status table,
+  table, `x/ai/module.yaml` subpackage status, `docs/modules/x/ai/README.md` status table,
   and `docs/ROADMAP.md` Phase 8 next-work section.
 
 Done Definition:

@@ -4,7 +4,7 @@ Operating guide for AI coding agents working in this feature demo.
 
 Read `AGENTS.md` (repository root) for the full operating contract.
 Read `ARCHITECTURE.md` (this directory) for layout rationale.
-Read `docs/modules/x-rest/README.md` for the `x/rest` API.
+Read `docs/modules/x/rest/README.md` for the `x/rest` API.
 
 ---
 

@@ -1,5 +1,7 @@
 # x/observability/ops
 
+> **Import path:** `github.com/spcent/plumego/x/observability/ops` — sub-package of [`x/observability`](../README.md). This primer mirrors the package path under `docs/modules/x/`.
+
 ## Purpose
 
 `x/observability/ops` provides protected operations endpoints for queues, receipts, health HTTP orchestration, and runtime diagnostics.

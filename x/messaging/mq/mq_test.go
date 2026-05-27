@@ -449,7 +449,7 @@ func TestConfigValidation(t *testing.T) {
 				return cfg
 			},
 			wantErr: true,
-			errMsg:  "ClusterNodeID is required",
+			errMsg:  "cluster mode is not yet implemented",
 		},
 		{
 			name: "cluster enabled with whitespace node ID",
@@ -460,7 +460,7 @@ func TestConfigValidation(t *testing.T) {
 				return cfg
 			},
 			wantErr: true,
-			errMsg:  "ClusterNodeID is required",
+			errMsg:  "cluster mode is not yet implemented",
 		},
 		{
 			name: "invalid replication factor",
@@ -472,7 +472,7 @@ func TestConfigValidation(t *testing.T) {
 				return cfg
 			},
 			wantErr: true,
-			errMsg:  "ClusterReplicationFactor must be at least 1",
+			errMsg:  "cluster mode is not yet implemented",
 		},
 		{
 			name: "persistence enabled without path",
@@ -519,7 +519,7 @@ func TestConfigValidation(t *testing.T) {
 			errMsg:  "TransactionTimeout cannot be negative",
 		},
 		{
-			name: "valid cluster config",
+			name: "cluster enabled returns not implemented",
 			config: func() Config {
 				cfg := DefaultConfig()
 				cfg.EnableCluster = true
@@ -527,7 +527,8 @@ func TestConfigValidation(t *testing.T) {
 				cfg.ClusterReplicationFactor = 2
 				return cfg
 			},
-			wantErr: false,
+			wantErr: true,
+			errMsg:  "cluster mode is not yet implemented",
 		},
 		{
 			name: "valid persistence config",
@@ -705,8 +706,6 @@ func TestInProcBrokerMemoryLimitEnforced(t *testing.T) {
 	cfg.MaxMemoryUsage = 1 // 1 byte limit
 	cfg.EnablePriorityQueue = true
 	cfg.EnableAckSupport = true
-	cfg.EnableCluster = true
-	cfg.ClusterNodeID = "node-1"
 	cfg.EnableTransactions = true
 	cfg.EnableDeadLetterQueue = true
 	cfg.DeadLetterTopic = "dlq" // Required when dead letter queue is enabled
@@ -748,12 +747,6 @@ func TestInProcBrokerMemoryLimitEnforced(t *testing.T) {
 					Message:   Message{ID: "1", Data: "test"},
 					AckPolicy: AckRequired,
 				})
-			},
-		},
-		{
-			name: "PublishToCluster",
-			fn: func() error {
-				return broker.PublishToCluster(t.Context(), "topic", Message{ID: "1", Data: "test"})
 			},
 		},
 		{
@@ -800,49 +793,22 @@ func TestInProcBrokerTriePattern(t *testing.T) {
 	// This test verifies the configuration is properly stored
 }
 
-func TestInProcBrokerCluster(t *testing.T) {
-	// Test cluster configuration
+func TestInProcBrokerClusterNotImplemented(t *testing.T) {
+	// Cluster mode is reserved for a future release. Enabling it must return an
+	// explicit error so callers get a deterministic failure rather than a silent
+	// no-op. This test documents and enforces that contract.
 	cfg := DefaultConfig()
 	cfg.EnableCluster = true
 	cfg.ClusterNodeID = "node-1"
 	cfg.ClusterNodes = []string{"node-2@localhost:9000", "node-3@localhost:9001"}
 	cfg.ClusterReplicationFactor = 2
-	broker, err := NewInProcBroker(pubsub.New(), WithConfig(cfg))
-	if err != nil {
-		t.Fatal(err)
+	_, err := NewInProcBroker(pubsub.New(), WithConfig(cfg))
+	if err == nil {
+		t.Fatal("expected error when EnableCluster is true, got nil")
 	}
-	defer broker.Close()
-
-	// Verify config
-	updatedCfg := broker.GetConfig()
-	if !updatedCfg.EnableCluster {
-		t.Fatalf("expected EnableCluster to be true")
+	if !errors.Is(err, ErrInvalidConfig) {
+		t.Fatalf("expected ErrInvalidConfig, got: %v", err)
 	}
-	if updatedCfg.ClusterNodeID != "node-1" {
-		t.Fatalf("expected ClusterNodeID to be 'node-1', got %s", updatedCfg.ClusterNodeID)
-	}
-
-	// Test cluster status
-	status := broker.GetClusterStatus()
-	if status.Status != "active" {
-		t.Fatalf("expected cluster status 'active', got %s", status.Status)
-	}
-	if status.NodeID != "node-1" {
-		t.Fatalf("expected node ID 'node-1', got %s", status.NodeID)
-	}
-
-	// Test cluster publish (should work even though cluster is not fully implemented)
-	err = broker.PublishToCluster(t.Context(), "cluster-topic", Message{ID: "cluster-1", Data: "cluster data"})
-	if err != nil {
-		t.Fatalf("publish to cluster error: %v", err)
-	}
-
-	// Test cluster subscribe
-	sub, err := broker.SubscribeFromCluster(t.Context(), "cluster-topic", SubOptions{BufferSize: 10})
-	if err != nil {
-		t.Fatalf("subscribe from cluster error: %v", err)
-	}
-	defer sub.Cancel()
 }
 
 func TestInProcBrokerTransaction(t *testing.T) {

@@ -18,7 +18,7 @@ entrypoint_reads:
   - specs/dependency-rules.yaml
   - x/ai/module.yaml
   - x/ai/semanticcache/module.yaml
-  - docs/modules/x-ai/README.md
+  - docs/modules/x/ai/README.md
 
 responsibilities:
   - Manager for cache lifecycle over vectorstore.Backend
@@ -71,7 +71,7 @@ test_commands:
   - go vet ./x/ai/semanticcache/cachemanager/...
 
 doc_paths:
-  - docs/modules/x-ai/README.md
+  - docs/modules/x/ai/README.md
 
 change_risks:
   - Warmer corpus format change breaks existing warm-up scripts

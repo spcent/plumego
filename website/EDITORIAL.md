@@ -85,10 +85,10 @@ Minimum required scenarios:
 
 | Scenario | x/* family | Link target |
 | --- | --- | --- |
-| AI streaming API | x/ai | /docs/modules/x-ai |
-| Multi-tenant SaaS | x/tenant | /docs/modules/x-tenant |
-| API gateway / proxy | x/gateway | /docs/modules/x-gateway |
-| WebSocket real-time | x/websocket | /docs/modules/x-websocket |
+| AI streaming API | x/ai | /docs/modules/x/ai |
+| Multi-tenant SaaS | x/tenant | /docs/modules/x/tenant |
+| API gateway / proxy | x/gateway | /docs/modules/x/gateway |
+| WebSocket real-time | x/websocket | /docs/modules/x/websocket |
 
 A list of module names without scenario framing does not satisfy this rule.
 

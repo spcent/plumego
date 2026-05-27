@@ -46,8 +46,8 @@ candidates:
     current_status: beta
     evidence_doc: docs/extension-evidence/x-rest.md
     release_refs:
-      - d2c25c377a27f3cf194c97442a4452d21bbcc9fa
-      - ec70358248874193c42fd6f79433cc7a3b1f2282
+      - b35d4b2269e2f0c36896126c93e0e8905c5d8dbe
+      - 0f6b0d1ffc6047809eb21dcdfc38abd7c1a5578d
     api_snapshots:
       - docs/extension-evidence/snapshots/first-batch/x-rest-head.snapshot
       - docs/extension-evidence/snapshots/x-rest/base.snapshot
@@ -60,8 +60,8 @@ candidates:
     current_status: beta
     evidence_doc: docs/extension-evidence/x-websocket.md
     release_refs:
-      - d2c25c377a27f3cf194c97442a4452d21bbcc9fa
-      - ec70358248874193c42fd6f79433cc7a3b1f2282
+      - b35d4b2269e2f0c36896126c93e0e8905c5d8dbe
+      - 0f6b0d1ffc6047809eb21dcdfc38abd7c1a5578d
     api_snapshots:
       - docs/extension-evidence/snapshots/first-batch/x-websocket-head.snapshot
       - docs/extension-evidence/snapshots/x-websocket/base.snapshot
@@ -74,8 +74,8 @@ candidates:
     current_status: beta
     evidence_doc: docs/extension-evidence/x-frontend.md
     release_refs:
-      - 6a99c5e0bc61c12378bcdab5a6a7c4d756b9fa96
-      - 58aad7eecc3202cef1eb57814dba65cce4348aaa
+      - b35d4b2269e2f0c36896126c93e0e8905c5d8dbe
+      - 0f6b0d1ffc6047809eb21dcdfc38abd7c1a5578d
     api_snapshots:
       - docs/extension-evidence/snapshots/x-frontend/base.snapshot
       - docs/extension-evidence/snapshots/x-frontend/head.snapshot
@@ -87,8 +87,8 @@ candidates:
     current_status: beta
     evidence_doc: docs/extension-evidence/x-tenant.md
     release_refs:
-      - 6a99c5e0bc61c12378bcdab5a6a7c4d756b9fa96
-      - 58aad7eecc3202cef1eb57814dba65cce4348aaa
+      - b35d4b2269e2f0c36896126c93e0e8905c5d8dbe
+      - 0f6b0d1ffc6047809eb21dcdfc38abd7c1a5578d
     api_snapshots:
       - docs/extension-evidence/snapshots/x-tenant/base.snapshot
       - docs/extension-evidence/snapshots/x-tenant/head.snapshot
@@ -100,8 +100,8 @@ candidates:
     current_status: beta
     evidence_doc: docs/extension-evidence/x-observability.md
     release_refs:
-      - d2c25c377a27f3cf194c97442a4452d21bbcc9fa
-      - ec70358248874193c42fd6f79433cc7a3b1f2282
+      - b35d4b2269e2f0c36896126c93e0e8905c5d8dbe
+      - 0f6b0d1ffc6047809eb21dcdfc38abd7c1a5578d
     api_snapshots:
       - docs/extension-evidence/snapshots/first-batch/x-observability-head.snapshot
       - docs/extension-evidence/snapshots/x-observability/base.snapshot
@@ -114,8 +114,8 @@ candidates:
     current_status: beta
     evidence_doc: docs/extension-evidence/x-gateway.md
     release_refs:
-      - d2c25c377a27f3cf194c97442a4452d21bbcc9fa
-      - ec70358248874193c42fd6f79433cc7a3b1f2282
+      - b35d4b2269e2f0c36896126c93e0e8905c5d8dbe
+      - 0f6b0d1ffc6047809eb21dcdfc38abd7c1a5578d
     api_snapshots:
       - docs/extension-evidence/snapshots/first-batch/x-gateway-head.snapshot
       - docs/extension-evidence/snapshots/x-gateway/base.snapshot
@@ -130,8 +130,8 @@ subpackage_candidates:
     current_tier: stable
     evidence_doc: docs/extension-evidence/x-ai-provider.md
     release_refs:
-      - 6a99c5e0bc61c12378bcdab5a6a7c4d756b9fa96
-      - 58aad7eecc3202cef1eb57814dba65cce4348aaa
+      - b35d4b2269e2f0c36896126c93e0e8905c5d8dbe
+      - 0f6b0d1ffc6047809eb21dcdfc38abd7c1a5578d
     api_snapshots:
       - docs/extension-evidence/snapshots/x-ai-provider/base.snapshot
       - docs/extension-evidence/snapshots/x-ai-provider/head.snapshot
@@ -144,8 +144,8 @@ subpackage_candidates:
     current_tier: stable
     evidence_doc: docs/extension-evidence/x-ai-session.md
     release_refs:
-      - 6a99c5e0bc61c12378bcdab5a6a7c4d756b9fa96
-      - 58aad7eecc3202cef1eb57814dba65cce4348aaa
+      - b35d4b2269e2f0c36896126c93e0e8905c5d8dbe
+      - 0f6b0d1ffc6047809eb21dcdfc38abd7c1a5578d
     api_snapshots:
       - docs/extension-evidence/snapshots/x-ai-session/base.snapshot
       - docs/extension-evidence/snapshots/x-ai-session/head.snapshot
@@ -158,8 +158,8 @@ subpackage_candidates:
     current_tier: stable
     evidence_doc: docs/extension-evidence/x-ai-streaming.md
     release_refs:
-      - 6a99c5e0bc61c12378bcdab5a6a7c4d756b9fa96
-      - 58aad7eecc3202cef1eb57814dba65cce4348aaa
+      - b35d4b2269e2f0c36896126c93e0e8905c5d8dbe
+      - 0f6b0d1ffc6047809eb21dcdfc38abd7c1a5578d
     api_snapshots:
       - docs/extension-evidence/snapshots/x-ai-streaming/base.snapshot
       - docs/extension-evidence/snapshots/x-ai-streaming/head.snapshot
@@ -172,8 +172,8 @@ subpackage_candidates:
     current_tier: stable
     evidence_doc: docs/extension-evidence/x-ai-tool.md
     release_refs:
-      - 6a99c5e0bc61c12378bcdab5a6a7c4d756b9fa96
-      - 58aad7eecc3202cef1eb57814dba65cce4348aaa
+      - b35d4b2269e2f0c36896126c93e0e8905c5d8dbe
+      - 0f6b0d1ffc6047809eb21dcdfc38abd7c1a5578d
     api_snapshots:
       - docs/extension-evidence/snapshots/x-ai-tool/base.snapshot
       - docs/extension-evidence/snapshots/x-ai-tool/head.snapshot
@@ -188,8 +188,8 @@ surface_candidates:
     current_status: experimental
     evidence_doc: docs/extension-evidence/x-data.md
     release_refs:
-      - 6a99c5e0bc61c12378bcdab5a6a7c4d756b9fa96
-      - 58aad7eecc3202cef1eb57814dba65cce4348aaa
+      - b35d4b2269e2f0c36896126c93e0e8905c5d8dbe
+      - 0f6b0d1ffc6047809eb21dcdfc38abd7c1a5578d
     api_snapshots:
       - docs/extension-evidence/snapshots/x-data-file/base.snapshot
       - docs/extension-evidence/snapshots/x-data-file/head.snapshot
@@ -203,8 +203,8 @@ surface_candidates:
     current_status: experimental
     evidence_doc: docs/extension-evidence/x-data.md
     release_refs:
-      - 6a99c5e0bc61c12378bcdab5a6a7c4d756b9fa96
-      - 58aad7eecc3202cef1eb57814dba65cce4348aaa
+      - b35d4b2269e2f0c36896126c93e0e8905c5d8dbe
+      - 0f6b0d1ffc6047809eb21dcdfc38abd7c1a5578d
     api_snapshots:
       - docs/extension-evidence/snapshots/x-data-idempotency/base.snapshot
       - docs/extension-evidence/snapshots/x-data-idempotency/head.snapshot
@@ -218,8 +218,8 @@ surface_candidates:
     current_status: experimental
     evidence_doc: docs/extension-evidence/x-discovery.md
     release_refs:
-      - 6a99c5e0bc61c12378bcdab5a6a7c4d756b9fa96
-      - 58aad7eecc3202cef1eb57814dba65cce4348aaa
+      - b35d4b2269e2f0c36896126c93e0e8905c5d8dbe
+      - 0f6b0d1ffc6047809eb21dcdfc38abd7c1a5578d
     api_snapshots:
       - docs/extension-evidence/snapshots/v1-baseline/x-discovery/base.snapshot
     blockers:
@@ -233,8 +233,8 @@ surface_candidates:
     current_status: beta
     evidence_doc: docs/extension-evidence/x-messaging.md
     release_refs:
-      - 6a99c5e0bc61c12378bcdab5a6a7c4d756b9fa96
-      - 58aad7eecc3202cef1eb57814dba65cce4348aaa
+      - b35d4b2269e2f0c36896126c93e0e8905c5d8dbe
+      - 0f6b0d1ffc6047809eb21dcdfc38abd7c1a5578d
     api_snapshots:
       - docs/extension-evidence/snapshots/x-messaging/base.snapshot
       - docs/extension-evidence/snapshots/x-messaging/head.snapshot

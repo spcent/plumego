@@ -17,7 +17,7 @@ entrypoint_reads:
   - specs/task-routing.yaml
   - specs/dependency-rules.yaml
   - x/ai/module.yaml
-  - docs/modules/x-ai/README.md
+  - docs/modules/x/ai/README.md
 
 responsibilities:
   - InstrumentedProvider decorator for provider.Provider
@@ -77,7 +77,7 @@ test_commands:
   - go vet ./x/ai/instrumentation/...
 
 doc_paths:
-  - docs/modules/x-ai/README.md
+  - docs/modules/x/ai/README.md
 
 change_risks:
   - Decorator method set must stay in sync with wrapped interface; missed methods silently drop instrumentation

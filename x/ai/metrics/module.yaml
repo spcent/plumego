@@ -17,7 +17,7 @@ entrypoint_reads:
   - specs/task-routing.yaml
   - specs/dependency-rules.yaml
   - x/ai/module.yaml
-  - docs/modules/x-ai/README.md
+  - docs/modules/x/ai/README.md
 
 responsibilities:
   - Collector interface with AI-oriented tag model (Counter, Gauge, Histogram, Timing)
@@ -71,7 +71,7 @@ test_commands:
   - go vet ./x/ai/metrics/...
 
 doc_paths:
-  - docs/modules/x-ai/README.md
+  - docs/modules/x/ai/README.md
 
 change_risks:
   - Collector interface change breaks x/ai/instrumentation and all metric call sites

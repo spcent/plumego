@@ -15,8 +15,8 @@ Affected Modules: `x/ai`, `x/resilience`, `docs`, `specs`
 
 | Card | Goal | Primary Module | Owned Files | Depends On | Quick Gates |
 |------|------|----------------|-------------|------------|-------------|
-| 2060 | Make shared `x/resilience/ratelimit` the only limiter input accepted by `x/ai/resilience`. | `x/ai` | `x/ai/resilience/provider.go`, `x/ai/resilience/provider_test.go`, `docs/modules/x-ai/README.md`, `specs/deprecation-inventory.yaml` | none | `go test ./x/ai/... ./x/resilience/...`, `deprecation-inventory -strict` |
-| 2061 | Make shared `x/resilience/circuitbreaker` the only breaker input accepted by `x/ai/resilience`. | `x/ai` | `x/ai/resilience/provider.go`, `x/ai/resilience/provider_test.go`, `docs/modules/x-ai/README.md`, `specs/deprecation-inventory.yaml` | 2060 | `go test ./x/ai/... ./x/resilience/...`, `deprecation-inventory -strict` |
+| 2060 | Make shared `x/resilience/ratelimit` the only limiter input accepted by `x/ai/resilience`. | `x/ai` | `x/ai/resilience/provider.go`, `x/ai/resilience/provider_test.go`, `docs/modules/x/ai/README.md`, `specs/deprecation-inventory.yaml` | none | `go test ./x/ai/... ./x/resilience/...`, `deprecation-inventory -strict` |
+| 2061 | Make shared `x/resilience/circuitbreaker` the only breaker input accepted by `x/ai/resilience`. | `x/ai` | `x/ai/resilience/provider.go`, `x/ai/resilience/provider_test.go`, `docs/modules/x/ai/README.md`, `specs/deprecation-inventory.yaml` | 2060 | `go test ./x/ai/... ./x/resilience/...`, `deprecation-inventory -strict` |
 
 ## Dependency Edges
 

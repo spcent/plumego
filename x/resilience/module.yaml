@@ -14,7 +14,7 @@ entrypoint_reads:
   - specs/repo.yaml
   - specs/task-routing.yaml
   - specs/dependency-rules.yaml
-  - docs/modules/x-resilience/README.md
+  - docs/modules/x/resilience/README.md
 
 responsibilities:
   - Circuit breaker primitives
@@ -47,7 +47,7 @@ test_commands:
   - go vet ./x/resilience/...
 
 doc_paths:
-  - docs/modules/x-resilience/README.md
+  - docs/modules/x/resilience/README.md
   - docs/architecture/x-ai-resilience-boundary.md
 
 change_risks:

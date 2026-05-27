@@ -4,7 +4,7 @@ Operating guide for AI coding agents working in this feature demo.
 
 Read `AGENTS.md` (repository root) for the full operating contract.
 Read `ARCHITECTURE.md` (this directory) for layout rationale.
-Read `docs/modules/x-gateway/README.md` for the `x/gateway` API.
+Read `docs/modules/x/gateway/README.md` for the `x/gateway` API.
 
 ---
 

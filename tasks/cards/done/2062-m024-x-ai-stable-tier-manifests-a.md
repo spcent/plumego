@@ -10,7 +10,7 @@ Owned Files:
 - `x/ai/provider/module.yaml`
 - `x/ai/session/module.yaml`
 - `x/ai/module.yaml`
-- `docs/modules/x-ai/README.md`
+- `docs/modules/x/ai/README.md`
 - `docs/EXTENSION_MATURITY.md`
 Depends On: M-023
 
@@ -36,7 +36,7 @@ sync the dashboard and primer wording to reference the new manifest authority.
 - `x/ai/provider/module.yaml`
 - `x/ai/session/module.yaml`
 - `x/ai/module.yaml`
-- `docs/modules/x-ai/README.md`
+- `docs/modules/x/ai/README.md`
 - `docs/EXTENSION_MATURITY.md`
 
 ## Acceptance Tests
@@ -50,7 +50,7 @@ sync the dashboard and primer wording to reference the new manifest authority.
 
 ## Docs Sync
 
-- `docs/modules/x-ai/README.md`
+- `docs/modules/x/ai/README.md`
 - `docs/EXTENSION_MATURITY.md`
 
 ## Validation

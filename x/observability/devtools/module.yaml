@@ -54,7 +54,7 @@ test_commands:
   - go vet ./x/observability/devtools/...
 
 doc_paths:
-  - docs/modules/x-devtools/README.md
+  - docs/modules/x/observability/devtools/README.md
 
 review_checklist:
   - Keep debug behavior opt-in

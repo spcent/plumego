@@ -18,7 +18,7 @@ entrypoint_reads:
   - specs/dependency-rules.yaml
   - x/ai/module.yaml
   - x/ai/llmcache/module.yaml
-  - docs/modules/x-ai/README.md
+  - docs/modules/x/ai/README.md
 
 responsibilities:
   - SemanticCache for embedding-based similarity lookup
@@ -96,7 +96,7 @@ test_commands:
   - go vet ./x/ai/semanticcache/...
 
 doc_paths:
-  - docs/modules/x-ai/README.md
+  - docs/modules/x/ai/README.md
 
 change_risks:
   - Similarity threshold change alters cache hit rate for all callers

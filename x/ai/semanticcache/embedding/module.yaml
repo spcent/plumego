@@ -18,7 +18,7 @@ entrypoint_reads:
   - specs/dependency-rules.yaml
   - x/ai/module.yaml
   - x/ai/semanticcache/module.yaml
-  - docs/modules/x-ai/README.md
+  - docs/modules/x/ai/README.md
 
 responsibilities:
   - Provider interface for embedding generation (single and batch)
@@ -80,7 +80,7 @@ test_commands:
   - go vet ./x/ai/semanticcache/embedding/...
 
 doc_paths:
-  - docs/modules/x-ai/README.md
+  - docs/modules/x/ai/README.md
 
 change_risks:
   - Provider interface change breaks all callers in cachemanager and parent semanticcache

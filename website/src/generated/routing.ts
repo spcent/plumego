@@ -54,7 +54,7 @@ export const ROUTING_SCENARIOS = {
         "specs/change-recipes/tenant-policy-change.yaml",
         "x/tenant/module.yaml",
         "docs/architecture/X_TENANT_BLUEPRINT.md",
-        "docs/modules/x-tenant/README.md"
+        "docs/modules/x/tenant/README.md"
       ],
       "avoid": [
         "middleware",
@@ -93,7 +93,7 @@ export const ROUTING_SCENARIOS = {
       "destination": "x/websocket/",
       "startWith": [
         "x/websocket/module.yaml",
-        "docs/modules/x-websocket/README.md",
+        "docs/modules/x/websocket/README.md",
         "x/websocket/websocket.go"
       ],
       "avoid": [
@@ -131,7 +131,7 @@ export const ROUTING_SCENARIOS = {
       "destination": "x/fileapi/",
       "startWith": [
         "x/fileapi/module.yaml",
-        "docs/modules/x-fileapi/README.md",
+        "docs/modules/x/fileapi/README.md",
         "x/fileapi/handler.go"
       ],
       "avoid": [
@@ -264,7 +264,7 @@ export const ROUTING_SCENARIOS = {
         "specs/change-recipes/tenant-policy-change.yaml",
         "x/tenant/module.yaml",
         "docs/architecture/X_TENANT_BLUEPRINT.md",
-        "docs/modules/x-tenant/README.md"
+        "docs/modules/x/tenant/README.md"
       ],
       "avoid": [
         "middleware",
@@ -303,7 +303,7 @@ export const ROUTING_SCENARIOS = {
       "destination": "x/websocket/",
       "startWith": [
         "x/websocket/module.yaml",
-        "docs/modules/x-websocket/README.md",
+        "docs/modules/x/websocket/README.md",
         "x/websocket/websocket.go"
       ],
       "avoid": [
@@ -341,7 +341,7 @@ export const ROUTING_SCENARIOS = {
       "destination": "x/fileapi/",
       "startWith": [
         "x/fileapi/module.yaml",
-        "docs/modules/x-fileapi/README.md",
+        "docs/modules/x/fileapi/README.md",
         "x/fileapi/handler.go"
       ],
       "avoid": [

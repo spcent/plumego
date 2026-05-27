@@ -26,7 +26,7 @@ Evidence state: complete
 
 ## Primer And Boundary State
 
-- Primer: `docs/modules/x-websocket/README.md`
+- Primer: `docs/modules/x/websocket/README.md`
 - Manifest: `x/websocket/module.yaml`
 - Boundary state: documented and aligned with explicit websocket transport
   wiring outside stable roots.

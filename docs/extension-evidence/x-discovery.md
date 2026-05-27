@@ -22,7 +22,7 @@ Evidence state: surface inventory
 
 ## Primer And Boundary State
 
-- Primer: `docs/modules/x-gateway/README.md`
+- Primer: `docs/modules/x/gateway/README.md`
 - Manifest: `x/gateway/discovery/module.yaml`
 - Boundary state: discovery is a secondary capability root, not bootstrap or
   gateway-only policy.

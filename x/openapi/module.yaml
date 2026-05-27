@@ -74,7 +74,7 @@ test_commands:
   - go vet ./...
 
 doc_paths:
-  - docs/modules/x-openapi/README.md
+  - docs/modules/x/openapi/README.md
 
 change_risks:
   - route path template regression

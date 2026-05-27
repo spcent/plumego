@@ -33,7 +33,7 @@ packages:
     start_with:
       - x/fileapi/module.yaml
       - x/fileapi/handler.go
-      - docs/modules/x-fileapi/README.md
+      - docs/modules/x/fileapi/README.md
     avoid:
       - x/data/file
       - store/file
@@ -310,7 +310,7 @@ packages:
       - store
     start_with:
       - x/data/module.yaml
-      - docs/modules/x-data/README.md
+      - docs/modules/x/data/README.md
     avoid:
       - store
       - x/data/cache
@@ -400,7 +400,7 @@ packages:
       - ai
     start_with:
       - x/ai/module.yaml
-      - docs/modules/x-ai/README.md
+      - docs/modules/x/ai/README.md
     avoid:
       - x/ai/semanticcache
       - x/ai/distributed

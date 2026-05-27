@@ -10,7 +10,7 @@ Owned Files:
 - `x/ai/resilience/provider.go`
 - `x/ai/resilience/provider_test.go`
 - `x/ai/ratelimit/adapter.go`
-- `docs/modules/x-ai/README.md`
+- `docs/modules/x/ai/README.md`
 - `specs/deprecation-inventory.yaml`
 Depends On:
 
@@ -38,7 +38,7 @@ surface only.
 - `x/ai/resilience/provider.go`
 - `x/ai/resilience/provider_test.go`
 - `x/ai/ratelimit/adapter.go`
-- `docs/modules/x-ai/README.md`
+- `docs/modules/x/ai/README.md`
 - `specs/deprecation-inventory.yaml`
 
 ## Acceptance Tests
@@ -53,7 +53,7 @@ surface only.
 
 ## Docs Sync
 
-- `docs/modules/x-ai/README.md`
+- `docs/modules/x/ai/README.md`
 
 ## Validation
 

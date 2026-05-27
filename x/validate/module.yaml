@@ -53,7 +53,7 @@ test_commands:
   - go vet ./...
 
 doc_paths:
-  - docs/modules/x-validate/README.md
+  - docs/modules/x/validate/README.md
 
 change_risks:
   - decode-before-validation regression

@@ -56,7 +56,7 @@ test_commands:
   - go vet ./x/gateway/discovery/...
 
 doc_paths:
-  - docs/modules/x-gateway/README.md
+  - docs/modules/x/gateway/README.md
 
 review_checklist:
   - Keep discovery behavior explicit

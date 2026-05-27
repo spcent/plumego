@@ -79,7 +79,7 @@ test_commands:
   - go vet ./x/gateway/ipc/...
 
 doc_paths:
-  - docs/modules/x-gateway/README.md
+  - docs/modules/x/gateway/README.md
 
 review_checklist:
   - Keep transport contracts explicit

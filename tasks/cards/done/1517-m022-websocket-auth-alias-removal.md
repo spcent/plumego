@@ -9,7 +9,7 @@ Primary Module: x/websocket
 Owned Files:
 - `x/websocket/auth.go`
 - `x/websocket/auth_test.go`
-- `docs/modules/x-websocket/README.md`
+- `docs/modules/x/websocket/README.md`
 - `specs/deprecation-inventory.yaml`
 Depends On: none
 
@@ -31,7 +31,7 @@ Non-goals:
 Files:
 - `x/websocket/auth.go`
 - `x/websocket/auth_test.go`
-- `docs/modules/x-websocket/README.md`
+- `docs/modules/x/websocket/README.md`
 - `specs/deprecation-inventory.yaml`
 
 Acceptance Tests:
@@ -42,7 +42,7 @@ Tests:
 - `go run ./internal/checks/deprecation-inventory -strict`
 
 Docs Sync:
-- `docs/modules/x-websocket/README.md`
+- `docs/modules/x/websocket/README.md`
 
 Validation:
 - `go test -timeout 20s ./x/websocket/...`

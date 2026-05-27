@@ -14,7 +14,7 @@ entrypoint_reads:
   - specs/repo.yaml
   - specs/task-routing.yaml
   - specs/dependency-rules.yaml
-  - docs/modules/x-observability/README.md
+  - docs/modules/x/observability/README.md
 
 subordinate_families:
   - package: x/observability/ops
@@ -78,7 +78,7 @@ test_commands:
   - go vet ./x/observability/...
 
 doc_paths:
-  - docs/modules/x-observability/README.md
+  - docs/modules/x/observability/README.md
 
 change_risks:
   - export wiring regression

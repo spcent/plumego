@@ -10,7 +10,7 @@ Owned Files:
 - `x/ai/metrics/adapter.go`
 - `x/ai/metrics/metrics_test.go`
 - `docs/modules/metrics/README.md`
-- `docs/modules/x-ai/README.md`
+- `docs/modules/x/ai/README.md`
 Depends On: 1511
 
 Goal:
@@ -33,7 +33,7 @@ Files:
 - `x/ai/metrics/adapter.go`
 - `x/ai/metrics/metrics_test.go`
 - `docs/modules/metrics/README.md`
-- `docs/modules/x-ai/README.md`
+- `docs/modules/x/ai/README.md`
 
 Acceptance Tests:
 - `go test -timeout 20s ./x/ai/metrics ./metrics`
@@ -44,7 +44,7 @@ Tests:
 
 Docs Sync:
 - `docs/modules/metrics/README.md`
-- `docs/modules/x-ai/README.md`
+- `docs/modules/x/ai/README.md`
 
 Validation:
 - `go test -timeout 20s ./x/ai/... ./metrics/...`

@@ -14,7 +14,7 @@ entrypoint_reads:
   - specs/repo.yaml
   - specs/task-routing.yaml
   - specs/dependency-rules.yaml
-  - docs/modules/x-ai/README.md
+  - docs/modules/x/ai/README.md
 
 responsibilities:
   - Provider adapters
@@ -66,14 +66,16 @@ public_entrypoints:
 
 allowed_imports:
   - contract
-  - middleware
-  - security
-  - store
   - log
   - metrics
+  - x/resilience
 
 forbidden_imports:
-  - core/components/**
+  - core/**
+  - router/**
+  - middleware/**
+  - security/**
+  - store/**
   - x/tenant/**
   - x/messaging/webhook/**
   - x/websocket/**
@@ -84,7 +86,7 @@ test_commands:
   - go vet ./x/ai/...
 
 doc_paths:
-  - docs/modules/x-ai/README.md
+  - docs/modules/x/ai/README.md
 
 change_risks:
   - provider compatibility regression

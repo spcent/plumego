@@ -14,7 +14,7 @@ entrypoint_reads:
   - specs/repo.yaml
   - specs/task-routing.yaml
   - specs/dependency-rules.yaml
-  - docs/modules/x-websocket/README.md
+  - docs/modules/x/websocket/README.md
 
 responsibilities:
   - WebSocket route registration
@@ -129,13 +129,14 @@ public_entrypoints:
   - NewCloseError
 
 allowed_imports:
+  - contract
   - health
   - log
   - middleware
   - router
+  - security
 
 forbidden_imports:
-  - core/components/**
   - x/tenant/**
   - x/ai/**
 
@@ -145,7 +146,7 @@ test_commands:
   - go vet ./x/websocket/...
 
 doc_paths:
-  - docs/modules/x-websocket/README.md
+  - docs/modules/x/websocket/README.md
 
 change_risks:
   - websocket auth regression

@@ -22,7 +22,7 @@ Evidence state: complete
 
 ## Primer And Boundary State
 
-- Primer: `docs/modules/x-tenant/README.md`
+- Primer: `docs/modules/x/tenant/README.md`
 - Manifest: `x/tenant/module.yaml`
 - Boundary state: documented and aligned with keeping tenant semantics out of
   stable `middleware` and stable `store`.

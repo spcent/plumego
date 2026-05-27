@@ -22,7 +22,7 @@ with actual values. Do not leave any section empty.
 | API unchanged between refs | ✓ confirmed by `extension-release-evidence` |
 | Release-backed snapshots on record | ✓ `docs/extension-evidence/snapshots/x-<family>/` |
 | Behavior coverage complete | ✓ (list key test files) |
-| Primer documents current behavior | ✓ `docs/modules/x-<family>/README.md` |
+| Primer documents current behavior | ✓ `docs/modules/x/<family>/README.md` |
 | Owner sign-off | ✓ recorded in evidence doc |
 
 ### Snapshot Comparison Output

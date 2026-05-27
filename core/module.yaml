@@ -72,13 +72,19 @@ allowed_imports:
   - contract
   - router
   - middleware
+  - health
   - log
+  - metrics
 
 forbidden_imports:
   - x/**
   - store/db
   - store/cache
   - store/file
+  - store/idempotency
+  - store/kv
+  - reference/**
+  - cmd/**
 
 test_commands:
   - go test -race -timeout 60s ./core/...

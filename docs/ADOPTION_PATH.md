@@ -49,20 +49,20 @@ Keep `reference/standard-service` as the app shape. Add one capability family:
 
 | Need | First read |
 | --- | --- |
-| CRUD/resource conventions | `docs/modules/x-rest/README.md` |
-| Tenant resolution and isolation | `docs/modules/x-tenant/README.md` |
-| Edge proxy and rewrite | `docs/modules/x-gateway/README.md` |
-| Dynamic service discovery behind gateway or clients | `docs/modules/x-gateway/README.md` (`x/gateway/discovery` section) |
-| WebSocket transport | `docs/modules/x-websocket/README.md` |
-| Messaging flows, queues, and webhook delivery | `docs/modules/x-messaging/README.md` |
-| Inbound webhook verification or outbound webhook transport | `docs/modules/x-messaging/README.md` (`x/messaging/webhook` section) |
-| File upload, download, and temporary URL transport | `docs/modules/x-fileapi/README.md` |
-| Observability exporters | `docs/modules/x-observability/README.md` |
-| Local debug routes, config snapshots, or pprof | `docs/modules/x-devtools/README.md` |
-| Reusable circuit breaker or rate-limit primitives | `docs/modules/x-resilience/README.md` |
-| AI provider/session/tool primitives | `docs/modules/x-ai/README.md` |
-| gRPC service hosting, client pooling, or HTTP-RPC gateway | `docs/modules/x-rpc/README.md` |
-| OpenAPI 3.1 spec generation from route metadata | `docs/modules/x-openapi/README.md` |
+| CRUD/resource conventions | `docs/modules/x/rest/README.md` |
+| Tenant resolution and isolation | `docs/modules/x/tenant/README.md` |
+| Edge proxy and rewrite | `docs/modules/x/gateway/README.md` |
+| Dynamic service discovery behind gateway or clients | `docs/modules/x/gateway/README.md` (`x/gateway/discovery` section) |
+| WebSocket transport | `docs/modules/x/websocket/README.md` |
+| Messaging flows, queues, and webhook delivery | `docs/modules/x/messaging/README.md` |
+| Inbound webhook verification or outbound webhook transport | `docs/modules/x/messaging/README.md` (`x/messaging/webhook` section) |
+| File upload, download, and temporary URL transport | `docs/modules/x/fileapi/README.md` |
+| Observability exporters | `docs/modules/x/observability/README.md` |
+| Local debug routes, config snapshots, or pprof | `docs/modules/x/observability/devtools/README.md` |
+| Reusable circuit breaker or rate-limit primitives | `docs/modules/x/resilience/README.md` |
+| AI provider/session/tool primitives | `docs/modules/x/ai/README.md` |
+| gRPC service hosting, client pooling, or HTTP-RPC gateway | `docs/modules/x/rpc/README.md` |
+| OpenAPI 3.1 spec generation from route metadata | `docs/modules/x/openapi/README.md` |
 
 Done when the app still has explicit route wiring and only the selected
 capability family is added.

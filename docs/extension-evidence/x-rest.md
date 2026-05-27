@@ -21,7 +21,7 @@ Evidence state: complete
 
 ## Primer And Boundary State
 
-- Primer: `docs/modules/x-rest/README.md`
+- Primer: `docs/modules/x/rest/README.md`
 - Manifest: `x/rest/module.yaml`
 - Boundary state: documented and aligned with the current transport-only
   resource-controller role.

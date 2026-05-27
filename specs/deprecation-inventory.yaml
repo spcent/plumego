@@ -220,6 +220,20 @@ entries:
     paths:
       - x/messaging/mq/config.go
 
+  - id: x-mq-cluster-config-placeholder
+    category: unsupported_operation
+    status: keep
+    owner: messaging
+    decision: >
+      EnableCluster and Cluster* fields are reserved for a future distributed
+      mode. Config.Validate() now returns an explicit error when EnableCluster is
+      true so callers get a deterministic failure rather than a silent no-op.
+      Remove this entry and the guard in Validate() when cluster mode is
+      implemented.
+    replacement: none (future implementation)
+    paths:
+      - x/messaging/mq/config.go
+
   - id: x-mq-pubsub-reexports
     category: public_alias
     status: keep

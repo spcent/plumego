@@ -9,7 +9,7 @@ Primary Module: x/messaging/mq
 Owned Files:
 - `x/messaging/mq/config.go`
 - `x/messaging/mq/broker_routes.go`
-- `docs/modules/x-messaging/README.md`
+- `docs/modules/x/messaging/README.md`
 - `specs/deprecation-inventory.yaml`
 Depends On: 1510
 
@@ -34,7 +34,7 @@ Non-goals:
 Files:
 - `x/messaging/mq/config.go`
 - `x/messaging/mq/broker_routes.go`
-- `docs/modules/x-messaging/README.md`
+- `docs/modules/x/messaging/README.md`
 - `specs/deprecation-inventory.yaml`
 
 Acceptance Tests:
@@ -45,7 +45,7 @@ Tests:
 - `go run ./internal/checks/deprecation-inventory -strict`
 
 Docs Sync:
-- `docs/modules/x-messaging/README.md`
+- `docs/modules/x/messaging/README.md`
 
 Validation:
 - `go test -timeout 20s ./x/messaging/mq/...`
@@ -62,7 +62,7 @@ Outcome:
 - Added explicit `Deprecated:` guidance to the unsupported MQTT/AMQP config
   fields and protocol bridge stubs so the public surface now advertises them as
   compatibility placeholders instead of looking like dormant features.
-- Tightened `docs/modules/x-messaging/README.md` to state that the port fields
+- Tightened `docs/modules/x/messaging/README.md` to state that the port fields
   have no effect, the flags always fail closed, and `x/messaging/pubsub` is the
   preferred direct path until a real protocol bridge lands.
 - Updated the deprecation inventory decision text so these placeholders have a

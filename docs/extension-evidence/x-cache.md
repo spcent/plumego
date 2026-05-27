@@ -80,7 +80,7 @@ Evidence state: surface inventory
 
 ## Primer And Boundary State
 
-- Primer: `docs/modules/x-cache/README.md`
+- Primer: `docs/modules/x/data/cache/README.md`
 - Manifest: `x/data/cache/module.yaml`
 - Boundary state: topology-heavy and provider-specific cache behavior remains
   extension-owned and outside stable `store/cache`.

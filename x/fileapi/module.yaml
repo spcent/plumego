@@ -14,7 +14,7 @@ entrypoint_reads:
   - specs/repo.yaml
   - specs/task-routing.yaml
   - specs/dependency-rules.yaml
-  - docs/modules/x-fileapi/README.md
+  - docs/modules/x/fileapi/README.md
 
 responsibilities:
   - HTTP transport layer for file upload, download, info, URL, delete, list
@@ -57,7 +57,7 @@ test_commands:
   - go vet ./x/fileapi/...
 
 doc_paths:
-  - docs/modules/x-fileapi/README.md
+  - docs/modules/x/fileapi/README.md
 
 change_risks:
   - upload validation regression

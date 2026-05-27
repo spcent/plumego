@@ -1,3 +1,11 @@
+// Package security provides the HTTP security-header middleware. It adapts the
+// policy types in [security/headers] into the [middleware.Middleware] signature
+// so callers can wire a security-header policy into the standard middleware
+// chain without importing security/headers directly.
+//
+// This package and the top-level security/ package are distinct:
+//   - security/ owns auth primitives, JWT helpers, input safety, and abuse guards.
+//   - middleware/security (this package) owns only the HTTP response-header middleware adapter.
 package security
 
 import (
