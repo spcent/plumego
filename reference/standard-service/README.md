@@ -15,7 +15,7 @@ It is the single source of truth for:
 
 Design constraints:
 
-- depends only on `core`, `router`, `contract`, `middleware`, `health`, and `log` plus the standard library
+- depends only on `core`, `router`, `contract`, `middleware`, `health`, `metrics`, and `log` plus the standard library
 - excludes `x/*` capabilities from the canonical learning path
 - keeps all route registration explicit in `internal/app/routes.go`
 - keeps app-local configuration in `internal/config`
@@ -23,11 +23,23 @@ Design constraints:
 Configuration precedence is explicit and test-covered:
 `Defaults()` < `.env` file < process environment < command-line flags.
 
-Production services should extend this layout with explicit middleware wiring in
-`internal/app/app.go`. Start from the minimal reference stack, then add body
-limits, timeouts, security headers, abuse guard rate limiting, auth adapters,
-and observability middleware as application-local decisions. Do not replace the
-visible route and middleware wiring with a hidden global production bundle.
+The middleware stack in `internal/app/app.go` wires the production-relevant
+stable-root set in order:
+
+```
+requestid → security → cors → recovery → accesslog → bodylimit → httpmetrics → timeout
+```
+
+`middleware/security/headers` applies default security headers (X-Frame-Options,
+X-Content-Type-Options, Referrer-Policy) to every response. `middleware/cors`
+uses permissive defaults for the reference app; replace with
+`cors.StrictDefaultOptions(origins...)` in production. `middleware/httpmetrics`
+uses a noop collector; swap in a real `metrics.HTTPObserver` for production
+instrumentation.
+
+Production services extend this stack with abuse guard rate limiting, auth
+adapters, and tracing as application-local decisions. Do not replace the visible
+wiring with a hidden global production bundle.
 
 For operations, keep telemetry, admin, and debug surfaces separate:
 

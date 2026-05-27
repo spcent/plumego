@@ -14,7 +14,7 @@ internal/
   app/      app.go, routes.go
   domain/
     item/   item.go
-  handler/  api.go, health.go, items.go, handler_test.go
+  handler/  api.go, guard.go, health.go, items.go, handler_test.go
 ```
 
 This is the canonical Plumego application shape. Every scaffold and getting-
@@ -104,6 +104,17 @@ Tests live next to the handlers they test (`handler_test.go`).
 `internal/domain/item` owns the sample item model and in-memory repository. This
 keeps the transport package focused on HTTP adaptation while still showing where
 real business and persistence code belongs in an application.
+
+`guard.go` implements `RequireWriteKey`, a per-route middleware that gates
+mutating endpoints behind a static bearer key. It lives here because per-route
+guards are part of HTTP adaptation — they inspect request headers and write
+transport-level error responses, the same role as every other file in this
+package. Wiring happens in `routes.go`:
+
+```go
+writeGuard := handler.RequireWriteKey(cfg.App.WriteKey, logger)
+v1.post("/items", writeGuard(http.HandlerFunc(items.Create)))
+```
 
 ### Constructor injection
 
