@@ -4,7 +4,7 @@ Milestone: standalone
 Recipe: specs/change-recipes/fix-bug.yaml
 Context Package: implementation
 Priority: P1
-State: active
+State: done
 Primary Module: reference/standard-service
 Owned Files:
 - `reference/standard-service/internal/app/app.go`
@@ -112,4 +112,18 @@ go run ./internal/checks/dependency-rules
 
 ## Outcome
 
-<!-- Agent fills this after completion -->
+All three tasks completed. Three commits on `feat/standard-service-improvements`:
+
+1. Wired `middleware/security/headers` (default policy), `middleware/cors` (permissive dev defaults),
+   and `middleware/httpmetrics` (noop collector) into `app.go` in the canonical order:
+   `requestid → security → cors → recovery → accesslog → bodylimit → httpmetrics → timeout`.
+   Removed the stale "Extension points" comment block.
+
+2. Moved `RequireWriteKey` from `handler/guard.go` → `internal/middleware/guard.go`
+   (package `appmiddleware`). Routes.go updated to `appmiddleware.RequireWriteKey`.
+   Guard tests moved to `internal/middleware/guard_test.go`. `handler/guard.go` deleted.
+
+3. Updated `ARCHITECTURE.md` (directory tree, new middleware/ section, dependency diagram)
+   and `README.md` (middleware stack description, canonical files list).
+
+All tests pass: `go test -race ./...`, `go vet ./...`, `dependency-rules`, `reference-layout`.
