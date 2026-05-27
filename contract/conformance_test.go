@@ -124,7 +124,7 @@ func scanExternalContractGoFilePaths(repoRoot string) ([]string, error) {
 			}
 			if d.IsDir() {
 				switch d.Name() {
-				case ".git", ".codex", "node_modules", "vendor":
+				case ".git", ".codex", "gatus", "node_modules", "vendor":
 					return filepath.SkipDir
 				}
 				if d.Name() == "testdata" || strings.HasPrefix(d.Name(), "testdata_") {

@@ -108,9 +108,10 @@ layers:
       - internal/tools
 
   reference:
-    description: Canonical implementations.
+    description: Canonical and production-scale application examples.
     paths:
       - reference
+      - use-cases
 
 top_level_rules:
   allowed_library_roots:

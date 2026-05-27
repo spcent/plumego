@@ -1,5 +1,6 @@
 name: x/data/idempotency
 path: x/data/idempotency
+parent_family: x/data
 layer: extension
 status: experimental
 suggested_gate_profile: single_module_behavior

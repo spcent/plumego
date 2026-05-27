@@ -30,6 +30,7 @@ type marker struct {
 var skippedDirs = map[string]struct{}{
 	".git":         {},
 	".next":        {},
+	"gatus":        {},
 	"node_modules": {},
 	"output":       {},
 	"vendor":       {},
