@@ -17,10 +17,8 @@ entrypoint_reads:
   - docs/modules/x/gateway/README.md
 
 subordinate_families:
-  - package: x/gateway/discovery
-    role: service instance discovery, resolver helpers, and discovery adapters
-  - package: x/gateway/ipc
-    role: inter-process communication transport helpers
+  - x/gateway/discovery
+  - x/gateway/ipc
 
 responsibilities:
   - Reverse proxy helpers
