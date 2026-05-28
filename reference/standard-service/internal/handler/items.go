@@ -51,6 +51,11 @@ type ItemHandler struct {
 	Logger plumelog.StructuredLogger
 }
 
+// createItemReq, updateItemReq, and patchItemReq carry the same fields today but
+// are kept as distinct types because their validation semantics differ: Create and
+// Update require both fields; Patch requires at least one. Keeping them separate
+// also leaves room to diverge — for example, Patch could add pointer fields for
+// explicit-null semantics without changing the Create or Update contracts.
 type createItemReq struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
@@ -215,7 +220,7 @@ func parseQueryInt(r *http.Request, key string, defaultVal, minVal, maxVal int) 
 // GetByID handles GET /api/v1/items/:id.
 // It demonstrates path parameter extraction and the canonical 404 error path.
 //
-//	GET /api/v1/items/item-1  → 200 item
+//	GET /api/v1/items/<id>    → 200 item
 //	GET /api/v1/items/missing → 404 TypeNotFound
 func (h ItemHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 	id := router.Param(r, "id")
@@ -238,10 +243,10 @@ func (h ItemHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 // Collect all missing required fields before writing an error response,
 // matching the same pattern as Create so clients fix everything in one round trip.
 //
-//	PUT /api/v1/items/item-1 {"name":"renamed","description":"new"}  → 200 updated item
-//	PUT /api/v1/items/item-1                                         → 400 TypeRequired (empty body)
-//	PUT /api/v1/items/item-1 {}                                      → 400 TypeRequired (name + description)
-//	PUT /api/v1/items/missing {"name":"x","description":"y"}         → 404 TypeNotFound
+//	PUT /api/v1/items/<id> {"name":"renamed","description":"new"}  → 200 updated item
+//	PUT /api/v1/items/<id>                                         → 400 TypeRequired (empty body)
+//	PUT /api/v1/items/<id> {}                                      → 400 TypeRequired (name + description)
+//	PUT /api/v1/items/missing {"name":"x","description":"y"}       → 404 TypeNotFound
 func (h ItemHandler) Update(w http.ResponseWriter, r *http.Request) {
 	id := router.Param(r, "id")
 
@@ -290,12 +295,12 @@ func (h ItemHandler) Update(w http.ResponseWriter, r *http.Request) {
 // request body are written; fields absent or empty in the body are left unchanged.
 // At least one of name or description must be non-empty.
 //
-//	PATCH /api/v1/items/item-1 {"name":"renamed"}                          → 200 (name changed, description preserved)
-//	PATCH /api/v1/items/item-1 {"description":"new desc"}                  → 200 (description changed, name preserved)
-//	PATCH /api/v1/items/item-1 {"name":"renamed","description":"new desc"} → 200 (both changed)
-//	PATCH /api/v1/items/item-1                                             → 400 TypeRequired (empty body)
-//	PATCH /api/v1/items/item-1 {}                                          → 400 TypeRequired (no fields)
-//	PATCH /api/v1/items/missing {"name":"x"}                               → 404 TypeNotFound
+//	PATCH /api/v1/items/<id> {"name":"renamed"}                          → 200 (name changed, description preserved)
+//	PATCH /api/v1/items/<id> {"description":"new desc"}                  → 200 (description changed, name preserved)
+//	PATCH /api/v1/items/<id> {"name":"renamed","description":"new desc"} → 200 (both changed)
+//	PATCH /api/v1/items/<id>                                             → 400 TypeRequired (empty body)
+//	PATCH /api/v1/items/<id> {}                                          → 400 TypeRequired (no fields)
+//	PATCH /api/v1/items/missing {"name":"x"}                             → 404 TypeNotFound
 func (h ItemHandler) Patch(w http.ResponseWriter, r *http.Request) {
 	id := router.Param(r, "id")
 
@@ -342,7 +347,7 @@ func (h ItemHandler) Patch(w http.ResponseWriter, r *http.Request) {
 // Delete handles DELETE /api/v1/items/:id.
 // A successful delete returns 204 No Content with no body.
 //
-//	DELETE /api/v1/items/item-1  → 204
+//	DELETE /api/v1/items/<id>    → 204
 //	DELETE /api/v1/items/missing → 404 TypeNotFound
 func (h ItemHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	id := router.Param(r, "id")
@@ -355,5 +360,8 @@ func (h ItemHandler) Delete(w http.ResponseWriter, r *http.Request) {
 			Build()))
 		return
 	}
-	w.WriteHeader(http.StatusNoContent)
+	// WriteResponse with 204 writes only the status line — contract.writeJSON
+	// skips the body for statusDisallowsBody statuses (1xx, 204, 304).
+	// Using WriteResponse keeps the response path consistent with all other handlers.
+	logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusNoContent, nil, nil))
 }

@@ -4,6 +4,7 @@ package item
 import (
 	"context"
 	"fmt"
+	"math/rand/v2"
 	"sync"
 	"time"
 )
@@ -22,7 +23,13 @@ type MemoryStore struct {
 	mu    sync.RWMutex
 	items map[string]Item
 	ids   []string
-	next  int
+}
+
+// generateID returns a random 16-character hex string suitable for use as an
+// opaque resource identifier. Using random IDs rather than sequential integers
+// avoids leaking the store's internal state through the API.
+func generateID() string {
+	return fmt.Sprintf("%016x", rand.Uint64())
 }
 
 // NewMemoryStore returns a ready-to-use in-memory store.
@@ -37,9 +44,8 @@ func (s *MemoryStore) Create(_ context.Context, name, description string) Item {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	s.next++
 	item := Item{
-		ID:          fmt.Sprintf("item-%d", s.next),
+		ID:          generateID(),
 		Name:        name,
 		Description: description,
 		CreatedAt:   time.Now().UTC(),

@@ -157,10 +157,12 @@ func applyFlags(cfg *Config, args []string) error {
 	return fs.Parse(filterFlagArgs(args[1:], known))
 }
 
-// filterFlagArgs returns only the elements of args that correspond to flags in
-// known, along with their values. Unrecognized flags and positional arguments
-// are dropped so the process can accept arbitrary extra arguments without the
-// FlagSet returning an error.
+// filterFlagArgs extracts only the flag arguments known to this service from args,
+// silently dropping unknown flags and positional arguments. This lets the process
+// start cleanly even when a container runtime, process supervisor, or test harness
+// injects extra arguments that the flag.FlagSet has no definition for. Without
+// filtering, flag.ContinueOnError would still return an error on the first unknown
+// flag, which would prevent startup rather than tolerating environment noise.
 func filterFlagArgs(args []string, known map[string]bool) []string {
 	out := make([]string, 0, len(args))
 	for i := 0; i < len(args); i++ {
