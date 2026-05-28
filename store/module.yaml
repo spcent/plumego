@@ -80,9 +80,9 @@ review_checklist:
   - Prefer stdlib-compatible abstractions
 
 agent_hints:
-  - Move tenant-aware adapters to x/tenant/store and move DB analytics, slow-query helpers, and DB health/reporting to the owning observability extensions
-  - For distributed, provider-specific, or metrics/export-oriented cache behavior use x/data/cache; for HTTP response caching use x/gateway/cache
-  - Route durable topology and provider behavior to x/data/* and keep stable store focused on base storage contracts, shared types, and errors
+  - "store vs x/data: in-process primitives (MemoryCache, local file, in-memory KV/idempotency) → store; distributed/cloud/durable topology (Redis, S3, WAL-KV, SQL idempotency, sharding) → x/data"
+  - Move tenant-aware adapters to x/tenant/store; move DB analytics, slow-query helpers, and DB health/reporting to x/observability
+  - For HTTP response caching use x/gateway/cache; for distributed or Redis cache topology use x/data/cache
 
 task_affinity:
   store: store/

@@ -97,9 +97,9 @@ review_checklist:
   - Keep durable topology behavior separate from business repository logic
 
 agent_hints:
-  - Move sharding and rw orchestration here instead of widening store
-  - Keep business repositories and domain-specific dedupe rules in app code, not in x/data
-  - x/data/cache is a subordinate package for distributed/Redis cache topology; start cache work here before opening x/data/cache directly
+  - "store vs x/data: in-process primitives (MemoryCache, local file, in-memory KV/idempotency) → store; distributed/cloud/durable topology (Redis, S3, WAL-KV, SQL idempotency, sharding) → x/data"
+  - Move sharding and rw orchestration here instead of widening store; keep business repositories and domain-specific dedupe rules in app code
+  - x/data/cache is a subordinate package; start distributed/Redis cache work from x/data before opening x/data/cache directly
 
 task_affinity:
   store: x/data/

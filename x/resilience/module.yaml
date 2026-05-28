@@ -69,8 +69,8 @@ review_checklist:
   - Keep feature-specific resilience orchestration, including AI provider fallback, in owning extensions
 
 agent_hints:
-  - Put reusable circuit breaking and rate limiting here instead of in stable security or feature-specific packages
-  - Keep feature-specific resilience orchestration in the owning extension package
+  - "Rate-limit decision guide: HTTP abuse-guard middleware → middleware/ratelimit (wraps security/abuse); internal token-bucket primitive for extension packages → x/resilience/ratelimit (not an HTTP middleware)"
+  - Put reusable circuit breaking and rate limiting here instead of in stable security or feature-specific packages; keep feature-specific orchestration (e.g. AI fallback) in the owning extension
   - Keep adapters explicit rather than wrapping failures behind hidden middleware magic
 
 task_affinity:

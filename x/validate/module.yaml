@@ -72,9 +72,9 @@ review_checklist:
   - Return contract-shaped validation errors
 
 agent_hints:
-  - Keep adapters in subordinate packages
-  - Decode JSON before calling validators
-  - Prefer contract.NewErrorBuilder for API errors
+  - "validate vs security/input: this package handles request binding and validation wiring (Bind/BindJSON + Validator interface); security/input handles field-type validators (email, URL, phone, token format)"
+  - Decode JSON before calling validators; keep adapters in subordinate packages
+  - Prefer contract.NewErrorBuilder for API errors; do not add third-party validation dependencies here
 
 task_affinity:
   validation: x/validate/
