@@ -54,12 +54,13 @@ func (a *App) RegisterRoutes() error {
 	}
 
 	// Versioned API — all routes under /api/v1 share this group prefix.
-	// Query-param binding: GET /api/v1/greet?name=Alice → 200
-	//                      GET /api/v1/greet            → 400 TypeRequired
-	// Collection:          GET  /api/v1/items                                                     → 200 {items:[…],total:N,…}
-	//                      POST /api/v1/items {"name":"…","description":"…"}                      → 201 item (guarded)
-	// Member:              GET    /api/v1/items/:id                                               → 200 item or 404
-	//                      PUT    /api/v1/items/:id {"name":"…","description":"…"}               → 200 item or 404 (guarded)
+	// Query-param binding: GET   /api/v1/greet?name=Alice → 200
+	//                      GET   /api/v1/greet            → 400 TypeRequired
+	// Collection:          GET   /api/v1/items                                                     → 200 {items:[…],total:N,…}
+	//                      POST  /api/v1/items {"name":"…","description":"…"}                      → 201 item (guarded)
+	// Member:              GET   /api/v1/items/:id                                                 → 200 item or 404
+	//                      PUT   /api/v1/items/:id {"name":"…","description":"…"}                 → 200 item or 404 (guarded, replaces all fields)
+	//                      PATCH /api/v1/items/:id {"name":"…"}                                   → 200 item or 404 (guarded, updates only non-empty fields)
 	//                      DELETE /api/v1/items/:id                                               → 204      or 404 (guarded)
 	v1 := newRouteReg(a.Core.Group("/api/v1"))
 	v1.get("/greet", http.HandlerFunc(api.Greet))
@@ -67,6 +68,7 @@ func (a *App) RegisterRoutes() error {
 	v1.post("/items", writeGuard(http.HandlerFunc(items.Create)))
 	v1.get("/items/:id", http.HandlerFunc(items.GetByID))
 	v1.put("/items/:id", writeGuard(http.HandlerFunc(items.Update)))
+	v1.patch("/items/:id", writeGuard(http.HandlerFunc(items.Patch)))
 	v1.delete("/items/:id", writeGuard(http.HandlerFunc(items.Delete)))
 	return v1.err
 }
@@ -77,6 +79,7 @@ type routeAdder interface {
 	Get(path string, h http.Handler) error
 	Post(path string, h http.Handler) error
 	Put(path string, h http.Handler) error
+	Patch(path string, h http.Handler) error
 	Delete(path string, h http.Handler) error
 }
 
@@ -95,6 +98,7 @@ func newRouteReg(adder routeAdder) *routeReg { return &routeReg{adder: adder} }
 func (r *routeReg) get(path string, h http.Handler)    { r.record(r.adder.Get(path, h)) }
 func (r *routeReg) post(path string, h http.Handler)   { r.record(r.adder.Post(path, h)) }
 func (r *routeReg) put(path string, h http.Handler)    { r.record(r.adder.Put(path, h)) }
+func (r *routeReg) patch(path string, h http.Handler)  { r.record(r.adder.Patch(path, h)) }
 func (r *routeReg) delete(path string, h http.Handler) { r.record(r.adder.Delete(path, h)) }
 
 // record stores the first non-nil error; subsequent errors are dropped.

@@ -170,6 +170,110 @@ func TestMemoryStoreDelete(t *testing.T) {
 	}
 }
 
+func TestMemoryStorePatch(t *testing.T) {
+	t.Run("patch name only leaves description unchanged", func(t *testing.T) {
+		s := NewMemoryStore()
+		created := s.Create(ctx, "original", "original desc")
+
+		patched, ok := s.Patch(ctx, created.ID, "renamed", "")
+		if !ok {
+			t.Fatal("Patch: want true for existing id")
+		}
+		if patched.Name != "renamed" || patched.Description != "original desc" {
+			t.Fatalf("Patch name only: name=%q desc=%q, want renamed/original desc", patched.Name, patched.Description)
+		}
+		if patched.ID != created.ID || !patched.CreatedAt.Equal(created.CreatedAt) {
+			t.Fatalf("Patch: ID and CreatedAt must be immutable")
+		}
+	})
+
+	t.Run("patch description only leaves name unchanged", func(t *testing.T) {
+		s := NewMemoryStore()
+		created := s.Create(ctx, "original", "original desc")
+
+		patched, ok := s.Patch(ctx, created.ID, "", "new desc")
+		if !ok {
+			t.Fatal("Patch: want true for existing id")
+		}
+		if patched.Name != "original" || patched.Description != "new desc" {
+			t.Fatalf("Patch desc only: name=%q desc=%q, want original/new desc", patched.Name, patched.Description)
+		}
+	})
+
+	t.Run("patch both fields replaces both", func(t *testing.T) {
+		s := NewMemoryStore()
+		created := s.Create(ctx, "original", "original desc")
+
+		patched, ok := s.Patch(ctx, created.ID, "renamed", "new desc")
+		if !ok {
+			t.Fatal("Patch: want true for existing id")
+		}
+		if patched.Name != "renamed" || patched.Description != "new desc" {
+			t.Fatalf("Patch both: name=%q desc=%q, want renamed/new desc", patched.Name, patched.Description)
+		}
+	})
+
+	t.Run("patch missing id returns false", func(t *testing.T) {
+		s := NewMemoryStore()
+		_, ok := s.Patch(ctx, "no-such-id", "name", "")
+		if ok {
+			t.Fatal("Patch missing: want false, got true")
+		}
+	})
+
+	t.Run("patch is reflected by subsequent get", func(t *testing.T) {
+		s := NewMemoryStore()
+		created := s.Create(ctx, "original", "original desc")
+		s.Patch(ctx, created.ID, "patched", "")
+
+		got, ok := s.Get(ctx, created.ID)
+		if !ok {
+			t.Fatal("Get after Patch: want found")
+		}
+		if got.Name != "patched" || got.Description != "original desc" {
+			t.Fatalf("Get after Patch: name=%q desc=%q, want patched/original desc", got.Name, got.Description)
+		}
+	})
+}
+
+func TestMemoryStoreContextCancellation(t *testing.T) {
+	t.Run("cancelled ctx returns false from Get", func(t *testing.T) {
+		s := NewMemoryStore()
+		created := s.Create(ctx, "item", "an item")
+
+		cancelled, cancel := context.WithCancel(context.Background())
+		cancel()
+		_, ok := s.Get(cancelled, created.ID)
+		if ok {
+			t.Fatal("Get with cancelled ctx: want false, got true")
+		}
+	})
+
+	t.Run("cancelled ctx returns nil from List", func(t *testing.T) {
+		s := NewMemoryStore()
+		s.Create(ctx, "item", "an item")
+
+		cancelled, cancel := context.WithCancel(context.Background())
+		cancel()
+		items := s.List(cancelled)
+		if items != nil {
+			t.Fatalf("List with cancelled ctx: want nil, got %v", items)
+		}
+	})
+
+	t.Run("cancelled ctx returns false from Patch", func(t *testing.T) {
+		s := NewMemoryStore()
+		created := s.Create(ctx, "item", "an item")
+
+		cancelled, cancel := context.WithCancel(context.Background())
+		cancel()
+		_, ok := s.Patch(cancelled, created.ID, "renamed", "")
+		if ok {
+			t.Fatal("Patch with cancelled ctx: want false, got true")
+		}
+	})
+}
+
 func TestMemoryStoreDeleteDoesNotAffectOthers(t *testing.T) {
 	s := NewMemoryStore()
 	keep := s.Create(ctx, "keeper", "a keeper item")

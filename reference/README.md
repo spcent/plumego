@@ -16,6 +16,7 @@ Kubernetes, Prometheus), see [`use-cases/`](../use-cases/AGENTS.md).
 |---|---|
 | Understand the canonical app layout | [`standard-service`](#standard-service) |
 | Add production security and observability | [`production-service`](#production-service) |
+| Add Prometheus metrics and distributed tracing | [`with-observability`](#with-observability) |
 | Add an LLM backend | [`with-ai`](#with-ai) |
 | Stream async events to HTTP clients | [`with-events`](#with-events) |
 | Serve a static frontend | [`with-frontend`](#with-frontend) |
@@ -64,6 +65,19 @@ baseline before adding `x/*` capabilities.
 Each `with-*` app starts from `standard-service` and adds exactly one
 capability. They are non-canonical: they import `x/*` and exist to show
 integration patterns, not to be used as a baseline.
+
+### with-observability
+
+Adds `x/observability` Prometheus metrics and OpenTelemetry distributed tracing.
+`httpmetrics.Middleware` is wired with a real `PrometheusCollector` instead of
+the noop used in `standard-service`; `middleware/tracing.Middleware` is wired
+with an `OpenTelemetryTracer`. Shows the path from noop to real observability
+in a single focused diff.
+
+- `GET /metrics` — Prometheus text exposition format, ready for scraping.
+- `GET /api/v1/spans` — in-process spans for development (remove in production).
+- `GET /api/v1/stats` — metrics summary in the standard JSON envelope.
+- `MetricsHandler` demonstrates reading via the `metrics.StatsReader` interface.
 
 ### with-ai
 

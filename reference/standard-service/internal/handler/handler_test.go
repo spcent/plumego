@@ -870,6 +870,170 @@ func TestItemHandlerDelete(t *testing.T) {
 	})
 }
 
+func TestItemHandlerPatch(t *testing.T) {
+	t.Run("patch name only returns 200 with name updated and description unchanged", func(t *testing.T) {
+		store := item.NewMemoryStore()
+		created := store.Create(context.Background(), "original", "original desc")
+		h := ItemHandler{Repo: store, Logger: discardLogger()}
+
+		body := bytes.NewBufferString(`{"name":"renamed"}`)
+		req := httptest.NewRequest(http.MethodPatch, "/api/v1/items/"+created.ID, body)
+		ctx := contract.WithRequestContext(req.Context(), contract.RequestContext{
+			Params: map[string]string{"id": created.ID},
+		})
+		rec := httptest.NewRecorder()
+		h.Patch(rec, req.WithContext(ctx))
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+		}
+		got := decodeReferenceData[item.Item](t, rec)
+		if got.Name != "renamed" || got.Description != "original desc" {
+			t.Fatalf("patch name only: name=%q desc=%q, want renamed/original desc", got.Name, got.Description)
+		}
+		if got.ID != created.ID || !got.CreatedAt.Equal(created.CreatedAt) {
+			t.Fatalf("patch: ID and CreatedAt must be immutable")
+		}
+	})
+
+	t.Run("patch description only returns 200 with description updated and name unchanged", func(t *testing.T) {
+		store := item.NewMemoryStore()
+		created := store.Create(context.Background(), "original", "original desc")
+		h := ItemHandler{Repo: store, Logger: discardLogger()}
+
+		body := bytes.NewBufferString(`{"description":"new desc"}`)
+		req := httptest.NewRequest(http.MethodPatch, "/api/v1/items/"+created.ID, body)
+		ctx := contract.WithRequestContext(req.Context(), contract.RequestContext{
+			Params: map[string]string{"id": created.ID},
+		})
+		rec := httptest.NewRecorder()
+		h.Patch(rec, req.WithContext(ctx))
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+		}
+		got := decodeReferenceData[item.Item](t, rec)
+		if got.Name != "original" || got.Description != "new desc" {
+			t.Fatalf("patch desc only: name=%q desc=%q, want original/new desc", got.Name, got.Description)
+		}
+	})
+
+	t.Run("patch both fields returns 200 with both updated", func(t *testing.T) {
+		store := item.NewMemoryStore()
+		created := store.Create(context.Background(), "original", "original desc")
+		h := ItemHandler{Repo: store, Logger: discardLogger()}
+
+		body := bytes.NewBufferString(`{"name":"renamed","description":"new desc"}`)
+		req := httptest.NewRequest(http.MethodPatch, "/api/v1/items/"+created.ID, body)
+		ctx := contract.WithRequestContext(req.Context(), contract.RequestContext{
+			Params: map[string]string{"id": created.ID},
+		})
+		rec := httptest.NewRecorder()
+		h.Patch(rec, req.WithContext(ctx))
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+		}
+		got := decodeReferenceData[item.Item](t, rec)
+		if got.Name != "renamed" || got.Description != "new desc" {
+			t.Fatalf("patch both: name=%q desc=%q, want renamed/new desc", got.Name, got.Description)
+		}
+	})
+
+	t.Run("patch with no fields returns 400 TypeRequired", func(t *testing.T) {
+		store := item.NewMemoryStore()
+		created := store.Create(context.Background(), "original", "original desc")
+		h := ItemHandler{Repo: store, Logger: discardLogger()}
+
+		body := bytes.NewBufferString(`{}`)
+		req := httptest.NewRequest(http.MethodPatch, "/api/v1/items/"+created.ID, body)
+		ctx := contract.WithRequestContext(req.Context(), contract.RequestContext{
+			Params: map[string]string{"id": created.ID},
+		})
+		rec := httptest.NewRecorder()
+		h.Patch(rec, req.WithContext(ctx))
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
+		}
+		if code := decodeErrorPayload(t, rec).Code; code != codeItemPatchNoFields {
+			t.Fatalf("error code = %q, want %q", code, codeItemPatchNoFields)
+		}
+	})
+
+	t.Run("patch missing id returns 404 TypeNotFound", func(t *testing.T) {
+		h := ItemHandler{Repo: item.NewMemoryStore(), Logger: discardLogger()}
+		body := bytes.NewBufferString(`{"name":"renamed"}`)
+		req := httptest.NewRequest(http.MethodPatch, "/api/v1/items/no-such-item", body)
+		ctx := contract.WithRequestContext(req.Context(), contract.RequestContext{
+			Params: map[string]string{"id": "no-such-item"},
+		})
+		rec := httptest.NewRecorder()
+		h.Patch(rec, req.WithContext(ctx))
+		if rec.Code != http.StatusNotFound {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusNotFound)
+		}
+	})
+
+	t.Run("empty body returns 400 TypeRequired with body_required code", func(t *testing.T) {
+		store := item.NewMemoryStore()
+		created := store.Create(context.Background(), "original", "original desc")
+		h := ItemHandler{Repo: store, Logger: discardLogger()}
+
+		req := httptest.NewRequest(http.MethodPatch, "/api/v1/items/"+created.ID, http.NoBody)
+		ctx := contract.WithRequestContext(req.Context(), contract.RequestContext{
+			Params: map[string]string{"id": created.ID},
+		})
+		rec := httptest.NewRecorder()
+		h.Patch(rec, req.WithContext(ctx))
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
+		}
+		if code := decodeErrorPayload(t, rec).Code; code != codeItemPatchBodyRequired {
+			t.Fatalf("error code = %q, want %q", code, codeItemPatchBodyRequired)
+		}
+	})
+
+	t.Run("invalid JSON returns 400 TypeBadRequest", func(t *testing.T) {
+		store := item.NewMemoryStore()
+		created := store.Create(context.Background(), "original", "original desc")
+		h := ItemHandler{Repo: store, Logger: discardLogger()}
+
+		body := bytes.NewBufferString(`not-json`)
+		req := httptest.NewRequest(http.MethodPatch, "/api/v1/items/"+created.ID, body)
+		ctx := contract.WithRequestContext(req.Context(), contract.RequestContext{
+			Params: map[string]string{"id": created.ID},
+		})
+		rec := httptest.NewRecorder()
+		h.Patch(rec, req.WithContext(ctx))
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
+		}
+		if code := decodeErrorPayload(t, rec).Code; code != codeItemPatchInvalidJSON {
+			t.Fatalf("error code = %q, want %q", code, codeItemPatchInvalidJSON)
+		}
+	})
+
+	t.Run("patch is idempotent when same values are sent twice", func(t *testing.T) {
+		store := item.NewMemoryStore()
+		created := store.Create(context.Background(), "original", "original desc")
+		h := ItemHandler{Repo: store, Logger: discardLogger()}
+
+		for i := 0; i < 2; i++ {
+			body := bytes.NewBufferString(`{"name":"stable"}`)
+			req := httptest.NewRequest(http.MethodPatch, "/api/v1/items/"+created.ID, body)
+			ctx := contract.WithRequestContext(req.Context(), contract.RequestContext{
+				Params: map[string]string{"id": created.ID},
+			})
+			rec := httptest.NewRecorder()
+			h.Patch(rec, req.WithContext(ctx))
+			if rec.Code != http.StatusOK {
+				t.Fatalf("attempt %d: status = %d, want %d", i+1, rec.Code, http.StatusOK)
+			}
+			got := decodeReferenceData[item.Item](t, rec)
+			if got.Name != "stable" {
+				t.Fatalf("attempt %d: Name = %q, want stable", i+1, got.Name)
+			}
+		}
+	})
+}
+
 func TestRequireWriteKey(t *testing.T) {
 	okHandler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
