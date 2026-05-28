@@ -252,3 +252,12 @@ entries:
     paths:
       - x/messaging/mq/priority_test.go
       - x/messaging/mq/mq_test.go
+
+  - id: x-messaging-ratelimiter-resilience-alias
+    category: public_alias
+    status: keep
+    owner: messaging
+    decision: RateLimiter is a type alias for x/resilience/ratelimit.TokenBucket kept to preserve the public API surface of RateLimitedSMSProvider and RateLimitedEmailProvider while eliminating the duplicate token-bucket implementation.
+    replacement: x/resilience/ratelimit.TokenBucket
+    paths:
+      - x/messaging/ratelimit.go

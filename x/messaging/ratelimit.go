@@ -7,9 +7,8 @@ import (
 	"github.com/spcent/plumego/x/resilience/ratelimit"
 )
 
-// RateLimiter is a token-bucket rate limiter backed by x/resilience/ratelimit.
-// It is exported for backward compatibility; prefer x/resilience/ratelimit.New
-// for new code outside this package.
+// RateLimiter is the rate limiter type used by [RateLimitedSMSProvider] and
+// [RateLimitedEmailProvider]. It delegates to x/resilience/ratelimit.TokenBucket.
 type RateLimiter = ratelimit.TokenBucket
 
 // NewRateLimiter returns a RateLimiter that permits maxPerInterval calls per
