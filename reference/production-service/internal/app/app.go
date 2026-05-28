@@ -63,26 +63,28 @@ func New(cfg config.Config) (*App, error) {
 		return nil, fmt.Errorf("configure security middleware: %w", err)
 	}
 
-	// Middleware order — outermost to innermost (first registered runs first on inbound):
+	// Middleware order — outermost to innermost (first registered runs first on inbound requests):
 	//   requestid    → stamps correlation ID before any logging or error handling
-	//   recovery     → converts panics to 500; inside requestid so ID appears in the response
-	//   bodylimit    → rejects oversized bodies before auth or rate-limit processing
-	//   timeout      → enforces per-request wall-clock limit on everything below
-	//   security     → adds security headers to all responses, including timed-out ones
-	//   ratelimit    → rejects abusive clients; after security so headers are always set
-	//   tracing      → hooks span lifecycle after rejection decisions are made
-	//   httpmetrics  → records request stats including rejected and timed-out requests
-	//   accesslog    → innermost: logs the final status with full middleware context
+	//   security     → sets security headers (X-Frame-Options, …) on all responses, including
+	//                  timed-out, rate-limited, and panicked ones
+	//   recovery     → converts panics to 500; inside security so headers are already set
+	//   accesslog    → logs all requests including 413 (body too large) and 429 (rate limited);
+	//                  must be outer to bodylimit and ratelimit to capture those rejections
+	//   bodylimit    → rejects oversized bodies with 413; after accesslog so the 413 is logged
+	//   ratelimit    → rejects abusive clients with 429; after accesslog so the 429 is logged
+	//   tracing      → records distributed trace spans; after rejection decisions
+	//   httpmetrics  → records request count and latency including rejected requests
+	//   timeout      → per-request wall-clock limit; innermost so only handler time is counted
 	if err := app.Use(
 		requestid.Middleware(),
-		recoveryMw,
-		bodylimit.Middleware(bodylimit.Config{MaxBytes: cfg.App.BodyLimitBytes, Logger: app.Logger()}),
-		timeout.Middleware(timeout.Config{Timeout: cfg.App.RequestTimeout}),
 		securityMw,
+		recoveryMw,
+		accesslogMw,
+		bodylimit.Middleware(bodylimit.Config{MaxBytes: cfg.App.BodyLimitBytes, Logger: app.Logger()}),
 		rateLimitGuard.Middleware(),
 		tracing.Middleware(noopTracer{}),
 		httpmetrics.Middleware(collector),
-		accesslogMw,
+		timeout.Middleware(timeout.Config{Timeout: cfg.App.RequestTimeout}),
 	); err != nil {
 		rateLimitGuard.Stop()
 		return nil, fmt.Errorf("register middleware: %w", err)

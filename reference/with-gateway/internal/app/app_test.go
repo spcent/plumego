@@ -23,6 +23,7 @@ func TestRegisterRoutesCanonicalShape(t *testing.T) {
 		Path   string
 	}{
 		{http.MethodGet, "/healthz"},
+		{http.MethodGet, "/readyz"},
 		// /proxy/*path accepts any method via App.Any
 		{"ANY", "/proxy/*path"},
 	}

@@ -8,10 +8,18 @@ import (
 
 // RegisterRoutes wires all HTTP routes for the with-gateway demo.
 func (a *App) RegisterRoutes() error {
-	logger := a.Core.Logger()
-	if err := a.Core.Get("/healthz", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		handler.WriteHealthResponse(w, r, "with-gateway", logger)
-	})); err != nil {
+	// HealthHandler receives no Checkers because the gateway has no application-level
+	// dependencies to probe. In production, pass one health.ComponentChecker per
+	// downstream dependency so /readyz reflects real backend availability.
+	h := handler.HealthHandler{
+		ServiceName: "with-gateway",
+		Logger:      a.Core.Logger(),
+	}
+
+	if err := a.Core.Get("/healthz", http.HandlerFunc(h.Live)); err != nil {
+		return err
+	}
+	if err := a.Core.Get("/readyz", http.HandlerFunc(h.Ready)); err != nil {
 		return err
 	}
 

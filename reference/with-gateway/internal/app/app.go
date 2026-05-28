@@ -12,8 +12,11 @@ import (
 	"github.com/spcent/plumego/core"
 	plumelog "github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/middleware/accesslog"
+	"github.com/spcent/plumego/middleware/bodylimit"
 	"github.com/spcent/plumego/middleware/recovery"
 	"github.com/spcent/plumego/middleware/requestid"
+	midsecurity "github.com/spcent/plumego/middleware/security"
+	"github.com/spcent/plumego/middleware/timeout"
 	"github.com/spcent/plumego/x/gateway"
 	"with-gateway/internal/config"
 )
@@ -26,8 +29,16 @@ type App struct {
 }
 
 // New constructs the App with a gateway reverse proxy.
+// Middleware order matches standard-service so the gateway runs with the same
+// production-oriented baseline. CORS is intentionally omitted — the gateway
+// proxies CORS headers from the backend rather than imposing its own policy.
 func New(cfg config.Config) (*App, error) {
 	a := core.New(cfg.Core, core.AppDependencies{Logger: plumelog.NewLogger()})
+
+	securityMw, err := midsecurity.Middleware(midsecurity.Config{})
+	if err != nil {
+		return nil, fmt.Errorf("configure security headers middleware: %w", err)
+	}
 	recoveryMw, err := recovery.Middleware(recovery.Config{Logger: a.Logger()})
 	if err != nil {
 		return nil, fmt.Errorf("configure recovery middleware: %w", err)
@@ -36,10 +47,24 @@ func New(cfg config.Config) (*App, error) {
 	if err != nil {
 		return nil, fmt.Errorf("configure access log middleware: %w", err)
 	}
+
+	// Middleware order — outermost to innermost:
+	//   requestid → stamps correlation ID
+	//   security  → security headers on all responses
+	//   recovery  → converts panics to 500
+	//   accesslog → logs all requests; outer to bodylimit so 413s are logged
+	//   bodylimit → protects the backend from oversized request bodies
+	//   timeout   → per-request wall-clock limit; innermost
 	if err := a.Use(
 		requestid.Middleware(),
+		securityMw,
 		recoveryMw,
 		accesslogMw,
+		bodylimit.Middleware(bodylimit.Config{
+			MaxBytes: 1 << 20, // 1 MiB
+			Logger:   a.Logger(),
+		}),
+		timeout.Middleware(timeout.Config{Timeout: 30 * time.Second}),
 	); err != nil {
 		return nil, fmt.Errorf("register middleware: %w", err)
 	}
