@@ -3,6 +3,7 @@ package websocket
 import (
 	"bufio"
 	"bytes"
+	"crypto/rand"
 	"encoding/binary"
 	"io"
 	"net"
@@ -145,6 +146,11 @@ type Conn struct {
 	writeMu sync.Mutex
 	stateMu sync.RWMutex
 
+	// client is true on connections returned by Dial. RFC 6455 §5.3 requires
+	// client→server frames to be masked and forbids the server from masking its
+	// frames; readFrame and writeFrame branch on this flag accordingly.
+	client bool
+
 	// send queue
 	sendQueue chan Outbound
 	// config
@@ -194,6 +200,7 @@ func NewConn(c net.Conn, queueSize int, sendTimeout time.Duration, behavior Send
 		bufio.NewReaderSize(c, defaultBufSize),
 		bufio.NewWriterSize(c, defaultBufSize),
 		queueSize, sendTimeout, behavior,
+		false,
 	), nil
 }
 
@@ -212,11 +219,16 @@ func validateConnConfig(c net.Conn, queueSize int, behavior SendBehavior) error 
 
 // newConnFromHijack creates a Conn using buffers already allocated by the
 // HTTP server's hijack operation, avoiding a redundant allocation pair.
-func newConnFromHijack(c net.Conn, br *bufio.Reader, bw *bufio.Writer, queueSize int, sendTimeout time.Duration, behavior SendBehavior) *Conn {
+//
+// client toggles RFC 6455 framing direction. Server-side hijack constructions
+// pass client=false; the Dial path passes client=true so outgoing frames are
+// masked and incoming server frames are accepted unmasked.
+func newConnFromHijack(c net.Conn, br *bufio.Reader, bw *bufio.Writer, queueSize int, sendTimeout time.Duration, behavior SendBehavior, client bool) *Conn {
 	cc := &Conn{
 		conn:          c,
 		br:            br,
 		bw:            bw,
+		client:        client,
 		sendQueue:     make(chan Outbound, queueSize),
 		sendQueueSize: queueSize,
 		sendTimeout:   sendTimeout,
@@ -360,8 +372,16 @@ func (c *Conn) readFrame() (byte, bool, []byte, error) {
 	if !isValidFrameOpcode(op) {
 		return 0, false, nil, ErrProtocolError
 	}
-	if !mask {
-		return 0, false, nil, ErrUnmaskedFrame
+	// RFC 6455 §5.1/§5.3: client→server frames MUST be masked; server→client
+	// frames MUST NOT be masked. Direction depends on which side this Conn is on.
+	if c.client {
+		if mask {
+			return 0, false, nil, ErrUnexpectedMaskedFrame
+		}
+	} else {
+		if !mask {
+			return 0, false, nil, ErrUnmaskedFrame
+		}
 	}
 
 	var payloadLen int64
@@ -400,26 +420,18 @@ func (c *Conn) readFrame() (byte, bool, []byte, error) {
 	}
 
 	var maskKey [4]byte
-	if _, err := io.ReadFull(c.br, maskKey[:]); err != nil {
-		return 0, false, nil, err
+	if mask {
+		if _, err := io.ReadFull(c.br, maskKey[:]); err != nil {
+			return 0, false, nil, err
+		}
 	}
 	payload := make([]byte, payloadLen)
 	if payloadLen > 0 {
 		if _, err := io.ReadFull(c.br, payload); err != nil {
 			return 0, false, nil, err
 		}
-		// Unmask the payload. Process 4 bytes per iteration to let the compiler
-		// optimise the loop; avoids the modulo in the byte-by-byte version.
-		n := len(payload)
-		i := 0
-		for ; i+3 < n; i += 4 {
-			payload[i] ^= maskKey[0]
-			payload[i+1] ^= maskKey[1]
-			payload[i+2] ^= maskKey[2]
-			payload[i+3] ^= maskKey[3]
-		}
-		for ; i < n; i++ {
-			payload[i] ^= maskKey[i%4]
+		if mask {
+			applyMask(payload, maskKey)
 		}
 	}
 
@@ -495,33 +507,79 @@ func (c *Conn) writeFrame(op byte, fin bool, payload []byte) error {
 	header[0] = b0
 	hlen = 1
 
+	// RFC 6455 §5.3: client→server frames MUST be masked. Set the mask bit and
+	// reserve room for the 4-byte mask key, written after the length prefix.
+	maskBit := byte(0)
+	if c.client {
+		maskBit = 0x80
+	}
+
 	n := len(payload)
 	switch {
 	case n <= 125:
-		header[hlen] = byte(n)
+		header[hlen] = maskBit | byte(n)
 		hlen++
 	case n <= 0xFFFF:
-		header[hlen] = 126
+		header[hlen] = maskBit | 126
 		hlen++
 		header[hlen] = byte(n >> 8)
 		header[hlen+1] = byte(n)
 		hlen += 2
 	default:
-		header[hlen] = 127
+		header[hlen] = maskBit | 127
 		hlen++
 		binary.BigEndian.PutUint64(header[hlen:hlen+8], uint64(n))
 		hlen += 8
+	}
+
+	var maskKey [4]byte
+	if c.client {
+		if _, err := io.ReadFull(rand.Reader, maskKey[:]); err != nil {
+			return err
+		}
+		copy(header[hlen:hlen+4], maskKey[:])
+		hlen += 4
 	}
 
 	if _, err := c.bw.Write(header[:hlen]); err != nil {
 		return err
 	}
 	if n > 0 {
-		if _, err := c.bw.Write(payload); err != nil {
-			return err
+		if c.client {
+			// Mask in place on a private copy so the caller's slice is not
+			// mutated; this also keeps message-pool buffers reusable.
+			masked := make([]byte, n)
+			copy(masked, payload)
+			applyMask(masked, maskKey)
+			if _, err := c.bw.Write(masked); err != nil {
+				return err
+			}
+		} else {
+			if _, err := c.bw.Write(payload); err != nil {
+				return err
+			}
 		}
 	}
 	return c.bw.Flush()
+}
+
+// applyMask XORs payload in place with the 4-byte WebSocket mask key.
+//
+// Processes 4 bytes per iteration to let the compiler unroll the loop; avoids
+// the modulo in the byte-by-byte tail. Used for both inbound unmasking
+// (server-side) and outbound masking (client-side).
+func applyMask(payload []byte, key [4]byte) {
+	n := len(payload)
+	i := 0
+	for ; i+3 < n; i += 4 {
+		payload[i] ^= key[0]
+		payload[i+1] ^= key[1]
+		payload[i+2] ^= key[2]
+		payload[i+3] ^= key[3]
+	}
+	for ; i < n; i++ {
+		payload[i] ^= key[i%4]
+	}
 }
 
 // SetMetadata sets a metadata value for the connection (concurrent-safe).

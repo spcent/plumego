@@ -19,6 +19,10 @@ var (
 	ErrPayloadTooLarge    = errors.New("websocket: payload too large")
 	ErrProtocolError      = errors.New("websocket: protocol error")
 	ErrUnmaskedFrame      = errors.New("websocket: unmasked client frame")
+	// ErrUnexpectedMaskedFrame is returned when a client-side Conn receives a
+	// masked frame from the server. RFC 6455 §5.1 forbids server→client frames
+	// from being masked.
+	ErrUnexpectedMaskedFrame = errors.New("websocket: unexpected masked server frame")
 	ErrFragmentedControl  = errors.New("websocket: fragmented control frame")
 	ErrControlTooLarge    = errors.New("websocket: control frame too large")
 	ErrInvalidOpcode      = errors.New("websocket: invalid opcode")

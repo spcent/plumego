@@ -2,7 +2,7 @@
 
 ## Purpose
 
-`x/websocket` owns websocket server helpers and explicit route registration for websocket transport.
+`x/websocket` owns websocket server helpers and explicit route registration for websocket transport, plus an RFC 6455 client `Dial` for outbound websocket connections.
 
 ## v1 Status
 
@@ -17,6 +17,7 @@
 
 - the task is websocket transport behavior
 - the change is connection lifecycle or hub behavior
+- a use-case needs to dial an outbound websocket server (e.g., for active health probes); use `Dial` rather than adding a third-party websocket dependency
 
 ## Do not use this module for
 
@@ -51,6 +52,8 @@
 - `SendBehavior`
 - `Conn`
 - `NewConnE`
+- `Dial`
+- `DialOptions`
 - `Hub`
 - `HubConfig`
 - `HubMetrics`
@@ -114,6 +117,8 @@
 - handle room-password setup errors explicitly; do not hide hash failures behind log-only behavior
 - keep security metrics instance-scoped (`SecureRoomAuth.GetMetrics`, `Hub.Metrics`) instead of reintroducing global wrappers
 - treat `x/websocket` as the app-facing websocket transport surface; app-level session management belongs in the calling handler
+- use `Dial(ctx, url, *DialOptions)` for outbound websocket connections; the returned `*Conn` runs in client framing mode (outgoing frames masked per RFC 6455 §5.3, server frames must arrive unmasked) and the underlying transport is the HTTP client's response body, so per-frame write deadlines are no-ops — bound dial latency through the supplied context or `HTTPClient.Timeout`
+- attribute upstream code: the client handshake in `dial.go` is adapted from the ISC-licensed `github.com/coder/websocket` and intentionally omits permessage-deflate, ping/pong callbacks, and subprotocol fallback recovery; do not silently re-add them without a follow-up review
 
 ## Current test coverage
 
@@ -132,6 +137,7 @@
 - room-name policy: invalid direct hub joins, invalid handshake room queries, custom validator allowance, and invalid admin broadcast room targets
 - route registration: nil registrar, nil hub, empty websocket path, duplicate routes, and empty enabled broadcast path
 - admin broadcast: disabled-by-default behavior, dedicated secret or authorizer validation, JWT-secret rejection, empty body behavior, and oversized-body rejection
+- client `Dial`: text and binary roundtrip against the in-package server, header propagation through `DialOptions.HTTPHeader`, scheme rejection (non-`ws`/`wss`/`http`/`https`), non-101 response rejection, invalid `Sec-WebSocket-Accept` rejection, context-deadline cancellation, and `rwcConn` deadline no-op contract
 
 ## Beta readiness
 

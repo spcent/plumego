@@ -329,7 +329,7 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 	// Reuse the bufio.ReadWriter returned by Hijack to avoid a redundant
 	// buffer allocation (NewConn would otherwise create default-sized buffers
 	// that are immediately discarded).
-	c := newConnFromHijack(conn, buf.Reader, buf.Writer, cfg.QueueSize, cfg.SendTimeout, cfg.SendBehavior)
+	c := newConnFromHijack(conn, buf.Reader, buf.Writer, cfg.QueueSize, cfg.SendTimeout, cfg.SendBehavior, false)
 	if cfg.WriteTimeout > 0 {
 		if err := c.SetWriteTimeout(cfg.WriteTimeout); err != nil {
 			writeHijackedWebSocketHandshakeError(buf.Writer, http.StatusInternalServerError, codeWebSocketInvalidConfig, "websocket server misconfigured", contract.CategoryServer)

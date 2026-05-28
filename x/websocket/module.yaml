@@ -5,7 +5,7 @@ status: beta
 suggested_gate_profile: single_module_behavior
 owner: realtime
 risk: medium
-summary: WebSocket extension surface for hub primitives and explicit route registration.
+summary: WebSocket extension surface for hub primitives, explicit route registration, and RFC 6455 client dialing.
 
 entrypoint_reads:
   - AGENTS.md
@@ -21,6 +21,7 @@ responsibilities:
   - App-facing hub aliases
   - Auth and broadcast entrypoints
   - Default websocket configuration
+  - RFC 6455 client handshake (Dial)
 
 non_goals:
   - Core bootstrap ownership
@@ -64,6 +65,8 @@ public_entrypoints:
   - UserInfo
   - Conn
   - NewConn
+  - Dial
+  - DialOptions
   - BroadcastResult
   - Hub
   - HubConfig
@@ -92,6 +95,7 @@ public_entrypoints:
   - ErrPayloadTooLarge
   - ErrProtocolError
   - ErrUnmaskedFrame
+  - ErrUnexpectedMaskedFrame
   - ErrFragmentedControl
   - ErrControlTooLarge
   - ErrInvalidOpcode
@@ -180,6 +184,7 @@ landing_zones:
   server: server.go
   auth: auth.go
   security: security.go
+  client_dial: dial.go
 
 docs_sync_contract:
   on_status_change:
