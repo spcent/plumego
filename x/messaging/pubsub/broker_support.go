@@ -5,7 +5,6 @@ import (
 	"time"
 )
 
-
 // normalizeSubOptions fills in defaults from the broker config.
 func (b *InProcBroker) normalizeSubOptions(opts SubOptions) SubOptions {
 	if opts.BufferSize <= 0 {

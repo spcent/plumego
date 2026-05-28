@@ -135,7 +135,6 @@ func (s *subscriber) pumpRingBuffer() {
 	}
 }
 
-
 // initSubscriberChannel sets up the subscriber's message channel.
 func initSubscriberChannel(sub *subscriber, opts SubOptions) {
 	if opts.UseRingBuffer && opts.Policy == DropOldest {
@@ -147,4 +146,3 @@ func initSubscriberChannel(sub *subscriber, opts SubOptions) {
 		sub.ch = make(chan Message, opts.BufferSize)
 	}
 }
-

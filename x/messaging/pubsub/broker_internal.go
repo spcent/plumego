@@ -6,7 +6,6 @@ import (
 	"sort"
 )
 
-
 // doPublish performs the actual fan-out delivery.
 func (b *InProcBroker) doPublish(ctx context.Context, topic string, msg Message) {
 	if ctx.Err() != nil {

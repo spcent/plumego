@@ -6,7 +6,6 @@ import (
 	"time"
 )
 
-
 // deliver handles message delivery to a single subscriber with the configured backpressure policy.
 func (b *InProcBroker) deliver(ctx context.Context, s *subscriber, msg Message) {
 	if b.config.EnablePanicRecovery {

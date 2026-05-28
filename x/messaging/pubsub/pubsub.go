@@ -315,4 +315,3 @@ func (b *InProcBroker) subscribeMQTTInternal(ctx context.Context, pattern string
 
 	return sub, nil
 }
-

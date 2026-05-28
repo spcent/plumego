@@ -4,7 +4,6 @@ import (
 	"fmt"
 )
 
-
 func getCanonicalAPIHandlerContent(name string) string {
 	return fmt.Sprintf(`// Package handler contains the HTTP handlers.
 package handler
@@ -634,4 +633,3 @@ func parseEnvLine(line string) (key, value string, ok bool) {
 }
 	`
 }
-
