@@ -179,6 +179,21 @@
       "path": "reference/standard-service/internal/handler/items.go",
       "symbol": "codeItemUpdateBodyRequired",
       "type": "TypeRequired"
+    },
+    {
+      "path": "reference/standard-service/internal/handler/items.go",
+      "symbol": "codeItemPatchBodyRequired",
+      "type": "TypeRequired"
+    },
+    {
+      "path": "reference/standard-service/internal/handler/items.go",
+      "symbol": "codeItemPatchInvalidJSON",
+      "type": "TypeBadRequest"
+    },
+    {
+      "path": "reference/standard-service/internal/handler/items.go",
+      "symbol": "codeItemPatchNoFields",
+      "type": "TypeRequired"
     }
   ]
 }
