@@ -1,0 +1,13 @@
+@import "tailwindcss";
+
+/* Enable class-based dark mode: add 'dark' class to <html> */
+@custom-variant dark (&:where(.dark, .dark *));
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
