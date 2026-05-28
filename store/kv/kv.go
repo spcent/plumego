@@ -132,6 +132,18 @@ func (kv *KVStore) SetContext(ctx context.Context, key string, value []byte, ttl
 		kv.data = before
 		return err
 	}
+	// If persist latency exceeded the TTL the entry is already expired in
+	// memory. Refresh the in-memory expiry so callers see the entry as live
+	// for at least ttl after Set returns. The on-disk record keeps the
+	// earlier expiry, so on reload the entry may expire sooner by at most
+	// one persist latency — an acceptable trade-off.
+	if !expireAt.IsZero() {
+		if persistedAt := time.Now(); persistedAt.After(expireAt) {
+			if e, ok := kv.data[key]; ok {
+				e.ExpireAt = persistedAt.Add(ttl)
+			}
+		}
+	}
 	return nil
 }
 
