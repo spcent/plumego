@@ -1,5 +1,6 @@
-// Package tenant is the experimental multi-tenancy extension surface for Plumego.
+// Package tenant is the multi-tenancy extension surface for Plumego.
 //
-// The long-term target is to move tenant-specific middleware, policy, quota,
-// rate limit, and tenant-aware store adapters under x/tenant subpackages.
+// Sub-packages: core (resolution, config, rate limit), policy, quota, resolve,
+// session, store, transport, ratelimit, config. See docs/modules/x/tenant/ for
+// a primer and x/tenant/core for the canonical wiring entry-point.
 package tenant

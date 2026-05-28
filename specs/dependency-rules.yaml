@@ -24,7 +24,7 @@ modules:
     # contract owns: request/response envelopes, error types, HTTP helpers,
     # context key accessors, binding helpers.
     # contract must NOT contain:
-    #   - Tracing infrastructure: Tracer, Span, SpanCollector, Sampler  → x/observability
+    #   - Tracing implementation types (Tracer, Span, SpanCollector, Sampler)  → x/observability
     #   - Session lifecycle: SessionStore, SessionValidator, RefreshManager → x/tenant
     #   - Metric aggregation types                                       → x/observability
     # ── API shape rules ──────────────────────────────────────────────────────
@@ -593,6 +593,7 @@ modules:
       - router
       - security
       - store
+      - x/resilience
       - x/messaging/mq
       - x/messaging/pubsub
       - x/messaging/scheduler

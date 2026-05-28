@@ -26,7 +26,7 @@ func TestNewDBMetadataManager_RejectsNilDB(t *testing.T) {
 func TestDBMetadataManagerNilDBMethodsReturnSentinel(t *testing.T) {
 	m := &DBMetadataManager{}
 	ctx := t.Context()
-	file := &File{ID: "f-1", Metadata: map[string]any{}}
+	file := &File{File: storefile.File{ID: "f-1", Metadata: map[string]any{}}}
 
 	tests := []struct {
 		name string
@@ -163,10 +163,8 @@ func TestDBMetadataManagerRejectsInvalidDirectInputs(t *testing.T) {
 	ctx := t.Context()
 
 	validFile := &File{
-		ID:       "f-1",
+		File:     storefile.File{ID: "f-1", Path: "tenant-1/path.txt", Hash: "hash"},
 		TenantID: "tenant-1",
-		Path:     "tenant-1/path.txt",
-		Hash:     "hash",
 	}
 	tests := []struct {
 		name string

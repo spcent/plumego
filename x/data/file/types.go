@@ -12,26 +12,22 @@ import (
 	storefile "github.com/spcent/plumego/store/file"
 )
 
-// File extends the core file record with tenant identity.
+// File extends the core store/file.File record with tenant identity and
+// media-processing metadata.
 type File struct {
-	ID            string         `json:"id" db:"id"`
-	TenantID      string         `json:"tenant_id" db:"tenant_id"`
-	Name          string         `json:"name" db:"name"`
-	Path          string         `json:"path" db:"path"`
-	Size          int64          `json:"size" db:"size"`
-	MimeType      string         `json:"mime_type" db:"mime_type"`
-	Extension     string         `json:"extension" db:"extension"`
-	Hash          string         `json:"hash" db:"hash"`
-	Width         int            `json:"width,omitempty" db:"width"`
-	Height        int            `json:"height,omitempty" db:"height"`
-	ThumbnailPath string         `json:"thumbnail_path,omitempty" db:"thumbnail_path"`
-	StorageType   string         `json:"storage_type" db:"storage_type"`
-	Metadata      map[string]any `json:"metadata,omitempty" db:"metadata"`
-	UploadedBy    string         `json:"uploaded_by" db:"uploaded_by"`
-	CreatedAt     time.Time      `json:"created_at" db:"created_at"`
-	UpdatedAt     time.Time      `json:"updated_at" db:"updated_at"`
-	LastAccessAt  *time.Time     `json:"last_access_at,omitempty" db:"last_access_at"`
-	DeletedAt     *time.Time     `json:"deleted_at,omitempty" db:"deleted_at"`
+	storefile.File
+	TenantID      string `json:"tenant_id" db:"tenant_id"`
+	Width         int    `json:"width,omitempty" db:"width"`
+	Height        int    `json:"height,omitempty" db:"height"`
+	ThumbnailPath string `json:"thumbnail_path,omitempty" db:"thumbnail_path"`
+	UploadedBy    string `json:"uploaded_by" db:"uploaded_by"`
+}
+
+// Clone returns a copy of f with all mutable fields detached from the original.
+func (f File) Clone() File {
+	clone := f
+	clone.File = f.File.Clone()
+	return clone
 }
 
 // PutOptions contains options for uploading a file, including the tenant

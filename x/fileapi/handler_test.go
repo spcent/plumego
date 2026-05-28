@@ -44,7 +44,7 @@ func (m *mockStorage) Put(ctx context.Context, opts datafile.PutOptions) (*dataf
 	if m.putFunc != nil {
 		return m.putFunc(ctx, opts)
 	}
-	return &datafile.File{ID: "test-id", TenantID: opts.TenantID, Path: "test/path.txt"}, nil
+	return &datafile.File{File: storefile.File{ID: "test-id", Path: "test/path.txt"}, TenantID: opts.TenantID}, nil
 }
 
 func (m *mockStorage) Get(ctx context.Context, path string) (io.ReadCloser, error) {
@@ -96,11 +96,14 @@ func (m *mockMetadataManager) Get(ctx context.Context, tenantID, id string) (*da
 	if m.getFunc != nil {
 		return m.getFunc(ctx, tenantID, id)
 	}
-	return &datafile.File{ID: id, TenantID: tenantID, Path: "test/path.txt", Name: "test.txt", Size: 1024, MimeType: "text/plain"}, nil
+	return &datafile.File{
+		File:     storefile.File{ID: id, Path: "test/path.txt", Name: "test.txt", Size: 1024, MimeType: "text/plain"},
+		TenantID: tenantID,
+	}, nil
 }
 
 func (m *mockMetadataManager) GetByPath(ctx context.Context, tenantID, path string) (*datafile.File, error) {
-	return &datafile.File{TenantID: tenantID, Path: path}, nil
+	return &datafile.File{File: storefile.File{Path: path}, TenantID: tenantID}, nil
 }
 
 func (m *mockMetadataManager) GetByHash(ctx context.Context, tenantID, hash string) (*datafile.File, error) {
@@ -192,11 +195,8 @@ func TestHandler_Upload(t *testing.T) {
 	storage := &mockStorage{
 		putFunc: func(ctx context.Context, opts datafile.PutOptions) (*datafile.File, error) {
 			return &datafile.File{
-				ID:       "test-id",
+				File:     storefile.File{ID: "test-id", Name: opts.FileName, Path: "test/path.txt", Size: 100},
 				TenantID: opts.TenantID,
-				Name:     opts.FileName,
-				Path:     "test/path.txt",
-				Size:     100,
 			}, nil
 		},
 	}
@@ -281,7 +281,10 @@ func TestHandler_Download(t *testing.T) {
 	}
 	metadata := &mockMetadataManager{
 		getFunc: func(ctx context.Context, tenantID, id string) (*datafile.File, error) {
-			return &datafile.File{ID: id, TenantID: "tenant-123", Path: "test/path.txt", Name: "test.txt", Size: 12, MimeType: "text/plain"}, nil
+			return &datafile.File{
+				File:     storefile.File{ID: id, Path: "test/path.txt", Name: "test.txt", Size: 12, MimeType: "text/plain"},
+				TenantID: "tenant-123",
+			}, nil
 		},
 	}
 	h := NewHandler(storage, metadata)
@@ -307,7 +310,10 @@ func TestHandler_Download(t *testing.T) {
 func TestHandler_Download_CrossTenant(t *testing.T) {
 	metadata := &mockMetadataManager{
 		getFunc: func(ctx context.Context, tenantID, id string) (*datafile.File, error) {
-			return &datafile.File{ID: id, TenantID: "tenant-other", Path: "test/path.txt", Name: "test.txt", Size: 12, MimeType: "text/plain"}, nil
+			return &datafile.File{
+				File:     storefile.File{ID: id, Path: "test/path.txt", Name: "test.txt", Size: 12, MimeType: "text/plain"},
+				TenantID: "tenant-other",
+			}, nil
 		},
 	}
 	h := NewHandler(&mockStorage{}, metadata)
@@ -346,7 +352,10 @@ func TestHandler_Download_NotFound(t *testing.T) {
 func TestHandler_GetInfo(t *testing.T) {
 	metadata := &mockMetadataManager{
 		getFunc: func(ctx context.Context, tenantID, id string) (*datafile.File, error) {
-			return &datafile.File{ID: id, TenantID: "tenant-123", Name: "test.txt", Size: 1024, MimeType: "text/plain"}, nil
+			return &datafile.File{
+				File:     storefile.File{ID: id, Name: "test.txt", Size: 1024, MimeType: "text/plain"},
+				TenantID: "tenant-123",
+			}, nil
 		},
 	}
 	h := NewHandler(&mockStorage{}, metadata)
@@ -371,7 +380,10 @@ func TestHandler_GetInfo(t *testing.T) {
 func TestHandler_GetInfo_CrossTenant(t *testing.T) {
 	metadata := &mockMetadataManager{
 		getFunc: func(ctx context.Context, tenantID, id string) (*datafile.File, error) {
-			return &datafile.File{ID: id, TenantID: "tenant-other", Name: "test.txt", Size: 1024, MimeType: "text/plain"}, nil
+			return &datafile.File{
+				File:     storefile.File{ID: id, Name: "test.txt", Size: 1024, MimeType: "text/plain"},
+				TenantID: "tenant-other",
+			}, nil
 		},
 	}
 	h := NewHandler(&mockStorage{}, metadata)
@@ -393,7 +405,7 @@ func TestHandler_Delete(t *testing.T) {
 	storage := &mockStorage{}
 	metadata := &mockMetadataManager{
 		getFunc: func(ctx context.Context, tenantID, id string) (*datafile.File, error) {
-			return &datafile.File{ID: id, TenantID: "tenant-123", Path: "test/path.txt"}, nil
+			return &datafile.File{File: storefile.File{ID: id, Path: "test/path.txt"}, TenantID: "tenant-123"}, nil
 		},
 		deleteFunc: func(ctx context.Context, tenantID, id string) error {
 			deletedTenantID = tenantID
@@ -449,7 +461,7 @@ func TestHandler_Delete_NotFound(t *testing.T) {
 func TestHandler_Delete_CrossTenant(t *testing.T) {
 	metadata := &mockMetadataManager{
 		getFunc: func(ctx context.Context, tenantID, id string) (*datafile.File, error) {
-			return &datafile.File{ID: id, TenantID: "tenant-other", Path: "test/path.txt"}, nil
+			return &datafile.File{File: storefile.File{ID: id, Path: "test/path.txt"}, TenantID: "tenant-other"}, nil
 		},
 	}
 	h := NewHandler(&mockStorage{}, metadata)
@@ -470,8 +482,8 @@ func TestHandler_List(t *testing.T) {
 	metadata := &mockMetadataManager{
 		listFunc: func(ctx context.Context, q datafile.Query) ([]*datafile.File, int64, error) {
 			return []*datafile.File{
-				{ID: "file1", Name: "test1.txt"},
-				{ID: "file2", Name: "test2.txt"},
+				{File: storefile.File{ID: "file1", Name: "test1.txt"}},
+				{File: storefile.File{ID: "file2", Name: "test2.txt"}},
 			}, 2, nil
 		},
 	}
@@ -606,7 +618,7 @@ func TestHandler_GetURL(t *testing.T) {
 	}
 	metadata := &mockMetadataManager{
 		getFunc: func(ctx context.Context, tenantID, id string) (*datafile.File, error) {
-			return &datafile.File{ID: id, TenantID: "tenant-123", Path: "test/path.txt"}, nil
+			return &datafile.File{File: storefile.File{ID: id, Path: "test/path.txt"}, TenantID: "tenant-123"}, nil
 		},
 	}
 	h := NewHandler(storage, metadata)
@@ -639,7 +651,7 @@ func TestHandler_GetURL_StorageErrorDoesNotLeak(t *testing.T) {
 	}
 	metadata := &mockMetadataManager{
 		getFunc: func(ctx context.Context, tenantID, id string) (*datafile.File, error) {
-			return &datafile.File{ID: id, TenantID: "tenant-123", Path: "test/path.txt"}, nil
+			return &datafile.File{File: storefile.File{ID: id, Path: "test/path.txt"}, TenantID: "tenant-123"}, nil
 		},
 	}
 	h := NewHandler(storage, metadata)
@@ -686,7 +698,7 @@ func TestHandler_GetURL_InvalidExpiry(t *testing.T) {
 func TestHandler_GetURL_CrossTenant(t *testing.T) {
 	metadata := &mockMetadataManager{
 		getFunc: func(ctx context.Context, tenantID, id string) (*datafile.File, error) {
-			return &datafile.File{ID: id, TenantID: "tenant-other", Path: "test/path.txt"}, nil
+			return &datafile.File{File: storefile.File{ID: id, Path: "test/path.txt"}, TenantID: "tenant-other"}, nil
 		},
 	}
 	h := NewHandler(&mockStorage{}, metadata)
@@ -756,7 +768,10 @@ func BenchmarkHandler_Upload(b *testing.B) {
 func BenchmarkHandler_Download(b *testing.B) {
 	metadata := &mockMetadataManager{
 		getFunc: func(ctx context.Context, tenantID, id string) (*datafile.File, error) {
-			return &datafile.File{ID: id, TenantID: "tenant-123", Path: "test/path.txt", Name: "test.txt", Size: 12, MimeType: "text/plain"}, nil
+			return &datafile.File{
+				File:     storefile.File{ID: id, Path: "test/path.txt", Name: "test.txt", Size: 12, MimeType: "text/plain"},
+				TenantID: "tenant-123",
+			}, nil
 		},
 	}
 	h := NewHandler(&mockStorage{}, metadata)
