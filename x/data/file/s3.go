@@ -163,19 +163,21 @@ func (s *S3Storage) Put(ctx context.Context, opts PutOptions) (*File, error) {
 	}
 
 	file := &File{
-		ID:          fileID,
-		TenantID:    tenantID,
-		Name:        opts.FileName,
-		Path:        objectKey,
-		Size:        size,
-		MimeType:    opts.ContentType,
-		Extension:   ext,
-		Hash:        hashString,
-		StorageType: "s3",
-		Metadata:    opts.Metadata,
-		UploadedBy:  opts.UploadedBy,
-		CreatedAt:   now,
-		UpdatedAt:   now,
+		File: storefile.File{
+			ID:          fileID,
+			Name:        opts.FileName,
+			Path:        objectKey,
+			Size:        size,
+			MimeType:    opts.ContentType,
+			Extension:   ext,
+			Hash:        hashString,
+			StorageType: "s3",
+			Metadata:    opts.Metadata,
+			CreatedAt:   now,
+			UpdatedAt:   now,
+		},
+		TenantID:   tenantID,
+		UploadedBy: opts.UploadedBy,
 	}
 
 	if s.metadata != nil {

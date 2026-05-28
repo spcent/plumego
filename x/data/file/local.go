@@ -118,19 +118,21 @@ func (s *LocalStorage) Put(ctx context.Context, opts PutOptions) (*File, error) 
 	}
 
 	file := &File{
-		ID:          fileID,
-		TenantID:    tenantID,
-		Name:        opts.FileName,
-		Path:        relativePath,
-		Size:        size,
-		MimeType:    opts.ContentType,
-		Extension:   ext,
-		Hash:        hashString,
-		StorageType: "local",
-		Metadata:    opts.Metadata,
-		UploadedBy:  opts.UploadedBy,
-		CreatedAt:   now,
-		UpdatedAt:   now,
+		File: storefile.File{
+			ID:          fileID,
+			Name:        opts.FileName,
+			Path:        relativePath,
+			Size:        size,
+			MimeType:    opts.ContentType,
+			Extension:   ext,
+			Hash:        hashString,
+			StorageType: "local",
+			Metadata:    opts.Metadata,
+			CreatedAt:   now,
+			UpdatedAt:   now,
+		},
+		TenantID:   tenantID,
+		UploadedBy: opts.UploadedBy,
 	}
 
 	if opts.ContentType != "" && s.imageProc.IsImage(opts.ContentType) {

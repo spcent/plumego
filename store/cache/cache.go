@@ -6,6 +6,8 @@
 //   - memory-bounded eviction
 //   - thread-safe operations
 //
+// For distributed, Redis-backed, or topology-heavy caching, see x/data/cache.
+//
 // Example usage:
 //
 //	import (
