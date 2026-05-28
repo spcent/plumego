@@ -48,10 +48,15 @@ func New(cfg config.Config) (*App, error) {
 	// Middleware order — outermost to innermost (first registered runs first on inbound requests):
 	//   requestid  → stamps correlation ID before any logging or error handling
 	//   security   → security headers (X-Frame-Options, X-Content-Type-Options, …) on all responses
-	//   cors       → CORS preflight and headers; use cors.StrictDefaultOptions in production
+	//   cors       → CORS preflight and headers; CORSOptions{} defaults AllowedOrigins to ["*"]
+	//               (allow all origins) — replace with cors.StrictDefaultOptions(origins…) in
+	//               production to restrict cross-origin access to known domains
 	//   recovery   → converts panics to 500 responses; inside cors/security so headers still apply
 	//   accesslog  → logs every request/response; after recovery so panics appear as 500
 	//   bodylimit  → rejects oversized bodies with 413; after accesslog so the 413 is logged
+	//   [ratelimit]→ optional: add middleware/ratelimit.NewAbuseGuard here (after bodylimit so
+	//               oversized bodies are rejected before a rate-limit token is consumed)
+	//               See middleware/ratelimit.AbuseGuardConfig for token-bucket defaults.
 	//   httpmetrics→ measures handler latency and status; swap NewNoopCollector for
 	//               observability.NewPrometheusCollector (from x/observability) in production,
 	//               then register GET /metrics with observability.NewPrometheusExporter.

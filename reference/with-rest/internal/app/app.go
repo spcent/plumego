@@ -11,8 +11,15 @@ import (
 
 	"github.com/spcent/plumego/core"
 	plumelog "github.com/spcent/plumego/log"
+	"github.com/spcent/plumego/metrics"
+	"github.com/spcent/plumego/middleware/accesslog"
+	"github.com/spcent/plumego/middleware/bodylimit"
+	"github.com/spcent/plumego/middleware/cors"
+	"github.com/spcent/plumego/middleware/httpmetrics"
 	"github.com/spcent/plumego/middleware/recovery"
 	"github.com/spcent/plumego/middleware/requestid"
+	midsecurity "github.com/spcent/plumego/middleware/security"
+	"github.com/spcent/plumego/middleware/timeout"
 	"github.com/spcent/plumego/x/rest"
 	"with-rest/internal/config"
 	"with-rest/internal/domain/user"
@@ -29,13 +36,46 @@ type App struct {
 }
 
 // New constructs the App with all dependencies wired explicitly.
+// The middleware stack mirrors standard-service so x/rest integrations
+// run with the full production-oriented middleware baseline.
 func New(cfg config.Config) (*App, error) {
 	app := core.New(cfg.Core, core.AppDependencies{Logger: plumelog.NewLogger()})
+
+	securityMw, err := midsecurity.Middleware(midsecurity.Config{})
+	if err != nil {
+		return nil, fmt.Errorf("configure security headers middleware: %w", err)
+	}
 	recoveryMw, err := recovery.Middleware(recovery.Config{Logger: app.Logger()})
 	if err != nil {
 		return nil, fmt.Errorf("configure recovery middleware: %w", err)
 	}
-	if err := app.Use(requestid.Middleware(), recoveryMw); err != nil {
+	accesslogMw, err := accesslog.Middleware(accesslog.Config{Logger: app.Logger()})
+	if err != nil {
+		return nil, fmt.Errorf("configure access log middleware: %w", err)
+	}
+
+	// Middleware order matches standard-service (outermost to innermost):
+	//   requestid  → stamps correlation ID before any logging or error handling
+	//   security   → security headers on all responses
+	//   cors       → CORS preflight and headers; CORSOptions{} allows all origins (dev default)
+	//   recovery   → converts panics to 500 responses
+	//   accesslog  → logs all requests including 413; outer to bodylimit so rejections are logged
+	//   bodylimit  → rejects oversized bodies with 413
+	//   httpmetrics→ noop collector; swap for observability.NewPrometheusCollector in production
+	//   timeout    → per-request wall-clock limit; innermost so only handler time is counted
+	if err := app.Use(
+		requestid.Middleware(),
+		securityMw,
+		cors.Middleware(cors.CORSOptions{}),
+		recoveryMw,
+		accesslogMw,
+		bodylimit.Middleware(bodylimit.Config{
+			MaxBytes: 1 << 20, // 1 MiB default; make configurable via AppConfig if needed
+			Logger:   app.Logger(),
+		}),
+		httpmetrics.Middleware(metrics.NewNoopCollector()),
+		timeout.Middleware(timeout.Config{Timeout: 30 * time.Second}),
+	); err != nil {
 		return nil, fmt.Errorf("register middleware: %w", err)
 	}
 

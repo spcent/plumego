@@ -7,7 +7,7 @@ import plumelog "github.com/spcent/plumego/log"
 // Response write errors (e.g., client disconnects after headers are sent)
 // are not recoverable; logging them surfaces unexpected disconnects for operators.
 func logWriteErr(logger plumelog.StructuredLogger, err error) {
-	if err == nil {
+	if err == nil || logger == nil {
 		return
 	}
 	logger.Warn("write response failed", plumelog.Fields{"error": err.Error()})

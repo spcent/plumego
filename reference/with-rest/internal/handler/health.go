@@ -28,8 +28,6 @@ type livenessResponse struct {
 }
 
 // Live reports that the process is serving HTTP traffic.
-// Kubernetes liveness probes call this endpoint; it must never be gated on
-// dependency health — if the backend is down the proxy process is still alive.
 func (h HealthHandler) Live(w http.ResponseWriter, r *http.Request) {
 	logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusOK, livenessResponse{
 		Status:    "ok",
@@ -39,9 +37,7 @@ func (h HealthHandler) Live(w http.ResponseWriter, r *http.Request) {
 }
 
 // Ready probes all registered health.ComponentChecker instances.
-// Returns 200 with component status when all pass; 503 with failing component
-// names when any fail. All checkers are probed even if one fails so operators
-// see every unhealthy dependency in a single response.
+// Returns 200 when all pass; 503 with failing component names when any fail.
 func (h HealthHandler) Ready(w http.ResponseWriter, r *http.Request) {
 	components := make(map[string]bool, len(h.Checkers))
 	eb := contract.NewErrorBuilder().

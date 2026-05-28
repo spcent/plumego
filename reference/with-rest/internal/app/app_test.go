@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"testing"
 
-	"with-gateway/internal/config"
+	"with-rest/internal/config"
 )
 
 func TestRegisterRoutesCanonicalShape(t *testing.T) {
@@ -22,10 +22,15 @@ func TestRegisterRoutesCanonicalShape(t *testing.T) {
 		Method string
 		Path   string
 	}{
+		{http.MethodDelete, "/api/users/:id"},
+		{http.MethodGet, "/api/hello"},
+		{http.MethodGet, "/api/users"},
+		{http.MethodGet, "/api/users/:id"},
 		{http.MethodGet, "/healthz"},
 		{http.MethodGet, "/readyz"},
-		// /proxy/*path accepts any method via App.Any
-		{"ANY", "/proxy/*path"},
+		{http.MethodPost, "/api/items"},
+		{http.MethodPost, "/api/users"},
+		{http.MethodPut, "/api/users/:id"},
 	}
 
 	if len(routes) != len(want) {

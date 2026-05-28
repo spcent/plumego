@@ -51,6 +51,10 @@ func TestRegisterRoutesCanonicalShape(t *testing.T) {
 // contains exactly the same Method+Path pairs as the routes registered in
 // RegisterRoutes. When you add a route in routes.go you must also add it to
 // the Endpoints slice in handler/api.go Hello — this test will fail if you forget.
+//
+// Coverage note: this test enforces Method+Path parity only. The Name and
+// Description fields in the endpoint list are documentation-oriented and are
+// not verified here; update them manually when route semantics change.
 func TestHelloEndpointListMatchesRegisteredRoutes(t *testing.T) {
 	a, err := New(config.Defaults())
 	if err != nil {

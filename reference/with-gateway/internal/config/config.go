@@ -40,17 +40,24 @@ func Defaults() Config {
 
 // Load reads configuration from environment variables and flags.
 func Load() (Config, error) {
+	return load(os.Args, os.LookupEnv)
+}
+
+func load(args []string, lookupEnv func(string) (string, bool)) (Config, error) {
 	cfg := Defaults()
+	if lookupEnv == nil {
+		lookupEnv = os.LookupEnv
+	}
 
-	cfg.App.EnvFile = resolveEnvFile(os.Args, cfg.App.EnvFile)
-	if err := loadEnvFile(cfg.App.EnvFile); err != nil {
+	cfg.App.EnvFile = resolveEnvFile(args, lookupEnv, cfg.App.EnvFile)
+	fileEnv, err := readEnvFile(cfg.App.EnvFile)
+	if err != nil {
 		return cfg, err
 	}
 
-	if err := applyEnv(&cfg); err != nil {
-		return cfg, err
-	}
-	if err := applyFlags(&cfg, os.Args); err != nil {
+	applyEnvMap(&cfg, fileEnv)
+	applyEnv(&cfg, lookupEnv)
+	if err := applyFlags(&cfg, args); err != nil {
 		return cfg, err
 	}
 
@@ -68,12 +75,43 @@ func Validate(cfg Config) error {
 	return nil
 }
 
-func applyEnv(cfg *Config) error {
-	cfg.Core.Addr = envString("APP_ADDR", cfg.Core.Addr)
-	cfg.App.EnvFile = envString("APP_ENV_FILE", cfg.App.EnvFile)
-	cfg.App.Debug = envBool("APP_DEBUG", cfg.App.Debug)
-	cfg.GatewayBackend = envString("GATEWAY_BACKEND", cfg.GatewayBackend)
-	return nil
+// applyEnv is the single source of truth for mapping environment variables to
+// config fields. It accepts a lookupEnv function so it works identically with
+// os.LookupEnv, test stubs, and pre-parsed .env file maps.
+func applyEnv(cfg *Config, lookupEnv func(string) (string, bool)) {
+	if lookupEnv == nil {
+		return
+	}
+	str := func(key string, dest *string) {
+		if val, ok := lookupEnv(key); ok {
+			if v := strings.TrimSpace(val); v != "" {
+				*dest = v
+			}
+		}
+	}
+	boolf := func(key string, dest *bool) {
+		if val, ok := lookupEnv(key); ok {
+			if b, err := strconv.ParseBool(strings.TrimSpace(val)); err == nil {
+				*dest = b
+			}
+		}
+	}
+	str("APP_ADDR", &cfg.Core.Addr)
+	str("APP_ENV_FILE", &cfg.App.EnvFile)
+	boolf("APP_DEBUG", &cfg.App.Debug)
+	str("GATEWAY_BACKEND", &cfg.GatewayBackend)
+}
+
+// applyEnvMap applies a pre-parsed key-value map (e.g., from a .env file) to cfg.
+// It delegates to applyEnv so the field mapping is defined in exactly one place.
+func applyEnvMap(cfg *Config, values map[string]string) {
+	if len(values) == 0 {
+		return
+	}
+	applyEnv(cfg, func(key string) (string, bool) {
+		v, ok := values[key]
+		return v, ok
+	})
 }
 
 func applyFlags(cfg *Config, args []string) error {
@@ -85,21 +123,29 @@ func applyFlags(cfg *Config, args []string) error {
 	if len(args) == 0 {
 		return fs.Parse(nil)
 	}
-	return fs.Parse(configFlagArgs(args[1:]))
+	// Collect registered flag names from the FlagSet itself so filterFlagArgs
+	// stays in sync automatically when new flags are added above.
+	known := make(map[string]bool)
+	fs.VisitAll(func(f *flag.Flag) { known[f.Name] = true })
+	return fs.Parse(filterFlagArgs(args[1:], known))
 }
 
-func configFlagArgs(args []string) []string {
+// filterFlagArgs extracts only the flag arguments known to this service from args,
+// silently dropping unknown flags and positional arguments. This lets the process
+// start cleanly even when a container runtime or process supervisor injects extra
+// arguments that the flag.FlagSet has no definition for.
+func filterFlagArgs(args []string, known map[string]bool) []string {
 	out := make([]string, 0, len(args))
 	for i := 0; i < len(args); i++ {
 		arg := args[i]
 		name, hasValue := flagName(arg)
-		switch name {
-		case "addr", "env-file", "debug", "gateway-backend":
-			out = append(out, arg)
-			if !hasValue && i+1 < len(args) {
-				i++
-				out = append(out, args[i])
-			}
+		if !known[name] {
+			continue
+		}
+		out = append(out, arg)
+		if !hasValue && i+1 < len(args) {
+			i++
+			out = append(out, args[i])
 		}
 	}
 	return out
@@ -119,8 +165,8 @@ func flagName(arg string) (name string, hasValue bool) {
 	return arg, false
 }
 
-func resolveEnvFile(args []string, defaultPath string) string {
-	if envPath := strings.TrimSpace(os.Getenv("APP_ENV_FILE")); envPath != "" {
+func resolveEnvFile(args []string, lookupEnv func(string) (string, bool), defaultPath string) string {
+	if envPath, ok := lookupEnv("APP_ENV_FILE"); ok && strings.TrimSpace(envPath) != "" {
 		defaultPath = envPath
 	}
 	for i := 0; i < len(args); i++ {
@@ -140,19 +186,20 @@ func resolveEnvFile(args []string, defaultPath string) string {
 	return defaultPath
 }
 
-func loadEnvFile(path string) error {
+func readEnvFile(path string) (map[string]string, error) {
 	if path == "" {
-		return nil
-	}
-	if _, err := os.Stat(path); err != nil {
-		return nil
+		return nil, nil
 	}
 	file, err := os.Open(path)
 	if err != nil {
-		return err
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, err
 	}
 	defer file.Close()
 
+	values := make(map[string]string)
 	scanner := bufio.NewScanner(file)
 	scanner.Buffer(make([]byte, 64*1024), 1024*1024)
 	for scanner.Scan() {
@@ -160,26 +207,9 @@ func loadEnvFile(path string) error {
 		if !ok {
 			continue
 		}
-		if err := os.Setenv(key, value); err != nil {
-			return err
-		}
+		values[key] = value
 	}
-	return scanner.Err()
-}
-
-func envString(key, fallback string) string {
-	if value := os.Getenv(key); value != "" {
-		return value
-	}
-	return fallback
-}
-
-func envBool(key string, fallback bool) bool {
-	value, err := strconv.ParseBool(os.Getenv(key))
-	if err != nil {
-		return fallback
-	}
-	return value
+	return values, scanner.Err()
 }
 
 func parseEnvLine(line string) (key, value string, ok bool) {
