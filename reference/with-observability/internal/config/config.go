@@ -1,5 +1,4 @@
-// Package config loads and validates the reference application configuration
-// from environment variables and command-line flags.
+// Package config loads and validates the with-observability application configuration.
 package config
 
 import (
@@ -20,13 +19,13 @@ type Config struct {
 }
 
 // AppConfig holds app-local, non-kernel configuration.
-// Add application-specific fields here; keep framework/kernel config in Config.Core.
 type AppConfig struct {
-	EnvFile      string
-	ServiceName  string // APP_SERVICE_NAME; used as the service identity in health and API responses.
-	MaxBodyBytes int64  // APP_MAX_BODY_BYTES; maximum request body size. 0 disables the limit.
-	WriteKey     string // APP_WRITE_KEY; when non-empty, POST/PUT/DELETE /api/v1/items require X-Write-Key header. Empty disables the guard.
-	Version      string // Build version injected via -ldflags "-X main.version=…" in main.go; defaults to "dev".
+	EnvFile          string
+	ServiceName      string // APP_SERVICE_NAME; service identity in health and API responses.
+	MaxBodyBytes     int64  // APP_MAX_BODY_BYTES; maximum request body size (0 disables).
+	Version          string // Build version injected via -ldflags "-X main.version=…".
+	MetricsNamespace string // APP_METRICS_NAMESPACE; Prometheus metric name prefix.
+	MetricsMaxSeries int    // APP_METRICS_MAX_SERIES; maximum distinct label combinations retained.
 }
 
 // Defaults returns safe configuration values for local development.
@@ -36,10 +35,12 @@ func Defaults() Config {
 	return Config{
 		Core: coreCfg,
 		App: AppConfig{
-			EnvFile:      ".env",
-			ServiceName:  "plumego-reference",
-			MaxBodyBytes: 1 << 20, // 1 MiB
-			Version:      "dev",
+			EnvFile:          ".env",
+			ServiceName:      "plumego-observability",
+			MaxBodyBytes:     1 << 20, // 1 MiB
+			Version:          "dev",
+			MetricsNamespace: "plumego",
+			MetricsMaxSeries: 10000,
 		},
 	}
 }
@@ -78,6 +79,9 @@ func Validate(cfg Config) error {
 	if cfg.App.MaxBodyBytes < 0 {
 		return fmt.Errorf("APP_MAX_BODY_BYTES must be non-negative (0 disables the limit)")
 	}
+	if cfg.App.MetricsMaxSeries <= 0 {
+		return fmt.Errorf("APP_METRICS_MAX_SERIES must be positive")
+	}
 	if cfg.Core.TLS.Enabled {
 		if cfg.Core.TLS.CertFile == "" {
 			return fmt.Errorf("APP_TLS_CERT_FILE is required when TLS is enabled")
@@ -89,10 +93,6 @@ func Validate(cfg Config) error {
 	return nil
 }
 
-// applyEnv is the single source of truth for mapping APP_* variables to config
-// fields. It accepts a lookupEnv function so it works identically with
-// os.LookupEnv, test stubs, and pre-parsed .env file maps.
-// Adding a new config field requires only one change here.
 func applyEnv(cfg *Config, lookupEnv func(string) (string, bool)) {
 	if lookupEnv == nil {
 		return
@@ -111,6 +111,13 @@ func applyEnv(cfg *Config, lookupEnv func(string) (string, bool)) {
 			}
 		}
 	}
+	intf := func(key string, dest *int) {
+		if val, ok := lookupEnv(key); ok {
+			if n, err := strconv.Atoi(strings.TrimSpace(val)); err == nil {
+				*dest = n
+			}
+		}
+	}
 	boolf := func(key string, dest *bool) {
 		if val, ok := lookupEnv(key); ok {
 			if b, err := strconv.ParseBool(strings.TrimSpace(val)); err == nil {
@@ -122,15 +129,13 @@ func applyEnv(cfg *Config, lookupEnv func(string) (string, bool)) {
 	str("APP_ENV_FILE", &cfg.App.EnvFile)
 	str("APP_SERVICE_NAME", &cfg.App.ServiceName)
 	int64f("APP_MAX_BODY_BYTES", &cfg.App.MaxBodyBytes)
-	str("APP_WRITE_KEY", &cfg.App.WriteKey)
+	str("APP_METRICS_NAMESPACE", &cfg.App.MetricsNamespace)
+	intf("APP_METRICS_MAX_SERIES", &cfg.App.MetricsMaxSeries)
 	boolf("APP_TLS_ENABLED", &cfg.Core.TLS.Enabled)
 	str("APP_TLS_CERT_FILE", &cfg.Core.TLS.CertFile)
 	str("APP_TLS_KEY_FILE", &cfg.Core.TLS.KeyFile)
 }
 
-// applyEnvMap applies a pre-parsed key-value map (e.g., from a .env file) to cfg.
-// It adapts the map to a lookupEnv signature and delegates to applyEnv, so the
-// field mapping is defined in exactly one place.
 func applyEnvMap(cfg *Config, values map[string]string) {
 	if len(values) == 0 {
 		return
@@ -142,25 +147,17 @@ func applyEnvMap(cfg *Config, values map[string]string) {
 }
 
 func applyFlags(cfg *Config, args []string) error {
-	fs := flag.NewFlagSet("standard-service", flag.ContinueOnError)
+	fs := flag.NewFlagSet("with-observability", flag.ContinueOnError)
 	fs.StringVar(&cfg.Core.Addr, "addr", cfg.Core.Addr, "listen address")
 	fs.StringVar(&cfg.App.EnvFile, "env-file", cfg.App.EnvFile, "path to .env file")
 	if len(args) == 0 {
 		return fs.Parse(nil)
 	}
-	// Collect registered flag names from the FlagSet itself so filterFlagArgs
-	// stays in sync automatically when new flags are added above.
-	// Adding a new flag to fs only requires the fs.StringVar call above;
-	// no separate name list needs to be maintained.
 	known := make(map[string]bool)
 	fs.VisitAll(func(f *flag.Flag) { known[f.Name] = true })
 	return fs.Parse(filterFlagArgs(args[1:], known))
 }
 
-// filterFlagArgs returns only the elements of args that correspond to flags in
-// known, along with their values. Unrecognized flags and positional arguments
-// are dropped so the process can accept arbitrary extra arguments without the
-// FlagSet returning an error.
 func filterFlagArgs(args []string, known map[string]bool) []string {
 	out := make([]string, 0, len(args))
 	for i := 0; i < len(args); i++ {
@@ -244,17 +241,14 @@ func parseEnvLine(line string) (key, value string, ok bool) {
 	if line == "" || strings.HasPrefix(line, "#") {
 		return "", "", false
 	}
-
 	idx := strings.IndexByte(line, '=')
 	if idx < 0 {
 		return "", "", false
 	}
-
 	key = strings.TrimSpace(line[:idx])
 	if key == "" {
 		return "", "", false
 	}
-
 	value = strings.TrimSpace(line[idx+1:])
 	if len(value) >= 2 {
 		q := value[0]
@@ -263,6 +257,5 @@ func parseEnvLine(line string) (key, value string, ok bool) {
 			value = strings.ReplaceAll(value, string([]byte{'\\', q}), string(q))
 		}
 	}
-
 	return key, value, true
 }

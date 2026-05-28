@@ -23,6 +23,9 @@ const (
 	codeItemUpdateInvalidJSON    = "item.update.invalid_json"
 	codeItemUpdateBodyRequired   = "item.update.body_required"
 	codeItemListInvalidParam     = "item.list.invalid_param"
+	codeItemPatchInvalidJSON     = "item.patch.invalid_json"
+	codeItemPatchBodyRequired    = "item.patch.body_required"
+	codeItemPatchNoFields        = "item.patch.no_fields"
 )
 
 // ItemRepository is the minimal persistence contract that ItemHandler depends on.
@@ -34,6 +37,7 @@ type ItemRepository interface {
 	Get(ctx context.Context, id string) (item.Item, bool)
 	List(ctx context.Context) []item.Item
 	Update(ctx context.Context, id, name, description string) (item.Item, bool)
+	Patch(ctx context.Context, id, name, description string) (item.Item, bool)
 	Delete(ctx context.Context, id string) bool
 }
 
@@ -55,6 +59,28 @@ type createItemReq struct {
 type updateItemReq struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
+}
+
+type patchItemReq struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
+}
+
+// requireItemFields checks that name and description are both non-empty.
+// It adds a per-field detail entry to eb for each empty field and returns false
+// when at least one is missing, so the caller can return a single error response
+// that names every problem the client needs to fix in one round trip.
+func requireItemFields(eb *contract.ErrorBuilder, name, description string) (*contract.ErrorBuilder, bool) {
+	valid := true
+	if name == "" {
+		eb = eb.Detail("name", "field is required")
+		valid = false
+	}
+	if description == "" {
+		eb = eb.Detail("description", "field is required")
+		valid = false
+	}
+	return eb, valid
 }
 
 // Create handles POST /api/v1/items.
@@ -90,23 +116,11 @@ func (h ItemHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Collect all missing required fields before writing any error response.
-	// Each field gets its own key in the details map so clients can fix
-	// every problem in a single round trip.
 	eb := contract.NewErrorBuilder().
 		Type(contract.TypeRequired).
 		Code(codeItemFieldsRequired).
 		Message("one or more required fields are missing")
-	valid := true
-	if req.Name == "" {
-		eb = eb.Detail("name", "field is required")
-		valid = false
-	}
-	if req.Description == "" {
-		eb = eb.Detail("description", "field is required")
-		valid = false
-	}
-	if !valid {
+	if eb, ok := requireItemFields(eb, req.Name, req.Description); !ok {
 		logWriteErr(h.Logger, contract.WriteError(w, r, eb.Build()))
 		return
 	}
@@ -253,21 +267,66 @@ func (h ItemHandler) Update(w http.ResponseWriter, r *http.Request) {
 		Type(contract.TypeRequired).
 		Code(codeItemUpdateFieldsRequired).
 		Message("one or more required fields are missing")
-	valid := true
-	if req.Name == "" {
-		eb = eb.Detail("name", "field is required")
-		valid = false
-	}
-	if req.Description == "" {
-		eb = eb.Detail("description", "field is required")
-		valid = false
-	}
-	if !valid {
+	if eb, ok := requireItemFields(eb, req.Name, req.Description); !ok {
 		logWriteErr(h.Logger, contract.WriteError(w, r, eb.Build()))
 		return
 	}
 
 	updated, ok := h.Repo.Update(r.Context(), id, req.Name, req.Description)
+	if !ok {
+		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+			Type(contract.TypeNotFound).
+			Code(codeItemNotFound).
+			Detail("id", id).
+			Message("item not found").
+			Build()))
+		return
+	}
+	logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusOK, updated, nil))
+}
+
+// Patch handles PATCH /api/v1/items/:id.
+// Unlike PUT, PATCH applies a partial update: only the non-empty fields in the
+// request body are written; fields absent or empty in the body are left unchanged.
+// At least one of name or description must be non-empty.
+//
+//	PATCH /api/v1/items/item-1 {"name":"renamed"}                          → 200 (name changed, description preserved)
+//	PATCH /api/v1/items/item-1 {"description":"new desc"}                  → 200 (description changed, name preserved)
+//	PATCH /api/v1/items/item-1 {"name":"renamed","description":"new desc"} → 200 (both changed)
+//	PATCH /api/v1/items/item-1                                             → 400 TypeRequired (empty body)
+//	PATCH /api/v1/items/item-1 {}                                          → 400 TypeRequired (no fields)
+//	PATCH /api/v1/items/missing {"name":"x"}                               → 404 TypeNotFound
+func (h ItemHandler) Patch(w http.ResponseWriter, r *http.Request) {
+	id := router.Param(r, "id")
+
+	var req patchItemReq
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		if errors.Is(err, io.EOF) {
+			logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+				Type(contract.TypeRequired).
+				Code(codeItemPatchBodyRequired).
+				Message("request body is required").
+				Build()))
+			return
+		}
+		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+			Type(contract.TypeBadRequest).
+			Code(codeItemPatchInvalidJSON).
+			Message("request body must be valid JSON").
+			Build()))
+		return
+	}
+
+	if req.Name == "" && req.Description == "" {
+		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+			Type(contract.TypeRequired).
+			Code(codeItemPatchNoFields).
+			Message("at least one of name or description is required").
+			Build()))
+		return
+	}
+
+	updated, ok := h.Repo.Patch(r.Context(), id, req.Name, req.Description)
 	if !ok {
 		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeNotFound).

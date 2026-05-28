@@ -72,6 +72,22 @@ func TestValidateFailsOnEmptyAddr(t *testing.T) {
 	}
 }
 
+func TestValidateFailsOnNegativeMaxBodyBytes(t *testing.T) {
+	cfg := Defaults()
+	cfg.App.MaxBodyBytes = -1
+	if err := Validate(cfg); err == nil {
+		t.Fatal("Validate: want error for negative MaxBodyBytes, got nil")
+	}
+}
+
+func TestValidateAllowsZeroMaxBodyBytes(t *testing.T) {
+	cfg := Defaults()
+	cfg.App.MaxBodyBytes = 0
+	if err := Validate(cfg); err != nil {
+		t.Fatalf("Validate: want nil for MaxBodyBytes=0 (disables limit), got %v", err)
+	}
+}
+
 func TestValidateTLSRequiresCertAndKey(t *testing.T) {
 	t.Run("TLS enabled with no cert returns error", func(t *testing.T) {
 		cfg := Defaults()

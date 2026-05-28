@@ -89,8 +89,9 @@ func (h APIHandler) Hello(w http.ResponseWriter, r *http.Request) {
 			{Name: "items_get", Method: http.MethodGet, Path: "/api/v1/items/:id", Description: "get item by id"},
 			{Name: "healthz", Method: http.MethodGet, Path: "/healthz", Description: "liveness probe"},
 			{Name: "readyz", Method: http.MethodGet, Path: "/readyz", Description: "readiness probe"},
+			{Name: "items_patch", Method: http.MethodPatch, Path: "/api/v1/items/:id", Description: "partially update an item (non-empty fields only)"},
 			{Name: "items_create", Method: http.MethodPost, Path: "/api/v1/items", Description: "create an item"},
-			{Name: "items_update", Method: http.MethodPut, Path: "/api/v1/items/:id", Description: "update an item"},
+			{Name: "items_update", Method: http.MethodPut, Path: "/api/v1/items/:id", Description: "update an item (replaces all fields)"},
 		},
 	}, nil))
 }

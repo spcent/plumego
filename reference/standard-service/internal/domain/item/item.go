@@ -50,8 +50,12 @@ func (s *MemoryStore) Create(_ context.Context, name, description string) Item {
 }
 
 // Get returns an item by id.
-// context.Context is accepted so callers can propagate deadlines to real storage backends.
-func (s *MemoryStore) Get(_ context.Context, id string) (Item, bool) {
+// Returns (Item{}, false) immediately when ctx is already cancelled so handlers
+// can short-circuit cleanly without acquiring the store lock.
+func (s *MemoryStore) Get(ctx context.Context, id string) (Item, bool) {
+	if ctx.Err() != nil {
+		return Item{}, false
+	}
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -60,8 +64,12 @@ func (s *MemoryStore) Get(_ context.Context, id string) (Item, bool) {
 }
 
 // List returns all stored items in creation order.
-// context.Context is accepted so callers can propagate deadlines to real storage backends.
-func (s *MemoryStore) List(_ context.Context) []Item {
+// Returns nil immediately when ctx is already cancelled so callers can detect
+// deadline expiry without acquiring the store lock.
+func (s *MemoryStore) List(ctx context.Context) []Item {
+	if ctx.Err() != nil {
+		return nil
+	}
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -86,6 +94,31 @@ func (s *MemoryStore) Update(_ context.Context, id, name, description string) (I
 	}
 	item.Name = name
 	item.Description = description
+	s.items[item.ID] = item
+	return item, true
+}
+
+// Patch applies a partial update to an existing item and returns the result.
+// Only non-empty fields are replaced; empty string values leave the corresponding
+// field unchanged. ID and CreatedAt are always immutable.
+// It reports false when no item with that id exists or ctx is already cancelled.
+func (s *MemoryStore) Patch(ctx context.Context, id, name, description string) (Item, bool) {
+	if ctx.Err() != nil {
+		return Item{}, false
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	item, ok := s.items[id]
+	if !ok {
+		return Item{}, false
+	}
+	if name != "" {
+		item.Name = name
+	}
+	if description != "" {
+		item.Description = description
+	}
 	s.items[item.ID] = item
 	return item, true
 }
