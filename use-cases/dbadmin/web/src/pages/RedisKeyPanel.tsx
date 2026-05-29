@@ -156,21 +156,23 @@ export default function RedisKeyPanel() {
   }, [connId, dbIndex, pattern, toast])
 
   const handleBatchDelete = useCallback(async () => {
-    if (!connId || isReadonly || selectedKeys.size === 0) return
-    const count = selectedKeys.size
+    if (!connId || isReadonly || previewKeys.length === 0) return
+    const count = previewKeys.length
     if (!window.confirm(t('redis.batch.confirm_delete', { n: count }))) return
 
     try {
-      await api.redisBatchDelete(connId, dbIndex, Array.from(selectedKeys), true)
+      const keysToDelete = previewKeys.map(k => k.key)
+      await api.redisBatchDelete(connId, dbIndex, keysToDelete, true)
       toast.showToast(t('redis.batch.deleted', { n: count }), 'success')
       setSelectedKeys(new Set())
       setBatchMode(false)
       setShowBatchPreview(false)
+      setPreviewKeys([])
       await loadKeys(true)
     } catch (err: any) {
       toast.showToast(err.message || 'Failed to delete keys', 'error')
     }
-  }, [connId, dbIndex, selectedKeys, isReadonly, loadKeys, t, toast])
+  }, [connId, dbIndex, previewKeys, isReadonly, loadKeys, t, toast])
 
   const toggleKeySelection = (key: string) => {
     setSelectedKeys(prev => {
@@ -557,6 +559,79 @@ export default function RedisKeyPanel() {
           </div>
         </div>
       </div>
+
+      {/* Batch Preview Modal */}
+      {showBatchPreview && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[80vh] flex flex-col">
+            <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+              <h3 className="text-lg font-semibold" style={{ color: 'var(--text-strong)' }}>
+                {t('redis.batch.preview')}
+              </h3>
+              <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>
+                {t('redis.batch.warning', { n: previewKeys.length })}
+              </p>
+            </div>
+            <div className="flex-1 overflow-y-auto p-6">
+              {previewKeys.length === 0 ? (
+                <div className="text-center py-8" style={{ color: 'var(--text-muted)' }}>
+                  {t('redis.batch.no_keys')}
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {previewKeys.map((key, idx) => (
+                    <div
+                      key={idx}
+                      className="flex items-center gap-3 p-3 rounded border"
+                      style={{ background: 'var(--bg-surface)', borderColor: 'var(--border-subtle)' }}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="font-mono text-sm truncate" style={{ color: 'var(--text-strong)' }}>
+                          {key.key}
+                        </div>
+                        <div className="flex gap-2 mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>
+                          <span className="px-1.5 py-0.5 rounded" style={{ background: 'var(--bg-muted)' }}>
+                            {key.type}
+                          </span>
+                          <span>{formatTTL(key.ttl)}</span>
+                          {key.memory && (
+                            <span className={key.isBig ? 'font-bold' : ''} style={{ color: key.isBig ? 'var(--danger)' : 'var(--text-muted)' }}>
+                              {formatMemory(key.memory)}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex gap-3">
+              <button
+                onClick={() => {
+                  setShowBatchPreview(false)
+                  setPreviewKeys([])
+                }}
+                className="flex-1 px-4 py-2 text-sm rounded border"
+                style={{
+                  background: 'var(--bg-surface)',
+                  color: 'var(--text-default)',
+                  borderColor: 'var(--border-subtle)',
+                }}
+              >
+                {t('redis.batch.cancel')}
+              </button>
+              <button
+                onClick={handleBatchDelete}
+                className="flex-1 px-4 py-2 text-sm rounded"
+                style={{ background: 'var(--danger)', color: 'white' }}
+              >
+                {t('redis.batch.delete')} ({previewKeys.length})
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -604,8 +679,9 @@ function KeyInspector({
           onClick={() => onCopy(detail.key)}
           className="mt-1 text-xs"
           style={{ color: 'var(--accent)' }}
+          title={t('redis.copy.key_success')}
         >
-          {t('redis.key.copy')}
+          {t('redis.copy.key')}
         </button>
       </div>
 
@@ -768,8 +844,9 @@ function KeyValueViewer({
           onClick={() => onCopy(detail.string!)}
           className="mt-2 text-xs"
           style={{ color: 'var(--accent)' }}
+          title={t('redis.copy.value_success')}
         >
-          {t('redis.key.copy')}
+          {t('redis.copy.value')}
         </button>
       </div>
     )
@@ -823,8 +900,9 @@ function KeyValueViewer({
           onClick={() => onCopy(JSON.stringify(detail.hash, null, 2))}
           className="mt-2 text-xs"
           style={{ color: 'var(--accent)' }}
+          title={t('redis.copy.value_success')}
         >
-          {t('redis.key.copy')}
+          {t('redis.copy.value')}
         </button>
       </div>
     )
@@ -895,8 +973,9 @@ function KeyValueViewer({
           onClick={() => onCopy(JSON.stringify(detail.list, null, 2))}
           className="mt-2 text-xs"
           style={{ color: 'var(--accent)' }}
+          title={t('redis.copy.value_success')}
         >
-          {t('redis.key.copy')}
+          {t('redis.copy.value')}
         </button>
       </div>
     )
@@ -961,8 +1040,9 @@ function KeyValueViewer({
           onClick={() => onCopy(JSON.stringify(detail.set, null, 2))}
           className="mt-2 text-xs"
           style={{ color: 'var(--accent)' }}
+          title={t('redis.copy.value_success')}
         >
-          {t('redis.key.copy')}
+          {t('redis.copy.value')}
         </button>
       </div>
     )
@@ -1033,25 +1113,72 @@ function KeyValueViewer({
           onClick={() => onCopy(JSON.stringify(detail.zset, null, 2))}
           className="mt-2 text-xs"
           style={{ color: 'var(--accent)' }}
+          title={t('redis.copy.value_success')}
         >
-          {t('redis.key.copy')}
+          {t('redis.copy.value')}
         </button>
       </div>
     )
   }
 
   if (type === 'stream' && detail.stream) {
+    const messages = detail.stream.messages || []
+    const streamText = JSON.stringify({
+      length: detail.stream.length,
+      groups: detail.stream.groups,
+      messages,
+    }, null, 2)
     return (
       <div className="space-y-2">
-        <div className="text-sm" style={{ color: 'var(--text-default)' }}>
-          {t('redis.key.stream_length', { n: detail.stream.length })}
+        <div className="flex items-center gap-3 text-sm" style={{ color: 'var(--text-default)' }}>
+          <span>{t('redis.key.stream_length', { n: detail.stream.length })}</span>
+          <span>{t('redis.key.stream_groups', { n: detail.stream.groups })}</span>
         </div>
-        <div className="text-sm" style={{ color: 'var(--text-default)' }}>
-          {t('redis.key.stream_groups', { n: detail.stream.groups })}
-        </div>
-        <div className="text-xs p-3 rounded" style={{ background: 'var(--bg-muted)', color: 'var(--text-muted)' }}>
-          Stream viewer coming soon. Use XREAD or XRANGE in the command console.
-        </div>
+        {messages.length === 0 ? (
+          <div className="text-xs p-3 rounded" style={{ background: 'var(--bg-muted)', color: 'var(--text-muted)' }}>
+            {t('redis.stream.no_messages')}
+          </div>
+        ) : (
+          <div className="border rounded overflow-hidden max-h-96 overflow-y-auto" style={{ borderColor: 'var(--border-subtle)' }}>
+            <table className="w-full text-sm">
+              <thead className="sticky top-0" style={{ background: 'var(--bg-muted)' }}>
+                <tr>
+                  <th className="text-left px-3 py-2 font-mono text-xs" style={{ color: 'var(--text-muted)' }}>
+                    {t('redis.stream.id')}
+                  </th>
+                  <th className="text-left px-3 py-2 font-mono text-xs" style={{ color: 'var(--text-muted)' }}>
+                    {t('redis.stream.fields')}
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {messages.map((msg) => (
+                  <tr key={msg.id} className="border-t" style={{ borderColor: 'var(--border-subtle)' }}>
+                    <td className="px-3 py-2 font-mono text-xs align-top" style={{ color: 'var(--text-strong)' }}>
+                      {msg.id}
+                    </td>
+                    <td className="px-3 py-2 font-mono text-xs break-all" style={{ color: 'var(--text-default)' }}>
+                      <pre className="whitespace-pre-wrap m-0">{JSON.stringify(msg.values, null, 2)}</pre>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        {messages.length < detail.stream.length && (
+          <div className="text-xs" style={{ color: 'var(--text-muted)' }}>
+            Showing {messages.length} of {detail.stream.length} messages. Use XRANGE in the command console to view more.
+          </div>
+        )}
+        <button
+          onClick={() => onCopy(streamText)}
+          className="text-xs"
+          style={{ color: 'var(--accent)' }}
+          title={t('redis.copy.value_success')}
+        >
+          {t('redis.copy.value')}
+        </button>
       </div>
     )
   }

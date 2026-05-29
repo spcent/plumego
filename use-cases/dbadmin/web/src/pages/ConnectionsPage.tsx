@@ -14,7 +14,7 @@ const emptyConn: Partial<Connection> = {
   name: '',
 }
 
-type DriverFilter = 'all' | 'mysql' | 'sqlite' | 'redis'
+type DriverFilter = 'all' | 'mysql' | 'sqlite' | 'redis' | 'mongodb'
 
 export default function ConnectionsPage() {
   const [conns, setConns] = useState<Connection[]>([])
@@ -100,7 +100,7 @@ export default function ConnectionsPage() {
 
       {conns.length > 0 && (
         <div className="flex gap-1 mb-3">
-          {(['all', 'mysql', 'sqlite', 'redis'] as DriverFilter[]).map(f => (
+          {(['all', 'mysql', 'sqlite', 'redis', 'mongodb'] as DriverFilter[]).map(f => (
             <button
               key={f}
               onClick={() => setDriverFilter(f)}
@@ -144,7 +144,9 @@ export default function ConnectionsPage() {
               <div className="text-xs truncate" style={{ color: 'var(--text-muted)' }}>
                 {c.driver === 'sqlite'
                   ? (c.uploaded_file ? (c.original_filename || c.file_path) : c.file_path)
-                  : `${c.host}:${c.port}/${c.database}`}
+                  : c.driver === 'mongodb'
+                    ? (c.mongo_uri || `${c.host}:${c.port}`)
+                    : `${c.host}:${c.port}/${c.database}`}
               </div>
             </div>
             {testing[c.id] && (
@@ -340,6 +342,7 @@ function ConnectionForm({ conn, onChange }: { conn: Partial<Connection>; onChang
           <option value="mysql">MySQL</option>
           <option value="sqlite">SQLite</option>
           <option value="redis">Redis</option>
+          <option value="mongodb">MongoDB</option>
         </select>
       </div>
       {conn.driver === 'sqlite' ? (
@@ -413,57 +416,7 @@ function ConnectionForm({ conn, onChange }: { conn: Partial<Connection>; onChang
             </div>
           )}
         </>
-      ) : (
-        <>
-          <div className="flex gap-2">
-            <div className="flex-1">
-              <label className={labelCls} style={labelStyle}>{t('connections.form.host')}</label>
-              <input value={conn.host || ''} onChange={field('host')} className={inputCls} style={inputStyle} placeholder="localhost" />
-            </div>
-            <div className="w-24">
-              <label className={labelCls} style={labelStyle}>{t('connections.form.port')}</label>
-              <input value={conn.port || 3306} onChange={field('port')} type="number" className={inputCls} style={inputStyle} />
-            </div>
-          </div>
-          <div>
-            <label className={labelCls} style={labelStyle}>{t('connections.form.database')}</label>
-            <input value={conn.database || ''} onChange={field('database')} className={inputCls} style={inputStyle} />
-          </div>
-          <div className="flex gap-2">
-            <div className="flex-1">
-              <label className={labelCls} style={labelStyle}>{t('connections.form.username')}</label>
-              <input value={conn.username || ''} onChange={field('username')} className={inputCls} style={inputStyle} />
-            </div>
-            <div className="flex-1">
-              <label className={labelCls} style={labelStyle}>{t('connections.form.password')}</label>
-              <input value={conn.password || ''} onChange={field('password')} type="password" className={inputCls} style={inputStyle} disabled={!conn.save_password} placeholder={conn.save_password ? '' : '••••••'} />
-            </div>
-          </div>
-          <div>
-            <label className="flex items-center gap-2 cursor-pointer text-sm" style={{ color: 'var(--text-default)' }}>
-              <input
-                type="checkbox"
-                checked={!!conn.save_password}
-                onChange={e => onChange({ ...conn, save_password: e.target.checked, password: e.target.checked ? (conn.password ?? '') : '' })}
-              />
-              {t('connections.form.save_password')}
-            </label>
-            {conn.save_password && (
-              <div
-                className="mt-1 px-3 py-2 text-xs rounded border"
-                style={{
-                  background: 'var(--warning)18',
-                  borderColor: 'var(--warning)',
-                  color: 'var(--warning)',
-                }}
-              >
-                {t('connections.form.save_password_warn')}
-              </div>
-            )}
-          </div>
-        </>
-      )}
-      {conn.driver === 'redis' && (
+      ) : conn.driver === 'redis' ? (
         <>
           <div className="flex gap-2">
             <div className="flex-1">
@@ -512,6 +465,138 @@ function ConnectionForm({ conn, onChange }: { conn: Partial<Connection>; onChang
             style={{ background: 'var(--warning)18', border: '1px solid var(--warning)44', color: 'var(--warning)' }}
           >
             {t('redis.driver_coming_soon')}
+          </div>
+        </>
+      ) : conn.driver === 'mongodb' ? (
+        <>
+          <div>
+            <label className={labelCls} style={labelStyle}>{t('mongodb.form.uri')}</label>
+            <input
+              value={conn.mongo_uri || ''}
+              onChange={field('mongo_uri')}
+              className={inputCls}
+              style={inputStyle}
+              placeholder="mongodb://localhost:27017 or mongodb+srv://..."
+            />
+            <p className="text-xs mt-1" style={{ color: 'var(--text-subtle)' }}>
+              {t('mongodb.form.uri_hint')}
+            </p>
+          </div>
+          <div
+            className="text-center text-xs py-1.5"
+            style={{ color: 'var(--text-subtle)' }}
+          >
+            {t('mongodb.form.or_basic')}
+          </div>
+          <div className="flex gap-2">
+            <div className="flex-1">
+              <label className={labelCls} style={labelStyle}>{t('connections.form.host')}</label>
+              <input value={conn.host || ''} onChange={field('host')} className={inputCls} style={inputStyle} placeholder="localhost" />
+            </div>
+            <div className="w-24">
+              <label className={labelCls} style={labelStyle}>{t('connections.form.port')}</label>
+              <input value={conn.port || 27017} onChange={field('port')} type="number" className={inputCls} style={inputStyle} />
+            </div>
+          </div>
+          <div>
+            <label className={labelCls} style={labelStyle}>{t('mongodb.form.auth_db')}</label>
+            <input
+              value={conn.mongo_auth_db || 'admin'}
+              onChange={field('mongo_auth_db')}
+              className={inputCls}
+              style={inputStyle}
+              placeholder="admin"
+            />
+          </div>
+          <div className="flex gap-2">
+            <div className="flex-1">
+              <label className={labelCls} style={labelStyle}>{t('connections.form.username')}</label>
+              <input value={conn.username || ''} onChange={field('username')} className={inputCls} style={inputStyle} />
+            </div>
+            <div className="flex-1">
+              <label className={labelCls} style={labelStyle}>{t('connections.form.password')}</label>
+              <input
+                value={conn.password || ''}
+                onChange={field('password')}
+                type="password"
+                className={inputCls}
+                style={inputStyle}
+                disabled={!conn.save_password}
+                placeholder={conn.save_password ? '' : '••••••'}
+              />
+            </div>
+          </div>
+          <label className="flex items-center gap-2 cursor-pointer text-sm" style={{ color: 'var(--text-default)' }}>
+            <input
+              type="checkbox"
+              checked={!!conn.save_password}
+              onChange={e => onChange({ ...conn, save_password: e.target.checked, password: e.target.checked ? (conn.password ?? '') : '' })}
+            />
+            {t('connections.form.save_password')}
+          </label>
+          <label className="flex items-center gap-2 cursor-pointer text-sm" style={{ color: 'var(--text-default)' }}>
+            <input
+              type="checkbox"
+              checked={!!conn.mongo_tls_enabled}
+              onChange={e => onChange({ ...conn, mongo_tls_enabled: e.target.checked })}
+            />
+            {t('mongodb.form.tls')}
+          </label>
+          <div
+            className="px-3 py-2 rounded text-xs"
+            style={{ background: 'var(--warning)18', border: '1px solid var(--warning)44', color: 'var(--warning)' }}
+          >
+            {t('mongodb.driver_coming_soon')}
+          </div>
+        </>
+      ) : (
+        <>
+          {/* MySQL (default) */}
+          <div className="flex gap-2">
+            <div className="flex-1">
+              <label className={labelCls} style={labelStyle}>{t('connections.form.host')}</label>
+              <input value={conn.host || ''} onChange={field('host')} className={inputCls} style={inputStyle} placeholder="localhost" />
+            </div>
+            <div className="w-24">
+              <label className={labelCls} style={labelStyle}>{t('connections.form.port')}</label>
+              <input value={conn.port || 3306} onChange={field('port')} type="number" className={inputCls} style={inputStyle} />
+            </div>
+          </div>
+          <div>
+            <label className={labelCls} style={labelStyle}>{t('connections.form.database')}</label>
+            <input value={conn.database || ''} onChange={field('database')} className={inputCls} style={inputStyle} />
+          </div>
+          <div className="flex gap-2">
+            <div className="flex-1">
+              <label className={labelCls} style={labelStyle}>{t('connections.form.username')}</label>
+              <input value={conn.username || ''} onChange={field('username')} className={inputCls} style={inputStyle} />
+            </div>
+            <div className="flex-1">
+              <label className={labelCls} style={labelStyle}>{t('connections.form.password')}</label>
+              <input value={conn.password || ''} onChange={field('password')} type="password" className={inputCls} style={inputStyle} disabled={!conn.save_password} placeholder={conn.save_password ? '' : '••••••'} />
+            </div>
+          </div>
+          <div>
+            <label className="flex items-center gap-2 cursor-pointer text-sm" style={{ color: 'var(--text-default)' }}>
+              <input
+                type="checkbox"
+                checked={!!conn.save_password}
+                onChange={e => onChange({ ...conn, save_password: e.target.checked, password: e.target.checked ? (conn.password ?? '') : '' })}
+              />
+              {t('connections.form.save_password')}
+            </label>
+            {conn.save_password && (
+              <div
+                className="mt-1 px-3 py-2 text-xs rounded border"
+                style={{
+                  background: 'var(--warning)18',
+                  borderColor: 'var(--warning)',
+                  color: 'var(--warning)',
+                }}
+              >
+                {t('connections.form.save_password_warn')}
+              </div>
+            )}
           </div>
         </>
       )}

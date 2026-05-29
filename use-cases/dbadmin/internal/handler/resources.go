@@ -16,11 +16,12 @@ import (
 //	GET /api/connections/:id/resources?parentId=<path>
 //
 // parentId is the ResourceNode.Path of the parent node.
-// Omit parentId to list top-level nodes (databases for SQL, db-indices for Redis).
+// Omit parentId to list top-level nodes (databases for SQL, db-indices for Redis, databases for MongoDB).
 type ResourceHandler struct {
 	Connections  *connection.Store
 	SQLAdapter   *datasource.SQLAdapter
 	RedisAdapter *datasource.RedisAdapter
+	MongoAdapter *datasource.MongoAdapter
 	Logger       plumelog.StructuredLogger
 }
 
@@ -90,6 +91,8 @@ func (h ResourceHandler) driverFor(conn *connection.Connection) datasource.DataS
 		return h.SQLAdapter
 	case connection.DriverRedis:
 		return h.RedisAdapter
+	case connection.DriverMongoDB:
+		return h.MongoAdapter
 	default:
 		return nil
 	}
@@ -100,6 +103,8 @@ func buildConnectionConfig(conn *connection.Connection) datasource.ConnectionCon
 	switch conn.Driver {
 	case connection.DriverRedis:
 		return datasource.RedisConfig{Conn: conn}
+	case connection.DriverMongoDB:
+		return datasource.MongoConfig{Conn: conn}
 	default:
 		return datasource.SQLConfig{Conn: conn}
 	}

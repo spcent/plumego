@@ -321,6 +321,19 @@ const en: Dict = {
   'redis.ttl.1week': '1 week',
   'redis.ttl.never': 'Never expire',
   'redis.ttl.custom': 'Custom',
+
+  // MongoDB (preparation — P0 not yet implemented)
+  'mongodb.form.uri': 'Connection URI',
+  'mongodb.form.uri_hint': 'Use mongodb:// or mongodb+srv:// format. Leave empty to use host:port below.',
+  'mongodb.form.or_basic': '— or use basic host:port —',
+  'mongodb.form.auth_db': 'Authentication Database',
+  'mongodb.form.tls': 'Use TLS/SSL',
+  'mongodb.driver_coming_soon': 'MongoDB document browsing will be available in a future release.',
+  'mongodb.readonly': 'READ ONLY',
+  'mongodb.coming_soon': 'MongoDB Document Browser',
+  'mongodb.coming_soon_hint': 'Document browsing, filtering, and editing will be available soon.',
+  'mongodb.p0_features': 'Planned: document list, JSON filter, insert/edit/delete, index viewer',
+  'connections.filter.mongodb': 'MongoDB',
 }
 
 const zh: Dict = {
@@ -640,6 +653,19 @@ const zh: Dict = {
   'redis.ttl.1week': '1 周',
   'redis.ttl.never': '永不过期',
   'redis.ttl.custom': '自定义',
+
+  // MongoDB (preparation — P0 not yet implemented)
+  'mongodb.form.uri': '连接 URI',
+  'mongodb.form.uri_hint': '使用 mongodb:// 或 mongodb+srv:// 格式。留空则使用下方的 host:port。',
+  'mongodb.form.or_basic': '— 或使用基本 host:port —',
+  'mongodb.form.auth_db': '认证数据库',
+  'mongodb.form.tls': '使用 TLS/SSL',
+  'mongodb.driver_coming_soon': 'MongoDB 文档浏览功能将在后续版本中提供。',
+  'mongodb.readonly': '只读',
+  'mongodb.coming_soon': 'MongoDB 文档浏览器',
+  'mongodb.coming_soon_hint': '文档浏览、过滤和编辑功能即将推出。',
+  'mongodb.p0_features': '计划功能：文档列表、JSON 过滤、插入/编辑/删除、索引查看',
+  'connections.filter.mongodb': 'MongoDB',
 }
 
 const dicts: Record<Locale, Dict> = { en, zh }

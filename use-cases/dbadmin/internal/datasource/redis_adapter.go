@@ -101,7 +101,7 @@ func (a *RedisAdapter) ListResources(ctx context.Context, sess *Session, parent 
 	return nodes, nil
 }
 
-// InspectResource is not implemented for Redis.
+// InspectResource reports that Redis resource details are unavailable.
 func (a *RedisAdapter) InspectResource(_ context.Context, _ *Session, _ ResourceRef) (*ResourceDetail, error) {
-	return nil, fmt.Errorf("redis adapter: InspectResource not implemented")
+	return nil, fmt.Errorf("redis adapter: InspectResource unavailable")
 }

@@ -13,9 +13,9 @@ function nodeIcon(type: ResourceNodeType): React.ReactNode {
     case 'sql_view':        return <span style={{ ...s, fontSize: 10 }}>◧</span>
     case 'redis_db':        return <span style={{ ...s, color: '#f87171' }}>⬡</span>
     case 'redis_key':       return <span style={{ ...s, fontSize: 10, color: '#fb923c' }}>⬡</span>
+    case 'mongo_database':  return <span style={{ ...s, color: '#4ade80', fontWeight: 700 }}>M</span>
+    case 'mongo_collection':return <span style={{ ...s, fontSize: 10, color: '#22d3ee' }}>C</span>
     // Reserved — future drivers:
-    // case 'mongo_database':  return <span style={s}>M</span>
-    // case 'mongo_collection':return <span style={{ ...s, fontSize: 10 }}>C</span>
     // case 'es_index':        return <span style={s}>I</span>
     // case 'es_alias':        return <span style={{ ...s, fontSize: 10 }}>~</span>
     // case 'es_data_stream':  return <span style={{ ...s, fontSize: 10 }}>↓</span>
@@ -45,6 +45,15 @@ function nodeUrl(connId: string, node: ResourceNode): string | null {
       const db = node.path.slice(0, slash)
       const key = node.path.slice(slash + 1)
       return `/conn/${connId}/redis/${encodeURIComponent(db)}?key=${encodeURIComponent(key)}`
+    }
+    case 'mongo_database':
+      return `/conn/${connId}/mongo/${encodeURIComponent(node.path)}/collections`
+    case 'mongo_collection': {
+      const slash = node.path.indexOf('/')
+      if (slash < 0) return null
+      const db = node.path.slice(0, slash)
+      const coll = node.path.slice(slash + 1)
+      return `/conn/${connId}/mongo/${encodeURIComponent(db)}/${encodeURIComponent(coll)}/documents`
     }
     default:
       return null
@@ -124,7 +133,7 @@ interface Props {
 }
 
 export default function ResourceExplorer({ connections, onRefresh: _onRefresh }: Props) {
-  const params = useParams<{ connId?: string; dbName?: string; tableName?: string; redisDb?: string }>()
+  const params = useParams<{ connId?: string; dbName?: string; tableName?: string; redisDb?: string; mongoDb?: string; mongoColl?: string }>()
   const location = useLocation()
   const navigate = useNavigate()
   const { t } = useI18n()
@@ -270,7 +279,7 @@ function ResourceNodeRow({
   const children: ResourceNode[] = resourceCache[nodeKey] ?? []
 
   const isActive = nodeIsActive(node, connId, params, isQueryPage)
-  const expandable = node.type === 'sql_database'
+  const expandable = node.type === 'sql_database' || node.type === 'mongo_database'
 
   const to = expandable ? undefined : (nodeUrl(connId, node) ?? undefined)
 
@@ -302,6 +311,20 @@ function ResourceNodeRow({
                 !isQueryPage
               }
               to={`/conn/${connId}/db/${encodeURIComponent(node.path)}/tables`}
+            />
+          )}
+          {/* Collections overview link — MongoDB databases only */}
+          {node.type === 'mongo_database' && (
+            <TreeItem
+              depth={depth + 1}
+              icon={<span style={{ color: '#22d3ee', fontSize: 10 }}>⊞</span>}
+              label="Collections"
+              active={
+                params.connId === connId &&
+                params.mongoDb === node.path &&
+                !params.mongoColl
+              }
+              to={`/conn/${connId}/mongo/${encodeURIComponent(node.path)}/collections`}
             />
           )}
           {children.map(child => (
@@ -344,6 +367,15 @@ function nodeIsActive(
     }
     case 'redis_db':
       return params.redisDb === node.path
+    case 'mongo_database':
+      return params.mongoDb === node.path && !params.mongoColl
+    case 'mongo_collection': {
+      const slash = node.path.indexOf('/')
+      if (slash < 0) return false
+      const db = node.path.slice(0, slash)
+      const coll = node.path.slice(slash + 1)
+      return params.mongoDb === db && params.mongoColl === coll
+    }
     default:
       return false
   }

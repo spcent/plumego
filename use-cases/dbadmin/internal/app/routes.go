@@ -75,12 +75,14 @@ func (a *App) RegisterRoutes() error {
 		Connections:  a.ConnectionStore,
 		Manager:      a.DBManager,
 		RedisManager: a.RedisManager,
+		MongoManager: a.MongoManager,
 		Logger:       a.Core.Logger(),
 	}
 	resourceH := handler.ResourceHandler{
 		Connections:  a.ConnectionStore,
 		SQLAdapter:   a.SQLAdapter,
 		RedisAdapter: a.RedisAdapter,
+		MongoAdapter: a.MongoAdapter,
 		Logger:       a.Core.Logger(),
 	}
 	redisH := handler.RedisHandler{

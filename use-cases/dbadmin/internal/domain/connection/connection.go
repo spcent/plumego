@@ -25,10 +25,10 @@ const (
 	DriverMySQL  DriverType = "mysql"
 	DriverSQLite DriverType = "sqlite"
 
-	DriverRedis DriverType = "redis" // supported: save/load config; driver not yet implemented
+	DriverRedis   DriverType = "redis"   // supported: save/load config; driver not yet implemented
+	DriverMongoDB DriverType = "mongodb" // supported: save/load config; driver not yet implemented
 
 	// Planned drivers — not yet implemented:
-	// DriverMongoDB       DriverType = "mongodb"
 	// DriverElasticsearch DriverType = "elasticsearch"
 )
 
@@ -53,8 +53,15 @@ type Connection struct {
 	FilePath string     `json:"file_path,omitempty"` // for SQLite
 	Options  string     `json:"options,omitempty"`   // extra DSN params
 	// Redis-specific fields (used when Driver = "redis")
-	RedisDBIndex     int       `json:"redis_db_index,omitempty"`    // logical DB index 0-15, default 0
-	TLSEnabled       bool      `json:"tls_enabled,omitempty"`       // use TLS/SSL
+	RedisDBIndex int  `json:"redis_db_index,omitempty"` // logical DB index 0-15, default 0
+	TLSEnabled   bool `json:"tls_enabled,omitempty"`    // use TLS/SSL
+
+	// MongoDB-specific fields (used when Driver = "mongodb")
+	MongoURI        string `json:"mongo_uri,omitempty"`         // mongodb://host:port or mongodb+srv:// connection string
+	MongoAuthDB     string `json:"mongo_auth_db,omitempty"`     // authentication database (default: admin)
+	MongoTLSEnabled bool   `json:"mongo_tls_enabled,omitempty"` // use TLS/SSL for MongoDB
+	MongoReplicaSet string `json:"mongo_replica_set,omitempty"` // replica set name (optional)
+
 	Readonly         bool      `json:"readonly,omitempty"`          // disallow all write operations
 	SavePassword     bool      `json:"save_password,omitempty"`     // persist password to disk
 	UploadedFile     bool      `json:"uploaded_file,omitempty"`     // file_path is a server-managed temp file

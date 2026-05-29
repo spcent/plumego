@@ -299,9 +299,15 @@ type zsetMember struct {
 	Score  float64 `json:"score"`
 }
 
+type streamMessage struct {
+	ID     string            `json:"id"`
+	Values map[string]string `json:"values"`
+}
+
 type streamInfo struct {
-	Length int64 `json:"length"`
-	Groups int64 `json:"groups"`
+	Length   int64           `json:"length"`
+	Groups   int64           `json:"groups"`
+	Messages []streamMessage `json:"messages,omitempty"`
 }
 
 // GetKey returns full details for a single key including type-appropriate value.
@@ -400,7 +406,17 @@ func (h RedisHandler) GetKey(w http.ResponseWriter, r *http.Request) {
 	case "stream":
 		length, _ := cl.XLen(ctx, key).Result()
 		groups, _ := cl.XInfoGroups(ctx, key).Result()
-		detail.StreamVal = &streamInfo{Length: length, Groups: int64(len(groups))}
+		// Fetch first 100 messages for read-only viewing
+		messages, _ := cl.XRangeN(ctx, key, "-", "+", 100).Result()
+		msgs := make([]streamMessage, len(messages))
+		for i, m := range messages {
+			vals := make(map[string]string)
+			for k, v := range m.Values {
+				vals[k] = fmt.Sprintf("%v", v)
+			}
+			msgs[i] = streamMessage{ID: m.ID, Values: vals}
+		}
+		detail.StreamVal = &streamInfo{Length: length, Groups: int64(len(groups)), Messages: msgs}
 	}
 
 	logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusOK, detail, nil))

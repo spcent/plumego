@@ -158,12 +158,35 @@ export const api = {
       keys,
       confirm,
     }),
+
+  // ── MongoDB API (placeholder — P0 not yet implemented) ─────────────────────
+  // These endpoints will be implemented in the MongoDB P0 phase.
+  // Listed here for type completeness and to drive the placeholder UI.
+  mongoListDatabases: (id: string) =>
+    req<{ databases: MongoDatabaseInfo[] }>('GET', `/conn/${id}/mongo/databases`),
+  mongoListCollections: (id: string, db: string) =>
+    req<{ collections: MongoCollectionInfo[] }>('GET', `/conn/${id}/mongo/${encodeURIComponent(db)}/collections`),
+  mongoListDocuments: (id: string, db: string, coll: string, params?: MongoDocParams) => {
+    const q = new URLSearchParams()
+    if (params?.page) q.set('page', String(params.page))
+    if (params?.pageSize) q.set('pageSize', String(params.pageSize))
+    if (params?.filter) q.set('filter', params.filter)
+    return req<MongoDocsResponse>('GET', `/conn/${id}/mongo/${encodeURIComponent(db)}/${encodeURIComponent(coll)}/documents?${q}`)
+  },
+  mongoInsertDocument: (id: string, db: string, coll: string, document: Record<string, unknown>) =>
+    req<{ inserted_id: string }>('POST', `/conn/${id}/mongo/${encodeURIComponent(db)}/${encodeURIComponent(coll)}/documents`, { document }),
+  mongoUpdateDocument: (id: string, db: string, coll: string, filter: Record<string, unknown>, update: Record<string, unknown>) =>
+    req<{ modified: number }>('PATCH', `/conn/${id}/mongo/${encodeURIComponent(db)}/${encodeURIComponent(coll)}/documents`, { filter, update, confirm: true }),
+  mongoDeleteDocument: (id: string, db: string, coll: string, filter: Record<string, unknown>) =>
+    req<{ deleted: number }>('DELETE', `/conn/${id}/mongo/${encodeURIComponent(db)}/${encodeURIComponent(coll)}/documents`, { filter, confirm: true }),
+  mongoListIndexes: (id: string, db: string, coll: string) =>
+    req<{ indexes: MongoIndexInfo[] }>('GET', `/conn/${id}/mongo/${encodeURIComponent(db)}/${encodeURIComponent(coll)}/indexes`),
 }
 
 export interface Connection {
   id: string
   name: string
-  driver: 'mysql' | 'sqlite' | 'redis'
+  driver: 'mysql' | 'sqlite' | 'redis' | 'mongodb'
   host?: string
   port?: number
   database?: string
@@ -173,6 +196,12 @@ export interface Connection {
   options?: string
   // Redis-specific
   redis_db_index?: number  // 0-15, default 0
+  // MongoDB-specific
+  mongo_uri?: string           // mongodb://host:port or mongodb+srv://...
+  mongo_auth_db?: string       // authentication database (default: admin)
+  mongo_tls_enabled?: boolean  // use TLS/SSL
+  mongo_replica_set?: string   // replica set name (optional)
+  // Common flags
   tls_enabled?: boolean
   readonly?: boolean
   save_password?: boolean
@@ -344,9 +373,15 @@ export interface RedisZSetMember {
   score: number
 }
 
+export interface RedisStreamMessage {
+  id: string
+  values: Record<string, string>
+}
+
 export interface RedisStreamInfo {
   length: number
   groups: number
+  messages?: RedisStreamMessage[]
 }
 
 export interface RedisKeyDetail {
@@ -372,4 +407,37 @@ export interface RedisBatchPreviewResponse {
   keys: RedisKeyEntry[]
   totalKeys: number
   truncated: boolean
+}
+
+// ── MongoDB types (placeholder — P0 not yet implemented) ─────────────────
+
+export interface MongoDatabaseInfo {
+  name: string
+  size_on_disk: number
+  empty: boolean
+}
+
+export interface MongoCollectionInfo {
+  name: string
+  type: 'collection' | 'view'  // "collection" or "view"
+}
+
+export interface MongoDocParams {
+  page?: number
+  pageSize?: number
+  filter?: string  // JSON query string, e.g. '{ "age": { "$gt": 30 } }'
+}
+
+export interface MongoDocsResponse {
+  documents: Record<string, unknown>[]
+  total: number
+  page: number
+  pageSize: number
+}
+
+export interface MongoIndexInfo {
+  name: string
+  unique: boolean
+  keys: Record<string, number | string>  // e.g. { "field": 1 } or { "field": "text" }
+  sparse?: boolean
 }

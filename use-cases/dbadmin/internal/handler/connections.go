@@ -12,6 +12,7 @@ import (
 
 	"dbadmin/internal/dbmanager"
 	"dbadmin/internal/domain/connection"
+	"dbadmin/internal/mongomanager"
 	"dbadmin/internal/redismanager"
 )
 
@@ -20,6 +21,7 @@ type ConnectionHandler struct {
 	Connections  *connection.Store
 	Manager      *dbmanager.Manager
 	RedisManager *redismanager.Manager
+	MongoManager *mongomanager.Manager
 	Logger       plumelog.StructuredLogger
 }
 
@@ -158,6 +160,15 @@ func (h ConnectionHandler) Test(w http.ResponseWriter, r *http.Request) {
 		logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusOK, map[string]any{"ok": true}, nil))
 		return
 	}
+	if c.Driver == connection.DriverMongoDB {
+		if err := h.MongoManager.Test(r.Context(), c); err != nil {
+			logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusOK,
+				map[string]any{"ok": false, "error": err.Error()}, nil))
+			return
+		}
+		logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusOK, map[string]any{"ok": true}, nil))
+		return
+	}
 	if err := h.Manager.Test(c); err != nil {
 		logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusOK,
 			map[string]any{"ok": false, "error": err.Error()}, nil))
@@ -193,8 +204,15 @@ func validateConnection(c *connection.Connection) error {
 		if c.RedisDBIndex < 0 || c.RedisDBIndex > 15 {
 			return fmt.Errorf("redis_db_index must be 0-15")
 		}
+	case connection.DriverMongoDB:
+		if c.MongoURI == "" && c.Host == "" {
+			return fmt.Errorf("mongo_uri or host is required for mongodb")
+		}
+		if c.MongoURI == "" && c.Port == 0 {
+			c.Port = 27017
+		}
 	default:
-		return fmt.Errorf("driver must be 'mysql', 'sqlite', or 'redis'")
+		return fmt.Errorf("driver must be 'mysql', 'sqlite', 'redis', or 'mongodb'")
 	}
 	return nil
 }

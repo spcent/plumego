@@ -29,9 +29,9 @@ const (
 	NodeRedisDB  ResourceNodeType = "redis_db"
 	NodeRedisKey ResourceNodeType = "redis_key"
 
-	// Reserved — MongoDB driver (not yet implemented):
-	// NodeMongoDatabase   ResourceNodeType = "mongo_database"
-	// NodeMongoCollection ResourceNodeType = "mongo_collection"
+	// MongoDB node types — driver not yet fully implemented, but config accepted.
+	NodeMongoDatabase   ResourceNodeType = "mongo_database"
+	NodeMongoCollection ResourceNodeType = "mongo_collection"
 
 	// Reserved — Elasticsearch driver (not yet implemented):
 	// NodeESIndex      ResourceNodeType = "es_index"
