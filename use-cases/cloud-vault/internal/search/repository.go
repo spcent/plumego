@@ -174,11 +174,18 @@ func (r *Repository) GetPendingDocs(ctx context.Context, limit int) ([]pendingIn
 	var docs []pendingIndexDoc
 	for rows.Next() {
 		var d pendingIndexDoc
+		var summary, headingText *string
 		if err := rows.Scan(
-			&d.DocumentID, &d.Title, &d.OriginalPath, &d.Summary, &d.HeadingText,
+			&d.DocumentID, &d.Title, &d.OriginalPath, &summary, &headingText,
 			&d.StorageKey, &d.ContentHash, &d.Version, &d.SizeBytes,
 		); err != nil {
 			return nil, fmt.Errorf("scan pending doc: %w", err)
+		}
+		if summary != nil {
+			d.Summary = *summary
+		}
+		if headingText != nil {
+			d.HeadingText = *headingText
 		}
 		docs = append(docs, d)
 	}
