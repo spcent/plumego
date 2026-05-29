@@ -108,6 +108,8 @@ func New(cfg *Config, logger plumelog.StructuredLogger) (Store, error) {
 		return memory.NewStore(cfg.MaximumNumberOfResults, cfg.MaximumNumberOfEvents), nil
 	case TypeSQLite:
 		return sql.NewStore("sqlite", cfg.Path, cfg.Caching, cfg.MaximumNumberOfResults, cfg.MaximumNumberOfEvents, logger)
+	case TypeMySQL:
+		return sql.NewStore("mysql", cfg.Path, cfg.Caching, cfg.MaximumNumberOfResults, cfg.MaximumNumberOfEvents, logger)
 	default:
 		return nil, ErrUnknownStorageType
 	}

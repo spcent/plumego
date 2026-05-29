@@ -14,14 +14,15 @@ var (
 
 // Config controls how a Store is built.
 type Config struct {
-	// Path used by the store to achieve persistence. Required for TypeSQLite.
+	// Path used by the store to achieve persistence. Required for TypeSQLite
+	// (file path) and TypeMySQL (DSN string).
 	Path string `json:"path"`
 
 	// Type of store. Empty string defaults to TypeMemory.
 	Type Type `json:"type"`
 
 	// Caching enables a write-through cache for read latency. Only meaningful
-	// for TypeSQLite.
+	// for SQL backends (TypeSQLite, TypeMySQL).
 	Caching bool `json:"caching,omitempty"`
 
 	// MaximumNumberOfResults retained per endpoint.
@@ -36,7 +37,7 @@ func (c *Config) ValidateAndSetDefaults() error {
 	if c.Type == "" {
 		c.Type = TypeMemory
 	}
-	if c.Type == TypeSQLite && len(c.Path) == 0 {
+	if (c.Type == TypeSQLite || c.Type == TypeMySQL) && len(c.Path) == 0 {
 		return ErrSQLStorageRequiresPath
 	}
 	if c.Type == TypeMemory && len(c.Path) > 0 {

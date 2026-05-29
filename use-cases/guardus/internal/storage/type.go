@@ -8,4 +8,6 @@ const (
 	TypeMemory Type = "memory"
 	// TypeSQLite is the SQLite-backed store. Requires Path.
 	TypeSQLite Type = "sqlite"
+	// TypeMySQL is the MySQL-backed store. Requires Path (DSN).
+	TypeMySQL Type = "mysql"
 )

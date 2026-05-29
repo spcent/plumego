@@ -1280,4 +1280,3 @@ func (s *Store) invalidateCacheByPrefix(prefix string) {
 		}
 	}
 }
-

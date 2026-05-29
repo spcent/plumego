@@ -1,6 +1,7 @@
 package storage_test
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -16,10 +17,14 @@ import (
 func newStores(t *testing.T) map[string]storage.Store {
 	t.Helper()
 	logger := plumelog.NewLogger(plumelog.LoggerConfig{Format: plumelog.LoggerFormatDiscard})
+	stores := make(map[string]storage.Store)
+
 	mem, err := storage.New(&storage.Config{Type: storage.TypeMemory}, logger)
 	if err != nil {
 		t.Fatalf("memory store: %v", err)
 	}
+	stores["memory"] = mem
+
 	dir := t.TempDir()
 	dbPath := filepath.Join(dir, "guardus.db")
 	sqliteCfg := &storage.Config{Type: storage.TypeSQLite, Path: dbPath}
@@ -27,11 +32,25 @@ func newStores(t *testing.T) map[string]storage.Store {
 	if err != nil {
 		t.Fatalf("sqlite store: %v", err)
 	}
+	stores["sqlite"] = sqlite
+
+	// MySQL: opt-in via GUARDUS_TEST_MYSQL_DSN env var.
+	// Example: GUARDUS_TEST_MYSQL_DSN="guardus:test@tcp(127.0.0.1:3306)/guardus_test?parseTime=true"
+	if mysqlDSN := os.Getenv("GUARDUS_TEST_MYSQL_DSN"); mysqlDSN != "" {
+		mysqlCfg := &storage.Config{Type: storage.TypeMySQL, Path: mysqlDSN}
+		mysql, err := storage.New(mysqlCfg, logger)
+		if err != nil {
+			t.Fatalf("mysql store: %v", err)
+		}
+		stores["mysql"] = mysql
+	}
+
 	t.Cleanup(func() {
-		mem.Close()
-		sqlite.Close()
+		for _, s := range stores {
+			s.Close()
+		}
 	})
-	return map[string]storage.Store{"memory": mem, "sqlite": sqlite}
+	return stores
 }
 
 func TestStoreContract(t *testing.T) {
@@ -97,6 +116,10 @@ func TestConfigValidate(t *testing.T) {
 	c := &storage.Config{Type: storage.TypeSQLite}
 	if err := c.ValidateAndSetDefaults(); err == nil {
 		t.Errorf("expected error: sqlite without path")
+	}
+	c = &storage.Config{Type: storage.TypeMySQL}
+	if err := c.ValidateAndSetDefaults(); err == nil {
+		t.Errorf("expected error: mysql without path")
 	}
 	c = &storage.Config{Type: storage.TypeMemory, Path: "x"}
 	if err := c.ValidateAndSetDefaults(); err == nil {
