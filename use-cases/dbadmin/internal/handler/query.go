@@ -86,10 +86,35 @@ func classifySQL(sql string) sqlClass {
 	return sqlClass{}
 }
 
+// stripBlockComments removes /* ... */ block comments from SQL, replacing each
+// comment with a single space so adjacent tokens remain separated.
+func stripBlockComments(sql string) string {
+	var out strings.Builder
+	i := 0
+	for i < len(sql) {
+		if i+1 < len(sql) && sql[i] == '/' && sql[i+1] == '*' {
+			out.WriteByte(' ')
+			i += 2
+			for i+1 < len(sql) && !(sql[i] == '*' && sql[i+1] == '/') {
+				i++
+			}
+			i += 2 // skip closing */
+			continue
+		}
+		out.WriteByte(sql[i])
+		i++
+	}
+	return out.String()
+}
+
 func hasWhereClause(upperSQL string) bool {
-	return strings.Contains(upperSQL, " WHERE ") ||
-		strings.Contains(upperSQL, "\tWHERE ") ||
-		strings.Contains(upperSQL, "\nWHERE ")
+	// Strip block comments first so /* WHERE */ inside a comment is ignored,
+	// and DELETE /*comment*/ FROM t is not incorrectly classified as safe.
+	clean := stripBlockComments(upperSQL)
+	return strings.Contains(clean, " WHERE ") ||
+		strings.Contains(clean, "\tWHERE ") ||
+		strings.Contains(clean, "\nWHERE ") ||
+		strings.HasSuffix(strings.TrimRight(clean, " \t\n\r"), "WHERE")
 }
 
 // hasMultipleStatements returns true if sql contains more than one statement
@@ -267,6 +292,31 @@ func (h QueryHandler) ListHistory(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusOK, entries, map[string]any{"count": len(entries)}))
+}
+
+// DeleteHistory removes a single history entry.
+func (h QueryHandler) DeleteHistory(w http.ResponseWriter, r *http.Request) {
+	connID := router.Param(r, "id")
+	entryID := router.Param(r, "entryId")
+	if err := h.History.Delete(connID, entryID); err != nil {
+		h.Logger.Error("delete history", plumelog.Fields{"error": err.Error()})
+		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+			Type(contract.TypeInternal).Message("failed to delete history entry").Build()))
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// ClearHistory removes all history entries for a connection.
+func (h QueryHandler) ClearHistory(w http.ResponseWriter, r *http.Request) {
+	connID := router.Param(r, "id")
+	if err := h.History.Clear(connID); err != nil {
+		h.Logger.Error("clear history", plumelog.Fields{"error": err.Error()})
+		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+			Type(contract.TypeInternal).Message("failed to clear history").Build()))
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (h QueryHandler) recordHistory(connID, dbName, sql string, durationMS int64, errStr string) error {

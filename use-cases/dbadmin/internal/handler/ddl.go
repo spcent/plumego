@@ -64,6 +64,12 @@ func (h DDLHandler) CreateTable(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	for _, col := range req.Columns {
+		if err := validateColumnType(col.Type); err != nil {
+			logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+				Type(contract.TypeValidation).
+				Message("invalid type for column "+col.Name+": "+err.Error()).Build()))
+			return
+		}
 		if col.Default != "" {
 			if err := validateDDLLiteral(col.Default); err != nil {
 				logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
@@ -104,6 +110,14 @@ func (h DDLHandler) AlterTable(w http.ResponseWriter, r *http.Request) {
 		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeBadRequest).Message("invalid request body").Build()))
 		return
+	}
+	for _, col := range req.AddColumns {
+		if err := validateColumnType(col.Type); err != nil {
+			logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+				Type(contract.TypeValidation).
+				Message("invalid type for column "+col.Name+": "+err.Error()).Build()))
+			return
+		}
 	}
 	stmts := buildAlterTable(dbName, table, req, conn.Driver)
 	if len(stmts) == 0 {
@@ -220,6 +234,25 @@ func buildCreateTable(dbName string, req createTableRequest, driver connection.D
 		sb.WriteString(" DEFAULT CHARSET=" + charset)
 	}
 	return sb.String()
+}
+
+// validateColumnType rejects column type strings that contain SQL injection
+// characters while allowing all standard SQL type syntax (e.g. VARCHAR(255),
+// DECIMAL(10,2), DOUBLE PRECISION, INT UNSIGNED).
+func validateColumnType(s string) error {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return fmt.Errorf("column type is required")
+	}
+	if len(s) > 64 {
+		return fmt.Errorf("column type too long (max 64 chars)")
+	}
+	for _, bad := range []string{";", "--", "/*", "*/", "\x00"} {
+		if strings.Contains(s, bad) {
+			return fmt.Errorf("column type contains unsafe characters")
+		}
+	}
+	return nil
 }
 
 // validateDDLLiteral rejects DEFAULT values that contain SQL statement terminators

@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 
 	// Register drivers via blank imports so they're available to database/sql.
@@ -50,7 +51,8 @@ func (m *Manager) Open(c *connection.Connection) (*sql.DB, error) {
 
 	db, err := sql.Open(driverName, dsn)
 	if err != nil {
-		return nil, fmt.Errorf("open %s connection: %w", c.Driver, err)
+		// Use redactDSN so the password is never included in error messages.
+		return nil, fmt.Errorf("open %s connection (%s): %w", c.Driver, redactDSN(dsn), err)
 	}
 	if err := db.PingContext(context.Background()); err != nil {
 		db.Close()
@@ -108,6 +110,22 @@ func (m *Manager) Test(c *connection.Connection) error {
 	return nil
 }
 
+
+// redactDSN masks the password in a MySQL DSN for safe use in log/error messages.
+// Input:  "user:secret@tcp(host:3306)/db?..."
+// Output: "user:***@tcp(host:3306)/db?..."
+// Non-MySQL DSNs (e.g. file paths) are returned unchanged.
+func redactDSN(dsn string) string {
+	at := strings.Index(dsn, "@")
+	if at <= 0 {
+		return dsn
+	}
+	colon := strings.Index(dsn[:at], ":")
+	if colon <= 0 {
+		return dsn
+	}
+	return dsn[:colon+1] + "***" + dsn[at:]
+}
 
 func buildDSN(c *connection.Connection) (string, error) {
 	switch c.Driver {

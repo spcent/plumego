@@ -149,25 +149,56 @@ func (h ImportHandler) Import(w http.ResponseWriter, r *http.Request) {
 	logWriteErr(h.Logger, contract.WriteResponse(w, r, status, result, nil))
 }
 
-// splitSQL splits a SQL script into individual statements on semicolons,
-// skipping single-line comments and empty lines.
+// splitSQL splits a SQL script into individual statements using a character-level
+// parser that correctly handles:
+//   - Block comments /* ... */ (may span multiple lines or contain semicolons)
+//   - Line comments -- ... and # ...
+//   - Single-quoted and double-quoted string literals
 func splitSQL(script string) []string {
 	var stmts []string
 	var current strings.Builder
-	for _, line := range strings.Split(script, "\n") {
-		trimmed := strings.TrimSpace(line)
-		if strings.HasPrefix(trimmed, "--") || strings.HasPrefix(trimmed, "#") {
-			continue
-		}
-		current.WriteString(line)
-		current.WriteByte('\n')
-		if strings.HasSuffix(strings.TrimSpace(trimmed), ";") {
-			stmt := strings.TrimSpace(current.String())
-			stmt = strings.TrimSuffix(stmt, ";")
-			if stmt != "" {
+	inSingle, inDouble, inBlock := false, false, false
+	i := 0
+	for i < len(script) {
+		ch := script[i]
+		switch {
+		case !inSingle && !inDouble && !inBlock && i+1 < len(script) && ch == '/' && script[i+1] == '*':
+			// Block comment start — skip entire comment, leave a space boundary.
+			inBlock = true
+			i += 2
+		case inBlock && i+1 < len(script) && ch == '*' && script[i+1] == '/':
+			inBlock = false
+			i += 2
+			current.WriteByte(' ')
+		case inBlock:
+			i++
+		case !inSingle && !inDouble && i+1 < len(script) && ch == '-' && script[i+1] == '-':
+			// Line comment: skip to end of line.
+			for i < len(script) && script[i] != '\n' {
+				i++
+			}
+		case !inSingle && !inDouble && ch == '#':
+			// MySQL-style line comment: skip to end of line.
+			for i < len(script) && script[i] != '\n' {
+				i++
+			}
+		case ch == '\'' && !inDouble:
+			inSingle = !inSingle
+			current.WriteByte(ch)
+			i++
+		case ch == '"' && !inSingle:
+			inDouble = !inDouble
+			current.WriteByte(ch)
+			i++
+		case ch == ';' && !inSingle && !inDouble:
+			if stmt := strings.TrimSpace(current.String()); stmt != "" {
 				stmts = append(stmts, stmt)
 			}
 			current.Reset()
+			i++
+		default:
+			current.WriteByte(ch)
+			i++
 		}
 	}
 	if stmt := strings.TrimSpace(current.String()); stmt != "" {

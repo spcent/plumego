@@ -8,6 +8,26 @@ import { toMarkdownSchema, toJSONSchemaDesc } from '../utils/copyFormats'
 type TabKey = 'columns' | 'indexes' | 'fks' | 'ddl'
 const VALID_TABS: TabKey[] = ['columns', 'indexes', 'fks', 'ddl']
 
+const th: React.CSSProperties = {
+  textAlign: 'left',
+  padding: '6px 16px',
+  fontWeight: 500,
+  fontSize: 12,
+  color: 'var(--text-muted)',
+  background: 'var(--bg-muted)',
+  borderBottom: '1px solid var(--border-subtle)',
+  position: 'sticky',
+  top: 0,
+  zIndex: 10,
+}
+
+const td: React.CSSProperties = {
+  padding: '6px 16px',
+  fontSize: 13,
+  borderBottom: '1px solid var(--border-subtle)',
+  color: 'var(--text-default)',
+}
+
 export default function StructurePage() {
   const { connId, dbName, tableName } = useParams<{ connId: string; dbName: string; tableName: string }>()
   const [searchParams] = useSearchParams()
@@ -33,7 +53,13 @@ export default function StructurePage() {
     )
   }
 
-  if (!structure) return <div className="p-6 text-gray-400">Loading…</div>
+  if (!structure) {
+    return (
+      <div className="p-6 text-sm" style={{ color: 'var(--text-muted)' }}>
+        Loading…
+      </div>
+    )
+  }
 
   const tabLabel: Record<TabKey, string> = {
     columns: t('structure.tab.columns'),
@@ -42,52 +68,66 @@ export default function StructurePage() {
     ddl: t('structure.tab.ddl'),
   }
 
-  const copyBtnClass = 'text-xs px-2.5 py-1 rounded border border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+  const copyBtnStyle: React.CSSProperties = {
+    fontSize: 11,
+    padding: '3px 10px',
+    borderRadius: 4,
+    border: '1px solid var(--border-strong)',
+    color: 'var(--text-muted)',
+    background: 'transparent',
+    cursor: 'pointer',
+  }
 
   return (
     <div className="flex flex-col h-full">
-      <div className="px-6 pt-5 pb-0 border-b border-gray-100 dark:border-gray-700 shrink-0">
+      {/* Header + tabs */}
+      <div
+        className="px-6 pt-5 pb-0 shrink-0"
+        style={{ borderBottom: '1px solid var(--border-subtle)' }}
+      >
         <div className="flex items-start justify-between mb-3">
-          <h1 className="text-xl font-bold text-gray-800 dark:text-gray-100">
+          <h1 className="text-lg font-bold" style={{ color: 'var(--text-strong)' }}>
             Structure — <span className="font-mono">{tableName}</span>
           </h1>
-          {/* Schema copy buttons */}
           {tab === 'columns' && (
             <div className="flex items-center gap-1.5">
-              <span className="text-xs text-gray-400">{t('copy.as')}</span>
-              <button
-                onClick={() => copyText(toMarkdownSchema(tableName!, structure.columns))}
-                className={copyBtnClass}
-              >{t('copy.markdown')}</button>
-              <button
-                onClick={() => copyText(toJSONSchemaDesc(tableName!, structure.columns))}
-                className={copyBtnClass}
-              >{t('copy.json_schema')}</button>
+              <span className="text-xs" style={{ color: 'var(--text-subtle)' }}>{t('copy.as')}</span>
+              <button style={copyBtnStyle} onClick={() => copyText(toMarkdownSchema(tableName!, structure.columns))}>
+                {t('copy.markdown')}
+              </button>
+              <button style={copyBtnStyle} onClick={() => copyText(toJSONSchemaDesc(tableName!, structure.columns))}>
+                {t('copy.json_schema')}
+              </button>
               {structure.ddl && (
-                <button
-                  onClick={() => copyText(structure.ddl!)}
-                  className={copyBtnClass}
-                >{t('copy.ddl')}</button>
+                <button style={copyBtnStyle} onClick={() => copyText(structure.ddl!)}>
+                  {t('copy.ddl')}
+                </button>
               )}
             </div>
           )}
           {tab === 'ddl' && structure.ddl && (
-            <button
-              onClick={() => copyText(structure.ddl!)}
-              className={copyBtnClass}
-            >{t('copy.ddl')}</button>
+            <button style={copyBtnStyle} onClick={() => copyText(structure.ddl!)}>
+              {t('copy.ddl')}
+            </button>
           )}
         </div>
+
         <div className="flex gap-1">
           {VALID_TABS.map(tk => (
             <button
               key={tk}
               onClick={() => setTab(tk)}
-              className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
-                tab === tk
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
-              }`}
+              style={{
+                padding: '6px 16px',
+                fontSize: 13,
+                fontWeight: tab === tk ? 500 : 400,
+                borderBottom: tab === tk ? '2px solid var(--accent)' : '2px solid transparent',
+                color: tab === tk ? 'var(--accent)' : 'var(--text-muted)',
+                background: 'transparent',
+                cursor: 'pointer',
+                marginBottom: -1,
+                transition: 'color 75ms',
+              }}
             >
               {tabLabel[tk]}
             </button>
@@ -95,26 +135,33 @@ export default function StructurePage() {
         </div>
       </div>
 
+      {/* Tab content */}
       <div className="flex-1 overflow-auto">
         {tab === 'columns' && (
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 dark:bg-gray-800 sticky top-0 z-10 border-b border-gray-200 dark:border-gray-700">
+          <table style={{ width: '100%', minWidth: 'max-content', borderCollapse: 'collapse', fontSize: 13 }}>
+            <thead>
               <tr>
                 {['#', 'Name', 'Type', 'Nullable', 'Default', 'Key', 'Extra'].map(h => (
-                  <th key={h} className="text-left px-4 py-2 font-medium text-gray-600 dark:text-gray-400">{h}</th>
+                  <th key={h} style={th}>{h}</th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+            <tbody>
               {(structure.columns ?? []).map(c => (
-                <tr key={c.name} className={c.primary_key ? 'bg-yellow-50 dark:bg-yellow-900/20' : 'hover:bg-gray-50 dark:hover:bg-gray-800'}>
-                  <td className="px-4 py-2 text-gray-400 tabular-nums">{c.position}</td>
-                  <td className="px-4 py-2 font-mono font-medium text-gray-800 dark:text-gray-200">{c.name}</td>
-                  <td className="px-4 py-2 text-blue-700 dark:text-blue-400 font-mono text-xs">{c.full_type}</td>
-                  <td className="px-4 py-2 text-center text-gray-500">{c.nullable ? '✓' : ''}</td>
-                  <td className="px-4 py-2 text-gray-400 text-xs font-mono">{c.default ?? ''}</td>
-                  <td className="px-4 py-2 text-xs">{c.primary_key ? <span className="text-amber-600 font-medium">PK</span> : ''}</td>
-                  <td className="px-4 py-2 text-gray-400 text-xs">{c.auto_increment ? 'AUTO_INCREMENT' : ''}</td>
+                <tr
+                  key={c.name}
+                  style={{ background: c.primary_key ? 'var(--bg-selected)' : 'transparent' }}
+                  className="hover:bg-[var(--bg-hover)]"
+                >
+                  <td style={{ ...td, color: 'var(--text-subtle)', fontVariantNumeric: 'tabular-nums' }}>{c.position}</td>
+                  <td style={{ ...td, fontFamily: 'monospace', fontWeight: 500, color: 'var(--text-strong)' }}>{c.name}</td>
+                  <td style={{ ...td, fontFamily: 'monospace', fontSize: 11, color: 'var(--accent)' }}>{c.full_type}</td>
+                  <td style={{ ...td, textAlign: 'center', color: 'var(--text-muted)' }}>{c.nullable ? '✓' : ''}</td>
+                  <td style={{ ...td, fontFamily: 'monospace', fontSize: 11, color: 'var(--text-subtle)' }}>{c.default ?? ''}</td>
+                  <td style={{ ...td, fontSize: 11 }}>
+                    {c.primary_key ? <span style={{ color: 'var(--warning)', fontWeight: 600 }}>PK</span> : ''}
+                  </td>
+                  <td style={{ ...td, fontSize: 11, color: 'var(--text-subtle)' }}>{c.auto_increment ? 'AUTO_INCREMENT' : ''}</td>
                 </tr>
               ))}
             </tbody>
@@ -122,60 +169,81 @@ export default function StructurePage() {
         )}
 
         {tab === 'indexes' && (
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 dark:bg-gray-800 sticky top-0 z-10 border-b border-gray-200 dark:border-gray-700">
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+            <thead>
               <tr>
                 {['Name', 'Unique', 'Columns', 'Type'].map(h => (
-                  <th key={h} className="text-left px-4 py-2 font-medium text-gray-600 dark:text-gray-400">{h}</th>
+                  <th key={h} style={th}>{h}</th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+            <tbody>
               {(structure.indexes ?? []).map(idx => (
-                <tr key={idx.name} className="hover:bg-gray-50 dark:hover:bg-gray-800">
-                  <td className="px-4 py-2 font-mono text-sm text-gray-800 dark:text-gray-200">{idx.name}</td>
-                  <td className="px-4 py-2 text-center">
-                    {idx.unique ? <span className="text-green-600 font-medium text-xs">UNIQUE</span> : ''}
+                <tr key={idx.name} className="hover:bg-[var(--bg-hover)]">
+                  <td style={{ ...td, fontFamily: 'monospace' }}>{idx.name}</td>
+                  <td style={{ ...td, textAlign: 'center' }}>
+                    {idx.unique ? <span style={{ color: 'var(--success)', fontWeight: 600, fontSize: 11 }}>UNIQUE</span> : ''}
                   </td>
-                  <td className="px-4 py-2 font-mono text-xs text-gray-700 dark:text-gray-300">{(idx.columns ?? []).join(', ')}</td>
-                  <td className="px-4 py-2 text-gray-400 text-xs">{idx.type || ''}</td>
+                  <td style={{ ...td, fontFamily: 'monospace', fontSize: 11 }}>{(idx.columns ?? []).join(', ')}</td>
+                  <td style={{ ...td, fontSize: 11, color: 'var(--text-subtle)' }}>{idx.type || ''}</td>
                 </tr>
               ))}
               {(structure.indexes ?? []).length === 0 && (
-                <tr><td colSpan={4} className="px-4 py-10 text-center text-gray-400">{t('structure.no_indexes')}</td></tr>
+                <tr>
+                  <td colSpan={4} style={{ padding: '40px 16px', textAlign: 'center', color: 'var(--text-subtle)' }}>
+                    {t('structure.no_indexes')}
+                  </td>
+                </tr>
               )}
             </tbody>
           </table>
         )}
 
         {tab === 'fks' && (
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 dark:bg-gray-800 sticky top-0 z-10 border-b border-gray-200 dark:border-gray-700">
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+            <thead>
               <tr>
                 {['Name', 'Column', 'References', 'On Delete', 'On Update'].map(h => (
-                  <th key={h} className="text-left px-4 py-2 font-medium text-gray-600 dark:text-gray-400">{h}</th>
+                  <th key={h} style={th}>{h}</th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+            <tbody>
               {(structure.foreign_keys ?? []).map(fk => (
-                <tr key={fk.name} className="hover:bg-gray-50 dark:hover:bg-gray-800">
-                  <td className="px-4 py-2 font-mono text-xs text-gray-800 dark:text-gray-200">{fk.name}</td>
-                  <td className="px-4 py-2 font-mono text-gray-800 dark:text-gray-200">{fk.column}</td>
-                  <td className="px-4 py-2 font-mono text-xs text-gray-700 dark:text-gray-300">{fk.ref_table}.{fk.ref_column}</td>
-                  <td className="px-4 py-2 text-gray-400 text-xs">{fk.on_delete}</td>
-                  <td className="px-4 py-2 text-gray-400 text-xs">{fk.on_update}</td>
+                <tr key={fk.name} className="hover:bg-[var(--bg-hover)]">
+                  <td style={{ ...td, fontFamily: 'monospace', fontSize: 11 }}>{fk.name}</td>
+                  <td style={{ ...td, fontFamily: 'monospace' }}>{fk.column}</td>
+                  <td style={{ ...td, fontFamily: 'monospace', fontSize: 11 }}>{fk.ref_table}.{fk.ref_column}</td>
+                  <td style={{ ...td, fontSize: 11, color: 'var(--text-subtle)' }}>{fk.on_delete}</td>
+                  <td style={{ ...td, fontSize: 11, color: 'var(--text-subtle)' }}>{fk.on_update}</td>
                 </tr>
               ))}
               {(structure.foreign_keys ?? []).length === 0 && (
-                <tr><td colSpan={5} className="px-4 py-10 text-center text-gray-400">{t('structure.no_fks')}</td></tr>
+                <tr>
+                  <td colSpan={5} style={{ padding: '40px 16px', textAlign: 'center', color: 'var(--text-subtle)' }}>
+                    {t('structure.no_fks')}
+                  </td>
+                </tr>
               )}
             </tbody>
           </table>
         )}
 
         {tab === 'ddl' && (
-          <pre className="m-4 bg-gray-900 text-green-400 p-4 rounded-lg text-xs overflow-auto font-mono whitespace-pre-wrap">
+          <pre
+            style={{
+              margin: 16,
+              padding: 16,
+              borderRadius: 8,
+              fontSize: 12,
+              fontFamily: 'monospace',
+              background: '#0d1117',
+              color: '#56d364',
+              overflowX: 'auto',
+              whiteSpace: 'pre-wrap',
+              border: '1px solid var(--border-subtle)',
+            }}
+          >
             {structure.ddl || '-- DDL not available'}
           </pre>
         )}

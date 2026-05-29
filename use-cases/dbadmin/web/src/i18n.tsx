@@ -117,7 +117,7 @@ const en: Dict = {
   'settings.title': 'Settings',
   'settings.sql_history': 'SQL History',
   'settings.sql_history_enabled': 'Enable SQL history',
-  'settings.sql_history_hint': 'Records executed SQL in browser localStorage (max 100 entries). Disable if queries may contain sensitive data.',
+  'settings.sql_history_hint': 'Executed SQL is recorded server-side (max 100 entries per connection, 30-day retention). Manage history in the SQL Console history tab.',
   'nav.settings': 'Settings',
 
   // History (localStorage)
@@ -316,7 +316,7 @@ const zh: Dict = {
   'settings.title': '设置',
   'settings.sql_history': 'SQL 历史',
   'settings.sql_history_enabled': '启用 SQL 历史',
-  'settings.sql_history_hint': '执行的 SQL 将保存在浏览器 localStorage 中（最多 100 条）。如查询可能包含敏感数据，建议关闭。',
+  'settings.sql_history_hint': '执行的 SQL 将保存在服务端（每个连接最多 100 条，保留 30 天）。可在 SQL Console 历史 tab 中管理。',
   'nav.settings': '设置',
 
   // History (localStorage)

@@ -58,6 +58,26 @@ func (s *Store) List(connID string) ([]Entry, error) {
 	return entries, nil
 }
 
+// Delete removes a single history entry by ID for the given connection.
+func (s *Store) Delete(connID, entryID string) error {
+	entries, err := s.List(connID)
+	if err != nil {
+		return err
+	}
+	filtered := entries[:0]
+	for _, e := range entries {
+		if e.ID != entryID {
+			filtered = append(filtered, e)
+		}
+	}
+	return s.save(connID, filtered)
+}
+
+// Clear removes all history entries for the given connection.
+func (s *Store) Clear(connID string) error {
+	return s.kv.Delete(key(connID))
+}
+
 func (s *Store) save(connID string, entries []Entry) error {
 	data, err := json.Marshal(entries)
 	if err != nil {

@@ -122,9 +122,13 @@ func (a *App) RegisterRoutes() error {
 	protected.get("/api/conn/:id/db/:db/tables/:table/export", guard(http.HandlerFunc(exportH.Export)))
 	protected.post("/api/conn/:id/db/:db/import", guard(http.HandlerFunc(importH.Import)))
 
-	// SQL console.
+	// SQL console — SQL-specific routes (MySQL / SQLite only).
+	// Future non-SQL data sources (Redis, MongoDB, Elasticsearch) should use
+	// their own route groups, e.g. /api/conn/:id/redis/... or /api/conn/:id/mongo/...
 	protected.post("/api/conn/:id/db/:db/query", guard(http.HandlerFunc(queryH.Execute)))
 	protected.get("/api/conn/:id/history", guard(http.HandlerFunc(queryH.ListHistory)))
+	protected.delete("/api/conn/:id/history", guard(http.HandlerFunc(queryH.ClearHistory)))
+	protected.delete("/api/conn/:id/history/:entryId", guard(http.HandlerFunc(queryH.DeleteHistory)))
 
 	// SQLite file upload and download.
 	protected.post("/api/sqlite/upload", guard(http.HandlerFunc(sqliteH.Upload)))

@@ -4,6 +4,7 @@ import (
 	"encoding/csv"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -17,6 +18,10 @@ import (
 	sqliteinspect "dbadmin/internal/dbmanager/sqlite"
 	"dbadmin/internal/domain/connection"
 )
+
+// maxExportRows is the default and hard cap on rows returned by export.
+// Prevents unbounded memory consumption and overly long downloads.
+const maxExportRows = 100_000
 
 // ExportHandler handles data export (CSV and SQL dump).
 type ExportHandler struct {
@@ -40,6 +45,14 @@ func (h ExportHandler) Export(w http.ResponseWriter, r *http.Request) {
 	includeSchema := q.Get("includeSchema") != "false"
 	includeData := q.Get("includeData") != "false"
 	ts := time.Now().Format("20060102_150405")
+
+	// Parse optional row limit (default and hard-cap at maxExportRows).
+	limit := maxExportRows
+	if lStr := q.Get("limit"); lStr != "" {
+		if n, err := strconv.Atoi(lStr); err == nil && n > 0 && n < maxExportRows {
+			limit = n
+		}
+	}
 
 	conn, err := h.Connections.Get(connID)
 	if err != nil {
@@ -68,7 +81,8 @@ func (h ExportHandler) Export(w http.ResponseWriter, r *http.Request) {
 		tableFQN = fmt.Sprintf(`"%s"`, table)
 	}
 
-	rows, err := db.QueryContext(r.Context(), "SELECT * FROM "+tableFQN)
+	query := fmt.Sprintf("SELECT * FROM %s LIMIT %d", tableFQN, limit)
+	rows, err := db.QueryContext(r.Context(), query)
 	if err != nil {
 		h.Logger.Error("export query", plumelog.Fields{"error": err.Error()})
 		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
@@ -84,11 +98,14 @@ func (h ExportHandler) Export(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Inform the client of the row limit applied so it can show a truncation warning.
+	w.Header().Set("X-Export-Row-Limit", strconv.Itoa(limit))
+
 	switch format {
 	case "sql":
-		h.exportSQL(w, r, rows, cols, conn, dbName, table, ts, includeSchema, includeData)
+		h.exportSQL(w, r, rows, cols, conn, dbName, table, ts, includeSchema, includeData, limit)
 	default:
-		h.exportCSV(w, r, rows, cols, table, ts, includeData)
+		h.exportCSV(w, r, rows, cols, table, ts, includeData, limit)
 	}
 }
 
@@ -96,7 +113,7 @@ func (h ExportHandler) exportCSV(w http.ResponseWriter, r *http.Request, rows in
 	Next() bool
 	Scan(...any) error
 	Err() error
-}, cols []string, table, ts string, includeData bool) {
+}, cols []string, table, ts string, includeData bool, limit int) {
 	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
 	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s_%s.csv"`, table, ts))
 	cw := csv.NewWriter(w)
@@ -112,6 +129,7 @@ func (h ExportHandler) exportCSV(w http.ResponseWriter, r *http.Request, rows in
 	for i := range vals {
 		ptrs[i] = &vals[i]
 	}
+	n := 0
 	for rows.Next() {
 		if err := rows.Scan(ptrs...); err != nil {
 			h.Logger.Warn("csv scan", plumelog.Fields{"error": err.Error()})
@@ -133,6 +151,10 @@ func (h ExportHandler) exportCSV(w http.ResponseWriter, r *http.Request, rows in
 			}
 		}
 		_ = cw.Write(record)
+		n++
+	}
+	if n == limit {
+		_ = cw.Write([]string{fmt.Sprintf("[export truncated at %d rows — use filters or increase ?limit= to export more]", limit)})
 	}
 	cw.Flush()
 }
@@ -141,7 +163,7 @@ func (h ExportHandler) exportSQL(w http.ResponseWriter, r *http.Request, rows in
 	Next() bool
 	Scan(...any) error
 	Err() error
-}, cols []string, conn *connection.Connection, dbName, table, ts string, includeSchema, includeData bool) {
+}, cols []string, conn *connection.Connection, dbName, table, ts string, includeSchema, includeData bool, limit int) {
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s_%s.sql"`, table, ts))
 
@@ -179,6 +201,7 @@ func (h ExportHandler) exportSQL(w http.ResponseWriter, r *http.Request, rows in
 		ptrs[i] = &vals[i]
 	}
 
+	n := 0
 	for rows.Next() {
 		if err := rows.Scan(ptrs...); err != nil {
 			continue
@@ -204,6 +227,10 @@ func (h ExportHandler) exportSQL(w http.ResponseWriter, r *http.Request, rows in
 			tableFQN,
 			strings.Join(quotedCols, ", "),
 			strings.Join(valStrs, ", "))
+		n++
+	}
+	if n == limit {
+		fmt.Fprintf(w, "-- Export truncated at %d rows. Use filters or increase ?limit= to export more.\n", limit)
 	}
 }
 

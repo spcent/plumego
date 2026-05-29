@@ -67,6 +67,8 @@ export const api = {
                 opts?: { readonly?: boolean; confirmDangerous?: boolean }) =>
     req<QueryResult>('POST', `/conn/${id}/db/${db}/query`, { sql, database: db, ...opts }),
   listHistory: (id: string) => req<HistoryEntry[]>('GET', `/conn/${id}/history`),
+  deleteHistory: (id: string, entryId: string) => req<void>('DELETE', `/conn/${id}/history/${entryId}`),
+  clearHistory: (id: string) => req<void>('DELETE', `/conn/${id}/history`),
 
   createTable: (id: string, db: string, body: unknown) =>
     req<{ table: string }>('POST', `/conn/${id}/db/${db}/tables`, body),

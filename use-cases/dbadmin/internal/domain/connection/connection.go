@@ -16,11 +16,19 @@ import (
 )
 
 // DriverType identifies the database driver.
+// When adding a new driver: add its constant here, extend validateConnection in
+// connections.go, add a DSN builder case in dbmanager/manager.go, and register
+// handler routes in app/routes.go under a dedicated route group.
 type DriverType string
 
 const (
 	DriverMySQL  DriverType = "mysql"
 	DriverSQLite DriverType = "sqlite"
+
+	// Planned drivers — not yet implemented:
+	// DriverRedis         DriverType = "redis"
+	// DriverMongoDB       DriverType = "mongodb"
+	// DriverElasticsearch DriverType = "elasticsearch"
 )
 
 var (
