@@ -1,0 +1,216 @@
+import React, { useState, useMemo } from 'react'
+import { XCircle, AlertTriangle, Info, CheckCircle, Circle, ChevronDown } from 'lucide-react'
+import { formatAnnouncementMessage } from '@/utils/markdown'
+
+const typeConfigs = {
+  outage: {
+    icon: XCircle,
+    background: 'bg-red-50 border-gray-200 dark:bg-red-900/50 dark:border-gray-600',
+    border: 'border-red-500',
+    iconColor: 'text-red-600 dark:text-red-400',
+    text: 'text-red-700 dark:text-red-300',
+  },
+  warning: {
+    icon: AlertTriangle,
+    background: 'bg-yellow-50 border-gray-200 dark:bg-yellow-900/50 dark:border-gray-600',
+    border: 'border-yellow-500',
+    iconColor: 'text-yellow-600 dark:text-yellow-400',
+    text: 'text-yellow-700 dark:text-yellow-300',
+  },
+  information: {
+    icon: Info,
+    background: 'bg-blue-50 border-gray-200 dark:bg-blue-900/50 dark:border-gray-600',
+    border: 'border-blue-500',
+    iconColor: 'text-blue-600 dark:text-blue-400',
+    text: 'text-blue-700 dark:text-blue-300',
+  },
+  operational: {
+    icon: CheckCircle,
+    background: 'bg-green-50 border-gray-200 dark:bg-green-900/50 dark:border-gray-600',
+    border: 'border-green-500',
+    iconColor: 'text-green-600 dark:text-green-400',
+    text: 'text-green-700 dark:text-green-300',
+  },
+  none: {
+    icon: Circle,
+    background: 'bg-gray-50 border-gray-200 dark:bg-gray-800/50 dark:border-gray-600',
+    border: 'border-gray-500',
+    iconColor: 'text-gray-600 dark:text-gray-400',
+    text: 'text-gray-700 dark:text-gray-300',
+  },
+}
+
+const getTypeIcon = (type) => typeConfigs[type]?.icon || Circle
+const getTypeClasses = (type) => typeConfigs[type] || typeConfigs.none
+
+const formatDate = (dateString) => {
+  const date = new Date(dateString)
+  const today = new Date()
+  const yesterday = new Date(today)
+  yesterday.setDate(yesterday.getDate() - 1)
+
+  if (date.toDateString() === today.toDateString()) {
+    return 'Today'
+  } else if (date.toDateString() === yesterday.toDateString()) {
+    return 'Yesterday'
+  } else {
+    return date.toLocaleDateString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    })
+  }
+}
+
+const formatTime = (timestamp) => {
+  return new Date(timestamp).toLocaleTimeString('en-US', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  })
+}
+
+const formatFullTimestamp = (timestamp) => {
+  return new Date(timestamp).toLocaleString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    timeZoneName: 'short',
+  })
+}
+
+export default function AnnouncementBanner({ announcements = [] }) {
+  const [isCollapsed, setIsCollapsed] = useState(false)
+
+  const mostRecentAnnouncement = announcements.length > 0 ? announcements[0] : null
+  const mostRecentIcon = mostRecentAnnouncement ? getTypeIcon(mostRecentAnnouncement.type) : Circle
+  const mostRecentIconClass = mostRecentAnnouncement
+    ? typeConfigs[mostRecentAnnouncement.type]?.iconColor || 'text-gray-600 dark:text-gray-400'
+    : 'text-gray-600 dark:text-gray-400'
+
+  const containerClasses = (() => {
+    const type = mostRecentAnnouncement?.type || 'none'
+    const config = typeConfigs[type]
+    return `border-l-4 ${config.border.replace('border-', 'border-l-')}`
+  })()
+
+  const groupedAnnouncements = useMemo(() => {
+    if (!announcements.length) return {}
+    const groups = {}
+    announcements.forEach((announcement) => {
+      const date = new Date(announcement.timestamp).toDateString()
+      if (!groups[date]) {
+        groups[date] = []
+      }
+      groups[date].push(announcement)
+    })
+    return groups
+  }, [announcements])
+
+  if (!announcements.length) return null
+
+  return (
+    <div className="mb-6">
+      <div className={`rounded-lg border bg-card text-card-foreground shadow-sm transition-all duration-200 ${containerClasses}`}>
+        <div
+          className={`px-4 py-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors ${
+            isCollapsed ? 'rounded-lg' : 'rounded-t-lg border-b border-gray-200 dark:border-gray-600'
+          }`}
+          onClick={() => setIsCollapsed(!isCollapsed)}
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              {React.createElement(mostRecentIcon, { className: `w-5 h-5 ${mostRecentIconClass}` })}
+              <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">Announcements</h2>
+              <span className="text-xs text-gray-500 dark:text-gray-400">({announcements.length})</span>
+            </div>
+            <ChevronDown
+              className={`w-4 h-4 text-gray-500 dark:text-gray-400 transition-transform duration-200 ${
+                isCollapsed ? '-rotate-90' : 'rotate-0'
+              }`}
+            />
+          </div>
+        </div>
+
+        {!isCollapsed && (
+          <div className="p-4 transition-all duration-200 rounded-b-lg">
+            <div className="relative space-y-3">
+              {Object.entries(groupedAnnouncements).map(([date, group]) => (
+                <div key={date} className="relative">
+                  <div className="flex items-center gap-3 mb-2 relative">
+                    <div className="relative z-10 bg-white dark:bg-gray-800 px-2 py-1 rounded-md border border-gray-200 dark:border-gray-600">
+                      <time className="text-sm font-medium text-gray-600 dark:text-gray-300">{formatDate(date)}</time>
+                    </div>
+                    <div className="flex-1 border-t border-gray-200 dark:border-gray-600"></div>
+                  </div>
+
+                  <div className="space-y-2 ml-7 relative">
+                    {group.map((announcement, index) => {
+                      const Icon = getTypeIcon(announcement.type)
+                      const typeClasses = getTypeClasses(announcement.type)
+                      return (
+                        <div key={`${date}-${index}-${announcement.timestamp}`} className="relative">
+                          <div
+                            className={`absolute -left-[26px] w-5 h-5 rounded-full border bg-white dark:bg-gray-800 flex items-center justify-center z-10 ${
+                              index === group.length - 1 ? 'top-3' : 'top-1/2 -translate-y-1/2'
+                            } ${typeClasses.border}`}
+                          >
+                            {React.createElement(Icon, { className: `w-3 h-3 ${typeClasses.iconColor}` })}
+                          </div>
+
+                          {index === 0 && (
+                            <div
+                              className="absolute w-0.5 bg-gray-300 dark:bg-gray-600 pointer-events-none"
+                              style={{ left: '-16px', top: '-2.5rem', height: 'calc(50% + 2.5rem)' }}
+                            ></div>
+                          )}
+
+                          {index < group.length - 1 && (
+                            <div
+                              className="absolute w-0.5 bg-gray-300 dark:bg-gray-600 pointer-events-none"
+                              style={{
+                                left: '-16px',
+                                top: '50%',
+                                height:
+                                  index === group.length - 2
+                                    ? 'calc(50% + 1.25rem)'
+                                    : 'calc(50% + 2rem)',
+                              }}
+                            ></div>
+                          )}
+
+                          <div className={`rounded-md border p-3 transition-all duration-200 hover:shadow-sm ${typeClasses.background}`}>
+                            <div className="flex items-center gap-3">
+                              <time
+                                className={`text-sm font-mono whitespace-nowrap flex-shrink-0 ${typeClasses.text}`}
+                                title={formatFullTimestamp(announcement.timestamp)}
+                              >
+                                {formatTime(announcement.timestamp)}
+                              </time>
+                              <div className="flex-1 min-w-0">
+                                <p
+                                  className="text-sm leading-relaxed text-gray-900 dark:text-gray-100"
+                                  dangerouslySetInnerHTML={{
+                                    __html: formatAnnouncementMessage(announcement.message),
+                                  }}
+                                ></p>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
