@@ -163,31 +163,61 @@ func (h WidgetHandler) Delete(w http.ResponseWriter, r *http.Request) {
             Type(contract.TypeNotFound).Detail("id", id).Message("not found").Build()))
         return
     }
-    w.WriteHeader(http.StatusNoContent)
+    // contract.WriteResponse skips the body for 204 (statusDisallowsBody);
+    // using it here keeps the response path consistent with all other handlers.
+    logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusNoContent, nil, nil))
 }
 
-// 4. Register both verbs in app/routes.go
-if err := a.Core.Get("/api/v1/widgets", http.HandlerFunc(widgets.List)); err != nil {
-    return err
-}
-if err := a.Core.Delete("/api/v1/widgets/:id", http.HandlerFunc(widgets.Delete)); err != nil {
-    return err
-}
+// 4. Register both verbs in app/routes.go using routeReg.
+// routeReg captures only the first registration error so the table stays flat;
+// inspect reg.err once at the end rather than checking each call individually.
+wg := newRouteReg(a.Core.Group("/api/v1"))
+wg.get("/widgets",        http.HandlerFunc(widgets.List))
+wg.delete("/widgets/:id", http.HandlerFunc(widgets.Delete))
+return wg.err
 ```
 
-### Validate multiple fields and return the first error
+### Validate multiple required fields — collect all errors in one response
 
-`contract.WriteError` writes one error per response. The canonical pattern is
-fail-fast: validate fields in priority order and return on the first failure.
-This keeps error responses simple and predictable.
+The canonical pattern collects **all** missing required fields before writing an
+error response. Clients receive a single actionable reply that names every field
+they need to fix, rather than discovering failures one at a time across multiple
+round trips.
+
+`ErrorBuilder.Detail(key, value)` adds one entry per failing field. The builder
+accumulates details and writes them together in a single 400 response.
 
 ```go
+// requireWidgetFields checks that name and color are both non-empty.
+// It adds a per-field detail to eb for each empty field and returns false
+// when at least one is missing — callers write one error for all problems.
+func requireWidgetFields(eb *contract.ErrorBuilder, name, color string) (*contract.ErrorBuilder, bool) {
+    valid := true
+    if name == "" {
+        eb = eb.Detail("name", "field is required")
+        valid = false
+    }
+    if color == "" {
+        eb = eb.Detail("color", "field is required")
+        valid = false
+    }
+    return eb, valid
+}
+
 func (h WidgetHandler) Create(w http.ResponseWriter, r *http.Request) {
     var req struct {
         Name  string `json:"name"`
         Color string `json:"color"`
     }
     if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+        if errors.Is(err, io.EOF) {
+            logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+                Type(contract.TypeRequired).
+                Code("widget.create.body_required").
+                Message("request body is required").
+                Build()))
+            return
+        }
         logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
             Type(contract.TypeBadRequest).
             Code("widget.create.invalid_json").
@@ -195,32 +225,25 @@ func (h WidgetHandler) Create(w http.ResponseWriter, r *http.Request) {
             Build()))
         return
     }
-    if req.Name == "" {
-        logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
-            Type(contract.TypeRequired).
-            Code("widget.name.required").
-            Detail("field", "name").
-            Message("name is required").
-            Build()))
-        return
-    }
-    if req.Color == "" {
-        logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
-            Type(contract.TypeRequired).
-            Code("widget.color.required").
-            Detail("field", "color").
-            Message("color is required").
-            Build()))
+
+    // Body/JSON errors short-circuit above; field validation collects all problems.
+    eb := contract.NewErrorBuilder().
+        Type(contract.TypeRequired).
+        Code("widget.fields.required").
+        Message("one or more required fields are missing")
+    if eb, ok := requireWidgetFields(eb, req.Name, req.Color); !ok {
+        logWriteErr(h.Logger, contract.WriteError(w, r, eb.Build()))
         return
     }
     // all fields valid — proceed
 }
 ```
 
-Each error carries a `Detail("field", "<name>")` annotation so clients know
-exactly which field to highlight. Error codes are namespaced
-(`<resource>.<field>.<reason>`) for machine-readable disambiguation. Write one
-constant per distinct error code at the top of the handler file.
+Each detail entry carries the field name as the key so clients know exactly which
+field to highlight (`{"details":{"name":"field is required","color":"field is
+required"}}`). Error codes are namespaced (`<resource>.<operation>.<reason>`) for
+machine-readable disambiguation. Write one constant per distinct error code at the
+top of the handler file.
 
 ### Add a config field
 
@@ -240,6 +263,30 @@ constant per distinct error code at the top of the handler file.
 
 Middleware that runs on all routes goes in `app.Use`. Middleware that applies
 to a specific route group wraps the handler in `routes.go`.
+
+**Route-group middleware** — when every route under a prefix needs the same
+middleware (e.g., all `/api/v1/*` routes require authentication), wrap the
+group's routes with a shared middleware rather than wrapping each handler:
+
+```go
+// routes.go: wrap a whole group with one middleware call.
+// auth wraps every handler registered on the returned group — no per-route
+// wrapping needed. Read-only routes outside this group are unaffected.
+authed := auth.Middleware(cfg.App.AuthSecret)
+
+v1 := newRouteReg(a.Core.Group("/api/v1"))
+// All routes on v1 run through authed first.
+v1.get("/items",        authed(http.HandlerFunc(items.List)))
+v1.post("/items",       authed(http.HandlerFunc(items.Create)))
+v1.get("/items/:id",    authed(http.HandlerFunc(items.GetByID)))
+v1.put("/items/:id",    authed(http.HandlerFunc(items.Update)))
+v1.patch("/items/:id",  authed(http.HandlerFunc(items.Patch)))
+v1.delete("/items/:id", authed(http.HandlerFunc(items.Delete)))
+```
+
+For mixed cases where only a subset of routes in a group needs additional
+protection, compose guards: `authed(writeGuard(http.HandlerFunc(items.Create)))`.
+The outermost middleware in the chain runs first on every incoming request.
 
 ---
 

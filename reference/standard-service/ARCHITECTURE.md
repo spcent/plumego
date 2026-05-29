@@ -129,6 +129,7 @@ type ItemRepository interface {
     Get(ctx context.Context, id string) (item.Item, bool)
     List(ctx context.Context) []item.Item
     Update(ctx context.Context, id, name, description string) (item.Item, bool)
+    Patch(ctx context.Context, id, name, description string) (item.Item, bool)
     Delete(ctx context.Context, id string) bool
 }
 
@@ -189,10 +190,11 @@ the prefix is declared once and never repeated:
 v1 := a.Core.Group("/api/v1")
 v1.Get("/greet",        http.HandlerFunc(api.Greet))
 v1.Get("/items",        http.HandlerFunc(items.List))
-v1.Post("/items",       http.HandlerFunc(items.Create))
+v1.Post("/items",       writeGuard(http.HandlerFunc(items.Create)))
 v1.Get("/items/:id",    http.HandlerFunc(items.GetByID))
 v1.Put("/items/:id",    writeGuard(http.HandlerFunc(items.Update)))
-v1.Delete("/items/:id", http.HandlerFunc(items.Delete))
+v1.Patch("/items/:id",  writeGuard(http.HandlerFunc(items.Patch)))
+v1.Delete("/items/:id", writeGuard(http.HandlerFunc(items.Delete)))
 ```
 
 `RouteGroup` is a `core.App` concept: it enforces the same lifecycle and
@@ -202,24 +204,29 @@ nested (`api := app.Group("/api"); v1 := api.Group("/v1")`).
 REST resources follow a consistent two-path pattern:
 
 ```
-GET    /api/v1/items         → list all items
-POST   /api/v1/items         → create an item
+GET    /api/v1/items          → list all items
+POST   /api/v1/items          → create an item (write-guarded)
 
-GET    /api/v1/items/:id     → fetch one item
-PUT    /api/v1/items/:id     → replace an item (idempotent full replacement)
-DELETE /api/v1/items/:id     → remove one item
+GET    /api/v1/items/:id      → fetch one item
+PUT    /api/v1/items/:id      → replace all fields, idempotent (write-guarded)
+PATCH  /api/v1/items/:id      → update non-empty fields only (write-guarded)
+DELETE /api/v1/items/:id      → remove one item (write-guarded)
 ```
 
 The same collection path and member path carry different verbs; the group
 prefix keeps the registration readable without any controller scanning or
 annotation-based magic.
 
-**PUT vs PATCH**: This reference uses PUT (full replacement). PATCH (partial
-update) is semantically more complex: it requires distinguishing "field not
-provided" from "field set to null/zero", which typically demands a custom
-merge strategy or JSON Merge Patch (RFC 7396). Use PUT when the client owns
-the full resource representation; reach for PATCH only when partial updates
-are a hard product requirement and the merge semantics are well-defined.
+**PUT vs PATCH**: This reference implements both. PUT replaces all mutable fields
+and is idempotent — repeated calls with the same body produce the same stored
+state. PATCH applies a partial update: only the fields present and non-empty in
+the request body are written; absent or empty fields are left unchanged. The
+implementation uses string-emptiness as the "not provided" sentinel, which is
+sufficient for these two string fields. In real APIs with optional boolean or
+nullable fields you would need pointer types or JSON Merge Patch (RFC 7396) to
+distinguish "field absent" from "field set to zero/null". Use PUT when the client
+always sends the full resource representation; use PATCH when only the changed
+fields are transmitted.
 
 ### Error accumulation in route registration (`routeReg`)
 

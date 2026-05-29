@@ -202,6 +202,30 @@ func TestLoadEnvTLSEnabled(t *testing.T) {
 	})
 }
 
+// TestWriteKeyClearableByEmptyEnv verifies that APP_WRITE_KEY="" in the process
+// environment overrides a non-empty WriteKey from the .env file.
+// This matters because an empty WriteKey disables the write guard entirely; if
+// the str helper's empty-skip logic were applied here, a developer could not
+// disable the guard via environment once .env set it.
+func TestWriteKeyClearableByEmptyEnv(t *testing.T) {
+	dir := t.TempDir()
+	envFile := filepath.Join(dir, ".env")
+	if err := os.WriteFile(envFile, []byte("APP_WRITE_KEY=secret-from-file\n"), 0o600); err != nil {
+		t.Fatalf("write env file: %v", err)
+	}
+
+	cfg, err := load(
+		[]string{"standard-service", "--env-file", envFile},
+		mapLookup(map[string]string{"APP_WRITE_KEY": ""}),
+	)
+	if err != nil {
+		t.Fatalf("load config: %v", err)
+	}
+	if cfg.App.WriteKey != "" {
+		t.Fatalf("WriteKey = %q, want empty: process env APP_WRITE_KEY= must override .env value", cfg.App.WriteKey)
+	}
+}
+
 func mapLookup(values map[string]string) func(string) (string, bool) {
 	return func(key string) (string, bool) {
 		value, ok := values[key]

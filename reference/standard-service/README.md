@@ -59,7 +59,44 @@ Canonical files:
 - `internal/handler/items.go`
 - `internal/config/config.go`
 
-Run it with:
+## Response shape
+
+Every endpoint uses a single canonical envelope via `contract.WriteResponse` and
+`contract.WriteError`. No ad hoc JSON helpers or per-handler response structs.
+
+**Success** (`contract.WriteResponse` — only accepts 2xx status codes):
+```json
+{
+  "data":       { "id": "...", "name": "widget", "description": "...", "created_at": "..." },
+  "meta":       { "total": 42, "limit": 20, "offset": 0 },
+  "request_id": "01HX..."
+}
+```
+`data` and `meta` use `omitempty`: `meta` is absent when `nil` is passed;
+`data` is absent when `nil`. For 204 No Content the body is suppressed entirely
+by the contract layer — `writeJSON` writes only the status line.
+
+**Error** (`contract.WriteError`):
+```json
+{
+  "error": {
+    "code":     "item.fields.required",
+    "message":  "one or more required fields are missing",
+    "category": "validation_error",
+    "type":     "required_field_missing",
+    "details":  { "name": "field is required", "description": "field is required" }
+  },
+  "request_id": "01HX..."
+}
+```
+`type` is the `ErrorType` string value (e.g. `TypeRequired = "required_field_missing"`),
+not the Go identifier. `category` is derived automatically from the type
+(`TypeRequired → "validation_error"`, `TypeNotFound → "client_error"`,
+`TypeUnauthorized → "auth_error"`, `TypeUnavailable → "server_error"`). `code`
+is overridden per handler with a namespaced string (`<resource>.<operation>.<reason>`).
+`details` carries per-field annotations; it is omitted when empty.
+
+## Run it
 
 ```bash
 cd reference/standard-service

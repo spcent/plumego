@@ -615,6 +615,39 @@ func TestItemHandlerList(t *testing.T) {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
 		}
 	})
+
+	t.Run("zero limit returns 400 TypeBadRequest", func(t *testing.T) {
+		// limit=0 violates minVal=1; must be rejected as an invalid param.
+		h := ItemHandler{Repo: item.NewMemoryStore(), Logger: discardLogger()}
+		rec := httptest.NewRecorder()
+		h.List(rec, httptest.NewRequest(http.MethodGet, "/api/v1/items?limit=0", nil))
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
+		}
+		if code := decodeErrorPayload(t, rec).Code; code != codeItemListInvalidParam {
+			t.Fatalf("error code = %q, want %q", code, codeItemListInvalidParam)
+		}
+	})
+
+	t.Run("limit above max is silently clamped and reflected in meta", func(t *testing.T) {
+		// parseQueryInt silently clamps limit to maxLimit (100) without returning
+		// an error. Meta always reflects the effective limit so clients know the
+		// actual page size they received.
+		store := item.NewMemoryStore()
+		for i := 0; i < 5; i++ {
+			store.Create(context.Background(), "item", "an item")
+		}
+		h := ItemHandler{Repo: store, Logger: discardLogger()}
+
+		rec := httptest.NewRecorder()
+		h.List(rec, httptest.NewRequest(http.MethodGet, "/api/v1/items?limit=200", nil))
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+		}
+		env := decodeEnvelope(t, rec)
+		// Effective limit is clamped to 100; total and offset are unaffected.
+		assertMeta(t, env.Meta, 5, 100, 0)
+	})
 }
 
 func TestItemHandlerGetByID(t *testing.T) {
@@ -826,11 +859,8 @@ func TestItemHandlerUpdate(t *testing.T) {
 }
 
 func TestItemHandlerDelete(t *testing.T) {
-	store := item.NewMemoryStore()
-	created := store.Create(context.Background(), "gadget", "a gadget")
-	h := ItemHandler{Repo: store, Logger: discardLogger()}
-
 	t.Run("missing id returns 404 TypeNotFound", func(t *testing.T) {
+		h := ItemHandler{Repo: item.NewMemoryStore(), Logger: discardLogger()}
 		req := httptest.NewRequest(http.MethodDelete, "/api/v1/items/no-such-item", nil)
 		ctx := contract.WithRequestContext(req.Context(), contract.RequestContext{
 			Params: map[string]string{"id": "no-such-item"},
@@ -843,6 +873,10 @@ func TestItemHandlerDelete(t *testing.T) {
 	})
 
 	t.Run("existing id returns 204 no content", func(t *testing.T) {
+		store := item.NewMemoryStore()
+		created := store.Create(context.Background(), "gadget", "a gadget")
+		h := ItemHandler{Repo: store, Logger: discardLogger()}
+
 		req := httptest.NewRequest(http.MethodDelete, "/api/v1/items/"+created.ID, nil)
 		ctx := contract.WithRequestContext(req.Context(), contract.RequestContext{
 			Params: map[string]string{"id": created.ID},
@@ -857,13 +891,25 @@ func TestItemHandlerDelete(t *testing.T) {
 		}
 	})
 
-	t.Run("already deleted id returns 404", func(t *testing.T) {
+	t.Run("second delete of same id returns 404", func(t *testing.T) {
+		store := item.NewMemoryStore()
+		created := store.Create(context.Background(), "gadget", "a gadget")
+		h := ItemHandler{Repo: store, Logger: discardLogger()}
+
+		// First delete succeeds.
 		req := httptest.NewRequest(http.MethodDelete, "/api/v1/items/"+created.ID, nil)
 		ctx := contract.WithRequestContext(req.Context(), contract.RequestContext{
 			Params: map[string]string{"id": created.ID},
 		})
+		h.Delete(httptest.NewRecorder(), req.WithContext(ctx))
+
+		// Second delete on the same id must return 404.
+		req2 := httptest.NewRequest(http.MethodDelete, "/api/v1/items/"+created.ID, nil)
+		ctx2 := contract.WithRequestContext(req2.Context(), contract.RequestContext{
+			Params: map[string]string{"id": created.ID},
+		})
 		rec := httptest.NewRecorder()
-		h.Delete(rec, req.WithContext(ctx))
+		h.Delete(rec, req2.WithContext(ctx2))
 		if rec.Code != http.StatusNotFound {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusNotFound)
 		}
@@ -1010,7 +1056,12 @@ func TestItemHandlerPatch(t *testing.T) {
 		}
 	})
 
-	t.Run("patch is idempotent when same values are sent twice", func(t *testing.T) {
+	t.Run("repeated patch with same values produces stable state", func(t *testing.T) {
+		// PATCH is not defined as idempotent by RFC 5789 — whether repeated
+		// calls produce identical state depends on the server's merge strategy.
+		// This implementation uses string-emptiness as "not provided", so sending
+		// the same non-empty field twice leaves the resource in the same state.
+		// This is a property of the merge semantics, not an HTTP guarantee.
 		store := item.NewMemoryStore()
 		created := store.Create(context.Background(), "original", "original desc")
 		h := ItemHandler{Repo: store, Logger: discardLogger()}
@@ -1083,9 +1134,18 @@ func TestRequireWriteKey(t *testing.T) {
 // assertMeta verifies pagination metadata from the response meta field.
 func assertMeta(t *testing.T, meta map[string]any, wantTotal, wantLimit, wantOffset int) {
 	t.Helper()
-	total := int(meta["total"].(float64))
-	limit := int(meta["limit"].(float64))
-	offset := int(meta["offset"].(float64))
+	getInt := func(key string) int {
+		v, ok := meta[key]
+		if !ok {
+			t.Fatalf("meta missing key %q", key)
+		}
+		f, ok := v.(float64)
+		if !ok {
+			t.Fatalf("meta[%q] = %T, want float64", key, v)
+		}
+		return int(f)
+	}
+	total, limit, offset := getInt("total"), getInt("limit"), getInt("offset")
 	if total != wantTotal || limit != wantLimit || offset != wantOffset {
 		t.Fatalf("meta total=%d limit=%d offset=%d, want %d/%d/%d",
 			total, limit, offset, wantTotal, wantLimit, wantOffset)
