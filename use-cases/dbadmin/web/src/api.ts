@@ -148,6 +148,16 @@ export const api = {
     req<{ ok: boolean }>('DELETE', `/conn/${id}/redis/${dbIndex}/key`, { key, confirm: true }),
   redisCommand: (id: string, dbIndex: number, command: string) =>
     req<RedisCommandResult>('POST', `/conn/${id}/redis/${dbIndex}/command`, { command }),
+  redisBatchPreview: (id: string, dbIndex: number, pattern: string, maxKeys: number) =>
+    req<RedisBatchPreviewResponse>('POST', `/conn/${id}/redis/${dbIndex}/batch-preview`, {
+      pattern,
+      maxKeys,
+    }),
+  redisBatchDelete: (id: string, dbIndex: number, keys: string[], confirm: boolean) =>
+    req<{ deleted: number }>('POST', `/conn/${id}/redis/${dbIndex}/batch-delete`, {
+      keys,
+      confirm,
+    }),
 }
 
 export interface Connection {

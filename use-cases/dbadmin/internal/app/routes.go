@@ -155,6 +155,8 @@ func (a *App) RegisterRoutes() error {
 	protected.patch("/api/conn/:id/redis/:dbIndex/key/ttl", guard(http.HandlerFunc(redisH.SetTTL)))
 	protected.delete("/api/conn/:id/redis/:dbIndex/key", guard(http.HandlerFunc(redisH.DeleteKey)))
 	protected.post("/api/conn/:id/redis/:dbIndex/command", guard(http.HandlerFunc(redisH.Command)))
+	protected.post("/api/conn/:id/redis/:dbIndex/batch-preview", guard(http.HandlerFunc(redisH.BatchPreview)))
+	protected.post("/api/conn/:id/redis/:dbIndex/batch-delete", guard(http.HandlerFunc(redisH.BatchDelete)))
 
 	// SQLite file upload and download.
 	protected.post("/api/sqlite/upload", guard(http.HandlerFunc(sqliteH.Upload)))

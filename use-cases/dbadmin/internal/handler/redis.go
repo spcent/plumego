@@ -178,9 +178,11 @@ func (h RedisHandler) ListDBs(w http.ResponseWriter, r *http.Request) {
 // --- ListKeys ----------------------------------------------------------------
 
 type keyEntry struct {
-	Key  string `json:"key"`
-	Type string `json:"type"`
-	TTL  int64  `json:"ttl"` // seconds; -1 = no expiry
+	Key     string `json:"key"`
+	Type    string `json:"type"`
+	TTL     int64  `json:"ttl"` // seconds; -1 = no expiry
+	Memory  int64  `json:"memory,omitempty"` // bytes; 0 if unavailable
+	IsBig   bool   `json:"isBig,omitempty"`  // true if memory > 1MB
 }
 
 type listKeysResponse struct {
@@ -229,15 +231,17 @@ func (h RedisHandler) ListKeys(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Fetch types and TTLs in pipeline.
+	// Fetch types, TTLs, and memory usage in pipeline.
 	entries := make([]keyEntry, len(keys))
 	if len(keys) > 0 {
 		pipe := cl.Pipeline()
 		typeCmds := make([]*redis.StatusCmd, len(keys))
 		ttlCmds := make([]*redis.DurationCmd, len(keys))
+		memCmds := make([]*redis.IntCmd, len(keys))
 		for i, k := range keys {
 			typeCmds[i] = pipe.Type(ctx, k)
 			ttlCmds[i] = pipe.TTL(ctx, k)
+			memCmds[i] = pipe.MemoryUsage(ctx, k, 0) // 0 = default samples
 		}
 		pipe.Exec(ctx) //nolint:errcheck — individual cmd errors handled below
 		for i, k := range keys {
@@ -256,7 +260,13 @@ func (h RedisHandler) ListKeys(w http.ResponseWriter, r *http.Request) {
 					ttlSec = int64(d.Seconds())
 				}
 			}
-			entries[i] = keyEntry{Key: k, Type: t, TTL: ttlSec}
+			var memory int64
+			if memCmds[i].Err() == nil {
+				memory = memCmds[i].Val()
+			}
+			// Mark as big key if > 1MB
+			isBig := memory > 1024*1024
+			entries[i] = keyEntry{Key: k, Type: t, TTL: ttlSec, Memory: memory, IsBig: isBig}
 		}
 	}
 
@@ -504,6 +514,189 @@ func (h RedisHandler) DeleteKey(w http.ResponseWriter, r *http.Request) {
 	}
 
 	logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusOK, map[string]any{"ok": true}, nil))
+}
+
+// --- BatchPreview ------------------------------------------------------------
+
+type batchPreviewRequest struct {
+	Pattern string `json:"pattern"`
+	MaxKeys int    `json:"maxKeys"` // default 100, max 1000
+}
+
+type batchPreviewResponse struct {
+	Keys      []keyEntry `json:"keys"`
+	TotalKeys int        `json:"totalKeys"`
+	Truncated bool       `json:"truncated"` // true if more keys match than maxKeys
+}
+
+// BatchPreview scans keys matching a pattern and returns them without deleting.
+// This allows the user to preview what will be deleted before confirming.
+func (h RedisHandler) BatchPreview(w http.ResponseWriter, r *http.Request) {
+	connID := router.Param(r, "id")
+	dbIndexStr := router.Param(r, "dbIndex")
+	dbIndex, _ := strconv.Atoi(dbIndexStr)
+
+	var req batchPreviewRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+			Type(contract.TypeBadRequest).Message("invalid request body").Build()))
+		return
+	}
+	if req.Pattern == "" {
+		req.Pattern = "*"
+	}
+	if req.MaxKeys <= 0 {
+		req.MaxKeys = 100
+	} else if req.MaxKeys > 1000 {
+		req.MaxKeys = 1000
+	}
+
+	_, cl, err := h.openClient(connID, dbIndex)
+	if err != nil {
+		if err == connection.ErrNotFound {
+			h.connNotFound(w, r)
+			return
+		}
+		h.internalErr(w, r, err)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+	defer cancel()
+
+	var allKeys []keyEntry
+	var cursor uint64
+	truncated := false
+
+	// Scan in batches to collect keys
+	for {
+		keys, nextCursor, err := cl.Scan(ctx, cursor, req.Pattern, 100).Result()
+		if err != nil {
+			h.internalErr(w, r, err)
+			return
+		}
+
+		// Fetch metadata for this batch
+		if len(keys) > 0 {
+			pipe := cl.Pipeline()
+			typeCmds := make([]*redis.StatusCmd, len(keys))
+			ttlCmds := make([]*redis.DurationCmd, len(keys))
+			memCmds := make([]*redis.IntCmd, len(keys))
+			for i, k := range keys {
+				typeCmds[i] = pipe.Type(ctx, k)
+				ttlCmds[i] = pipe.TTL(ctx, k)
+				memCmds[i] = pipe.MemoryUsage(ctx, k, 0)
+			}
+			pipe.Exec(ctx) //nolint:errcheck
+
+			for i, k := range keys {
+				if len(allKeys) >= req.MaxKeys {
+					truncated = true
+					break
+				}
+
+				t := "unknown"
+				if typeCmds[i].Err() == nil {
+					t = typeCmds[i].Val()
+				}
+				ttlSec := int64(-1)
+				if ttlCmds[i].Err() == nil {
+					d := ttlCmds[i].Val()
+					if d == -1*time.Second {
+						ttlSec = -1
+					} else if d == -2*time.Second {
+						ttlSec = -2
+					} else {
+						ttlSec = int64(d.Seconds())
+					}
+				}
+				var memory int64
+				if memCmds[i].Err() == nil {
+					memory = memCmds[i].Val()
+				}
+				isBig := memory > 1024*1024
+				allKeys = append(allKeys, keyEntry{Key: k, Type: t, TTL: ttlSec, Memory: memory, IsBig: isBig})
+			}
+		}
+
+		if truncated || nextCursor == 0 {
+			break
+		}
+		cursor = nextCursor
+	}
+
+	resp := batchPreviewResponse{
+		Keys:      allKeys,
+		TotalKeys: len(allKeys),
+		Truncated: truncated,
+	}
+	logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusOK, resp, nil))
+}
+
+// --- BatchDelete -------------------------------------------------------------
+
+type batchDeleteRequest struct {
+	Keys    []string `json:"keys"`
+	Confirm bool     `json:"confirm"`
+}
+
+type batchDeleteResponse struct {
+	DeletedCount int64 `json:"deletedCount"`
+}
+
+// BatchDelete deletes multiple keys. Requires confirm=true in the request body.
+func (h RedisHandler) BatchDelete(w http.ResponseWriter, r *http.Request) {
+	connID := router.Param(r, "id")
+	dbIndexStr := router.Param(r, "dbIndex")
+	dbIndex, _ := strconv.Atoi(dbIndexStr)
+
+	var req batchDeleteRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+			Type(contract.TypeBadRequest).Message("invalid request body").Build()))
+		return
+	}
+	if len(req.Keys) == 0 {
+		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+			Type(contract.TypeBadRequest).Message("no keys specified").Build()))
+		return
+	}
+	if !req.Confirm {
+		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+			Type(contract.TypeBadRequest).Message("confirm required to delete keys").Build()))
+		return
+	}
+	// Limit batch size to prevent accidental mass deletion
+	if len(req.Keys) > 1000 {
+		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+			Type(contract.TypeBadRequest).Message("batch delete limited to 1000 keys at a time").Build()))
+		return
+	}
+
+	conn, cl, err := h.openClient(connID, dbIndex)
+	if err != nil {
+		if err == connection.ErrNotFound {
+			h.connNotFound(w, r)
+			return
+		}
+		h.internalErr(w, r, err)
+		return
+	}
+	if guardReadonly(conn, w, r, h.Logger) {
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+	defer cancel()
+
+	deleted, err := cl.Del(ctx, req.Keys...).Result()
+	if err != nil {
+		h.internalErr(w, r, err)
+		return
+	}
+
+	resp := batchDeleteResponse{DeletedCount: deleted}
+	logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusOK, resp, nil))
 }
 
 // --- Command -----------------------------------------------------------------

@@ -250,6 +250,69 @@ const en: Dict = {
   'redis.command.running': 'Running…',
   'redis.command.readonly_blocked': 'Blocked: write command on read-only connection',
   'redis.command.forbidden': 'Forbidden command',
+
+  // Redis Batch Operations
+  'redis.batch.select_keys': 'Select keys to delete',
+  'redis.batch.selected': '{n} keys selected',
+  'redis.batch.preview': 'Preview',
+  'redis.batch.delete': 'Delete Selected',
+  'redis.batch.confirm_delete': 'Delete {n} selected keys? This cannot be undone.',
+  'redis.batch.deleted': '{n} keys deleted',
+  'redis.batch.no_keys': 'No keys match the pattern',
+  'redis.batch.warning': 'Warning: This will delete {n} keys permanently',
+
+  // Redis Pattern Favorites
+  'redis.favorites.title': 'Pattern Favorites',
+  'redis.favorites.save': 'Save Pattern',
+  'redis.favorites.saved': 'Pattern saved',
+  'redis.favorites.no_favorites': 'No saved patterns',
+  'redis.favorites.delete': 'Remove from favorites',
+  'redis.favorites.name': 'Pattern name',
+
+  // Redis Big Key Warning
+  'redis.big_key.warning': 'Large key detected ({size})',
+  'redis.big_key.confirm_load': 'This key is {size}. Loading it may slow down the interface. Continue?',
+  'redis.big_key.skip': 'Skip loading large value',
+
+  // Redis Memory
+  'redis.memory': 'Memory: {size}',
+  'redis.memory.bytes': '{n} B',
+  'redis.memory.kb': '{n} KB',
+  'redis.memory.mb': '{n} MB',
+  'redis.memory.gb': '{n} GB',
+
+  // Redis Hash Field Search
+  'redis.hash.search': 'Search fields',
+  'redis.hash.search_placeholder': 'Filter by field name…',
+  'redis.hash.no_match': 'No fields match the filter',
+
+  // Redis List/Set/ZSet Pagination
+  'redis.collection.range': 'Showing {start}-{end} of {total}',
+  'redis.collection.load_more': 'Load more items',
+  'redis.collection.first': 'First',
+  'redis.collection.prev': 'Previous',
+  'redis.collection.next': 'Next',
+
+  // Redis Stream
+  'redis.stream.id': 'ID',
+  'redis.stream.fields': 'Fields',
+  'redis.stream.no_messages': 'No messages in stream',
+
+  // Redis Copy
+  'redis.copy.key': 'Copy Key',
+  'redis.copy.value': 'Copy Value',
+  'redis.copy.key_success': 'Key copied to clipboard',
+  'redis.copy.value_success': 'Value copied to clipboard',
+
+  // Redis TTL Presets
+  'redis.ttl.presets': 'TTL Presets',
+  'redis.ttl.1min': '1 minute',
+  'redis.ttl.5min': '5 minutes',
+  'redis.ttl.1hour': '1 hour',
+  'redis.ttl.1day': '1 day',
+  'redis.ttl.1week': '1 week',
+  'redis.ttl.never': 'Never expire',
+  'redis.ttl.custom': 'Custom',
 }
 
 const zh: Dict = {
@@ -498,6 +561,69 @@ const zh: Dict = {
   'redis.command.running': '执行中…',
   'redis.command.readonly_blocked': '已拦截：只读连接不允许写命令',
   'redis.command.forbidden': '禁止的命令',
+
+  // Redis Batch Operations
+  'redis.batch.select_keys': '选择要删除的 Key',
+  'redis.batch.selected': '已选择 {n} 个 Key',
+  'redis.batch.preview': '预览',
+  'redis.batch.delete': '删除选中',
+  'redis.batch.confirm_delete': '删除 {n} 个选中的 Key？此操作不可撤销。',
+  'redis.batch.deleted': '已删除 {n} 个 Key',
+  'redis.batch.no_keys': '没有匹配该模式的 Key',
+  'redis.batch.warning': '警告：这将永久删除 {n} 个 Key',
+
+  // Redis Pattern Favorites
+  'redis.favorites.title': '模式收藏',
+  'redis.favorites.save': '保存模式',
+  'redis.favorites.saved': '模式已保存',
+  'redis.favorites.no_favorites': '暂无收藏模式',
+  'redis.favorites.delete': '从收藏中移除',
+  'redis.favorites.name': '模式名称',
+
+  // Redis Big Key Warning
+  'redis.big_key.warning': '检测到大 Key（{size}）',
+  'redis.big_key.confirm_load': '此 Key 大小为 {size}，加载可能会拖慢界面。是否继续？',
+  'redis.big_key.skip': '跳过大 value 加载',
+
+  // Redis Memory
+  'redis.memory': '内存：{size}',
+  'redis.memory.bytes': '{n} B',
+  'redis.memory.kb': '{n} KB',
+  'redis.memory.mb': '{n} MB',
+  'redis.memory.gb': '{n} GB',
+
+  // Redis Hash Field Search
+  'redis.hash.search': '搜索字段',
+  'redis.hash.search_placeholder': '按字段名过滤…',
+  'redis.hash.no_match': '没有匹配的字段',
+
+  // Redis List/Set/ZSet Pagination
+  'redis.collection.range': '显示 {start}-{end}，共 {total}',
+  'redis.collection.load_more': '加载更多',
+  'redis.collection.first': '首页',
+  'redis.collection.prev': '上一页',
+  'redis.collection.next': '下一页',
+
+  // Redis Stream
+  'redis.stream.id': 'ID',
+  'redis.stream.fields': '字段',
+  'redis.stream.no_messages': '流中没有消息',
+
+  // Redis Copy
+  'redis.copy.key': '复制 Key',
+  'redis.copy.value': '复制 Value',
+  'redis.copy.key_success': 'Key 已复制到剪贴板',
+  'redis.copy.value_success': 'Value 已复制到剪贴板',
+
+  // Redis TTL Presets
+  'redis.ttl.presets': 'TTL 预设',
+  'redis.ttl.1min': '1 分钟',
+  'redis.ttl.5min': '5 分钟',
+  'redis.ttl.1hour': '1 小时',
+  'redis.ttl.1day': '1 天',
+  'redis.ttl.1week': '1 周',
+  'redis.ttl.never': '永不过期',
+  'redis.ttl.custom': '自定义',
 }
 
 const dicts: Record<Locale, Dict> = { en, zh }
