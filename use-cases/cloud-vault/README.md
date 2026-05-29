@@ -68,6 +68,16 @@ cp env.example .env
 | `QINIU_DOMAIN` | — | Qiniu CDN domain (e.g. `https://example.com`) |
 | `QINIU_REGION` | `z0` | Qiniu region: `z0` 华东, `z1` 华北, `z2` 华南, `na0` 北美, `as0` 新加坡 |
 | `QINIU_USE_HTTPS` | `true` | Whether to use HTTPS for Qiniu API calls |
+| `AUTH_ENABLED` | `false` | Enable authentication (see V0.7) |
+| `AUTH_SESSION_TTL_HOURS` | `720` | Session TTL in hours (default 30 days) |
+| `AUTH_COOKIE_NAME` | `cv_session` | Session cookie name |
+| `AUTH_SECURE_COOKIE` | `false` | Use Secure flag on cookies (HTTPS only) |
+| `AUTH_MAX_LOGIN_FAILURES` | `5` | Max failures before lockout |
+| `AUTH_PASSWORD_MIN_LENGTH` | `12` | Minimum password length (≥ 8) |
+| `AUTH_BOOTSTRAP_ADMIN_ENABLED` | `false` | Auto-create admin on first startup |
+| `AUTH_BOOTSTRAP_ADMIN_USERNAME` | — | Bootstrap admin username |
+| `AUTH_BOOTSTRAP_ADMIN_EMAIL` | — | Bootstrap admin email |
+| `AUTH_BOOTSTRAP_ADMIN_PASSWORD` | — | Bootstrap admin password (set via env for security) |
 
 ## Using LocalStorage (default)
 
@@ -108,6 +118,19 @@ All endpoints are under `/api/v1`. Successful responses use `{"data": ...}`, err
 | DELETE | `/api/v1/documents/:id` | Soft-delete document |
 | GET | `/api/v1/documents/:id/versions` | List document versions |
 | GET | `/api/v1/documents/:id/versions/:version` | Get specific version content |
+| POST | `/api/v1/auth/login` | Login (public, returns session cookie) |
+| POST | `/api/v1/auth/logout` | Logout and revoke session (protected) |
+| POST | `/api/v1/auth/setup` | Create first admin user (public, one-time) |
+| GET | `/api/v1/auth/status` | Check if system is initialized (public) |
+| GET | `/api/v1/auth/me` | Get current user profile (protected) |
+| PUT | `/api/v1/auth/me` | Update user profile (protected) |
+| POST | `/api/v1/auth/change-password` | Change password (protected) |
+| GET | `/api/v1/auth/sessions` | List active sessions (protected) |
+| DELETE | `/api/v1/auth/sessions/:id` | Revoke specific session (protected) |
+| POST | `/api/v1/auth/sessions/revoke-all` | Revoke all other sessions (protected) |
+| GET | `/api/v1/auth/security-events` | List security events (protected) |
+
+**Note:** Protected endpoints require a valid session cookie. See V0.7 documentation for authentication details.
 
 ### Version conflict
 
@@ -137,6 +160,10 @@ make server-build  # embeds frontend and compiles Go binary → bin/markdown-vau
 | `tags` | Tag definitions (reserved for V0.2) |
 | `document_tags` | Document↔tag associations (reserved for V0.2) |
 | `sync_jobs` | Background sync job queue (reserved for V0.2) |
+| `users` | User accounts with profile and preferences (V0.7) |
+| `user_sessions` | Session tokens with metadata (V0.7) |
+| `login_attempts` | Failed login tracking for rate limiting (V0.7) |
+| `security_events` | Audit log for authentication actions (V0.7) |
 
 ## Object Storage Key Format
 
@@ -754,10 +781,26 @@ password = "Change-Me-Strong-Password-123"
 
 #### Environment Variable Override
 
+All auth settings can be overridden via environment variables:
+
 ```bash
-MARKDOWN_VAULT_AUTH_ENABLED=true
-MARKDOWN_VAULT_AUTH_SESSION_TTL_HOURS=168
-MARKDOWN_VAULT_AUTH_SECURE_COOKIE=true
+AUTH_ENABLED=true
+AUTH_SESSION_TTL_HOURS=168
+AUTH_SECURE_COOKIE=true
+AUTH_MAX_LOGIN_FAILURES=5
+AUTH_LOGIN_FAILURE_WINDOW_MINUTES=15
+AUTH_LOCKOUT_MINUTES=30
+AUTH_PASSWORD_MIN_LENGTH=10
+AUTH_COOKIE_NAME=markdown_vault_session
+```
+
+Bootstrap admin settings:
+
+```bash
+AUTH_BOOTSTRAP_ADMIN_ENABLED=true
+AUTH_BOOTSTRAP_ADMIN_USERNAME=admin
+AUTH_BOOTSTRAP_ADMIN_EMAIL=admin@example.com
+AUTH_BOOTSTRAP_ADMIN_PASSWORD=Change-Me-Strong-Password-123
 ```
 
 ### Authentication API
