@@ -1,0 +1,26 @@
+name: x/observability/recordbuffer
+path: x/observability/recordbuffer
+layer: extension
+status: beta
+parent_family: x/observability
+suggested_gate_profile: single_module_behavior
+owner: observability
+risk: low
+summary: In-process metric record buffer for deferred export and replay; used internally by x/observability export pipeline.
+
+responsibilities:
+  - Bounded in-memory metric record queue
+  - Replay of buffered records to an export backend
+
+non_goals:
+  - Export backend configuration (owned by x/observability)
+  - Distributed record storage
+  - Business metric policy
+
+allowed_imports:
+  - stdlib
+  - metrics
+
+test_commands:
+  - go test -race -timeout 60s ./x/observability/recordbuffer/...
+  - go vet ./x/observability/recordbuffer/...

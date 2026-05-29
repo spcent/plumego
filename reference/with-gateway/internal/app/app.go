@@ -15,7 +15,7 @@ import (
 	"github.com/spcent/plumego/middleware/bodylimit"
 	"github.com/spcent/plumego/middleware/recovery"
 	"github.com/spcent/plumego/middleware/requestid"
-	midsecurity "github.com/spcent/plumego/middleware/security"
+	"github.com/spcent/plumego/middleware/securityheaders"
 	"github.com/spcent/plumego/middleware/timeout"
 	"github.com/spcent/plumego/x/gateway"
 	"with-gateway/internal/config"
@@ -35,7 +35,7 @@ type App struct {
 func New(cfg config.Config) (*App, error) {
 	a := core.New(cfg.Core, core.AppDependencies{Logger: plumelog.NewLogger()})
 
-	securityMw, err := midsecurity.Middleware(midsecurity.Config{})
+	securityMw, err := securityheaders.Middleware(securityheaders.Config{})
 	if err != nil {
 		return nil, fmt.Errorf("configure security headers middleware: %w", err)
 	}

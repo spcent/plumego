@@ -1,0 +1,28 @@
+name: x/observability/tracer
+path: x/observability/tracer
+layer: extension
+status: beta
+parent_family: x/observability
+suggested_gate_profile: single_module_behavior
+owner: observability
+risk: medium
+summary: OpenTelemetry tracer setup and configuration helpers; wires distributed tracing into the app lifecycle.
+
+responsibilities:
+  - Tracer construction and provider configuration
+  - OpenTelemetry exporter setup (OTLP, stdout, etc.)
+  - Span propagation helpers
+
+non_goals:
+  - Transport-layer tracing (owned by middleware/tracing)
+  - Metrics collection (owned by metrics stable root)
+  - Business observability policy
+
+allowed_imports:
+  - stdlib
+  - log
+  - x/observability
+
+test_commands:
+  - go test -race -timeout 60s ./x/observability/tracer/...
+  - go vet ./x/observability/tracer/...

@@ -41,7 +41,7 @@ Default landing zones: kernel/lifecycle/transport/auth/storage → stable root; 
 
 Extension maturity: **beta** (production-ready with caveats) → `x/frontend`, `x/gateway`, `x/messaging`, `x/observability`, `x/rest`, `x/tenant`, `x/websocket`; **experimental** (APIs may change) → `x/ai`, `x/data`, `x/fileapi`, `x/openapi`, `x/resilience`, `x/rpc`, `x/validate`. Full dashboard: `docs/EXTENSION_MATURITY.md` and `specs/extension-maturity.yaml`.
 
-Reference starting points: plain JSON API → `reference/standard-service`; hardened production (auth, tracing, metrics, tenant) → `reference/production-service`; REST CRUD → `reference/with-rest`; multi-tenant → `reference/with-tenant`; LLM/AI → `reference/with-ai`; WebSocket → `reference/with-websocket`; gRPC → `reference/with-rpc`; async events/pubsub → `reference/with-events`; inbound webhooks → `reference/with-webhook`; reverse proxy → `reference/with-gateway`; embedded static assets → `reference/with-frontend`; health/metrics routes → `reference/with-ops`; benchmarking → `reference/benchmark`.
+Reference starting points: plain JSON API → `reference/standard-service`; hardened production (auth, tracing, metrics, tenant) → `reference/production-service`; REST CRUD → `reference/with-rest`; multi-tenant → `reference/with-tenant`; LLM/AI → `reference/with-ai`; WebSocket → `reference/with-websocket`; gRPC → `reference/with-rpc`; event-driven pubsub architecture → `reference/with-events`; messaging feature integration into existing service → `reference/with-messaging`; inbound webhooks → `reference/with-webhook`; reverse proxy → `reference/with-gateway`; embedded static assets → `reference/with-frontend`; health/metrics routes → `reference/with-ops`; benchmarking → `reference/benchmark`.
 
 Boundary reminders:
 

@@ -1,3 +1,12 @@
+// WebSocket proxy support for the gateway reverse proxy.
+//
+// handleWebSocketProxy operates at the raw TCP proxy layer — it performs the
+// HTTP upgrade handshake and then copies bytes bidirectionally between the
+// client and the upstream backend. It does not own application-level WebSocket
+// semantics (hub management, routing, broadcasting).
+//
+// For application-level WebSocket features use x/websocket, which provides
+// the hub, route registration, and broadcast primitives.
 package gateway
 
 import (

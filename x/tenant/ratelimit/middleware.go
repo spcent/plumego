@@ -1,3 +1,8 @@
+// Package ratelimit provides tenant-scoped HTTP rate limiting middleware.
+//
+// This is the tenant-aware layer: it applies per-tenant limits using
+// x/resilience/ratelimit.TokenBucket as the underlying primitive. For
+// general HTTP abuse protection without tenant context use middleware/abuseguard.
 package ratelimit
 
 import (

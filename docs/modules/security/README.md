@@ -37,7 +37,7 @@
 - keep JWT, header, and signature logic in `security/*` as primitives and policies
 - keep session revocation, token-version invalidation, and tenant-session sentinel errors in `x/tenant/session`, not in stable `security/*`
 - keep reusable resilience primitives such as circuit breakers in `x/resilience`, not in stable `security/*`
-- route HTTP adapter wiring through `middleware/auth` and `middleware/security`
+- route HTTP adapter wiring through `middleware/auth` and `middleware/securityheaders`
 
 ## Production Profile Relationship
 
@@ -48,10 +48,10 @@ Use `security/*` for reviewable primitives and policies:
 - `security/authn` owns principals, authenticators, authorizers, and context accessors.
 - `security/authn` context helpers defensively copy mutable principal fields.
 - `security/authn.StaticToken` compares fixed credentials through fixed-length digest comparison.
-- `security/headers` owns header policies consumed by `middleware/security`.
+- `security/headers` owns header policies consumed by `middleware/securityheaders`.
 - `security/headers.Policy.Validate` reports unsafe configured header names and values before runtime; `Policy.Apply` fails closed without writing headers when policy validation fails, and `Policy.ApplyChecked` also returns the validation error.
-- Production-facing examples should prefer `middleware/security.Middleware(security.Config{...})` or direct `Policy.ApplyChecked` when error handling is required.
-- `middleware/security.Middleware` validates custom policies during construction instead of applying a partially invalid policy at runtime.
+- Production-facing examples should prefer `middleware/securityheaders.Middleware(security.Config{...})` or direct `Policy.ApplyChecked` when error handling is required.
+- `middleware/securityheaders.Middleware` validates custom policies during construction instead of applying a partially invalid policy at runtime.
 - `security/headers` treats requests as HTTPS only for direct TLS, an all-HTTPS `X-Forwarded-Proto` chain, or an all-HTTPS RFC `Forwarded` proto chain; `X-Forwarded-Ssl` alone is ignored.
 - `security/headers.CSPBuilder` rejects unsafe directive values so caller-provided semicolons or controls cannot create extra directives; `Build` returns an empty header on invalid sources, while `BuildChecked` or `Validate` return the error.
 - `security/input` owns input-safety checks and rejects unsafe HTTP header names or values before they reach transport adapters.
@@ -61,7 +61,7 @@ Use `security/*` for reviewable primitives and policies:
 - `security/input` sanitizer helpers are lossy best-effort defense-in-depth utilities, not replacements for context-aware sanitizers, parameterized queries, or output encoding.
 - `security/input.BestEffortSanitizeHTML` covers script blocks and quoted or unquoted inline event handlers as a basic defense-in-depth helper.
 - `security/input.BestEffortSanitizeSQL` removes line comments, semicolons, common SQL keywords, and single-line or multiline block comments as a defense-in-depth helper only.
-- `security/abuse` owns abuse guard decisions consumed by `middleware/ratelimit`.
+- `security/abuse` owns abuse guard decisions consumed by `middleware/abuseguard`.
 - `security/abuse.Config.Validate` and `NewLimiterWithConfig` treat zero fields as omitted defaults and reject explicit negative values; `NewLimiter` fails closed with a disabled limiter when explicit configuration is invalid.
 - `security/abuse.Allow` denies empty limiter keys, and `AllowKey` additionally returns `ErrInvalidKey` for callers that need to classify the extraction failure.
 - `security/abuse` reports limiter bucket metrics from the same accounting path used for eviction and cleanup decisions.
@@ -82,7 +82,7 @@ Use `security/*` for reviewable primitives and policies:
 - `security/password` exposes sentinel errors for invalid cost, invalid stored hash, and password mismatch so callers can classify failures with `errors.Is`.
 - `security/password` enforces `MinimumCost` and `MaximumCost` bounds for generated and stored PBKDF2 hashes, rejects plaintext password inputs over `MaxPasswordLength` with `ErrPasswordTooLong`, and validates stored salt/hash lengths before verification.
 
-HTTP request wiring belongs in `middleware/auth`, `middleware/security`, and
-`middleware/ratelimit`. Application-specific authorization decisions should be
+HTTP request wiring belongs in `middleware/auth`, `middleware/securityheaders`, and
+`middleware/abuseguard`. Application-specific authorization decisions should be
 constructor-injected into those adapters rather than hidden behind package
 globals.

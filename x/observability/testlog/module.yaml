@@ -1,0 +1,25 @@
+name: x/observability/testlog
+path: x/observability/testlog
+layer: extension
+status: beta
+parent_family: x/observability
+suggested_gate_profile: single_module_behavior
+owner: observability
+risk: low
+summary: Test-only in-memory logger for asserting log output in unit and integration tests.
+
+responsibilities:
+  - In-memory implementation of log.StructuredLogger
+  - Log entry capture and assertion helpers
+
+non_goals:
+  - Production log output
+  - Export or transport functionality
+
+allowed_imports:
+  - stdlib
+  - log
+
+test_commands:
+  - go test -race -timeout 60s ./x/observability/testlog/...
+  - go vet ./x/observability/testlog/...

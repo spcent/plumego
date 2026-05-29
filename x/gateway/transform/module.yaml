@@ -1,0 +1,30 @@
+name: x/gateway/transform
+path: x/gateway/transform
+layer: extension
+status: beta
+parent_family: x/gateway
+suggested_gate_profile: single_module_behavior
+owner: edge
+risk: medium
+summary: Request and response transformation helpers for the gateway; header injection, body rewriting, and path normalization.
+
+responsibilities:
+  - Header injection and removal transforms
+  - Response body rewriting (prefix strip, host replacement)
+  - Path normalization helpers
+
+non_goals:
+  - Routing decisions (owned by x/gateway proxy)
+  - Business logic transforms
+  - Protocol transcoding (owned by x/gateway/protocol)
+
+allowed_imports:
+  - stdlib
+  - contract
+  - internal/httputil
+  - internal/httpx
+  - x/gateway
+
+test_commands:
+  - go test -race -timeout 60s ./x/gateway/transform/...
+  - go vet ./x/gateway/transform/...

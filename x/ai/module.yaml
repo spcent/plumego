@@ -42,19 +42,24 @@ stability_tiers:
     - streaming     # Family tier index; package metadata lives in x/ai/streaming/module.yaml
     - tool          # Family tier index; package metadata lives in x/ai/tool/module.yaml
   experimental:
+    # foundation tier — depended on by other x/ai packages
+    - tokenizer       # Token counting utilities; used by llmcache
+    - llmcache        # Exact-key LLM response cache; used by semanticcache and instrumentation
+
+    # composition tier — builds on foundation or x/resilience
+    - resilience      # Wraps x/resilience circuit-breaker and rate-limit for provider retry
+    - semanticcache   # Embedding-based similarity cache; builds on llmcache for exact fallback
+    - instrumentation # Observability decorators for x/ai components
+
+    # feature tier — independent experimental capabilities
     - orchestration   # Agent workflow engine; step types may evolve
-    - semanticcache   # Embedding-based caching; vector store backends in active development
     - marketplace     # Agent/workflow registry; installation and rating APIs unfinished
     - distributed     # Distributed execution; queue and persistence contracts not yet stable
-    - resilience      # Provider resilience decorator; package metadata lives in x/ai/resilience/module.yaml
-    - tokenizer       # Token counting utilities; package metadata lives in x/ai/tokenizer/module.yaml
-    - sse             # SSE transport primitive; package metadata lives in x/ai/sse/module.yaml
-    - filter          # Content filtering chain; package metadata lives in x/ai/filter/module.yaml
-    - metrics         # AI-specific metrics collector interface; package metadata lives in x/ai/metrics/module.yaml
-    - multimodal      # Extended multimodal content types; package metadata lives in x/ai/multimodal/module.yaml
-    - prompt          # Prompt template management; package metadata lives in x/ai/prompt/module.yaml
-    - llmcache        # LLM response cache interface and in-memory impl; package metadata lives in x/ai/llmcache/module.yaml
-    - instrumentation # Observability decorators for x/ai components; package metadata lives in x/ai/instrumentation/module.yaml
+    - sse             # SSE transport primitive for streaming AI responses over HTTP
+    - filter          # Content filtering chain
+    - metrics         # AI-specific metrics interface; convergence with stable metrics tracked in tasks/cards/active/1512-ai-metrics-interface-convergence.md
+    - multimodal      # Extended multimodal content types
+    - prompt          # Prompt template management
 
 public_entrypoints:
   - provider

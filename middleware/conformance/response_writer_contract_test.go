@@ -15,7 +15,7 @@ import (
 
 	"github.com/spcent/plumego/middleware"
 	"github.com/spcent/plumego/middleware/bodylimit"
-	"github.com/spcent/plumego/middleware/coalesce"
+	"github.com/spcent/plumego/middleware/singleflight"
 	"github.com/spcent/plumego/middleware/compression"
 	"github.com/spcent/plumego/middleware/debug"
 	"github.com/spcent/plumego/middleware/httpmetrics"
@@ -29,7 +29,7 @@ func TestResponseWriterConformancePanicPropagation(t *testing.T) {
 		mw   middleware.Middleware
 	}{
 		{name: "bodylimit", mw: bodylimit.Middleware(bodylimit.Config{MaxBytes: 1024})},
-		{name: "coalesce", mw: coalesce.New(coalesce.Config{Timeout: time.Second}).Middleware()},
+		{name: "coalesce", mw: singleflight.New(singleflight.Config{Timeout: time.Second}).Middleware()},
 		{name: "compression", mw: compression.Middleware(compression.Config{})},
 		{name: "timeout", mw: timeout.Middleware(timeout.Config{Timeout: time.Second})},
 	}
@@ -58,7 +58,7 @@ func TestResponseWriterConformanceFlushForwarding(t *testing.T) {
 		mw   middleware.Middleware
 	}{
 		{name: "bodylimit", mw: bodylimit.Middleware(bodylimit.Config{MaxBytes: 1024})},
-		{name: "coalesce", mw: coalesce.New(coalesce.Config{Timeout: time.Second}).Middleware()},
+		{name: "coalesce", mw: singleflight.New(singleflight.Config{Timeout: time.Second}).Middleware()},
 		{name: "compression", mw: compression.Middleware(compression.Config{})},
 	}
 
@@ -208,7 +208,7 @@ func TestResponseWriterConformanceOptionalInterfaceMatrix(t *testing.T) {
 			hasHijack: true,
 		},
 		{name: "bodylimit", mw: bodylimit.Middleware(bodylimit.Config{MaxBytes: 1024}), hasUnwrap: true, hasFlush: true, hasHijack: true},
-		{name: "coalesce", mw: coalesce.New(coalesce.Config{Timeout: time.Second}).Middleware(), hasUnwrap: true, hasFlush: true, hasHijack: true},
+		{name: "coalesce", mw: singleflight.New(singleflight.Config{Timeout: time.Second}).Middleware(), hasUnwrap: true, hasFlush: true, hasHijack: true},
 		{name: "compression", mw: compression.Middleware(compression.Config{}), hasUnwrap: true, hasFlush: true, hasHijack: true, needsGzip: true},
 		{name: "debug", mw: debug.Middleware(debug.DefaultConfig()), hasUnwrap: true, hasFlush: true, hasHijack: true},
 		{name: "httpmetrics", mw: httpmetrics.Middleware(conformanceObserver{}), hasUnwrap: true, hasFlush: true, hasHijack: true},

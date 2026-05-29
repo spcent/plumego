@@ -18,7 +18,7 @@ import (
 	"github.com/spcent/plumego/middleware/httpmetrics"
 	"github.com/spcent/plumego/middleware/recovery"
 	"github.com/spcent/plumego/middleware/requestid"
-	midsecurity "github.com/spcent/plumego/middleware/security"
+	"github.com/spcent/plumego/middleware/securityheaders"
 	"github.com/spcent/plumego/middleware/timeout"
 	"standard-service/internal/config"
 )
@@ -32,7 +32,7 @@ type App struct {
 // New constructs the App with explicit stable-root wiring only.
 func New(cfg config.Config) (*App, error) {
 	app := core.New(cfg.Core, core.AppDependencies{Logger: plumelog.NewLogger()})
-	securityMw, err := midsecurity.Middleware(midsecurity.Config{})
+	securityMw, err := securityheaders.Middleware(securityheaders.Config{})
 	if err != nil {
 		return nil, fmt.Errorf("configure security headers middleware: %w", err)
 	}
@@ -54,9 +54,9 @@ func New(cfg config.Config) (*App, error) {
 	//   recovery   → converts panics to 500 responses; inside cors/security so headers still apply
 	//   accesslog  → logs every request/response; after recovery so panics appear as 500
 	//   bodylimit  → rejects oversized bodies with 413; after accesslog so the 413 is logged
-	//   [ratelimit]→ optional: add middleware/ratelimit.NewAbuseGuard here (after bodylimit so
+	//   [abuseguard]→ optional: add middleware/abuseguard.NewAbuseGuard here (after bodylimit so
 	//               oversized bodies are rejected before a rate-limit token is consumed)
-	//               See middleware/ratelimit.AbuseGuardConfig for token-bucket defaults.
+	//               See middleware/abuseguard.AbuseGuardConfig for token-bucket defaults.
 	//   httpmetrics→ measures handler latency and status; swap NewNoopCollector for
 	//               observability.NewPrometheusCollector (from x/observability) in production,
 	//               then register GET /metrics with observability.NewPrometheusExporter.

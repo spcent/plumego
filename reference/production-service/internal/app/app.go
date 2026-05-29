@@ -14,10 +14,10 @@ import (
 	"github.com/spcent/plumego/middleware/accesslog"
 	"github.com/spcent/plumego/middleware/bodylimit"
 	"github.com/spcent/plumego/middleware/httpmetrics"
-	"github.com/spcent/plumego/middleware/ratelimit"
+	"github.com/spcent/plumego/middleware/abuseguard"
 	"github.com/spcent/plumego/middleware/recovery"
 	"github.com/spcent/plumego/middleware/requestid"
-	securitymw "github.com/spcent/plumego/middleware/security"
+	"github.com/spcent/plumego/middleware/securityheaders"
 	"github.com/spcent/plumego/middleware/timeout"
 	"github.com/spcent/plumego/middleware/tracing"
 	"production-service/internal/config"
@@ -30,7 +30,7 @@ type App struct {
 	Cfg       config.Config
 	Metrics   *metrics.BaseMetricsCollector
 	Profiles  *tenant.Store
-	RateLimit *ratelimit.AbuseGuardMiddleware
+	RateLimit *abuseguard.AbuseGuardMiddleware
 }
 
 // New constructs the production reference with explicit middleware wiring.
@@ -42,7 +42,7 @@ func New(cfg config.Config) (*App, error) {
 		return nil, fmt.Errorf("load profile store: %w", err)
 	}
 	app := core.New(cfg.Core, core.AppDependencies{Logger: logger})
-	rateLimitGuard := ratelimit.NewAbuseGuard(ratelimit.AbuseGuardConfig{
+	rateLimitGuard := abuseguard.NewAbuseGuard(abuseguard.AbuseGuardConfig{
 		Rate:     cfg.App.RateLimit,
 		Capacity: cfg.App.RateBurst,
 		Logger:   app.Logger(),
@@ -57,7 +57,7 @@ func New(cfg config.Config) (*App, error) {
 		rateLimitGuard.Stop()
 		return nil, fmt.Errorf("configure access log middleware: %w", err)
 	}
-	securityMw, err := securitymw.Middleware(securitymw.Config{})
+	securityMw, err := securityheaders.Middleware(securityheaders.Config{})
 	if err != nil {
 		rateLimitGuard.Stop()
 		return nil, fmt.Errorf("configure security middleware: %w", err)
@@ -71,7 +71,7 @@ func New(cfg config.Config) (*App, error) {
 	//   accesslog    → logs all requests including 413 (body too large) and 429 (rate limited);
 	//                  must be outer to bodylimit and ratelimit to capture those rejections
 	//   bodylimit    → rejects oversized bodies with 413; after accesslog so the 413 is logged
-	//   ratelimit    → rejects abusive clients with 429; after accesslog so the 429 is logged
+	//   abuseguard   → rejects abusive clients with 429; after accesslog so the 429 is logged
 	//   tracing      → records distributed trace spans; after rejection decisions
 	//   httpmetrics  → records request count and latency including rejected requests
 	//   timeout      → per-request wall-clock limit; innermost so only handler time is counted

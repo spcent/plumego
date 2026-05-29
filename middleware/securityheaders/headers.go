@@ -1,12 +1,7 @@
-// Package security provides the HTTP security-header middleware. It adapts the
+// Package securityheaders provides the HTTP security-header middleware. It adapts the
 // policy types in [security/headers] into the [middleware.Middleware] signature
-// so callers can wire a security-header policy into the standard middleware
-// chain without importing security/headers directly.
-//
-// This package and the top-level security/ package are distinct:
-//   - security/ owns auth primitives, JWT helpers, input safety, and abuse guards.
-//   - middleware/security (this package) owns only the HTTP response-header middleware adapter.
-package security
+// so callers can wire a security-header policy into the standard middleware chain.
+package securityheaders
 
 import (
 	"net/http"
@@ -27,11 +22,11 @@ type Config struct {
 //
 // Example:
 //
-//	import "github.com/spcent/plumego/middleware/security"
+//	import "github.com/spcent/plumego/middleware/securityheaders"
 //	import "github.com/spcent/plumego/security/headers"
 //
 //	// Use default security policy
-//	mw, err := security.Middleware(security.Config{})
+//	mw, err := securityheaders.Middleware(securityheaders.Config{})
 //
 //	// Or with custom policy
 //	policy := &headers.Policy{
@@ -39,7 +34,7 @@ type Config struct {
 //		ContentTypeOptions: "nosniff",
 //		ContentSecurityPolicy: headers.StrictCSP(),
 //	}
-//	mw, err = security.Middleware(security.Config{Policy: policy})
+//	mw, err = securityheaders.Middleware(securityheaders.Config{Policy: policy})
 //	_ = err
 //	handler := mw(myHandler)
 //

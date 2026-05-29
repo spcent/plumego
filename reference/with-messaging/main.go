@@ -1,9 +1,10 @@
-// Example: non-canonical
+// Example: with-messaging
 //
-// This is a feature demo showing how to add x/messaging (in-process pub/sub)
-// to a service that follows the standard-service layout.
+// Shows how to integrate x/messaging (pub/sub, queues, webhooks) into an
+// existing service that follows the standard-service layout.
 //
-// It is NOT the canonical app layout. See reference/standard-service for that.
+// Use reference/with-events for a service built around an event-driven
+// architecture from the ground up.
 package main
 
 import (
