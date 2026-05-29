@@ -1,15 +1,16 @@
-import { useState } from 'react'
-import VaultPage from './pages/VaultPage'
-import ImportPage from './pages/ImportPage'
-import SearchPage from './pages/SearchPage'
-import IndexPage from './pages/IndexPage'
-import DuplicatesPage from './pages/DuplicatesPage'
-import CollectionsPage from './pages/CollectionsPage'
-import ReviewPage from './pages/ReviewPage'
-import TopicsPage from './pages/TopicsPage'
-import AITasksPage from './pages/AITasksPage'
-import PromptsPage from './pages/PromptsPage'
-import SystemPage from './pages/SystemPage'
+import { useState, lazy, Suspense } from 'react'
+
+const VaultPage = lazy(() => import('./pages/VaultPage'))
+const ImportPage = lazy(() => import('./pages/ImportPage'))
+const SearchPage = lazy(() => import('./pages/SearchPage'))
+const IndexPage = lazy(() => import('./pages/IndexPage'))
+const DuplicatesPage = lazy(() => import('./pages/DuplicatesPage'))
+const CollectionsPage = lazy(() => import('./pages/CollectionsPage'))
+const ReviewPage = lazy(() => import('./pages/ReviewPage'))
+const TopicsPage = lazy(() => import('./pages/TopicsPage'))
+const AITasksPage = lazy(() => import('./pages/AITasksPage'))
+const PromptsPage = lazy(() => import('./pages/PromptsPage'))
+const SystemPage = lazy(() => import('./pages/SystemPage'))
 
 type Page = 'vault' | 'search' | 'import' | 'index' | 'duplicates' | 'collections' | 'review' | 'topics' | 'ai' | 'prompts' | 'system'
 
@@ -71,23 +72,25 @@ export default function App() {
 
       {/* Page content */}
       <div className="flex-1 overflow-hidden">
-        {page === 'vault' && (
-          <VaultPage
-            initialDocId={openDoc?.id ?? null}
-            highlightQuery={openDoc?.query ?? ''}
-            onDocumentOpened={() => setOpenDoc(null)}
-          />
-        )}
-        {page === 'search' && <SearchPage onOpenDocument={handleOpenFromSearch} />}
-        {page === 'import' && <ImportPage />}
-        {page === 'index' && <IndexPage />}
-        {page === 'duplicates' && <DuplicatesPage />}
-        {page === 'collections' && <CollectionsPage />}
-        {page === 'topics' && <TopicsPage />}
-        {page === 'review' && <ReviewPage />}
-        {page === 'ai' && <AITasksPage />}
-        {page === 'prompts' && <PromptsPage />}
-        {page === 'system' && <SystemPage />}
+        <Suspense fallback={<div className="flex items-center justify-center h-full text-muted-foreground text-sm">Loading…</div>}>
+          {page === 'vault' && (
+            <VaultPage
+              initialDocId={openDoc?.id ?? null}
+              highlightQuery={openDoc?.query ?? ''}
+              onDocumentOpened={() => setOpenDoc(null)}
+            />
+          )}
+          {page === 'search' && <SearchPage onOpenDocument={handleOpenFromSearch} />}
+          {page === 'import' && <ImportPage />}
+          {page === 'index' && <IndexPage />}
+          {page === 'duplicates' && <DuplicatesPage />}
+          {page === 'collections' && <CollectionsPage />}
+          {page === 'topics' && <TopicsPage />}
+          {page === 'review' && <ReviewPage />}
+          {page === 'ai' && <AITasksPage />}
+          {page === 'prompts' && <PromptsPage />}
+          {page === 'system' && <SystemPage />}
+        </Suspense>
       </div>
     </div>
   )
