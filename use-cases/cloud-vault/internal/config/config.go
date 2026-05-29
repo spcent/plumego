@@ -323,15 +323,28 @@ func load(args []string, lookupEnv func(string) (string, bool)) (Config, error) 
 		return cfg, err
 	}
 
-	// Environment variables override TOML values.
-	applyEnvOverrides(&cfg, lookupEnv)
+	// Layer 3: .env file overrides TOML.
+	// Layer 4: real env vars override .env. Combined via combineLookup.
+	dotenvPath := ".env"
+	if lookupEnv != nil {
+		if v, ok := lookupEnv("DOT_ENV_FILE"); ok && v != "" {
+			dotenvPath = v
+		}
+	}
+	dotenv := loadDotEnvFile(dotenvPath)
+	combined := combineLookup(dotenv, lookupEnv)
+	applyEnvOverrides(&cfg, combined)
 
 	// CLI flags override everything.
 	if err := applyFlags(&cfg, args); err != nil {
 		return cfg, err
 	}
 
-	return cfg, Validate(cfg)
+	// Full V0.8 validation (includes side effects like creating data dirs).
+	if err := ValidateConfig(cfg); err != nil {
+		return cfg, err
+	}
+	return cfg, nil
 }
 
 func readTOMLFile(path string, cfg *Config) error {

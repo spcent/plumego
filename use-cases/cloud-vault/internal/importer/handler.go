@@ -11,11 +11,6 @@ import (
 	"github.com/spcent/plumego/router"
 )
 
-const (
-	codeNotFound     = "NOT_FOUND"
-	codeInvalidInput = "INVALID_INPUT"
-)
-
 // Handler handles HTTP requests for import jobs.
 type Handler struct {
 	svc    *Service
@@ -131,7 +126,12 @@ func (h *Handler) decodeJSON(w http.ResponseWriter, r *http.Request, dst any) bo
 }
 
 func (h *Handler) writeOK(w http.ResponseWriter, r *http.Request, status int, data any) {
-	logWriteErr(h.logger, contract.WriteResponse(w, r, status, data, nil))
+	switch status {
+	case http.StatusCreated:
+		logWriteErr(h.logger, contract.WriteResponse(w, r, http.StatusCreated, data, nil))
+	default:
+		logWriteErr(h.logger, contract.WriteResponse(w, r, http.StatusOK, data, nil))
+	}
 }
 
 func (h *Handler) writeErr(w http.ResponseWriter, r *http.Request, err error) {
@@ -139,7 +139,6 @@ func (h *Handler) writeErr(w http.ResponseWriter, r *http.Request, err error) {
 	case errors.Is(err, ErrNotFound):
 		logWriteErr(h.logger, contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeNotFound).
-			Code(codeNotFound).
 			Message("import job not found").
 			Build()))
 	default:

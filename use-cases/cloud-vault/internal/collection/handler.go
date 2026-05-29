@@ -141,7 +141,12 @@ func (h *Handler) CreateFromSearch(w http.ResponseWriter, r *http.Request) {
 // --- helpers ---
 
 func (h *Handler) ok(w http.ResponseWriter, r *http.Request, status int, data any) {
-	logWriteErr(h.logger, contract.WriteResponse(w, r, status, data, nil))
+	switch status {
+	case http.StatusCreated:
+		logWriteErr(h.logger, contract.WriteResponse(w, r, http.StatusCreated, data, nil))
+	default:
+		logWriteErr(h.logger, contract.WriteResponse(w, r, http.StatusOK, data, nil))
+	}
 }
 
 func (h *Handler) decodeJSON(w http.ResponseWriter, r *http.Request, dst any) bool {

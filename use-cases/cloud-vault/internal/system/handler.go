@@ -21,11 +21,16 @@ func NewHandler(svc *Service, logger plumelog.StructuredLogger) *Handler {
 // GET /api/v1/system/health
 func (h *Handler) Health(w http.ResponseWriter, r *http.Request) {
 	result := h.svc.Health(r.Context())
-	status := http.StatusOK
 	if result.Status == StatusError {
-		status = http.StatusServiceUnavailable
+		if err := contract.WriteError(w, r, contract.NewErrorBuilder().
+			Type(contract.TypeUnavailable).
+			Message("system health check failed").
+			Build()); err != nil && h.logger != nil {
+			h.logger.Error("system health: write error", plumelog.Fields{"err": err.Error()})
+		}
+		return
 	}
-	if err := contract.WriteResponse(w, r, status, result, nil); err != nil && h.logger != nil {
+	if err := contract.WriteResponse(w, r, http.StatusOK, result, nil); err != nil && h.logger != nil {
 		h.logger.Error("system health: write", plumelog.Fields{"err": err.Error()})
 	}
 }

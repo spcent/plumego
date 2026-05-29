@@ -1,66 +1,125 @@
-# Cloud Vault Configuration
-# Copy this file to config.toml and adjust values as needed.
-# Environment variables override TOML values (useful for secrets).
+# Cloud Vault Configuration Example
+# Copy this file to config.toml and adjust values as needed
 
+# =============================================================================
+# Server Configuration
+# =============================================================================
 [server]
-# HTTP listen address
-addr = ":8180"
+# HTTP listen address (required)
+# Format: ":port" or "host:port"
+addr = ":8080"
 
 # TLS configuration (optional)
 [server.tls]
 enabled = false
-# cert_file = "cert.pem"
-# key_file = "key.pem"
+cert_file = ""
+key_file = ""
 
-[app]
-# Maximum upload size in MB
-max_upload_size_mb = 10
-# Version policy: "always" keeps all versions, "limited" keeps N versions
-version_policy = "always"
-
+# =============================================================================
+# Database Configuration
+# =============================================================================
 [database]
-# SQLite database file path
+# SQLite database file path (required)
+# Parent directory will be created if it doesn't exist
 path = "./data/app.db"
 
+# =============================================================================
+# Storage Configuration
+# =============================================================================
 [storage]
-# Storage provider: "local" or "qiniu"
+# Storage provider: "local" or "qiniu" (required)
 provider = "local"
 
 # Local filesystem storage (used when provider = "local")
 [storage.local]
+# Root directory for object storage (required when provider = "local")
+# Directory will be created if it doesn't exist
 root = "./data/objects"
 
-# Qiniu Kodo storage (used when provider = "qiniu")
+# Qiniu Kodo cloud storage (used when provider = "qiniu")
 [storage.qiniu]
-# access_key = "your-access-key"
-# secret_key = "your-secret-key"
-# bucket = "markdown-vault"
-# domain = "https://example.com"
-# region = "z0"  # z0=华东, z1=华北, z2=华南, na0=北美, as0=新加坡
-# use_https = true
+# Qiniu Access Key (required when provider = "qiniu")
+# For security, use environment variable QINIU_ACCESS_KEY instead
+access_key = ""
+# Qiniu Secret Key (required when provider = "qiniu")
+# For security, use environment variable QINIU_SECRET_KEY instead
+secret_key = ""
+# Qiniu bucket name (required when provider = "qiniu")
+bucket = ""
+# Qiniu CDN domain (required when provider = "qiniu")
+# Example: "https://cdn.example.com"
+domain = ""
+# Qiniu region (required when provider = "qiniu")
+# Valid values: z0 (华东), z1 (华北), z2 (华南), na0 (北美), as0 (新加坡)
+region = "z0"
+# Use HTTPS for Qiniu API calls
+use_https = true
 
-[import]
-# Maximum file size for imports in MB
-max_file_size_mb = 50
+# =============================================================================
+# Application Configuration
+# =============================================================================
+[app]
+# Maximum upload size in MB
+max_upload_size_mb = 10
+# Version retention policy: "all" (keep all versions) or "limited" (keep last N)
+version_policy = "all"
 
+# =============================================================================
+# Authentication Configuration (V0.7+)
+# =============================================================================
+[auth]
+# Enable authentication (recommended: true for production)
+enabled = true
+# Session cookie name (required when enabled = true)
+cookie_name = "cloud_vault_session"
+# Session time-to-live in hours (required when enabled = true)
+session_ttl_hours = 168  # 7 days
+# Minimum password length (required when enabled = true, minimum: 8)
+password_min_length = 10
+# Maximum failed login attempts before lockout (required when enabled = true)
+max_login_failures = 5
+# Account lockout duration in minutes (required when enabled = true)
+lockout_minutes = 30
+# Use secure cookies (recommended: true for production with HTTPS)
+# Set to false only for local development
+secure_cookie = false
+
+# Bootstrap admin configuration (optional, for initial setup)
+[auth.bootstrap_admin]
+# Enable automatic admin creation on first startup
+enabled = false
+# Admin username (required when enabled = true)
+username = ""
+# Admin email (required when enabled = true)
+email = ""
+# Admin password (required when enabled = true)
+# For security, use environment variable AUTH_BOOTSTRAP_ADMIN_PASSWORD instead
+password = ""
+
+# =============================================================================
+# Full-text Search Configuration (V0.3+)
+# =============================================================================
 [search]
 # Enable full-text search
 enabled = true
-# Index documents on save
+# Automatically index documents on save
 index_on_save = true
-# Index on import: "inline", "background", or "disabled"
+# Index documents during import: "inline", "background", or "disabled"
 index_on_import = "background"
 # Batch size for background indexing
 index_batch_size = 100
-# Interval between batches in seconds
+# Interval between background indexing batches (seconds)
 index_interval_seconds = 5
-# Maximum content size to index in MB
-max_content_size_mb = 5
-# Number of tokens in search snippets
+# Maximum document size to index (MB)
+max_content_size_mb = 10
+# Number of context tokens to show in search snippets
 snippet_tokens = 20
-# Keep last N search queries
+# Maximum number of search history entries to retain
 history_limit = 100
 
+# =============================================================================
+# Organization & Deduplication Configuration (V0.4+)
+# =============================================================================
 [organize]
 # Enable duplicate detection
 duplicate_detection = true
@@ -70,66 +129,45 @@ similarity_detection = true
 tag_suggestion = true
 # Enable topic building
 topic_build = true
-# Near-duplicate threshold (0.0-1.0)
-near_dup_threshold = 0.85
-# Related document threshold (0.0-1.0)
-related_threshold = 0.70
-# Maximum comparisons per bucket
+# Threshold for near-duplicate detection (0.0-1.0, higher = stricter)
+near_dup_threshold = 0.95
+# Threshold for related document detection (0.0-1.0)
+related_threshold = 0.7
+# Maximum documents to compare per bucket
 max_compare_per_bucket = 1000
-# Similarity batch size
-similarity_batch_size = 500
-# Auto-archive duplicates (never auto-deletes)
+# Batch size for similarity detection
+similarity_batch_size = 100
+# Automatically archive duplicates (move to .archive directory)
 auto_archive_duplicates = false
-# Auto-apply tag suggestions
+# Automatically apply tag suggestions
 auto_apply_tag_suggestions = false
 # Enable prompt candidate detection
 prompt_candidate_detection = true
 
+# =============================================================================
+# AI Features Configuration (V0.5+)
+# =============================================================================
 [ai]
 # Enable AI features
 enabled = false
-# AI provider: "local_mock" or "openai_compatible"
+# AI provider: "local_mock" (for testing) or "openai_compatible"
 provider = "local_mock"
-# OpenAI-compatible API base URL
-# base_url = "https://api.openai.com/v1"
-# API key (set via environment variable AI_API_KEY for security)
-# api_key = ""
-# Model name
-model = "gpt-4o-mini"
-# Maximum context tokens
-max_context_tokens = 8000
-# Maximum retries per request
-max_retries = 2
-# Number of worker goroutines
+# OpenAI-compatible API base URL (required when provider = "openai_compatible")
+base_url = ""
+# OpenAI-compatible API key (required when provider = "openai_compatible")
+# For security, use environment variable AI_API_KEY instead
+api_key = ""
+# AI model name (required when provider = "openai_compatible")
+model = ""
+# Maximum context tokens for AI requests
+max_context_tokens = 4000
+# Maximum retry attempts for failed AI requests
+max_retries = 3
+# Number of concurrent AI task workers
 task_workers = 2
-# Enable AI summaries
+# Enable AI-generated document summaries
 summary_enabled = true
-# Enable Q&A extraction
+# Enable AI-powered Q&A
 qa_enabled = true
-# Enable prompt extraction
+# Enable AI prompt extraction
 prompt_extract_enabled = true
-
-[auth]
-# Enable authentication
-enabled = false
-# Session TTL in hours (default: 720 = 30 days)
-session_ttl_hours = 720
-# Session cookie name
-cookie_name = "cv_session"
-# Use secure cookies (HTTPS only)
-secure_cookie = false
-# Maximum login failures before lockout
-max_login_failures = 5
-# Time window for counting failures in minutes
-login_failure_window_minutes = 15
-# Lockout duration in minutes
-lockout_minutes = 15
-# Minimum password length
-password_min_length = 12
-
-# Bootstrap admin (create first admin user on startup)
-[auth.bootstrap_admin]
-enabled = false
-# username = "admin"
-# email = "admin@example.com"
-# password = "secure-password-here"  # Set via AUTH_BOOTSTRAP_ADMIN_PASSWORD env var

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"path/filepath"
 	"time"
 
 	"github.com/spcent/plumego/core"
@@ -21,6 +22,7 @@ import (
 
 	"cloud-vault/internal/ai"
 	"cloud-vault/internal/auth"
+	"cloud-vault/internal/backup"
 	"cloud-vault/internal/collection"
 	"cloud-vault/internal/config"
 	"cloud-vault/internal/database"
@@ -47,6 +49,7 @@ type App struct {
 	AI             *ai.Handler
 	System         *system.Handler
 	Auth           *auth.Handler
+	Backup         *backup.Handler
 	authService    *auth.Service
 	authMiddleware func(http.Handler) http.Handler
 	indexer        *search.Indexer
@@ -203,6 +206,12 @@ func New(cfg config.Config) (*App, error) {
 		authMiddleware = auth.RequireAuth(authService, cfg.Auth.CookieName)
 	}
 
+	// Backup handler (V0.8).
+	backupDir := filepath.Join(filepath.Dir(cfg.DB.Path), "backups")
+	backupRepo := backup.NewRepository(backupDir)
+	backupSvc := backup.NewService(backupRepo, cfg.DB.Path, cfg.Storage.Provider, cfg.Local.Root, "", cfg.App.Version)
+	backupHandler := backup.NewHandler(backupSvc, filepath.Dir(cfg.DB.Path), app.Logger())
+
 	return &App{
 		Core:           app,
 		Cfg:            cfg,
@@ -216,6 +225,7 @@ func New(cfg config.Config) (*App, error) {
 		AI:             aiHandler,
 		System:         systemHandler,
 		Auth:           authHandler,
+		Backup:         backupHandler,
 		authService:    authService,
 		authMiddleware: authMiddleware,
 		indexer:        indexer,
