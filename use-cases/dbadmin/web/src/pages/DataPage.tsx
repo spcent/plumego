@@ -97,7 +97,7 @@ export default function DataPage() {
       })
       setData(r)
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Load failed')
+      showToast(e instanceof Error ? e.message : t('data.load_failed'))
     } finally {
       setLoading(false)
     }
@@ -175,11 +175,11 @@ export default function DataPage() {
     else text = toInsertSQL(tableName!, data.columns, rows)
     navigator.clipboard.writeText(text).then(
       () => showToast(t('copy.cell_success'), 'success'),
-      () => showToast('Copy failed'),
+      () => showToast(t('data.copy_failed')),
     )
   }
 
-  const noPKTitle = 'No primary key — edit/delete unavailable'
+  const noPKTitle = t('data.no_pk_hint')
   const pageCount = Math.ceil(data.total / pageSize) || 1
 
   async function handleSave(values: Record<string, unknown>) {
@@ -193,9 +193,9 @@ export default function DataPage() {
       }
       setDrawerMode(null)
       load()
-      showToast(drawerMode === 'insert' ? 'Row inserted' : 'Row updated', 'success')
+      showToast(drawerMode === 'insert' ? t('data.insert.success') : t('data.edit.success'), 'success')
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Save failed')
+      showToast(e instanceof Error ? e.message : t('data.save_failed'))
     } finally {
       setSaving(false)
     }
@@ -248,7 +248,7 @@ export default function DataPage() {
           )}
           {loading && (
             <span className="text-[11px] shrink-0 animate-pulse" style={{ color: 'var(--accent)' }}>
-              loading…
+              {t('data.loading')}
             </span>
           )}
         </h1>
@@ -543,7 +543,7 @@ export default function DataPage() {
                                 await api.deleteRow(connId!, dbName!, tableName!, primaryKey)
                                 load()
                               } catch (e) {
-                                showToast(e instanceof Error ? e.message : 'Delete failed')
+                                showToast(e instanceof Error ? e.message : t('data.delete_failed'))
                               }
                             },
                           })
@@ -588,7 +588,7 @@ export default function DataPage() {
           color: 'var(--text-muted)',
         }}
       >
-        <div>Page {page} of {pageCount}</div>
+        <div>{t('data.pagination', { page, total: pageCount })}</div>
         <div className="flex gap-1.5">
           <button
             onClick={() => setPage(p => Math.max(1, p - 1))}
@@ -618,7 +618,7 @@ export default function DataPage() {
               color: 'var(--text-default)',
             }}
           >
-            {[50, 100, 200, 500].map(n => <option key={n} value={n}>{n} / page</option>)}
+            {[50, 100, 200, 500].map(n => <option key={n} value={n}>{t('data.page_size', { n })}</option>)}
           </select>
           {data.executionTimeMs > 0 && (
             <span style={{ color: 'var(--text-subtle)' }}>{data.executionTimeMs}ms</span>

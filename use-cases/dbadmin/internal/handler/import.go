@@ -2,7 +2,6 @@ package handler
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"strings"
 
@@ -112,7 +111,7 @@ func (h ImportHandler) Import(w http.ResponseWriter, r *http.Request) {
 
 	// For MySQL, set the target database.
 	if conn.Driver == connection.DriverMySQL && dbName != "" {
-		if _, err := db.ExecContext(r.Context(), fmt.Sprintf("USE `%s`", dbName)); err != nil {
+		if _, err := db.ExecContext(r.Context(), "USE "+quoteIdent(dbName, connection.DriverMySQL)); err != nil {
 			logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
 				Type(contract.TypeInternal).Message("failed to select database").Build()))
 			return

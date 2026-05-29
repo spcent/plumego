@@ -83,6 +83,16 @@ const en: Dict = {
   'data.save': 'Save',
   'data.cancel': 'Cancel',
   'data.no_rows': 'No rows',
+  'data.loading': 'loading…',
+  'data.no_pk_hint': 'No primary key — edit/delete unavailable',
+  'data.load_failed': 'Load failed',
+  'data.copy_failed': 'Copy failed',
+  'data.delete_failed': 'Delete failed',
+  'data.save_failed': 'Save failed',
+  'data.insert.success': 'Row inserted',
+  'data.edit.success': 'Row updated',
+  'data.pagination': 'Page {page} of {total}',
+  'data.page_size': '{n} / page',
 
   // Structure
   'structure.tab.columns': 'Columns',
@@ -263,6 +273,16 @@ const zh: Dict = {
   'data.save': '保存',
   'data.cancel': '取消',
   'data.no_rows': '无数据',
+  'data.loading': '加载中…',
+  'data.no_pk_hint': '无主键 — 编辑和删除不可用',
+  'data.load_failed': '加载失败',
+  'data.copy_failed': '复制失败',
+  'data.delete_failed': '删除失败',
+  'data.save_failed': '保存失败',
+  'data.insert.success': '行已插入',
+  'data.edit.success': '行已更新',
+  'data.pagination': '第 {page} / {total} 页',
+  'data.page_size': '{n} 条/页',
 
   // Structure
   'structure.tab.columns': '字段',

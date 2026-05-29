@@ -42,7 +42,10 @@ export default function CellRenderer({ value, colType }: CellRendererProps) {
     const meta = s.slice(6, s.endsWith('>') ? s.length - 1 : s.length)
     return (
       <span className="inline-flex items-center gap-1.5 min-w-0">
-        <span className="shrink-0 text-[10px] bg-orange-100 dark:bg-orange-900/40 text-orange-600 dark:text-orange-400 px-1 py-px rounded font-mono leading-none">
+        <span
+          className="shrink-0 text-[10px] px-1 py-px rounded font-mono leading-none"
+          style={{ background: 'var(--warning)22', color: 'var(--warning)' }}
+        >
           BLOB
         </span>
         <span
@@ -59,7 +62,10 @@ export default function CellRenderer({ value, colType }: CellRendererProps) {
     const display = s.length > 120 ? s.slice(0, 120) + '…' : s
     return (
       <span className="inline-flex items-center gap-1.5 min-w-0">
-        <span className="shrink-0 text-[10px] bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300 px-1 py-px rounded font-mono leading-none">
+        <span
+          className="shrink-0 text-[10px] px-1 py-px rounded font-mono leading-none"
+          style={{ background: 'var(--accent)22', color: 'var(--accent)' }}
+        >
           JSON
         </span>
         <span

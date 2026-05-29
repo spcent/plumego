@@ -197,9 +197,9 @@ func buildCreateTable(dbName string, req createTableRequest, driver connection.D
 	var sb strings.Builder
 	switch driver {
 	case connection.DriverMySQL:
-		sb.WriteString(fmt.Sprintf("CREATE TABLE `%s`.`%s` (\n", dbName, req.Name))
+		sb.WriteString(fmt.Sprintf("CREATE TABLE %s.%s (\n", quoteIdent(dbName, driver), quoteIdent(req.Name, driver)))
 	default:
-		sb.WriteString(fmt.Sprintf("CREATE TABLE \"%s\" (\n", req.Name))
+		sb.WriteString(fmt.Sprintf("CREATE TABLE %s (\n", quoteIdent(req.Name, driver)))
 	}
 	for i, col := range req.Columns {
 		sb.WriteString("  ")
@@ -300,7 +300,8 @@ func buildAlterTable(dbName, table string, req alterTableRequest, driver connect
 			stmts = append(stmts, fmt.Sprintf("ALTER TABLE %s %s", fqn, strings.Join(parts, ", ")))
 		}
 		if req.RenameTable != "" {
-			stmts = append(stmts, fmt.Sprintf("RENAME TABLE %s TO `%s`.`%s`", fqn, dbName, req.RenameTable))
+			stmts = append(stmts, fmt.Sprintf("RENAME TABLE %s TO %s.%s",
+				fqn, quoteIdent(dbName, driver), quoteIdent(req.RenameTable, driver)))
 		}
 	default:
 		// SQLite: only ADD COLUMN and RENAME TABLE are supported.
@@ -310,7 +311,8 @@ func buildAlterTable(dbName, table string, req alterTableRequest, driver connect
 				fqn, quoteIdent(col.Name, driver), col.Type))
 		}
 		if req.RenameTable != "" {
-			stmts = append(stmts, fmt.Sprintf("ALTER TABLE %s RENAME TO \"%s\"", fqn, req.RenameTable))
+			stmts = append(stmts, fmt.Sprintf("ALTER TABLE %s RENAME TO %s",
+				fqn, quoteIdent(req.RenameTable, driver)))
 		}
 	}
 	return stmts

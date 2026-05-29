@@ -114,6 +114,7 @@ func hasWhereClause(upperSQL string) bool {
 	return strings.Contains(clean, " WHERE ") ||
 		strings.Contains(clean, "\tWHERE ") ||
 		strings.Contains(clean, "\nWHERE ") ||
+		strings.Contains(clean, "\rWHERE ") ||
 		strings.HasSuffix(strings.TrimRight(clean, " \t\n\r"), "WHERE")
 }
 
@@ -208,7 +209,7 @@ func (h QueryHandler) Execute(w http.ResponseWriter, r *http.Request) {
 
 	// For MySQL, USE the selected database first.
 	if conn.Driver == connection.DriverMySQL && req.Database != "" {
-		if _, err := db.ExecContext(r.Context(), "USE `"+req.Database+"`"); err != nil {
+		if _, err := db.ExecContext(r.Context(), "USE "+quoteIdent(req.Database, connection.DriverMySQL)); err != nil {
 			logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
 				Type(contract.TypeInternal).Message("failed to select database").Build()))
 			return
