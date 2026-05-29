@@ -1,0 +1,64 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --border: 214.3 31.8% 91.4%;
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+    --primary: 221.2 83.2% 53.3%;
+    --primary-foreground: 210 40% 98%;
+    --radius: 0.5rem;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+}
+
+/* CodeMirror overrides */
+.cm-editor {
+  height: 100%;
+  font-size: 14px;
+}
+
+.cm-editor.cm-focused {
+  outline: none;
+}
+
+.cm-scroller {
+  font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+  overflow: auto;
+}
+
+/* Markdown preview prose */
+.prose {
+  @apply text-foreground max-w-none;
+}
+
+.prose h1 { @apply text-2xl font-bold mt-6 mb-3; }
+.prose h2 { @apply text-xl font-semibold mt-5 mb-2; }
+.prose h3 { @apply text-lg font-semibold mt-4 mb-2; }
+.prose p  { @apply my-2 leading-relaxed; }
+.prose ul { @apply list-disc pl-5 my-2; }
+.prose ol { @apply list-decimal pl-5 my-2; }
+.prose li { @apply my-0.5; }
+.prose a  { @apply text-blue-600 hover:underline; }
+.prose code { @apply bg-muted px-1 rounded text-sm font-mono; }
+.prose pre  { @apply bg-muted rounded p-3 overflow-x-auto my-3; }
+.prose pre code { @apply bg-transparent p-0; }
+.prose blockquote { @apply border-l-4 border-muted-foreground/30 pl-4 italic text-muted-foreground; }
+.prose table { @apply w-full border-collapse my-3; }
+.prose th { @apply border border-border px-3 py-1 bg-muted font-semibold text-left; }
+.prose td { @apply border border-border px-3 py-1; }
+.prose hr { @apply border-border my-4; }

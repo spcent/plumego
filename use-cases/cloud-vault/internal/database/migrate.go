@@ -1,0 +1,279 @@
+package database
+
+import (
+	"database/sql"
+	"fmt"
+	"time"
+)
+
+type migration struct {
+	version int
+	up      func(tx *sql.Tx) error
+}
+
+var migrations = []migration{
+	{version: 1, up: migrate001},
+	{version: 2, up: migrate002},
+	{version: 3, up: migrate003},
+}
+
+// Migrate applies all pending migrations in ascending version order.
+func (db *DB) Migrate() error {
+	if _, err := db.Exec(`CREATE TABLE IF NOT EXISTS schema_migrations (
+		version    INTEGER PRIMARY KEY,
+		applied_at TEXT    NOT NULL
+	)`); err != nil {
+		return fmt.Errorf("create schema_migrations: %w", err)
+	}
+
+	for _, m := range migrations {
+		applied, err := isMigrationApplied(db.DB, m.version)
+		if err != nil {
+			return fmt.Errorf("check migration %d: %w", m.version, err)
+		}
+		if applied {
+			continue
+		}
+
+		tx, err := db.Begin()
+		if err != nil {
+			return fmt.Errorf("begin migration %d: %w", m.version, err)
+		}
+
+		if err := m.up(tx); err != nil {
+			_ = tx.Rollback()
+			return fmt.Errorf("run migration %d: %w", m.version, err)
+		}
+
+		if _, err := tx.Exec(
+			"INSERT INTO schema_migrations (version, applied_at) VALUES (?, ?)",
+			m.version, time.Now().UTC().Format(time.RFC3339),
+		); err != nil {
+			_ = tx.Rollback()
+			return fmt.Errorf("record migration %d: %w", m.version, err)
+		}
+
+		if err := tx.Commit(); err != nil {
+			return fmt.Errorf("commit migration %d: %w", m.version, err)
+		}
+	}
+
+	return nil
+}
+
+func isMigrationApplied(db *sql.DB, version int) (bool, error) {
+	var count int
+	err := db.QueryRow("SELECT COUNT(*) FROM schema_migrations WHERE version = ?", version).Scan(&count)
+	return count > 0, err
+}
+
+// addColumnIfNotExists adds a column only when absent.
+// SQLite lacks ADD COLUMN IF NOT EXISTS, so we check PRAGMA table_info first.
+func addColumnIfNotExists(tx *sql.Tx, table, column, definition string) error {
+	rows, err := tx.Query(fmt.Sprintf("PRAGMA table_info(%s)", table))
+	if err != nil {
+		return fmt.Errorf("pragma table_info %s: %w", table, err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var cid, notNull, pk int
+		var name, typ string
+		var dfltValue *string
+		if err := rows.Scan(&cid, &name, &typ, &notNull, &dfltValue, &pk); err != nil {
+			return err
+		}
+		if name == column {
+			return nil
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+
+	_, err = tx.Exec(fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s %s", table, column, definition))
+	return err
+}
+
+// migrate001 applies the V0.1 initial schema.
+// All CREATE TABLE IF NOT EXISTS — safe to reapply on any database state.
+func migrate001(tx *sql.Tx) error {
+	_, err := tx.Exec(`
+CREATE TABLE IF NOT EXISTS documents (
+  id TEXT PRIMARY KEY,
+  title TEXT NOT NULL,
+  slug TEXT,
+  original_path TEXT,
+  storage_key TEXT NOT NULL,
+  current_version INTEGER NOT NULL DEFAULT 1,
+  content_hash TEXT NOT NULL,
+  size_bytes INTEGER NOT NULL DEFAULT 0,
+  word_count INTEGER NOT NULL DEFAULT 0,
+  line_count INTEGER NOT NULL DEFAULT 0,
+  status TEXT NOT NULL DEFAULT 'active',
+  sync_status TEXT NOT NULL DEFAULT 'synced',
+  is_favorite INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  uploaded_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_documents_updated_at  ON documents(updated_at);
+CREATE INDEX IF NOT EXISTS idx_documents_status      ON documents(status);
+CREATE INDEX IF NOT EXISTS idx_documents_sync_status ON documents(sync_status);
+CREATE INDEX IF NOT EXISTS idx_documents_title       ON documents(title);
+CREATE TABLE IF NOT EXISTS document_versions (
+  id TEXT PRIMARY KEY,
+  document_id TEXT NOT NULL,
+  version INTEGER NOT NULL,
+  storage_key TEXT NOT NULL,
+  content_hash TEXT NOT NULL,
+  size_bytes INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL,
+  note TEXT,
+  FOREIGN KEY(document_id) REFERENCES documents(id)
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_document_versions_doc_version
+  ON document_versions(document_id, version);
+CREATE INDEX IF NOT EXISTS idx_document_versions_document_id
+  ON document_versions(document_id);
+CREATE TABLE IF NOT EXISTS tags (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL UNIQUE,
+  created_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS document_tags (
+  document_id TEXT NOT NULL,
+  tag_id TEXT NOT NULL,
+  PRIMARY KEY(document_id, tag_id),
+  FOREIGN KEY(document_id) REFERENCES documents(id),
+  FOREIGN KEY(tag_id) REFERENCES tags(id)
+);
+CREATE TABLE IF NOT EXISTS sync_jobs (
+  id TEXT PRIMARY KEY,
+  document_id TEXT,
+  job_type TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending',
+  error_message TEXT,
+  retry_count INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_sync_jobs_status ON sync_jobs(status);
+`)
+	return err
+}
+
+// migrate002 adds V0.2 import and management columns/tables.
+func migrate002(tx *sql.Tx) error {
+	docCols := []struct{ name, def string }{
+		{"source_type",   "TEXT NOT NULL DEFAULT 'manual'"},
+		{"import_job_id", "TEXT"},
+		{"imported_at",   "TEXT"},
+		{"summary",       "TEXT"},
+		{"heading_text",  "TEXT"},
+		{"review_status", "TEXT NOT NULL DEFAULT 'pending'"},
+	}
+	for _, col := range docCols {
+		if err := addColumnIfNotExists(tx, "documents", col.name, col.def); err != nil {
+			return fmt.Errorf("add documents.%s: %w", col.name, err)
+		}
+	}
+
+	tagCols := []struct{ name, def string }{
+		{"color",  "TEXT"},
+		{"source", "TEXT"},
+	}
+	for _, col := range tagCols {
+		if err := addColumnIfNotExists(tx, "tags", col.name, col.def); err != nil {
+			return fmt.Errorf("add tags.%s: %w", col.name, err)
+		}
+	}
+
+	_, err := tx.Exec(`
+CREATE TABLE IF NOT EXISTS import_jobs (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  source_path TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending',
+  total_count INTEGER NOT NULL DEFAULT 0,
+  processed_count INTEGER NOT NULL DEFAULT 0,
+  success_count INTEGER NOT NULL DEFAULT 0,
+  failed_count INTEGER NOT NULL DEFAULT 0,
+  skipped_count INTEGER NOT NULL DEFAULT 0,
+  error_message TEXT,
+  started_at TEXT,
+  completed_at TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_import_jobs_status ON import_jobs(status);
+CREATE TABLE IF NOT EXISTS import_job_items (
+  id TEXT PRIMARY KEY,
+  job_id TEXT NOT NULL,
+  file_path TEXT NOT NULL,
+  document_id TEXT,
+  status TEXT NOT NULL DEFAULT 'pending',
+  error_message TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  FOREIGN KEY(job_id) REFERENCES import_jobs(id)
+);
+CREATE INDEX IF NOT EXISTS idx_import_job_items_job_id ON import_job_items(job_id);
+CREATE INDEX IF NOT EXISTS idx_import_job_items_status ON import_job_items(status);
+CREATE TABLE IF NOT EXISTS document_metadata (
+  id TEXT PRIMARY KEY,
+  document_id TEXT NOT NULL UNIQUE,
+  headings TEXT,
+  code_languages TEXT,
+  code_block_count INTEGER NOT NULL DEFAULT 0,
+  link_count INTEGER NOT NULL DEFAULT 0,
+  image_count INTEGER NOT NULL DEFAULT 0,
+  extracted_at TEXT NOT NULL,
+  FOREIGN KEY(document_id) REFERENCES documents(id)
+);
+CREATE INDEX IF NOT EXISTS idx_document_metadata_doc_id ON document_metadata(document_id);
+CREATE INDEX IF NOT EXISTS idx_documents_source_type   ON documents(source_type);
+CREATE INDEX IF NOT EXISTS idx_documents_import_job_id ON documents(import_job_id);
+CREATE INDEX IF NOT EXISTS idx_documents_review_status ON documents(review_status);
+CREATE INDEX IF NOT EXISTS idx_documents_is_favorite   ON documents(is_favorite);
+`)
+	return err
+}
+
+// migrate003 adds V0.3 full-text search tables.
+func migrate003(tx *sql.Tx) error {
+	_, err := tx.Exec(`
+CREATE VIRTUAL TABLE IF NOT EXISTS document_fts USING fts5(
+  document_id UNINDEXED,
+  title,
+  original_path,
+  summary,
+  headings,
+  content,
+  tokenize = 'unicode61'
+);
+CREATE TABLE IF NOT EXISTS document_index_status (
+  document_id     TEXT PRIMARY KEY,
+  content_hash    TEXT NOT NULL,
+  indexed_version INTEGER NOT NULL DEFAULT 0,
+  status          TEXT NOT NULL DEFAULT 'pending',
+  error_message   TEXT,
+  indexed_at      TEXT,
+  created_at      TEXT NOT NULL,
+  updated_at      TEXT NOT NULL,
+  FOREIGN KEY(document_id) REFERENCES documents(id)
+);
+CREATE INDEX IF NOT EXISTS idx_document_index_status_status
+  ON document_index_status(status);
+CREATE TABLE IF NOT EXISTS search_history (
+  id           TEXT PRIMARY KEY,
+  query        TEXT NOT NULL,
+  filters_json TEXT,
+  result_count INTEGER NOT NULL DEFAULT 0,
+  created_at   TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_search_history_created_at
+  ON search_history(created_at DESC);
+`)
+	return err
+}
