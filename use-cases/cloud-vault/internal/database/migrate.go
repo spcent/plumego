@@ -169,11 +169,11 @@ CREATE INDEX IF NOT EXISTS idx_sync_jobs_status ON sync_jobs(status);
 // migrate002 adds V0.2 import and management columns/tables.
 func migrate002(tx *sql.Tx) error {
 	docCols := []struct{ name, def string }{
-		{"source_type",   "TEXT NOT NULL DEFAULT 'manual'"},
+		{"source_type", "TEXT NOT NULL DEFAULT 'manual'"},
 		{"import_job_id", "TEXT"},
-		{"imported_at",   "TEXT"},
-		{"summary",       "TEXT"},
-		{"heading_text",  "TEXT"},
+		{"imported_at", "TEXT"},
+		{"summary", "TEXT"},
+		{"heading_text", "TEXT"},
 		{"review_status", "TEXT NOT NULL DEFAULT 'pending'"},
 	}
 	for _, col := range docCols {
@@ -183,7 +183,7 @@ func migrate002(tx *sql.Tx) error {
 	}
 
 	tagCols := []struct{ name, def string }{
-		{"color",  "TEXT"},
+		{"color", "TEXT"},
 		{"source", "TEXT"},
 	}
 	for _, col := range tagCols {

@@ -29,7 +29,7 @@ func (s *Service) buildTopics(ctx context.Context) (int, error) {
 
 	// Build doc → tagIDs reverse for scoring.
 	topicDocMap := make(map[string][]string) // topicID → []docIDs
-	topicIDs := make(map[string]string)       // tagID → topicID
+	topicIDs := make(map[string]string)      // tagID → topicID
 
 	count := 0
 	for tagID, cnt := range tagDocCount {

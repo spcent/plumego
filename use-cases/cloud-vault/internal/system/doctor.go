@@ -34,6 +34,8 @@ func runCheck(ctx context.Context, name string, db *sql.DB, store storage.Object
 		return checkImports(ctx, db)
 	case "ai":
 		return checkAIConsistency(ctx, db)
+	case "auth":
+		return checkAuth(ctx, db)
 	default:
 		return CheckResult{Name: name, Status: StatusError, Items: []IssueItem{{Issue: "unknown_check"}}}
 	}
@@ -478,6 +480,87 @@ func checkAIConsistency(ctx context.Context, db *sql.DB) CheckResult {
 			r.Failed++
 			if len(r.Items) < defaultMaxItems {
 				r.Items = append(r.Items, IssueItem{EntityID: id, Issue: "missing_summary_document", Detail: docID})
+			}
+		}
+	}
+
+	if r.Failed > 0 {
+		r.Status = StatusWarning
+	}
+	return r
+}
+
+// checkAuth verifies authentication table integrity.
+func checkAuth(ctx context.Context, db *sql.DB) CheckResult {
+	r := CheckResult{Name: "auth", Status: StatusOK}
+
+	// Check users table exists and has reasonable data
+	var userCount int
+	err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM users`).Scan(&userCount)
+	if err != nil {
+		r.Status = StatusError
+		r.Items = []IssueItem{{Issue: "users_table_missing", Detail: err.Error()}}
+		return r
+	}
+	r.Total = userCount
+
+	// Check for users with empty password hashes
+	rows, err := db.QueryContext(ctx, `
+		SELECT id, username FROM users
+		WHERE password_hash = '' OR password_hash IS NULL
+		LIMIT ?`, defaultMaxItems)
+	if err == nil {
+		defer rows.Close()
+		for rows.Next() {
+			var userID, username string
+			if err := rows.Scan(&userID, &username); err != nil {
+				continue
+			}
+			r.Failed++
+			if len(r.Items) < defaultMaxItems {
+				r.Items = append(r.Items, IssueItem{
+					EntityID: userID,
+					Issue:    "empty_password_hash",
+					Detail:   username,
+				})
+			}
+		}
+		rows.Close()
+	}
+
+	// Check for expired sessions that should be cleaned up
+	var expiredSessions int
+	err = db.QueryRowContext(ctx, `
+		SELECT COUNT(*) FROM user_sessions
+		WHERE expires_at < datetime('now') AND revoked_at IS NULL
+	`).Scan(&expiredSessions)
+	if err == nil && expiredSessions > 0 {
+		r.Items = append(r.Items, IssueItem{
+			Issue:  "expired_sessions_pending_cleanup",
+			Detail: fmt.Sprintf("%d expired sessions awaiting cleanup", expiredSessions),
+		})
+		r.Status = StatusWarning
+	}
+
+	// Check for orphaned sessions (user_id doesn't exist)
+	orphanedRows, err := db.QueryContext(ctx, `
+		SELECT us.id, us.user_id FROM user_sessions us
+		WHERE NOT EXISTS (SELECT 1 FROM users u WHERE u.id = us.user_id)
+		LIMIT ?`, defaultMaxItems)
+	if err == nil {
+		defer orphanedRows.Close()
+		for orphanedRows.Next() {
+			var sessionID, userID string
+			if err := orphanedRows.Scan(&sessionID, &userID); err != nil {
+				continue
+			}
+			r.Failed++
+			if len(r.Items) < defaultMaxItems {
+				r.Items = append(r.Items, IssueItem{
+					EntityID: sessionID,
+					Issue:    "orphaned_session",
+					Detail:   fmt.Sprintf("user_id=%s", userID),
+				})
 			}
 		}
 	}

@@ -112,8 +112,8 @@ session_ttl_hours = 24
 
 	// Mock environment variables
 	env := map[string]string{
-		"APP_ADDR":              ":7070",
-		"AUTH_ENABLED":          "true",
+		"APP_ADDR":               ":7070",
+		"AUTH_ENABLED":           "true",
 		"AUTH_SESSION_TTL_HOURS": "72",
 	}
 

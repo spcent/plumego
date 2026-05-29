@@ -13,11 +13,11 @@ import (
 
 // Indexer is a background worker that periodically processes documents pending indexing.
 type Indexer struct {
-	engine  SearchEngine
-	repo    *Repository
-	store   storage.ObjectStorage
-	cfg     config.SearchConfig
-	logger  plumelog.StructuredLogger
+	engine SearchEngine
+	repo   *Repository
+	store  storage.ObjectStorage
+	cfg    config.SearchConfig
+	logger plumelog.StructuredLogger
 }
 
 // NewIndexer constructs an Indexer.

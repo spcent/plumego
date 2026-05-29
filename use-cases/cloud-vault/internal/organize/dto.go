@@ -5,9 +5,9 @@ package organize
 type DetectDuplicatesRequest struct{}
 
 type ResolveDuplicatesRequest struct {
-	KeepDocumentID      string   `json:"keep_document_id"`
+	KeepDocumentID       string   `json:"keep_document_id"`
 	DuplicateDocumentIDs []string `json:"duplicate_document_ids"`
-	Action              string   `json:"action"` // archive | mark_duplicate | ignore
+	Action               string   `json:"action"` // archive | mark_duplicate | ignore
 }
 
 // --- Similarity ---

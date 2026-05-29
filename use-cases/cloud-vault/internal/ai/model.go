@@ -82,10 +82,10 @@ type SummaryInput struct {
 
 // SummaryOutput is stored in ai_tasks.output_json after completion.
 type SummaryOutput struct {
-	Summary    string   `json:"summary"`
-	KeyPoints  []string `json:"key_points"`
-	Actions    []string `json:"actions"`
-	CodeRefs   []string `json:"code_refs"`
+	Summary   string   `json:"summary"`
+	KeyPoints []string `json:"key_points"`
+	Actions   []string `json:"actions"`
+	CodeRefs  []string `json:"code_refs"`
 }
 
 // QAInput is the JSON payload for search_answer tasks.
@@ -96,9 +96,9 @@ type QAInput struct {
 
 // QAOutput is stored after a Q&A task completes.
 type QAOutput struct {
-	Answer      string       `json:"answer"`
-	Citations   []Citation   `json:"citations"`
-	DocumentIDs []string     `json:"document_ids"`
+	Answer      string     `json:"answer"`
+	Citations   []Citation `json:"citations"`
+	DocumentIDs []string   `json:"document_ids"`
 }
 
 // Citation points to a specific document used as a source.

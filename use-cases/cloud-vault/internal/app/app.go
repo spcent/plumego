@@ -22,7 +22,6 @@ import (
 	"cloud-vault/internal/ai"
 	"cloud-vault/internal/auth"
 	"cloud-vault/internal/collection"
-	"cloud-vault/internal/system"
 	"cloud-vault/internal/config"
 	"cloud-vault/internal/database"
 	"cloud-vault/internal/document"
@@ -30,27 +29,28 @@ import (
 	"cloud-vault/internal/organize"
 	"cloud-vault/internal/search"
 	"cloud-vault/internal/storage"
+	"cloud-vault/internal/system"
 	"cloud-vault/internal/tag"
 )
 
 // App holds application-wide dependencies.
 type App struct {
-	Core            *core.App
-	Cfg             config.Config
-	DB              *database.DB
-	Docs            *document.Handler
-	Tags            *tag.Handler
-	Importer        *importer.Handler
-	Search          *search.Handler
-	Organize        *organize.Handler
-	Collection      *collection.Handler
-	AI              *ai.Handler
-	System          *system.Handler
-	Auth            *auth.Handler
-	authService     *auth.Service
-	authMiddleware  func(http.Handler) http.Handler
-	indexer         *search.Indexer
-	aiWorkers       []*ai.Worker
+	Core           *core.App
+	Cfg            config.Config
+	DB             *database.DB
+	Docs           *document.Handler
+	Tags           *tag.Handler
+	Importer       *importer.Handler
+	Search         *search.Handler
+	Organize       *organize.Handler
+	Collection     *collection.Handler
+	AI             *ai.Handler
+	System         *system.Handler
+	Auth           *auth.Handler
+	authService    *auth.Service
+	authMiddleware func(http.Handler) http.Handler
+	indexer        *search.Indexer
+	aiWorkers      []*ai.Worker
 }
 
 // New constructs the App: opens the database, initialises storage, and wires middleware.

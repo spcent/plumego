@@ -41,7 +41,7 @@ type SearchResult struct {
 
 // ReindexRequest specifies which documents to re-index.
 type ReindexRequest struct {
-	Scope      string `json:"scope"`       // all | failed | stale | document
+	Scope      string `json:"scope"` // all | failed | stale | document
 	DocumentID string `json:"document_id,omitempty"`
 }
 

@@ -55,13 +55,13 @@ type SearchHistoryRecord struct {
 
 // pendingIndexDoc is returned by the repository when scanning for docs to index.
 type pendingIndexDoc struct {
-	DocumentID  string
-	Title       string
+	DocumentID   string
+	Title        string
 	OriginalPath string
-	Summary     string
-	HeadingText string
-	StorageKey  string
-	ContentHash string
-	Version     int
-	SizeBytes   int64
+	Summary      string
+	HeadingText  string
+	StorageKey   string
+	ContentHash  string
+	Version      int
+	SizeBytes    int64
 }

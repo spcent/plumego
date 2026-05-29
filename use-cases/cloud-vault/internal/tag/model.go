@@ -6,8 +6,8 @@ import (
 )
 
 var (
-	ErrNotFound   = errors.New("tag not found")
-	ErrDuplicate  = errors.New("tag name already exists")
+	ErrNotFound  = errors.New("tag not found")
+	ErrDuplicate = errors.New("tag name already exists")
 )
 
 // Tag is a label that can be attached to documents.

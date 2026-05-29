@@ -18,15 +18,15 @@ type DocumentSaver interface {
 
 // Service orchestrates AI operations.
 type Service struct {
-	repo           *Repository
-	store          storage.ObjectStorage
-	cfg            config.AIConfig
-	provider       LLMProvider
-	summarizer     *Summarizer
-	qaEngine       *QAEngine
+	repo            *Repository
+	store           storage.ObjectStorage
+	cfg             config.AIConfig
+	provider        LLMProvider
+	summarizer      *Summarizer
+	qaEngine        *QAEngine
 	promptExtractor *PromptExtractor
-	ctxBuilder     *ContextBuilder
-	docSaver       DocumentSaver
+	ctxBuilder      *ContextBuilder
+	docSaver        DocumentSaver
 }
 
 func NewService(

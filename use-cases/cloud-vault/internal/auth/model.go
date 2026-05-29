@@ -34,13 +34,13 @@ type sessionRow struct {
 
 // securityEventRow represents a security event database row.
 type securityEventRow struct {
-	ID         string
-	UserID     sql.NullString
-	EventType  string
-	IPAddress  sql.NullString
-	UserAgent  sql.NullString
-	Details    sql.NullString
-	CreatedAt  string
+	ID        string
+	UserID    sql.NullString
+	EventType string
+	IPAddress sql.NullString
+	UserAgent sql.NullString
+	Details   sql.NullString
+	CreatedAt string
 }
 
 // loginAttemptRow represents a login attempt database row.

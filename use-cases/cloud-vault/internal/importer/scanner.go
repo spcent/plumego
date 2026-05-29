@@ -10,8 +10,8 @@ import (
 
 // ScannedFile is a single .md file found by the directory scanner.
 type ScannedFile struct {
-	AbsPath  string
-	RelPath  string
+	AbsPath   string
+	RelPath   string
 	SizeBytes int64
 }
 

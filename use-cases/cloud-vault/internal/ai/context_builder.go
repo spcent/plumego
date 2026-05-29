@@ -11,8 +11,8 @@ import (
 
 // ContextBuilder assembles document text for an LLM prompt.
 type ContextBuilder struct {
-	repo     *Repository
-	store    storage.ObjectStorage
+	repo      *Repository
+	store     storage.ObjectStorage
 	maxTokens int
 }
 

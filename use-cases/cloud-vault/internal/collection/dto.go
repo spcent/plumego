@@ -33,8 +33,8 @@ type CreateFromSearchRequest struct {
 
 // CollectionListResult is the paginated result for GET /api/v1/collections.
 type CollectionListResult struct {
-	Items  []Collection `json:"items"`
-	Total  int          `json:"total"`
+	Items []Collection `json:"items"`
+	Total int          `json:"total"`
 }
 
 // CollectionDetailResult includes documents.

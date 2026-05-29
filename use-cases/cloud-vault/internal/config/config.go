@@ -84,16 +84,16 @@ type OrganizeConfig struct {
 
 // AIConfig holds V0.5 AI configuration.
 type AIConfig struct {
-	Enabled            bool
-	Provider           string // "local_mock" | "openai_compatible"
-	BaseURL            string // OpenAI-compatible endpoint, e.g. https://api.openai.com/v1
-	APIKey             string
-	Model              string
-	MaxContextTokens   int
-	MaxRetries         int
-	TaskWorkers        int
-	SummaryEnabled     bool
-	QAEnabled          bool
+	Enabled              bool
+	Provider             string // "local_mock" | "openai_compatible"
+	BaseURL              string // OpenAI-compatible endpoint, e.g. https://api.openai.com/v1
+	APIKey               string
+	Model                string
+	MaxContextTokens     int
+	MaxRetries           int
+	TaskWorkers          int
+	SummaryEnabled       bool
+	QAEnabled            bool
 	PromptExtractEnabled bool
 }
 
@@ -201,17 +201,17 @@ type tomlOrganize struct {
 }
 
 type tomlAI struct {
-	Enabled            bool   `toml:"enabled"`
-	Provider           string `toml:"provider"`
-	BaseURL            string `toml:"base_url"`
-	APIKey             string `toml:"api_key"`
-	Model              string `toml:"model"`
-	MaxContextTokens   int    `toml:"max_context_tokens"`
-	MaxRetries         int    `toml:"max_retries"`
-	TaskWorkers        int    `toml:"task_workers"`
-	SummaryEnabled     bool   `toml:"summary_enabled"`
-	QAEnabled          bool   `toml:"qa_enabled"`
-	PromptExtract      bool   `toml:"prompt_extract_enabled"`
+	Enabled          bool   `toml:"enabled"`
+	Provider         string `toml:"provider"`
+	BaseURL          string `toml:"base_url"`
+	APIKey           string `toml:"api_key"`
+	Model            string `toml:"model"`
+	MaxContextTokens int    `toml:"max_context_tokens"`
+	MaxRetries       int    `toml:"max_retries"`
+	TaskWorkers      int    `toml:"task_workers"`
+	SummaryEnabled   bool   `toml:"summary_enabled"`
+	QAEnabled        bool   `toml:"qa_enabled"`
+	PromptExtract    bool   `toml:"prompt_extract_enabled"`
 }
 
 type tomlAuth struct {

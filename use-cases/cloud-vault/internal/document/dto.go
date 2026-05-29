@@ -49,8 +49,8 @@ type BatchStatusRequest struct {
 type ListQuery struct {
 	Q            string
 	TagID        string
-	Status       string  // active | archived | all; "" defaults to active
-	SourceType   string  // manual | imported; "" = no filter
+	Status       string // active | archived | all; "" defaults to active
+	SourceType   string // manual | imported; "" = no filter
 	ImportJobID  string
 	IsFavorite   *bool
 	ReviewStatus string // pending | reviewed; "" = no filter
