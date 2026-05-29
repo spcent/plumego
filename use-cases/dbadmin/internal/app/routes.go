@@ -97,6 +97,12 @@ func (a *App) RegisterRoutes() error {
 		MaxUploadBytes: a.Cfg.App.MaxUploadBytes,
 		Logger:         a.Core.Logger(),
 	}
+	mongoH := handler.MongoDBHandler{
+		Connections:  a.ConnectionStore,
+		MongoManager: a.MongoManager,
+		History:      a.MongoHistoryStore,
+		Logger:       a.Core.Logger(),
+	}
 
 	// Protected routes — all require a valid session cookie.
 	guard := func(h http.Handler) http.Handler { return authMw(h) }
@@ -163,6 +169,29 @@ func (a *App) RegisterRoutes() error {
 	// SQLite file upload and download.
 	protected.post("/api/sqlite/upload", guard(http.HandlerFunc(sqliteH.Upload)))
 	protected.get("/api/conn/:id/sqlite/download", guard(http.HandlerFunc(sqliteH.Download)))
+
+	// MongoDB operations — MongoDB-specific route group.
+	protected.get("/api/connections/:id/mongo/databases", guard(http.HandlerFunc(mongoH.ListDatabases)))
+	protected.get("/api/connections/:id/mongo/collections", guard(http.HandlerFunc(mongoH.ListCollections)))
+	protected.post("/api/connections/:id/mongo/documents/query", guard(http.HandlerFunc(mongoH.QueryDocuments)))
+	protected.get("/api/connections/:id/mongo/indexes", guard(http.HandlerFunc(mongoH.ListIndexes)))
+	protected.post("/api/connections/:id/mongo/documents", guard(http.HandlerFunc(mongoH.InsertDocument)))
+	protected.patch("/api/connections/:id/mongo/documents", guard(http.HandlerFunc(mongoH.UpdateDocument)))
+	protected.delete("/api/connections/:id/mongo/documents", guard(http.HandlerFunc(mongoH.DeleteDocument)))
+
+	// MongoDB P1 - Advanced features
+	protected.post("/api/connections/:id/mongo/aggregate", guard(http.HandlerFunc(mongoH.Aggregate)))
+	protected.post("/api/connections/:id/mongo/explain", guard(http.HandlerFunc(mongoH.ExplainQuery)))
+	protected.get("/api/connections/:id/mongo/schema", guard(http.HandlerFunc(mongoH.SchemaSample)))
+	protected.get("/api/connections/:id/mongo/stats", guard(http.HandlerFunc(mongoH.CollectionStats)))
+	protected.get("/api/connections/:id/mongo/export", guard(http.HandlerFunc(mongoH.ExportDocuments)))
+	protected.post("/api/connections/:id/mongo/import", guard(http.HandlerFunc(mongoH.ImportDocuments)))
+	protected.get("/api/mongo/objectid/:id/parse", guard(http.HandlerFunc(mongoH.ParseObjectId)))
+
+	// MongoDB P1 - Pipeline history
+	protected.get("/api/connections/:id/mongo/history", guard(http.HandlerFunc(mongoH.ListHistory)))
+	protected.delete("/api/connections/:id/mongo/history/:entryId", guard(http.HandlerFunc(mongoH.DeleteHistoryEntry)))
+	protected.delete("/api/connections/:id/mongo/history", guard(http.HandlerFunc(mongoH.ClearHistory)))
 	if protected.err != nil {
 		return protected.err
 	}

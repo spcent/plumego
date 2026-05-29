@@ -27,6 +27,7 @@ import (
 	"dbadmin/internal/dbmanager"
 	"dbadmin/internal/domain/connection"
 	"dbadmin/internal/domain/history"
+	"dbadmin/internal/domain/mongohistory"
 	"dbadmin/internal/domain/session"
 	"dbadmin/internal/mongomanager"
 	"dbadmin/internal/redismanager"
@@ -34,18 +35,19 @@ import (
 
 // App holds application-wide dependencies.
 type App struct {
-	Core            *core.App
-	Cfg             config.Config
-	SessionStore    *session.Store
-	ConnectionStore *connection.Store
-	HistoryStore    *history.Store
-	DBManager       *dbmanager.Manager
-	RedisManager    *redismanager.Manager
-	MongoManager    *mongomanager.Manager
-	SQLAdapter      *datasource.SQLAdapter
-	RedisAdapter    *datasource.RedisAdapter
-	MongoAdapter    *datasource.MongoAdapter
-	UploadDir       string
+	Core              *core.App
+	Cfg               config.Config
+	SessionStore      *session.Store
+	ConnectionStore   *connection.Store
+	HistoryStore      *history.Store
+	MongoHistoryStore *mongohistory.Store
+	DBManager         *dbmanager.Manager
+	RedisManager      *redismanager.Manager
+	MongoManager      *mongomanager.Manager
+	SQLAdapter        *datasource.SQLAdapter
+	RedisAdapter      *datasource.RedisAdapter
+	MongoAdapter      *datasource.MongoAdapter
+	UploadDir         string
 }
 
 // New constructs the App with all middleware and shared dependencies wired.
@@ -76,6 +78,13 @@ func New(cfg config.Config) (*App, error) {
 	})
 	if err != nil {
 		return nil, fmt.Errorf("create history KV store: %w", err)
+	}
+
+	mongoHistKV, err := kvstore.NewKVStore(kvstore.Options{
+		DataDir: cfg.App.DataDir + "/mongo-history",
+	})
+	if err != nil {
+		return nil, fmt.Errorf("create mongo history KV store: %w", err)
 	}
 
 	securityMw, err := midsecurity.Middleware(midsecurity.Config{})
@@ -117,18 +126,19 @@ func New(cfg config.Config) (*App, error) {
 	redisMgr := redismanager.NewManager()
 	mongoMgr := mongomanager.NewManager()
 	return &App{
-		Core:            coreApp,
-		Cfg:             cfg,
-		SessionStore:    session.NewStore(sessKV),
-		ConnectionStore: connStore,
-		HistoryStore:    history.NewStore(histKV),
-		DBManager:       mgr,
-		RedisManager:    redisMgr,
-		MongoManager:    mongoMgr,
-		SQLAdapter:      datasource.NewSQLAdapter(mgr),
-		RedisAdapter:    datasource.NewRedisAdapter(redisMgr),
-		MongoAdapter:    datasource.NewMongoAdapter(mongoMgr),
-		UploadDir:       uploadDir,
+		Core:              coreApp,
+		Cfg:               cfg,
+		SessionStore:      session.NewStore(sessKV),
+		ConnectionStore:   connStore,
+		HistoryStore:      history.NewStore(histKV),
+		MongoHistoryStore: mongohistory.NewStore(mongoHistKV),
+		DBManager:         mgr,
+		RedisManager:      redisMgr,
+		MongoManager:      mongoMgr,
+		SQLAdapter:        datasource.NewSQLAdapter(mgr),
+		RedisAdapter:      datasource.NewRedisAdapter(redisMgr),
+		MongoAdapter:      datasource.NewMongoAdapter(mongoMgr),
+		UploadDir:         uploadDir,
 	}, nil
 }
 

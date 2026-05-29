@@ -159,28 +159,62 @@ export const api = {
       confirm,
     }),
 
-  // ── MongoDB API (placeholder — P0 not yet implemented) ─────────────────────
-  // These endpoints will be implemented in the MongoDB P0 phase.
-  // Listed here for type completeness and to drive the placeholder UI.
-  mongoListDatabases: (id: string) =>
-    req<{ databases: MongoDatabaseInfo[] }>('GET', `/conn/${id}/mongo/databases`),
-  mongoListCollections: (id: string, db: string) =>
-    req<{ collections: MongoCollectionInfo[] }>('GET', `/conn/${id}/mongo/${encodeURIComponent(db)}/collections`),
-  mongoListDocuments: (id: string, db: string, coll: string, params?: MongoDocParams) => {
-    const q = new URLSearchParams()
-    if (params?.page) q.set('page', String(params.page))
-    if (params?.pageSize) q.set('pageSize', String(params.pageSize))
-    if (params?.filter) q.set('filter', params.filter)
-    return req<MongoDocsResponse>('GET', `/conn/${id}/mongo/${encodeURIComponent(db)}/${encodeURIComponent(coll)}/documents?${q}`)
+  // ── MongoDB API ─────────────────────────────────────────────────────────────
+  mongoListDatabases: (connId: string) =>
+    req<{ databases: MongoDatabaseInfo[] }>('GET', `/connections/${connId}/mongo/databases`),
+
+  mongoListCollections: (connId: string, database: string) =>
+    req<{ collections: MongoCollectionInfo[] }>('GET', `/connections/${connId}/mongo/collections?database=${encodeURIComponent(database)}`),
+
+  mongoQueryDocuments: (connId: string, query: MongoDocQuery) =>
+    req<MongoDocsResponse>('POST', `/connections/${connId}/mongo/documents/query`, query),
+
+  mongoInsertDocument: (connId: string, database: string, collection: string, document: string) =>
+    req<{ inserted_id: string }>('POST', `/connections/${connId}/mongo/documents`, { database, collection, document }),
+
+  mongoUpdateDocument: (connId: string, database: string, collection: string, id: string, document: string) =>
+    req<{ modified: number }>('PATCH', `/connections/${connId}/mongo/documents`, { database, collection, id, document }),
+
+  mongoDeleteDocument: (connId: string, database: string, collection: string, id: string) =>
+    req<{ deleted: number }>('DELETE', `/connections/${connId}/mongo/documents`, { database, collection, id, confirm: true }),
+
+  mongoListIndexes: (connId: string, database: string, collection: string) =>
+    req<{ indexes: MongoIndexInfo[] }>('GET', `/connections/${connId}/mongo/indexes?database=${encodeURIComponent(database)}&collection=${encodeURIComponent(collection)}`),
+
+  // MongoDB P1 - Advanced features
+  mongoAggregate: (connId: string, database: string, collection: string, pipeline: string) =>
+    req<MongoAggregateResponse>('POST', `/connections/${connId}/mongo/aggregate`, { database, collection, pipeline }),
+
+  mongoExplain: (connId: string, database: string, collection: string, filter?: string) =>
+    req<MongoExplainResponse>('POST', `/connections/${connId}/mongo/explain`, { database, collection, filter }),
+
+  mongoSchema: (connId: string, database: string, collection: string, sampleSize = 100) =>
+    req<MongoSchemaResponse>('GET', `/connections/${connId}/mongo/schema?database=${encodeURIComponent(database)}&collection=${encodeURIComponent(collection)}&sample=${sampleSize}`),
+
+  mongoStats: (connId: string, database: string, collection: string) =>
+    req<MongoStatsResponse>('GET', `/connections/${connId}/mongo/stats?database=${encodeURIComponent(database)}&collection=${encodeURIComponent(collection)}`),
+
+  mongoExport: (connId: string, database: string, collection: string, format: 'json' | 'ndjson' | 'csv' = 'json', filter?: string) => {
+    const params = new URLSearchParams({ database, collection, format })
+    if (filter) params.append('filter', filter)
+    return `${BASE}/connections/${connId}/mongo/export?${params.toString()}`
   },
-  mongoInsertDocument: (id: string, db: string, coll: string, document: Record<string, unknown>) =>
-    req<{ inserted_id: string }>('POST', `/conn/${id}/mongo/${encodeURIComponent(db)}/${encodeURIComponent(coll)}/documents`, { document }),
-  mongoUpdateDocument: (id: string, db: string, coll: string, filter: Record<string, unknown>, update: Record<string, unknown>) =>
-    req<{ modified: number }>('PATCH', `/conn/${id}/mongo/${encodeURIComponent(db)}/${encodeURIComponent(coll)}/documents`, { filter, update, confirm: true }),
-  mongoDeleteDocument: (id: string, db: string, coll: string, filter: Record<string, unknown>) =>
-    req<{ deleted: number }>('DELETE', `/conn/${id}/mongo/${encodeURIComponent(db)}/${encodeURIComponent(coll)}/documents`, { filter, confirm: true }),
-  mongoListIndexes: (id: string, db: string, coll: string) =>
-    req<{ indexes: MongoIndexInfo[] }>('GET', `/conn/${id}/mongo/${encodeURIComponent(db)}/${encodeURIComponent(coll)}/indexes`),
+
+  mongoImport: (connId: string, database: string, collection: string, data: string, format: 'json' | 'ndjson' = 'json') =>
+    req<MongoImportResponse>('POST', `/connections/${connId}/mongo/import`, { database, collection, data, format }),
+
+  mongoParseObjectId: (objectId: string) =>
+    req<MongoObjectIdInfo>('GET', `/mongo/objectid/${objectId}/parse`),
+
+  // MongoDB P1 - Pipeline history
+  mongoListHistory: (connId: string) =>
+    req<MongoPipelineEntry[]>('GET', `/connections/${connId}/mongo/history`),
+
+  mongoDeleteHistoryEntry: (connId: string, entryId: string) =>
+    req<void>('DELETE', `/connections/${connId}/mongo/history/${entryId}`),
+
+  mongoClearHistory: (connId: string) =>
+    req<void>('DELETE', `/connections/${connId}/mongo/history`),
 }
 
 export interface Connection {
@@ -422,22 +456,81 @@ export interface MongoCollectionInfo {
   type: 'collection' | 'view'  // "collection" or "view"
 }
 
-export interface MongoDocParams {
-  page?: number
-  pageSize?: number
-  filter?: string  // JSON query string, e.g. '{ "age": { "$gt": 30 } }'
+export interface MongoDocQuery {
+  database: string
+  collection: string
+  filter?: string
+  projection?: string
+  sort?: string
+  limit?: number
+  skip?: number
 }
 
 export interface MongoDocsResponse {
   documents: Record<string, unknown>[]
   total: number
-  page: number
-  pageSize: number
+  limit: number
+  skip: number
 }
 
 export interface MongoIndexInfo {
+  v: number
+  key: Record<string, unknown>
   name: string
-  unique: boolean
-  keys: Record<string, number | string>  // e.g. { "field": 1 } or { "field": "text" }
+  unique?: boolean
   sparse?: boolean
+  [key: string]: unknown
+}
+
+// MongoDB P1 - Advanced types
+export interface MongoAggregateResponse {
+  documents: Record<string, unknown>[]
+  count: number
+  duration_ms: number
+}
+
+export interface MongoExplainResponse {
+  explain: Record<string, unknown>
+}
+
+export interface MongoSchemaResponse {
+  fields: MongoSchemaField[]
+  sampled_count: number
+}
+
+export interface MongoSchemaField {
+  name: string
+  types: Array<{ type: string; count: number }>
+  sample_values: unknown[]
+}
+
+export interface MongoStatsResponse {
+  count: number
+  size: number
+  avgObjSize: number
+  storageSize: number
+  totalIndexSize: number
+  indexes: Array<{ name: string; size: number }>
+}
+
+export interface MongoImportResponse {
+  inserted_count: number
+}
+
+export interface MongoObjectIdInfo {
+  hex: string
+  timestamp: string
+  counter: number
+}
+
+export interface MongoPipelineEntry {
+  id: string
+  conn_id: string
+  database: string
+  collection: string
+  pipeline: string
+  duration_ms: number
+  result_count: number
+  error?: string
+  created_at: string
 }

@@ -178,11 +178,11 @@ func (h RedisHandler) ListDBs(w http.ResponseWriter, r *http.Request) {
 // --- ListKeys ----------------------------------------------------------------
 
 type keyEntry struct {
-	Key     string `json:"key"`
-	Type    string `json:"type"`
-	TTL     int64  `json:"ttl"` // seconds; -1 = no expiry
-	Memory  int64  `json:"memory,omitempty"` // bytes; 0 if unavailable
-	IsBig   bool   `json:"isBig,omitempty"`  // true if memory > 1MB
+	Key    string `json:"key"`
+	Type   string `json:"type"`
+	TTL    int64  `json:"ttl"`              // seconds; -1 = no expiry
+	Memory int64  `json:"memory,omitempty"` // bytes; 0 if unavailable
+	IsBig  bool   `json:"isBig,omitempty"`  // true if memory > 1MB
 }
 
 type listKeysResponse struct {
