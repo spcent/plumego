@@ -20,6 +20,7 @@ import (
 	"github.com/spcent/plumego/middleware/timeout"
 
 	"cloud-vault/internal/ai"
+	"cloud-vault/internal/auth"
 	"cloud-vault/internal/collection"
 	"cloud-vault/internal/system"
 	"cloud-vault/internal/config"
@@ -34,19 +35,22 @@ import (
 
 // App holds application-wide dependencies.
 type App struct {
-	Core       *core.App
-	Cfg        config.Config
-	DB         *database.DB
-	Docs       *document.Handler
-	Tags       *tag.Handler
-	Importer   *importer.Handler
-	Search     *search.Handler
-	Organize   *organize.Handler
-	Collection *collection.Handler
-	AI         *ai.Handler
-	System     *system.Handler
-	indexer    *search.Indexer
-	aiWorkers  []*ai.Worker
+	Core            *core.App
+	Cfg             config.Config
+	DB              *database.DB
+	Docs            *document.Handler
+	Tags            *tag.Handler
+	Importer        *importer.Handler
+	Search          *search.Handler
+	Organize        *organize.Handler
+	Collection      *collection.Handler
+	AI              *ai.Handler
+	System          *system.Handler
+	Auth            *auth.Handler
+	authService     *auth.Service
+	authMiddleware  func(http.Handler) http.Handler
+	indexer         *search.Indexer
+	aiWorkers       []*ai.Worker
 }
 
 // New constructs the App: opens the database, initialises storage, and wires middleware.
@@ -167,20 +171,55 @@ func New(cfg config.Config) (*App, error) {
 	systemSvc := system.NewService(db.DB, store, cfg.AI)
 	systemHandler := system.NewHandler(systemSvc, app.Logger())
 
+	// Auth handler (V0.7).
+	authRepo := auth.NewRepository(db)
+	authConfig := auth.Config{
+		Enabled:                   cfg.Auth.Enabled,
+		SessionTTLHours:           cfg.Auth.SessionTTLHours,
+		CookieName:                cfg.Auth.CookieName,
+		SecureCookie:              cfg.Auth.SecureCookie,
+		MaxLoginFailures:          cfg.Auth.MaxLoginFailures,
+		LoginFailureWindowMinutes: cfg.Auth.LoginFailureWindowMinutes,
+		LockoutMinutes:            cfg.Auth.LockoutMinutes,
+		PasswordMinLength:         cfg.Auth.PasswordMinLength,
+		BootstrapAdminEnabled:     cfg.Auth.BootstrapAdminEnabled,
+		BootstrapAdminUsername:    cfg.Auth.BootstrapAdminUsername,
+		BootstrapAdminEmail:       cfg.Auth.BootstrapAdminEmail,
+		BootstrapAdminPassword:    cfg.Auth.BootstrapAdminPassword,
+	}
+	authService := auth.NewService(authRepo, authConfig)
+	authHandler := auth.NewHandler(authService, authConfig, app.Logger())
+
+	// Bootstrap admin if enabled.
+	if cfg.Auth.BootstrapAdminEnabled {
+		if err := authService.BootstrapAdmin(context.Background()); err != nil {
+			app.Logger().Error("failed to bootstrap admin", plumelog.Fields{"error": err.Error()})
+		}
+	}
+
+	// Auth middleware.
+	var authMiddleware func(http.Handler) http.Handler
+	if cfg.Auth.Enabled {
+		authMiddleware = auth.RequireAuth(authService, cfg.Auth.CookieName)
+	}
+
 	return &App{
-		Core:       app,
-		Cfg:        cfg,
-		DB:         db,
-		Docs:       docs,
-		Tags:       tags,
-		Importer:   imp,
-		Search:     searchHandler,
-		Organize:   organizeHandler,
-		Collection: collectionHandler,
-		AI:         aiHandler,
-		System:     systemHandler,
-		indexer:    indexer,
-		aiWorkers:  aiWorkers,
+		Core:           app,
+		Cfg:            cfg,
+		DB:             db,
+		Docs:           docs,
+		Tags:           tags,
+		Importer:       imp,
+		Search:         searchHandler,
+		Organize:       organizeHandler,
+		Collection:     collectionHandler,
+		AI:             aiHandler,
+		System:         systemHandler,
+		Auth:           authHandler,
+		authService:    authService,
+		authMiddleware: authMiddleware,
+		indexer:        indexer,
+		aiWorkers:      aiWorkers,
 	}, nil
 }
 

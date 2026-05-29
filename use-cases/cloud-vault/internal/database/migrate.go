@@ -17,6 +17,7 @@ var migrations = []migration{
 	{version: 3, up: migrate003},
 	{version: 4, up: migrate004},
 	{version: 5, up: migrate005},
+	{version: 6, up: migrate006},
 }
 
 // Migrate applies all pending migrations in ascending version order.
@@ -475,6 +476,72 @@ CREATE TABLE IF NOT EXISTS search_history (
 );
 CREATE INDEX IF NOT EXISTS idx_search_history_created_at
   ON search_history(created_at DESC);
+`)
+	return err
+}
+
+// migrate006 adds V0.7 authentication tables.
+func migrate006(tx *sql.Tx) error {
+	_, err := tx.Exec(`
+CREATE TABLE IF NOT EXISTS users (
+  id                  TEXT PRIMARY KEY,
+  username            TEXT NOT NULL UNIQUE,
+  email               TEXT UNIQUE,
+  display_name        TEXT,
+  password_hash       TEXT NOT NULL,
+  password_algo       TEXT NOT NULL DEFAULT 'pbkdf2-sha512',
+  role                TEXT NOT NULL DEFAULT 'admin',
+  status              TEXT NOT NULL DEFAULT 'active',
+  locale              TEXT NOT NULL DEFAULT 'zh-CN',
+  theme               TEXT NOT NULL DEFAULT 'system',
+  last_login_at       TEXT,
+  password_changed_at TEXT,
+  created_at          TEXT NOT NULL,
+  updated_at          TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
+CREATE INDEX IF NOT EXISTS idx_users_email    ON users(email);
+CREATE INDEX IF NOT EXISTS idx_users_status   ON users(status);
+CREATE TABLE IF NOT EXISTS user_sessions (
+  id           TEXT PRIMARY KEY,
+  user_id      TEXT NOT NULL,
+  session_hash TEXT NOT NULL UNIQUE,
+  user_agent   TEXT,
+  ip_address   TEXT,
+  expires_at   TEXT NOT NULL,
+  revoked_at   TEXT,
+  created_at   TEXT NOT NULL,
+  updated_at   TEXT NOT NULL,
+  FOREIGN KEY(user_id) REFERENCES users(id)
+);
+CREATE INDEX IF NOT EXISTS idx_user_sessions_user_id    ON user_sessions(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_sessions_hash       ON user_sessions(session_hash);
+CREATE INDEX IF NOT EXISTS idx_user_sessions_expires_at ON user_sessions(expires_at);
+CREATE TABLE IF NOT EXISTS login_attempts (
+  id              TEXT PRIMARY KEY,
+  login_identifier TEXT NOT NULL,
+  ip_address      TEXT,
+  success         INTEGER NOT NULL DEFAULT 0,
+  reason          TEXT,
+  created_at      TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_login_attempts_identifier_created
+  ON login_attempts(login_identifier, created_at);
+CREATE INDEX IF NOT EXISTS idx_login_attempts_ip_created
+  ON login_attempts(ip_address, created_at);
+CREATE TABLE IF NOT EXISTS security_events (
+  id          TEXT PRIMARY KEY,
+  user_id     TEXT,
+  event_type  TEXT NOT NULL,
+  ip_address  TEXT,
+  user_agent  TEXT,
+  detail_json TEXT,
+  created_at  TEXT NOT NULL,
+  FOREIGN KEY(user_id) REFERENCES users(id)
+);
+CREATE INDEX IF NOT EXISTS idx_security_events_user_id    ON security_events(user_id);
+CREATE INDEX IF NOT EXISTS idx_security_events_type       ON security_events(event_type);
+CREATE INDEX IF NOT EXISTS idx_security_events_created_at ON security_events(created_at);
 `)
 	return err
 }

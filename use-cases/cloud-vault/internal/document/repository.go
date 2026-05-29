@@ -406,20 +406,36 @@ func scanDocumentRow(rows *sql.Rows) (*Document, error) {
 	var doc Document
 	var createdAt, updatedAt string
 	var uploadedAt, importedAt *string
+	var slug, originalPath, importJobID, summary, headingText *string
 	var isFavorite int
 
 	err := rows.Scan(
-		&doc.ID, &doc.Title, &doc.Slug, &doc.OriginalPath, &doc.StorageKey,
+		&doc.ID, &doc.Title, &slug, &originalPath, &doc.StorageKey,
 		&doc.CurrentVersion, &doc.ContentHash, &doc.SizeBytes, &doc.WordCount, &doc.LineCount,
 		&doc.Status, &doc.SyncStatus, &isFavorite,
 		&createdAt, &updatedAt, &uploadedAt,
-		&doc.SourceType, &doc.ImportJobID, &importedAt, &doc.Summary, &doc.HeadingText, &doc.ReviewStatus,
+		&doc.SourceType, &importJobID, &importedAt, &summary, &headingText, &doc.ReviewStatus,
 	)
 	if err != nil {
 		return nil, err
 	}
 
 	doc.IsFavorite = isFavorite != 0
+	if slug != nil {
+		doc.Slug = *slug
+	}
+	if originalPath != nil {
+		doc.OriginalPath = *originalPath
+	}
+	if importJobID != nil {
+		doc.ImportJobID = *importJobID
+	}
+	if summary != nil {
+		doc.Summary = *summary
+	}
+	if headingText != nil {
+		doc.HeadingText = *headingText
+	}
 	doc.CreatedAt, _ = time.Parse(time.RFC3339, createdAt)
 	doc.UpdatedAt, _ = time.Parse(time.RFC3339, updatedAt)
 	if uploadedAt != nil {

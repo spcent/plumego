@@ -1,0 +1,135 @@
+# Cloud Vault Configuration
+# Copy this file to config.toml and adjust values as needed.
+# Environment variables override TOML values (useful for secrets).
+
+[server]
+# HTTP listen address
+addr = ":8180"
+
+# TLS configuration (optional)
+[server.tls]
+enabled = false
+# cert_file = "cert.pem"
+# key_file = "key.pem"
+
+[app]
+# Maximum upload size in MB
+max_upload_size_mb = 10
+# Version policy: "always" keeps all versions, "limited" keeps N versions
+version_policy = "always"
+
+[database]
+# SQLite database file path
+path = "./data/app.db"
+
+[storage]
+# Storage provider: "local" or "qiniu"
+provider = "local"
+
+# Local filesystem storage (used when provider = "local")
+[storage.local]
+root = "./data/objects"
+
+# Qiniu Kodo storage (used when provider = "qiniu")
+[storage.qiniu]
+# access_key = "your-access-key"
+# secret_key = "your-secret-key"
+# bucket = "markdown-vault"
+# domain = "https://example.com"
+# region = "z0"  # z0=华东, z1=华北, z2=华南, na0=北美, as0=新加坡
+# use_https = true
+
+[import]
+# Maximum file size for imports in MB
+max_file_size_mb = 50
+
+[search]
+# Enable full-text search
+enabled = true
+# Index documents on save
+index_on_save = true
+# Index on import: "inline", "background", or "disabled"
+index_on_import = "background"
+# Batch size for background indexing
+index_batch_size = 100
+# Interval between batches in seconds
+index_interval_seconds = 5
+# Maximum content size to index in MB
+max_content_size_mb = 5
+# Number of tokens in search snippets
+snippet_tokens = 20
+# Keep last N search queries
+history_limit = 100
+
+[organize]
+# Enable duplicate detection
+duplicate_detection = true
+# Enable similarity detection
+similarity_detection = true
+# Enable tag suggestions
+tag_suggestion = true
+# Enable topic building
+topic_build = true
+# Near-duplicate threshold (0.0-1.0)
+near_dup_threshold = 0.85
+# Related document threshold (0.0-1.0)
+related_threshold = 0.70
+# Maximum comparisons per bucket
+max_compare_per_bucket = 1000
+# Similarity batch size
+similarity_batch_size = 500
+# Auto-archive duplicates (never auto-deletes)
+auto_archive_duplicates = false
+# Auto-apply tag suggestions
+auto_apply_tag_suggestions = false
+# Enable prompt candidate detection
+prompt_candidate_detection = true
+
+[ai]
+# Enable AI features
+enabled = false
+# AI provider: "local_mock" or "openai_compatible"
+provider = "local_mock"
+# OpenAI-compatible API base URL
+# base_url = "https://api.openai.com/v1"
+# API key (set via environment variable AI_API_KEY for security)
+# api_key = ""
+# Model name
+model = "gpt-4o-mini"
+# Maximum context tokens
+max_context_tokens = 8000
+# Maximum retries per request
+max_retries = 2
+# Number of worker goroutines
+task_workers = 2
+# Enable AI summaries
+summary_enabled = true
+# Enable Q&A extraction
+qa_enabled = true
+# Enable prompt extraction
+prompt_extract_enabled = true
+
+[auth]
+# Enable authentication
+enabled = false
+# Session TTL in hours (default: 720 = 30 days)
+session_ttl_hours = 720
+# Session cookie name
+cookie_name = "cv_session"
+# Use secure cookies (HTTPS only)
+secure_cookie = false
+# Maximum login failures before lockout
+max_login_failures = 5
+# Time window for counting failures in minutes
+login_failure_window_minutes = 15
+# Lockout duration in minutes
+lockout_minutes = 15
+# Minimum password length
+password_min_length = 12
+
+# Bootstrap admin (create first admin user on startup)
+[auth.bootstrap_admin]
+enabled = false
+# username = "admin"
+# email = "admin@example.com"
+# password = "secure-password-here"  # Set via AUTH_BOOTSTRAP_ADMIN_PASSWORD env var

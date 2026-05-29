@@ -1,4 +1,7 @@
+# Configuration files (may contain secrets)
 .env
+config.toml
+*.local.toml
 
 # IDE
 *.iml

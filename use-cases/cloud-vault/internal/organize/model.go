@@ -10,11 +10,11 @@ var (
 )
 
 // SimilarityType classifies how two documents relate.
-type SimilarityType = string
+type SimilarityType string
 
 const (
-	SimilarityTypeExact SimilarityType = "exact_duplicate"
-	SimilarityTypeNear  SimilarityType = "near_duplicate"
+	SimilarityTypeExact   SimilarityType = "exact_duplicate"
+	SimilarityTypeNear    SimilarityType = "near_duplicate"
 	SimilarityTypeRelated SimilarityType = "related"
 )
 
@@ -39,15 +39,15 @@ const (
 
 // DocumentSimilarity is a detected relationship between two documents.
 type DocumentSimilarity struct {
-	ID             string
-	DocumentIDA    string
-	DocumentIDB    string
-	SimilarityType SimilarityType
+	ID              string
+	DocumentIDA     string
+	DocumentIDB     string
+	SimilarityType  SimilarityType
 	SimilarityScore float64
-	Reason         string
-	Status         string
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
+	Reason          string
+	Status          string
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
 }
 
 // OrganizeJob tracks a long-running organize operation.
