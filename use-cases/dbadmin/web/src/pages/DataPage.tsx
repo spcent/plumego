@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { useParams } from 'react-router-dom'
 import { api, type RowsResponse, type TableStructure, type FilterCondition, type FilterOperator } from '../api'
+import CellRenderer from '../components/CellRenderer'
 import CellViewer from '../components/CellViewer'
 import ConfirmDialog from '../components/ConfirmDialog'
 import RowDrawer from '../components/RowDrawer'
@@ -28,34 +29,23 @@ const OPERATORS: { value: FilterOperator; label: string }[] = [
   { value: 'is_not_null', label: 'IS NOT NULL' },
 ]
 
-function renderCell(v: unknown) {
-  if (v === null || v === undefined) {
-    return <span className="text-gray-300 dark:text-gray-600 italic select-none">NULL</span>
-  }
-  if (v === '') {
-    return <span className="text-gray-400 dark:text-gray-500 font-mono italic select-none text-xs">''</span>
-  }
-  const s = String(v)
-  if (s.startsWith('<BLOB ')) {
-    return <span className="text-orange-500 dark:text-orange-400 font-mono text-xs">{s}</span>
-  }
-  // Quick JSON heuristic: starts with { or [ and ends with } or ]
-  const t = s.trim()
-  if ((t.startsWith('{') && t.endsWith('}')) || (t.startsWith('[') && t.endsWith(']'))) {
-    return (
-      <>
-        <span className="mr-1.5 inline-block align-middle text-[10px] bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300 px-1 rounded font-mono leading-snug">JSON</span>
-        {s}
-      </>
-    )
-  }
-  return s
-}
-
 function cellTitle(v: unknown): string {
   if (v === null || v === undefined) return 'NULL'
   if (v === '') return '(empty string)'
   return String(v)
+}
+
+function colWidth(colName: string, structure: TableStructure | null): number {
+  if (!structure) return 160
+  const col = structure.columns.find(c => c.name === colName)
+  if (!col) return 160
+  if (col.primary_key) return 120
+  const t = (col.data_type ?? col.full_type ?? '').toLowerCase()
+  if (/int|float|double|decimal|numeric|real|bigint|smallint|tinyint/i.test(t)) return 110
+  if (/blob|binary|bytea/i.test(t)) return 120
+  if (/text|clob/i.test(t)) return 240
+  if (/varchar|char/i.test(t)) return 200
+  return 160
 }
 
 export default function DataPage() {
@@ -122,12 +112,10 @@ export default function DataPage() {
     load()
   }, [load])
 
-  // Reset selection when page data changes.
   useEffect(() => {
     setSelectedRows(new Set())
   }, [data.rows])
 
-  // Sync indeterminate state on the select-all checkbox.
   useEffect(() => {
     if (selectAllRef.current) {
       selectAllRef.current.indeterminate =
@@ -229,81 +217,137 @@ export default function DataPage() {
 
   const needsValue = (op: FilterOperator) => op !== 'is_null' && op !== 'is_not_null'
 
-  const copyBtnClass = 'text-xs px-2 py-0.5 rounded border border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+  const copyBtnClass = 'text-[12px] px-2 py-0.5 rounded border hover:opacity-80 transition-opacity'
+  const copyBtnStyle = { borderColor: 'var(--border-strong)', color: 'var(--text-muted)' }
+
+  const colType = (colName: string) =>
+    structure?.columns.find(c => c.name === colName)?.data_type
 
   return (
-    <div className="p-4 flex flex-col h-full">
-      {/* Title row */}
-      <div className="flex items-center justify-between mb-2">
-        <h1 className="text-lg font-bold text-gray-800 dark:text-gray-100 flex items-center gap-2">
-          {dbName} / <span className="font-mono">{tableName}</span>
-          <span className="text-sm text-gray-400 font-normal">({data.total.toLocaleString()} rows)</span>
+    <div
+      className="flex flex-col h-full"
+      style={{ background: 'var(--bg-surface)' }}
+    >
+      {/* ── Title / toolbar ──────────────────────────────── */}
+      <div
+        className="flex items-center justify-between px-4 py-2 shrink-0"
+        style={{ borderBottom: '1px solid var(--border-subtle)' }}
+      >
+        <h1
+          className="text-sm font-semibold flex items-center gap-2 min-w-0"
+          style={{ color: 'var(--text-strong)' }}
+        >
+          <span className="truncate font-mono">{tableName}</span>
+          <span className="text-xs font-normal shrink-0" style={{ color: 'var(--text-muted)' }}>
+            ({data.total.toLocaleString()} rows)
+          </span>
           {!hasPK && structure && (
-            <span className="text-xs text-amber-500 font-normal" title={noPKTitle}>no PK</span>
+            <span className="text-[11px] shrink-0" style={{ color: 'var(--warning)' }} title={noPKTitle}>
+              no PK
+            </span>
           )}
-          {loading && <span className="text-xs text-blue-400 font-normal animate-pulse">loading…</span>}
+          {loading && (
+            <span className="text-[11px] shrink-0 animate-pulse" style={{ color: 'var(--accent)' }}>
+              loading…
+            </span>
+          )}
         </h1>
 
-        {/* Action bar */}
-        <div className="flex gap-2 flex-wrap justify-end items-center">
-          {/* Copy selected rows */}
+        <div className="flex gap-1.5 flex-wrap justify-end items-center ml-4 shrink-0">
           {selectedRows.size > 0 && (
             <div className="flex items-center gap-1">
-              <span className="text-xs text-gray-500">{t('copy.rows_selected', { n: selectedRows.size })}</span>
-              <button onClick={() => copySelectedRows('json')} className={copyBtnClass}>{t('copy.json')}</button>
-              <button onClick={() => copySelectedRows('csv')} className={copyBtnClass}>{t('copy.csv')}</button>
-              <button onClick={() => copySelectedRows('insert')} className={copyBtnClass}>{t('copy.insert')}</button>
+              <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                {t('copy.rows_selected', { n: selectedRows.size })}
+              </span>
+              <button onClick={() => copySelectedRows('json')} className={copyBtnClass} style={copyBtnStyle}>{t('copy.json')}</button>
+              <button onClick={() => copySelectedRows('csv')} className={copyBtnClass} style={copyBtnStyle}>{t('copy.csv')}</button>
+              <button onClick={() => copySelectedRows('insert')} className={copyBtnClass} style={copyBtnStyle}>{t('copy.insert')}</button>
             </div>
           )}
+
           <button
             onClick={load}
-            className="bg-gray-100 dark:bg-gray-700 dark:text-gray-300 text-sm px-3 py-1 rounded hover:bg-gray-200 dark:hover:bg-gray-600"
-          >{t('data.refresh')}</button>
+            className="text-[12px] px-2.5 py-1 rounded hover:opacity-80 transition-opacity"
+            style={{ background: 'var(--bg-muted)', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)' }}
+          >
+            {t('data.refresh')}
+          </button>
           <button
             onClick={() => setShowFilters(v => !v)}
-            className={`text-sm px-3 py-1 rounded ${showFilters
-              ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300'
-              : 'bg-gray-100 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'}`}
+            className="text-[12px] px-2.5 py-1 rounded transition-colors"
+            style={showFilters
+              ? { background: 'var(--accent)', color: '#fff', border: '1px solid var(--accent)' }
+              : { background: 'var(--bg-muted)', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)' }
+            }
           >
             {t('data.filter.show')}{filters.length > 0 && ` (${filters.length})`}
           </button>
           {!isReadonly && (
             <button
               onClick={() => { setDrawerInitial({}); setDrawerMode('insert') }}
-              className="bg-green-600 text-white text-sm px-3 py-1 rounded hover:bg-green-700"
-            >{t('data.insert')}</button>
+              className="text-[12px] px-2.5 py-1 rounded hover:opacity-80 transition-opacity"
+              style={{ background: 'var(--success)', color: '#fff' }}
+            >
+              {t('data.insert')}
+            </button>
           )}
           <button
             onClick={() => setExportOpen(true)}
-            className="bg-gray-100 dark:bg-gray-700 dark:text-gray-300 text-sm px-3 py-1 rounded hover:bg-gray-200 dark:hover:bg-gray-600"
-          >↓ {t('export.title')}</button>
+            className="text-[12px] px-2.5 py-1 rounded hover:opacity-80 transition-opacity"
+            style={{ background: 'var(--bg-muted)', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)' }}
+          >
+            ↓ {t('export.title')}
+          </button>
         </div>
       </div>
 
-      {/* Filter panel */}
+      {/* ── Filter panel ─────────────────────────────────── */}
       {showFilters && (
-        <div className="mb-2 p-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm space-y-2">
+        <div
+          className="px-4 py-2 shrink-0 space-y-2"
+          style={{
+            background: 'var(--bg-muted)',
+            borderBottom: '1px solid var(--border-subtle)',
+          }}
+        >
           {filters.length > 0 && (
             <div className="flex flex-wrap gap-1 items-center">
               {filters.map((f, i) => (
-                <span key={i} className="inline-flex items-center gap-1 bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-200 px-2 py-0.5 rounded text-xs">
+                <span
+                  key={i}
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px]"
+                  style={{ background: 'var(--bg-selected)', color: 'var(--accent)', border: '1px solid var(--accent)44' }}
+                >
                   <span className="font-mono">{f.column}</span>
                   <span>{OPERATORS.find(o => o.value === f.operator)?.label ?? f.operator}</span>
                   {f.value && <span className="font-mono">{f.value}</span>}
-                  <button onClick={() => handleRemoveFilter(i)} className="ml-1 hover:text-red-500">×</button>
+                  <button
+                    onClick={() => handleRemoveFilter(i)}
+                    className="ml-1 hover:opacity-60"
+                  >
+                    ×
+                  </button>
                 </span>
               ))}
               <button
                 onClick={() => { setFilters([]); setPage(1) }}
-                className="text-xs text-gray-500 hover:text-red-500 ml-1"
-              >{t('data.filter.clear_all')}</button>
+                className="text-[11px] hover:opacity-60"
+                style={{ color: 'var(--danger)' }}
+              >
+                {t('data.filter.clear_all')}
+              </button>
             </div>
           )}
-          <div className="flex gap-2 flex-wrap">
+          <div className="flex gap-2 flex-wrap items-center">
             <select
               value={addCol}
               onChange={e => setAddCol(e.target.value)}
-              className="border border-gray-300 dark:border-gray-600 rounded px-2 py-1 text-xs bg-white dark:bg-gray-700 dark:text-gray-200 min-w-28"
+              className="rounded px-2 py-1 text-[12px] min-w-28"
+              style={{
+                border: '1px solid var(--border-strong)',
+                background: 'var(--bg-surface)',
+                color: 'var(--text-default)',
+              }}
             >
               <option value="">{t('data.filter.col_placeholder')}</option>
               {data.columns.map(c => <option key={c} value={c}>{c}</option>)}
@@ -311,7 +355,12 @@ export default function DataPage() {
             <select
               value={addOp}
               onChange={e => setAddOp(e.target.value as FilterOperator)}
-              className="border border-gray-300 dark:border-gray-600 rounded px-2 py-1 text-xs bg-white dark:bg-gray-700 dark:text-gray-200"
+              className="rounded px-2 py-1 text-[12px]"
+              style={{
+                border: '1px solid var(--border-strong)',
+                background: 'var(--bg-surface)',
+                color: 'var(--text-default)',
+              }}
             >
               {OPERATORS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
@@ -321,24 +370,39 @@ export default function DataPage() {
                 onChange={e => setAddVal(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && handleAddFilter()}
                 placeholder={t('data.filter.val_placeholder')}
-                className="border border-gray-300 dark:border-gray-600 rounded px-2 py-1 text-xs bg-white dark:bg-gray-700 dark:text-gray-200 w-32"
+                className="rounded px-2 py-1 text-[12px] w-32"
+                style={{
+                  border: '1px solid var(--border-strong)',
+                  background: 'var(--bg-surface)',
+                  color: 'var(--text-default)',
+                }}
               />
             )}
             <button
               onClick={handleAddFilter}
               disabled={!addCol}
-              className="bg-blue-600 text-white text-xs px-3 py-1 rounded hover:bg-blue-700 disabled:opacity-50"
-            >{t('data.filter.add')}</button>
+              className="text-[12px] px-3 py-1 rounded disabled:opacity-40"
+              style={{ background: 'var(--accent)', color: '#fff' }}
+            >
+              {t('data.filter.add')}
+            </button>
           </div>
         </div>
       )}
 
-      {/* Table */}
-      <div className="flex-1 overflow-auto border border-gray-200 dark:border-gray-700 rounded-lg">
-        <table className="w-full text-xs">
-          <thead className="bg-gray-50 dark:bg-gray-800 sticky top-0 z-10 border-b border-gray-200 dark:border-gray-700">
-            <tr>
-              <th className="w-8 px-2 py-2">
+      {/* ── Table ────────────────────────────────────────── */}
+      <div
+        className="flex-1 overflow-auto min-h-0"
+        style={{ borderBottom: '1px solid var(--border-subtle)' }}
+      >
+        <table
+          className="border-collapse"
+          style={{ minWidth: 'max-content', width: '100%', fontSize: 12 }}
+        >
+          <thead style={{ background: 'var(--bg-muted)', position: 'sticky', top: 0, zIndex: 10 }}>
+            <tr style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+              {/* Checkbox col */}
+              <th style={{ width: 36, padding: '0 8px' }}>
                 <input
                   ref={selectAllRef}
                   type="checkbox"
@@ -348,27 +412,76 @@ export default function DataPage() {
                   disabled={data.rows.length === 0}
                 />
               </th>
-              {data.columns.map(col => (
-                <th
-                  key={col}
-                  onClick={() => handleSort(col)}
-                  className="text-left px-3 py-2 font-medium text-gray-600 dark:text-gray-400 whitespace-nowrap cursor-pointer select-none hover:bg-gray-100 dark:hover:bg-gray-700"
-                >
-                  {col}
-                  {sortColumn === col && (
-                    <span className="ml-1">{sortDirection === 'asc' ? '▲' : '▼'}</span>
-                  )}
-                </th>
-              ))}
+
+              {data.columns.map(col => {
+                const structCol = structure?.columns.find(c => c.name === col)
+                const isPK = structCol?.primary_key ?? false
+                const typeLabel = structCol?.data_type ?? structCol?.full_type ?? ''
+                const isSorted = sortColumn === col
+                const w = colWidth(col, structure)
+
+                return (
+                  <th
+                    key={col}
+                    onClick={() => handleSort(col)}
+                    className="text-left cursor-pointer select-none whitespace-nowrap"
+                    style={{
+                      width: w,
+                      minWidth: w,
+                      padding: '6px 8px',
+                      color: 'var(--text-muted)',
+                      fontWeight: 500,
+                    }}
+                  >
+                    <div className="flex items-center gap-1">
+                      {isPK && (
+                        <span
+                          className="shrink-0 text-[9px] font-mono px-0.5 rounded leading-none"
+                          style={{ background: 'var(--warning)22', color: 'var(--warning)' }}
+                        >
+                          PK
+                        </span>
+                      )}
+                      <span>{col}</span>
+                      {isSorted && (
+                        <span className="shrink-0 text-[10px]">
+                          {sortDirection === 'asc' ? '▲' : '▼'}
+                        </span>
+                      )}
+                    </div>
+                    {typeLabel && (
+                      <div
+                        className="text-[10px] font-normal font-mono mt-px truncate"
+                        style={{ color: 'var(--text-subtle)', maxWidth: w - 16 }}
+                      >
+                        {typeLabel}
+                      </div>
+                    )}
+                  </th>
+                )
+              })}
+
+              {/* Actions col */}
               {data.columns.length > 0 && (
-                <th className="px-3 py-2 text-right font-medium text-gray-600 dark:text-gray-400 w-20"></th>
+                <th style={{ width: 120, padding: '6px 8px' }} />
               )}
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+
+          <tbody>
             {data.rows.map((row, ri) => (
-              <tr key={ri} className={`hover:bg-blue-50 dark:hover:bg-blue-900/20 ${selectedRows.has(ri) ? 'bg-blue-50/60 dark:bg-blue-900/30' : ''}`}>
-                <td className="w-8 px-2" onClick={e => e.stopPropagation()}>
+              <tr
+                key={ri}
+                style={{
+                  height: 34,
+                  background: selectedRows.has(ri)
+                    ? 'var(--bg-selected)'
+                    : 'transparent',
+                  borderBottom: '1px solid var(--border-subtle)',
+                }}
+                className="hover:bg-[var(--bg-hover)]"
+              >
+                <td style={{ width: 36, padding: '0 8px' }} onClick={e => e.stopPropagation()}>
                   <input
                     type="checkbox"
                     checked={selectedRows.has(ri)}
@@ -376,18 +489,30 @@ export default function DataPage() {
                     className="cursor-pointer"
                   />
                 </td>
-                {data.columns.map(col => (
-                  <td
-                    key={col}
-                    title={cellTitle(row[col])}
-                    onClick={() => setCellDetail({ column: col, value: row[col] })}
-                    className="cursor-pointer px-3 py-1.5 max-w-xs truncate text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-blue-900/10"
-                  >
-                    {renderCell(row[col])}
-                  </td>
-                ))}
+
+                {data.columns.map(col => {
+                  const w = colWidth(col, structure)
+                  return (
+                    <td
+                      key={col}
+                      title={cellTitle(row[col])}
+                      onClick={() => setCellDetail({ column: col, value: row[col] })}
+                      className="cursor-pointer overflow-hidden"
+                      style={{
+                        width: w,
+                        maxWidth: w,
+                        padding: '6px 8px',
+                        color: 'var(--text-default)',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      <CellRenderer value={row[col]} colType={colType(col)} />
+                    </td>
+                  )
+                })}
+
                 {data.columns.length > 0 && (
-                  <td className="px-3 py-1.5">
+                  <td style={{ width: 120, padding: '6px 8px' }}>
                     <div className="flex gap-1 justify-end">
                       <button
                         onClick={() => {
@@ -397,10 +522,14 @@ export default function DataPage() {
                         }}
                         disabled={!hasPK || isReadonly}
                         title={isReadonly ? t('readonly.badge') : hasPK ? undefined : noPKTitle}
-                        className={`text-xs px-2 py-0.5 rounded ${hasPK && !isReadonly
-                          ? 'text-blue-500 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/30'
-                          : 'text-gray-300 dark:text-gray-600 cursor-not-allowed'}`}
-                      >{t('data.edit')}</button>
+                        className="text-[11px] px-1.5 py-0.5 rounded transition-colors"
+                        style={hasPK && !isReadonly
+                          ? { color: 'var(--accent)' }
+                          : { color: 'var(--text-subtle)', cursor: 'not-allowed' }
+                        }
+                      >
+                        {t('data.edit')}
+                      </button>
                       <button
                         onClick={() => {
                           if (!hasPK || isReadonly) return
@@ -421,18 +550,27 @@ export default function DataPage() {
                         }}
                         disabled={!hasPK || isReadonly}
                         title={isReadonly ? t('readonly.badge') : hasPK ? undefined : noPKTitle}
-                        className={`text-xs px-2 py-0.5 rounded ${hasPK && !isReadonly
-                          ? 'text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30'
-                          : 'text-gray-300 dark:text-gray-600 cursor-not-allowed'}`}
-                      >{t('data.delete')}</button>
+                        className="text-[11px] px-1.5 py-0.5 rounded transition-colors"
+                        style={hasPK && !isReadonly
+                          ? { color: 'var(--danger)' }
+                          : { color: 'var(--text-subtle)', cursor: 'not-allowed' }
+                        }
+                      >
+                        {t('data.delete')}
+                      </button>
                     </div>
                   </td>
                 )}
               </tr>
             ))}
+
             {data.rows.length === 0 && (
               <tr>
-                <td colSpan={data.columns.length + 2} className="px-3 py-8 text-center text-gray-400">
+                <td
+                  colSpan={data.columns.length + 2}
+                  className="py-12 text-center text-[12px]"
+                  style={{ color: 'var(--text-subtle)' }}
+                >
                   {t('data.no_rows')}
                 </td>
               </tr>
@@ -441,36 +579,54 @@ export default function DataPage() {
         </table>
       </div>
 
-      {/* Pagination bar */}
-      <div className="flex items-center justify-between mt-3 text-sm text-gray-600 dark:text-gray-400">
+      {/* ── Pagination bar ───────────────────────────────── */}
+      <div
+        className="flex items-center justify-between px-4 py-2 shrink-0 text-[12px]"
+        style={{
+          background: 'var(--bg-muted)',
+          borderTop: '1px solid var(--border-subtle)',
+          color: 'var(--text-muted)',
+        }}
+      >
         <div>Page {page} of {pageCount}</div>
-        <div className="flex gap-2">
+        <div className="flex gap-1.5">
           <button
             onClick={() => setPage(p => Math.max(1, p - 1))}
             disabled={page <= 1}
-            className="px-3 py-1 border border-gray-200 dark:border-gray-600 rounded disabled:opacity-40 hover:bg-gray-50 dark:hover:bg-gray-700"
-          >{t('data.prev')}</button>
+            className="px-2.5 py-1 rounded disabled:opacity-40 hover:opacity-80 transition-opacity"
+            style={{ border: '1px solid var(--border-subtle)', background: 'var(--bg-surface)' }}
+          >
+            {t('data.prev')}
+          </button>
           <button
             onClick={() => setPage(p => Math.min(pageCount, p + 1))}
             disabled={page >= pageCount}
-            className="px-3 py-1 border border-gray-200 dark:border-gray-600 rounded disabled:opacity-40 hover:bg-gray-50 dark:hover:bg-gray-700"
-          >{t('data.next')}</button>
+            className="px-2.5 py-1 rounded disabled:opacity-40 hover:opacity-80 transition-opacity"
+            style={{ border: '1px solid var(--border-subtle)', background: 'var(--bg-surface)' }}
+          >
+            {t('data.next')}
+          </button>
         </div>
         <div className="flex items-center gap-3">
           <select
             value={pageSize}
             onChange={e => { setPageSize(Number(e.target.value)); setPage(1) }}
-            className="border border-gray-200 dark:border-gray-600 rounded px-2 py-1 text-sm bg-white dark:bg-gray-800 dark:text-gray-300"
+            className="rounded px-2 py-1 text-[12px]"
+            style={{
+              border: '1px solid var(--border-subtle)',
+              background: 'var(--bg-surface)',
+              color: 'var(--text-default)',
+            }}
           >
             {[50, 100, 200, 500].map(n => <option key={n} value={n}>{n} / page</option>)}
           </select>
           {data.executionTimeMs > 0 && (
-            <span className="text-xs text-gray-400">{data.executionTimeMs}ms</span>
+            <span style={{ color: 'var(--text-subtle)' }}>{data.executionTimeMs}ms</span>
           )}
         </div>
       </div>
 
-      {/* Row insert/edit drawer */}
+      {/* ── Row drawer ──────────────────────────────────── */}
       {drawerMode && structure && (
         <RowDrawer
           columns={structure.columns}
@@ -503,13 +659,23 @@ export default function DataPage() {
 
       {exportOpen && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-sm mx-4">
-            <h2 className="font-bold mb-4 text-gray-900 dark:text-gray-100">{t('export.title')}</h2>
+          <div
+            className="rounded-lg shadow-xl p-6 w-full max-w-sm mx-4"
+            style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)' }}
+          >
+            <h2
+              className="font-bold mb-4 text-sm"
+              style={{ color: 'var(--text-strong)' }}
+            >
+              {t('export.title')}
+            </h2>
             <div className="mb-4">
-              <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('export.format')}</div>
+              <div className="text-[12px] font-medium mb-1" style={{ color: 'var(--text-muted)' }}>
+                {t('export.format')}
+              </div>
               <div className="flex gap-3">
                 {(['csv', 'sql'] as const).map(fmt => (
-                  <label key={fmt} className="flex items-center gap-1.5 cursor-pointer text-sm">
+                  <label key={fmt} className="flex items-center gap-1.5 cursor-pointer text-[12px]" style={{ color: 'var(--text-default)' }}>
                     <input
                       type="radio"
                       name="exportFormat"
@@ -524,20 +690,12 @@ export default function DataPage() {
             </div>
             {exportFormat === 'sql' && (
               <div className="mb-4 space-y-2">
-                <label className="flex items-center gap-2 cursor-pointer text-sm text-gray-700 dark:text-gray-300">
-                  <input
-                    type="checkbox"
-                    checked={exportSchema}
-                    onChange={e => setExportSchema(e.target.checked)}
-                  />
+                <label className="flex items-center gap-2 cursor-pointer text-[12px]" style={{ color: 'var(--text-default)' }}>
+                  <input type="checkbox" checked={exportSchema} onChange={e => setExportSchema(e.target.checked)} />
                   {t('export.include_schema')}
                 </label>
-                <label className="flex items-center gap-2 cursor-pointer text-sm text-gray-700 dark:text-gray-300">
-                  <input
-                    type="checkbox"
-                    checked={exportData}
-                    onChange={e => setExportData(e.target.checked)}
-                  />
+                <label className="flex items-center gap-2 cursor-pointer text-[12px]" style={{ color: 'var(--text-default)' }}>
+                  <input type="checkbox" checked={exportData} onChange={e => setExportData(e.target.checked)} />
                   {t('export.include_data')}
                 </label>
               </div>
@@ -545,12 +703,18 @@ export default function DataPage() {
             <div className="flex justify-end gap-2">
               <button
                 onClick={() => setExportOpen(false)}
-                className="px-4 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800"
-              >{t('data.cancel')}</button>
+                className="px-4 py-1.5 text-[12px] hover:opacity-70 transition-opacity"
+                style={{ color: 'var(--text-muted)' }}
+              >
+                {t('data.cancel')}
+              </button>
               <button
                 onClick={handleExportDownload}
-                className="px-4 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
-              >↓ {t('export.download')}</button>
+                className="px-4 py-1.5 text-[12px] rounded hover:opacity-80 transition-opacity"
+                style={{ background: 'var(--accent)', color: '#fff' }}
+              >
+                ↓ {t('export.download')}
+              </button>
             </div>
           </div>
         </div>

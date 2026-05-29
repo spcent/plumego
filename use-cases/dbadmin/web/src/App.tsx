@@ -24,8 +24,8 @@ export default function App() {
             <Route path="connections" element={<ConnectionsPage />} />
             <Route path="conn/:connId/databases" element={<TablesPage />} />
             <Route path="conn/:connId/db/:dbName/tables" element={<TablesPage />} />
-            <Route path="conn/:connId/db/:dbName/table/:tableName/data" element={<DataPage />} />
-            <Route path="conn/:connId/db/:dbName/table/:tableName/structure" element={<StructurePage />} />
+            <Route path="conn/:connId/db/:dbName/tables/:tableName/data" element={<DataPage />} />
+            <Route path="conn/:connId/db/:dbName/tables/:tableName/structure" element={<StructurePage />} />
             <Route path="conn/:connId/query" element={<QueryPage />} />
             <Route path="settings" element={<SettingsPage />} />
           </Route>

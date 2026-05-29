@@ -1,8 +1,9 @@
 import { createContext, useContext, useEffect, useState } from 'react'
-import { Outlet, Link, useNavigate, useParams } from 'react-router-dom'
+import { Outlet, Link, useNavigate } from 'react-router-dom'
 import { api, type Connection } from '../api'
 import { useTheme } from '../ThemeContext'
 import { useI18n } from '../i18n'
+import DatabaseTree from '../components/DatabaseTree'
 
 export const ConnectionsCtx = createContext<Connection[]>([])
 
@@ -14,10 +15,7 @@ export function useCurrentConn(connId: string | undefined): Connection | undefin
 export default function MainLayout() {
   const [user, setUser] = useState<string | null>(null)
   const [connections, setConnections] = useState<Connection[]>([])
-  const [expanded, setExpanded] = useState<Record<string, boolean>>({})
-  const [databases, setDatabases] = useState<Record<string, string[]>>({})
   const navigate = useNavigate()
-  const params = useParams()
   const { theme, toggleTheme } = useTheme()
   const { lang, setLang, t } = useI18n()
 
@@ -31,107 +29,102 @@ export default function MainLayout() {
     navigate('/login')
   }
 
-  async function toggleConn(connId: string) {
-    const next = !expanded[connId]
-    setExpanded(p => ({ ...p, [connId]: next }))
-    if (next && !databases[connId]) {
-      try {
-        const dbs = await api.databases(connId)
-        setDatabases(p => ({ ...p, [connId]: dbs }))
-      } catch {}
-    }
+  function refreshConnections() {
+    api.listConnections().then(setConnections).catch(console.error)
   }
 
   return (
-    <div className="flex h-screen bg-gray-100 dark:bg-gray-950 text-sm">
-      {/* Sidebar */}
-      <aside className="w-56 bg-gray-800 dark:bg-gray-900 text-gray-200 flex flex-col shrink-0 overflow-x-hidden border-r border-gray-700">
-        <div className="px-4 py-3 border-b border-gray-700 flex items-center justify-between">
-          <span className="font-bold text-white">DBAdmin</span>
-          <div className="flex items-center gap-2">
+    <div className="flex h-screen overflow-hidden" style={{ background: 'var(--bg-app)', color: 'var(--text-default)' }}>
+      {/* ── Sidebar ──────────────────────────────────────────── */}
+      <aside
+        className="flex flex-col shrink-0 overflow-hidden"
+        style={{
+          width: 260,
+          background: 'var(--sb-bg)',
+          borderRight: '1px solid var(--sb-border)',
+        }}
+      >
+        {/* Sidebar header */}
+        <div
+          className="flex items-center justify-between px-3 h-11 shrink-0"
+          style={{ borderBottom: '1px solid var(--sb-border)' }}
+        >
+          <span
+            className="text-sm font-semibold tracking-tight select-none"
+            style={{ color: 'var(--sb-text)' }}
+          >
+            DBAdmin
+          </span>
+          <div className="flex items-center gap-1.5">
             <button
               onClick={toggleTheme}
-              className="text-xs text-gray-400 hover:text-white w-5 text-center"
+              className="w-6 h-6 flex items-center justify-center rounded text-[13px] hover:bg-white/10 transition-colors"
+              style={{ color: 'var(--sb-muted)' }}
               title={theme === 'dark' ? 'Light mode' : 'Dark mode'}
             >
               {theme === 'dark' ? '☀' : '☾'}
             </button>
             <button
               onClick={() => setLang(lang === 'en' ? 'zh' : 'en')}
-              className="text-xs text-gray-400 hover:text-white font-mono"
+              className="w-6 h-6 flex items-center justify-center rounded text-[11px] font-mono hover:bg-white/10 transition-colors"
+              style={{ color: 'var(--sb-muted)' }}
               title="Switch language"
             >
               {lang === 'en' ? '中' : 'EN'}
             </button>
-            <button onClick={handleLogout} className="text-xs text-gray-400 hover:text-white">
-              {t('nav.logout')}
-            </button>
           </div>
         </div>
-        <div className="px-4 py-2 border-b border-gray-700 flex items-center justify-between">
-          <Link to="/connections" className="text-xs text-blue-400 hover:text-blue-300">
+
+        {/* Quick links */}
+        <div
+          className="flex items-center gap-2 px-3 py-1.5 shrink-0"
+          style={{ borderBottom: '1px solid var(--sb-border)' }}
+        >
+          <Link
+            to="/connections"
+            className="flex-1 text-[12px] text-center py-1 rounded transition-colors hover:bg-white/10"
+            style={{ color: 'var(--sb-text)' }}
+          >
             {t('nav.manage_connections')}
           </Link>
-          <Link to="/settings" className="text-xs text-gray-400 hover:text-gray-200">
-            {t('nav.settings')}
+          <Link
+            to="/settings"
+            className="w-6 h-6 flex items-center justify-center rounded text-[13px] hover:bg-white/10 transition-colors"
+            style={{ color: 'var(--sb-muted)' }}
+            title={t('nav.settings')}
+          >
+            ⚙
           </Link>
         </div>
-        <nav className="flex-1 overflow-y-auto py-1">
-          {connections.map(conn => (
-            <div key={conn.id}>
-              <button
-                onClick={() => toggleConn(conn.id)}
-                className="w-full text-left px-4 py-2 hover:bg-gray-700 flex items-center gap-2"
-              >
-                <span className="text-xs font-mono bg-gray-600 px-1 rounded shrink-0">
-                  {conn.driver === 'mysql' ? 'MY' : 'SQ'}
-                </span>
-                <span className="truncate flex-1 min-w-0">{conn.name}</span>
-                {conn.readonly && (
-                  <span className="text-xs bg-amber-600/70 text-amber-100 px-1 rounded shrink-0 font-mono">RO</span>
-                )}
-                <span className="shrink-0 text-gray-500">{expanded[conn.id] ? '▾' : '▸'}</span>
-              </button>
-              {expanded[conn.id] && (
-                <div className="pl-2">
-                  {(databases[conn.id] || []).map(db => {
-                    const isActive = params.connId === conn.id && params.dbName === db
-                    return (
-                      <Link
-                        key={db}
-                        to={`/conn/${conn.id}/db/${db}/tables`}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded mx-1 my-0.5 truncate ${
-                          isActive
-                            ? 'bg-blue-600 text-white'
-                            : 'text-gray-300 hover:bg-gray-700'
-                        }`}
-                      >
-                        <span className="shrink-0 text-gray-400">🗄</span>
-                        <span className="truncate">{db}</span>
-                      </Link>
-                    )
-                  })}
-                  <Link
-                    to={`/conn/${conn.id}/query`}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-blue-400 hover:text-blue-300 mx-1"
-                  >
-                    <span className="shrink-0">▶</span>
-                    <span>{t('nav.sql_console')}</span>
-                  </Link>
-                </div>
-              )}
-            </div>
-          ))}
-        </nav>
-        {user && (
-          <div className="px-4 py-2 border-t border-gray-700 text-xs text-gray-400 truncate">
-            {user}
-          </div>
-        )}
+
+        {/* Database tree — takes all remaining vertical space */}
+        <DatabaseTree connections={connections} onRefresh={refreshConnections} />
+
+        {/* Sidebar footer: logged-in user + logout */}
+        <div
+          className="flex items-center justify-between px-3 py-2 shrink-0"
+          style={{
+            borderTop: '1px solid var(--sb-border)',
+            color: 'var(--sb-muted)',
+            fontSize: 12,
+          }}
+        >
+          <span className="truncate flex-1 min-w-0">{user ?? '…'}</span>
+          <button
+            onClick={handleLogout}
+            className="ml-2 hover:text-white transition-colors"
+            style={{ fontSize: 11 }}
+          >
+            {t('nav.logout')}
+          </button>
+        </div>
       </aside>
 
-      {/* Main */}
-      <main className="flex-1 overflow-auto bg-white dark:bg-gray-900">
+      {/* ── Workbench ─────────────────────────────────────────── */}
+      <main
+        className="flex-1 min-w-0 overflow-auto"
+        style={{ background: 'var(--bg-app)' }}
+      >
         <ConnectionsCtx.Provider value={connections}>
           <Outlet />
         </ConnectionsCtx.Provider>

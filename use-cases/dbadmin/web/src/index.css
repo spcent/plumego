@@ -3,11 +3,91 @@
 /* Enable class-based dark mode: add 'dark' class to <html> */
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* ─── Design tokens ──────────────────────────────────────────── */
+:root {
+  /* App backgrounds */
+  --bg-app:      #f0f2f5;
+  --bg-surface:  #ffffff;
+  --bg-muted:    #f7f8fa;
+  --bg-hover:    #eef0f3;
+  --bg-selected: #dbeafe;
+
+  /* Text */
+  --text-strong:  #111827;
+  --text-default: #374151;
+  --text-muted:   #6b7280;
+  --text-subtle:  #9ca3af;
+
+  /* Borders */
+  --border-subtle: #e5e7eb;
+  --border-strong: #d1d5db;
+
+  /* Semantic colours */
+  --accent:       #2563eb;
+  --accent-hover: #1d4ed8;
+  --danger:       #dc2626;
+  --success:      #16a34a;
+  --warning:      #d97706;
+
+  /* Sidebar — always dark regardless of mode */
+  --sb-bg:      #1e2533;
+  --sb-surface: #252d3d;
+  --sb-hover:   #2d3a4d;
+  --sb-active:  #2563eb;
+  --sb-text:    #c9d1d9;
+  --sb-muted:   #6e7681;
+  --sb-border:  #2d3a4d;
+}
+
+.dark {
+  --bg-app:      #0d1117;
+  --bg-surface:  #161b22;
+  --bg-muted:    #1c2230;
+  --bg-hover:    #21262d;
+  --bg-selected: #1d3151;
+
+  --text-strong:  #f0f6fc;
+  --text-default: #c9d1d9;
+  --text-muted:   #8b949e;
+  --text-subtle:  #484f58;
+
+  --border-subtle: #30363d;
+  --border-strong: #444c56;
+
+  --accent:       #388bfd;
+  --accent-hover: #58a6ff;
+  --danger:       #f85149;
+  --success:      #56d364;
+  --warning:      #e3b341;
+}
+
+/* ─── Base ───────────────────────────────────────────────────── */
 body {
   margin: 0;
   font-family: system-ui, -apple-system, sans-serif;
+  background: var(--bg-app);
+  color: var(--text-default);
 }
 
 * {
   box-sizing: border-box;
+}
+
+/* ─── Scrollbars ─────────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-subtle);
 }
