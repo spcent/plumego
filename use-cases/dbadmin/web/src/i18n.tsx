@@ -241,6 +241,11 @@ const en: Dict = {
   'redis.key.stream_groups': 'Groups: {n}',
   'redis.key.list_length': '{n} items',
   'redis.key.set_size': '{n} members',
+  'redis.key.hash_search': 'Search fields...',
+  'redis.key.hash_no_match': 'No fields match',
+  'redis.key.page': 'Page {current} of {total}',
+  'redis.key.prev': 'Previous',
+  'redis.key.next': 'Next',
   'redis.key.hash_fields': '{n} fields',
 
   // Redis Command Console
@@ -253,6 +258,7 @@ const en: Dict = {
 
   // Redis Batch Operations
   'redis.batch.select_keys': 'Select keys to delete',
+  'redis.batch.cancel': 'Cancel selection',
   'redis.batch.selected': '{n} keys selected',
   'redis.batch.preview': 'Preview',
   'redis.batch.delete': 'Delete Selected',
@@ -260,6 +266,8 @@ const en: Dict = {
   'redis.batch.deleted': '{n} keys deleted',
   'redis.batch.no_keys': 'No keys match the pattern',
   'redis.batch.warning': 'Warning: This will delete {n} keys permanently',
+  'redis.batch.select_all': 'Select all',
+  'redis.batch.deselect_all': 'Deselect all',
 
   // Redis Pattern Favorites
   'redis.favorites.title': 'Pattern Favorites',
@@ -553,6 +561,11 @@ const zh: Dict = {
   'redis.key.list_length': '{n} 个元素',
   'redis.key.set_size': '{n} 个成员',
   'redis.key.hash_fields': '{n} 个字段',
+  'redis.key.hash_search': '搜索字段...',
+  'redis.key.hash_no_match': '没有匹配的字段',
+  'redis.key.page': '第 {current} 页，共 {total} 页',
+  'redis.key.prev': '上一页',
+  'redis.key.next': '下一页',
 
   // Redis Command Console
   'redis.command.title': '命令控制台',
@@ -564,6 +577,7 @@ const zh: Dict = {
 
   // Redis Batch Operations
   'redis.batch.select_keys': '选择要删除的 Key',
+  'redis.batch.cancel': '取消选择',
   'redis.batch.selected': '已选择 {n} 个 Key',
   'redis.batch.preview': '预览',
   'redis.batch.delete': '删除选中',
@@ -571,6 +585,8 @@ const zh: Dict = {
   'redis.batch.deleted': '已删除 {n} 个 Key',
   'redis.batch.no_keys': '没有匹配该模式的 Key',
   'redis.batch.warning': '警告：这将永久删除 {n} 个 Key',
+  'redis.batch.select_all': '全选',
+  'redis.batch.deselect_all': '取消全选',
 
   // Redis Pattern Favorites
   'redis.favorites.title': '模式收藏',

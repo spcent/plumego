@@ -323,6 +323,8 @@ export interface RedisKeyEntry {
   key: string
   type: string
   ttl: number // seconds; -1 = no expiry, -2 = not found
+  memory?: number // bytes
+  isBig?: boolean // true if > 1MB
 }
 
 export interface RedisKeyParams {
@@ -364,4 +366,10 @@ export interface RedisCommandResult {
   result: unknown
   error?: string
   timeMs: number
+}
+
+export interface RedisBatchPreviewResponse {
+  keys: RedisKeyEntry[]
+  totalKeys: number
+  truncated: boolean
 }
