@@ -1,8 +1,8 @@
 // Package ratelimit provides a reusable token bucket rate limiter.
 //
-// This package is a canonical resilience primitive shared by x/messaging/pubsub, x/tenant,
-// and any other package that needs per-key rate limiting without importing an
-// external rate-limit library.
+// This is the canonical rate-limit primitive used internally by x/messaging/pubsub,
+// x/tenant/ratelimit, and x/ai/resilience. It is not an HTTP middleware — for
+// HTTP-layer abuse protection use middleware/abuseguard, which wraps security/abuse.
 //
 // Example – global limit:
 //

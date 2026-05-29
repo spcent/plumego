@@ -1,0 +1,29 @@
+name: x/gateway/cache
+path: x/gateway/cache
+layer: extension
+status: beta
+parent_family: x/gateway
+suggested_gate_profile: single_module_behavior
+owner: edge
+risk: medium
+summary: HTTP response cache for the gateway reverse proxy; keyed by request method, URL, and configurable headers.
+
+responsibilities:
+  - HTTP response caching with pluggable key strategies
+  - In-memory cache store implementation
+  - Cache adapter wiring for gateway proxy
+
+non_goals:
+  - Distributed or Redis cache storage (owned by x/data/cache)
+  - In-process primitive caching (owned by store/cache)
+  - Business freshness or TTL policy decisions
+
+allowed_imports:
+  - stdlib
+  - contract
+  - internal/httputil
+  - x/gateway
+
+test_commands:
+  - go test -race -timeout 60s ./x/gateway/cache/...
+  - go vet ./x/gateway/cache/...

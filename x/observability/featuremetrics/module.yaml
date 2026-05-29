@@ -1,0 +1,25 @@
+name: x/observability/featuremetrics
+path: x/observability/featuremetrics
+layer: extension
+status: beta
+parent_family: x/observability
+suggested_gate_profile: single_module_behavior
+owner: observability
+risk: low
+summary: Feature-flag and rollout metric helpers; records feature adoption rates and error counts per feature.
+
+responsibilities:
+  - Feature-level counter and error rate recording
+  - Feature metric tag helpers
+
+non_goals:
+  - Feature flag evaluation (no flag storage or decision logic)
+  - Export backend ownership (owned by x/observability)
+
+allowed_imports:
+  - stdlib
+  - metrics
+
+test_commands:
+  - go test -race -timeout 60s ./x/observability/featuremetrics/...
+  - go vet ./x/observability/featuremetrics/...

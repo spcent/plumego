@@ -1,0 +1,25 @@
+name: x/observability/windowmetrics
+path: x/observability/windowmetrics
+layer: extension
+status: beta
+parent_family: x/observability
+suggested_gate_profile: single_module_behavior
+owner: observability
+risk: low
+summary: Sliding-window metric aggregator for rolling rate and latency summaries.
+
+responsibilities:
+  - Configurable sliding-window aggregation (count, sum, p50/p95/p99)
+  - Thread-safe window rotation
+
+non_goals:
+  - Export or scrape endpoint ownership (owned by x/observability)
+  - Business freshness or retention policy
+
+allowed_imports:
+  - stdlib
+  - metrics
+
+test_commands:
+  - go test -race -timeout 60s ./x/observability/windowmetrics/...
+  - go vet ./x/observability/windowmetrics/...

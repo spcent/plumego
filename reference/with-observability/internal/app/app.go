@@ -17,7 +17,7 @@ import (
 	"github.com/spcent/plumego/middleware/httpmetrics"
 	"github.com/spcent/plumego/middleware/recovery"
 	"github.com/spcent/plumego/middleware/requestid"
-	midsecurity "github.com/spcent/plumego/middleware/security"
+	"github.com/spcent/plumego/middleware/securityheaders"
 	"github.com/spcent/plumego/middleware/timeout"
 	mwtracing "github.com/spcent/plumego/middleware/tracing"
 	"github.com/spcent/plumego/x/observability"
@@ -56,7 +56,7 @@ func New(cfg config.Config) (*App, error) {
 
 	tracer := observability.NewOpenTelemetryTracer(cfg.App.ServiceName)
 
-	securityMw, err := midsecurity.Middleware(midsecurity.Config{})
+	securityMw, err := securityheaders.Middleware(securityheaders.Config{})
 	if err != nil {
 		return nil, fmt.Errorf("configure security headers middleware: %w", err)
 	}

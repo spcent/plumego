@@ -1,0 +1,29 @@
+name: x/gateway/protocolmw
+path: x/gateway/protocolmw
+layer: extension
+status: beta
+parent_family: x/gateway
+suggested_gate_profile: single_module_behavior
+owner: edge
+risk: medium
+summary: Protocol-aware middleware for the gateway; applies protocol-specific request/response transforms in the proxy pipeline.
+
+responsibilities:
+  - Protocol-specific middleware adapters for gateway pipelines
+  - Request/response rewrite hooks per protocol
+
+non_goals:
+  - Generic HTTP middleware (owned by middleware/)
+  - Protocol adapter logic (owned by x/gateway/protocol)
+  - Business policy enforcement
+
+allowed_imports:
+  - stdlib
+  - contract
+  - middleware
+  - x/gateway
+  - x/gateway/protocol
+
+test_commands:
+  - go test -race -timeout 60s ./x/gateway/protocolmw/...
+  - go vet ./x/gateway/protocolmw/...

@@ -1,5 +1,28 @@
 # store
 
+## Storage Decision Guide
+
+| Scenario | Package |
+|---|---|
+| In-process memory cache (dev/test/local) | `store/cache` |
+| Redis / distributed cache | `x/data/cache/redis` |
+| Distributed cache with replication | `x/data/cache/distributed` |
+| Ranked / leaderboard cache | `x/data/cache/leaderboard` |
+| HTTP response cache (reverse proxy layer) | `x/gateway/cache` |
+| Exact-key LLM response cache | `x/ai/llmcache` |
+| Semantic similarity cache (AI) | `x/ai/semanticcache` |
+| Local file read/write (contract layer) | `store/file` |
+| S3 / image processing / signed URLs | `x/data/file` |
+| File HTTP upload/download transport | `x/fileapi` |
+| In-process idempotency check | `store/idempotency` |
+| Durable idempotency (SQL/KV-backed) | `x/data/idempotency` |
+| Small embedded key-value (file-backed) | `store/kv` |
+| Durable KV engine (WAL, snapshots) | `x/data/kvengine` |
+| SQL query helpers | `store/db` |
+| pgx-specific helpers | `x/data/pgx` |
+| sqlx-specific helpers | `x/data/sqlx` |
+| Read-write split / sharding topology | `x/data/rw` / `x/data/sharding` |
+
 ## Purpose
 
 `store` holds persistence primitives and base abstractions.

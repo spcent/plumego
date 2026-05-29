@@ -1,8 +1,8 @@
-// Package ratelimit adapts stable abuse primitives to HTTP middleware.
+// Package abuseguard adapts stable abuse primitives to HTTP middleware.
 //
 // NewAbuseGuard is the canonical entrypoint. It exposes Stop for application
 // shutdown when middleware creates limiter resources.
-package ratelimit
+package abuseguard
 
 import (
 	"math"
@@ -34,16 +34,16 @@ const (
 //
 // Example:
 //
-//	import "github.com/spcent/plumego/middleware/ratelimit"
+//	import "github.com/spcent/plumego/middleware/abuseguard"
 //
-//	config := ratelimit.AbuseGuardConfig{
+//	config := abuseguard.AbuseGuardConfig{
 //		Rate:            10.0,      // 10 requests per second
 //		Capacity:        100,       // Burst capacity of 100 requests
 //		CleanupInterval: time.Minute, // Clean up idle entries every minute
 //		MaxIdle:         5 * time.Minute, // Remove entries idle for 5 minutes
 //		// KeyFunc defaults to RemoteAddr when omitted
 //	}
-//	guard := ratelimit.NewAbuseGuard(config)
+//	guard := abuseguard.NewAbuseGuard(config)
 //	defer guard.Stop()
 //	handler := guard.Middleware()(myHandler)
 type AbuseGuardConfig struct {

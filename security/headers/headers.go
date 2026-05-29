@@ -16,7 +16,7 @@
 // Example usage:
 //
 //	import (
-//		mwsecurity "github.com/spcent/plumego/middleware/security"
+//		"github.com/spcent/plumego/middleware/securityheaders"
 //		"github.com/spcent/plumego/security/headers"
 //	)
 //
@@ -35,7 +35,7 @@
 //	}
 //
 //	// Apply with the canonical transport adapter
-//	mw, err := mwsecurity.Middleware(mwsecurity.Config{Policy: &policy})
+//	mw, err := securityheaders.Middleware(securityheaders.Config{Policy: &policy})
 //	if err != nil {
 //		return err
 //	}

@@ -1,0 +1,25 @@
+name: x/observability/testmetrics
+path: x/observability/testmetrics
+layer: extension
+status: beta
+parent_family: x/observability
+suggested_gate_profile: single_module_behavior
+owner: observability
+risk: low
+summary: Test-only mock collector for asserting metric emissions in unit and integration tests.
+
+responsibilities:
+  - In-memory mock implementation of metrics.AggregateCollector
+  - Recorded metric assertions (Count, LastValue, etc.)
+
+non_goals:
+  - Production metric collection
+  - Export or scrape functionality
+
+allowed_imports:
+  - stdlib
+  - metrics
+
+test_commands:
+  - go test -race -timeout 60s ./x/observability/testmetrics/...
+  - go vet ./x/observability/testmetrics/...

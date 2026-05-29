@@ -51,10 +51,10 @@
 - keep side effects explicit and local
 - keep tenant-aware policy, resolution, and quota behavior in `x/tenant`
 - keep auth and security-header transport adapters here, on top of `security/*` primitives
-- keep stable rate limiting here as a thin `middleware/ratelimit` HTTP adapter over `security/abuse`, not as a catalog of limiter implementations
+- keep stable rate limiting here as a thin `middleware/abuseguard` HTTP adapter over `security/abuse`, not as a catalog of limiter implementations
 - if a task needs the reusable limiter primitive rather than the stable HTTP
   adapter, route it to `x/resilience/ratelimit` instead of widening
-  `middleware/ratelimit`
+  `middleware/abuseguard`
 - rate limiting defaults must use the direct `RemoteAddr` peer IP; applications behind trusted proxies can opt into `X-Forwarded-For`/`X-Real-IP` by supplying an explicit `ratelimit.AbuseGuardConfig.KeyFunc`
 - if a custom rate-limit `KeyFunc` returns an empty or all-whitespace key,
   `AbuseGuard` falls back to the direct `RemoteAddr` peer IP instead of sharing
@@ -106,7 +106,7 @@ Recommended baseline order:
 2. `recovery.Middleware(recovery.Config{Logger: app.Logger()})` to construct the panic recovery layer and convert panics from downstream middleware and handlers into structured errors.
 3. `bodylimit.Middleware(bodylimit.Config{...})` for request body caps.
 4. `timeout.Middleware(timeout.Config{...})` for bounded request runtime.
-5. `middleware/security.Middleware(security.Config{Policy: policy})` for response hardening; invalid custom header policies fail during construction.
+5. `middleware/securityheaders.Middleware(security.Config{Policy: policy})` for response hardening; invalid custom header policies fail during construction.
 6. `ratelimit.NewAbuseGuard(...).Middleware()` for transport abuse limits when the limiter is middleware-owned.
 7. `auth.Authenticate(...)` and `auth.Authorize(...)` on protected route groups or handlers; both return `(middleware.Middleware, error)` so invalid dependencies fail during startup.
 8. `httpmetrics.Middleware(...)` and `tracing.Middleware(...)` for transport telemetry when needed.

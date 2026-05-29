@@ -1,0 +1,29 @@
+name: x/observability/dbinsights
+path: x/observability/dbinsights
+layer: extension
+status: beta
+parent_family: x/observability
+suggested_gate_profile: single_module_behavior
+owner: observability
+risk: medium
+summary: Database query instrumentation helpers; records slow-query rates, error counts, and pool saturation metrics.
+
+responsibilities:
+  - Slow-query threshold detection and metric emission
+  - DB connection pool saturation recording
+  - Query error rate aggregation
+
+non_goals:
+  - Database driver or connection management (owned by store/db and x/data)
+  - Export backend configuration (owned by x/observability)
+  - Business query logic or retry policy
+
+allowed_imports:
+  - stdlib
+  - log
+  - metrics
+  - store
+
+test_commands:
+  - go test -race -timeout 60s ./x/observability/dbinsights/...
+  - go vet ./x/observability/dbinsights/...

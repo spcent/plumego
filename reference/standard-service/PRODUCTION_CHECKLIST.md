@@ -34,7 +34,7 @@ Each item is a conscious decision, not a default assumption.
 ## Security
 
 - [ ] **Security headers** are wired and cover your deployment requirements.
-  `middleware/security` is wired in `internal/app/app.go` and sets
+  `middleware/securityheaders` is wired in `internal/app/app.go` and sets
   `X-Frame-Options`, `X-Content-Type-Options`, and `Referrer-Policy`.
   Review the defaults against your Content Security Policy and HSTS requirements;
   extend `midsecurity.Config{}` if stricter headers are needed.

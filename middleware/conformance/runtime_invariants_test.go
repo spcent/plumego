@@ -11,7 +11,7 @@ import (
 	"github.com/spcent/plumego/middleware"
 	"github.com/spcent/plumego/middleware/bodylimit"
 	"github.com/spcent/plumego/middleware/httpmetrics"
-	"github.com/spcent/plumego/middleware/ratelimit"
+	"github.com/spcent/plumego/middleware/abuseguard"
 	"github.com/spcent/plumego/middleware/requestid"
 	mwtracing "github.com/spcent/plumego/middleware/tracing"
 	"github.com/spcent/plumego/security/authn"
@@ -162,7 +162,7 @@ func TestMiddlewareErrorSchemaCanonical(t *testing.T) {
 		{
 			name:         "abuse guard rate limited",
 			expectedCode: contract.CodeRateLimited,
-			handler: newConformanceAbuseGuardMiddleware(t, ratelimit.AbuseGuardConfig{Rate: 1, Capacity: 1, KeyFunc: func(*http.Request) string { return "k" }})(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			handler: newConformanceAbuseGuardMiddleware(t, abuseguard.AbuseGuardConfig{Rate: 1, Capacity: 1, KeyFunc: func(*http.Request) string { return "k" }})(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
 			})),
 			request: httptest.NewRequest(http.MethodGet, "/", nil),
@@ -200,10 +200,10 @@ func TestMiddlewareErrorSchemaCanonical(t *testing.T) {
 	}
 }
 
-func newConformanceAbuseGuardMiddleware(t *testing.T, config ratelimit.AbuseGuardConfig) middleware.Middleware {
+func newConformanceAbuseGuardMiddleware(t *testing.T, config abuseguard.AbuseGuardConfig) middleware.Middleware {
 	t.Helper()
 
-	guard := ratelimit.NewAbuseGuard(config)
+	guard := abuseguard.NewAbuseGuard(config)
 	t.Cleanup(guard.Stop)
 	return guard.Middleware()
 }

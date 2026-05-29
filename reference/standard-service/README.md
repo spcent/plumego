@@ -30,7 +30,7 @@ stable-root set in order:
 requestid → security → cors → recovery → accesslog → bodylimit → httpmetrics → timeout
 ```
 
-`middleware/security/headers` applies default security headers (X-Frame-Options,
+`middleware/securityheaders/headers` applies default security headers (X-Frame-Options,
 X-Content-Type-Options, Referrer-Policy) to every response. `middleware/cors`
 uses permissive defaults for the reference app; replace with
 `cors.StrictDefaultOptions(origins...)` in production. `middleware/httpmetrics`

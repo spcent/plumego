@@ -1,0 +1,27 @@
+name: x/gateway/protocol
+path: x/gateway/protocol
+layer: extension
+status: beta
+parent_family: x/gateway
+suggested_gate_profile: single_module_behavior
+owner: edge
+risk: medium
+summary: Protocol adapter layer for the gateway; bridges HTTP/1.1 reverse proxy to gRPC and GraphQL upstream backends.
+
+responsibilities:
+  - HTTP-to-gRPC transcoding adapter
+  - GraphQL introspection and query forwarding adapter
+
+non_goals:
+  - gRPC server or client pool (owned by x/rpc)
+  - Business GraphQL schema definition
+  - Authentication (owned by middleware/auth and security)
+
+allowed_imports:
+  - stdlib
+  - contract
+  - x/gateway
+
+test_commands:
+  - go test -race -timeout 60s ./x/gateway/protocol/...
+  - go vet ./x/gateway/protocol/...
