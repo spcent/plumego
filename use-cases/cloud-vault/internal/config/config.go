@@ -22,6 +22,7 @@ type Config struct {
 	Import   ImportConfig
 	Search   SearchConfig
 	Organize OrganizeConfig
+	AI       AIConfig
 }
 
 // AppConfig holds app-local configuration.
@@ -79,6 +80,21 @@ type OrganizeConfig struct {
 	AutoApplyTagSuggestions bool
 
 	PromptCandidateDetection bool
+}
+
+// AIConfig holds V0.5 AI configuration.
+type AIConfig struct {
+	Enabled          bool
+	Provider         string // "local_mock" | "openai_compatible"
+	BaseURL          string // OpenAI-compatible endpoint, e.g. https://api.openai.com/v1
+	APIKey           string
+	Model            string
+	MaxContextTokens int
+	MaxRetries       int
+	TaskWorkers      int
+	SummaryEnabled   bool
+	QAEnabled        bool
+	PromptExtractEnabled bool
 }
 
 // SearchConfig holds full-text search configuration.
@@ -143,6 +159,17 @@ func Defaults() Config {
 			AutoArchiveDuplicates:      false,
 			AutoApplyTagSuggestions:    false,
 			PromptCandidateDetection:   true,
+		},
+		AI: AIConfig{
+			Enabled:              false,
+			Provider:             "local_mock",
+			Model:                "gpt-4o-mini",
+			MaxContextTokens:     8000,
+			MaxRetries:           2,
+			TaskWorkers:          2,
+			SummaryEnabled:       true,
+			QAEnabled:            true,
+			PromptExtractEnabled: true,
 		},
 	}
 }
@@ -244,6 +271,30 @@ func applyEnv(cfg *Config, lookupEnv func(string) (string, bool)) {
 	boolf("APP_TLS_ENABLED", &cfg.Core.TLS.Enabled)
 	str("APP_TLS_CERT_FILE", &cfg.Core.TLS.CertFile)
 	str("APP_TLS_KEY_FILE", &cfg.Core.TLS.KeyFile)
+
+	boolf("AI_ENABLED", &cfg.AI.Enabled)
+	str("AI_PROVIDER", &cfg.AI.Provider)
+	str("AI_BASE_URL", &cfg.AI.BaseURL)
+	str("AI_API_KEY", &cfg.AI.APIKey)
+	str("AI_MODEL", &cfg.AI.Model)
+	if val, ok := lookupEnv("AI_MAX_CONTEXT_TOKENS"); ok {
+		if n, err := strconv.Atoi(strings.TrimSpace(val)); err == nil {
+			cfg.AI.MaxContextTokens = n
+		}
+	}
+	if val, ok := lookupEnv("AI_MAX_RETRIES"); ok {
+		if n, err := strconv.Atoi(strings.TrimSpace(val)); err == nil {
+			cfg.AI.MaxRetries = n
+		}
+	}
+	if val, ok := lookupEnv("AI_TASK_WORKERS"); ok {
+		if n, err := strconv.Atoi(strings.TrimSpace(val)); err == nil {
+			cfg.AI.TaskWorkers = n
+		}
+	}
+	boolf("AI_SUMMARY_ENABLED", &cfg.AI.SummaryEnabled)
+	boolf("AI_QA_ENABLED", &cfg.AI.QAEnabled)
+	boolf("AI_PROMPT_EXTRACT_ENABLED", &cfg.AI.PromptExtractEnabled)
 }
 
 func applyEnvMap(cfg *Config, values map[string]string) {

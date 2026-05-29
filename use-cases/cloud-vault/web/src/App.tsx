@@ -7,8 +7,11 @@ import DuplicatesPage from './pages/DuplicatesPage'
 import CollectionsPage from './pages/CollectionsPage'
 import ReviewPage from './pages/ReviewPage'
 import TopicsPage from './pages/TopicsPage'
+import AITasksPage from './pages/AITasksPage'
+import PromptsPage from './pages/PromptsPage'
+import SystemPage from './pages/SystemPage'
 
-type Page = 'vault' | 'search' | 'import' | 'index' | 'duplicates' | 'collections' | 'review' | 'topics'
+type Page = 'vault' | 'search' | 'import' | 'index' | 'duplicates' | 'collections' | 'review' | 'topics' | 'ai' | 'prompts' | 'system'
 
 interface OpenDoc {
   id: string
@@ -53,6 +56,17 @@ export default function App() {
         <TabButton active={page === 'review'} onClick={() => setPage('review')}>
           ✓ Review
         </TabButton>
+        <span className="text-muted-foreground mx-1 text-xs">|</span>
+        <TabButton active={page === 'ai'} onClick={() => setPage('ai')}>
+          ✦ AI Tasks
+        </TabButton>
+        <TabButton active={page === 'prompts'} onClick={() => setPage('prompts')}>
+          ⊞ Prompts
+        </TabButton>
+        <span className="text-muted-foreground mx-1 text-xs">|</span>
+        <TabButton active={page === 'system'} onClick={() => setPage('system')}>
+          ⊕ System
+        </TabButton>
       </nav>
 
       {/* Page content */}
@@ -71,6 +85,9 @@ export default function App() {
         {page === 'collections' && <CollectionsPage />}
         {page === 'topics' && <TopicsPage />}
         {page === 'review' && <ReviewPage />}
+        {page === 'ai' && <AITasksPage />}
+        {page === 'prompts' && <PromptsPage />}
+        {page === 'system' && <SystemPage />}
       </div>
     </div>
   )

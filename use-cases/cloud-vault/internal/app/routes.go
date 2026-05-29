@@ -111,6 +111,23 @@ func (a *App) RegisterRoutes() error {
 	// V0.4: Review queue
 	v1.get("/review/queue", http.HandlerFunc(a.Organize.GetReviewQueue))
 
+	// V0.6: System observability.
+	v1.get("/system/health", http.HandlerFunc(a.System.Health))
+	v1.get("/system/stats", http.HandlerFunc(a.System.Stats))
+	v1.post("/system/doctor", http.HandlerFunc(a.System.Doctor))
+
+	// V0.5: AI — static sub-paths before :id to avoid ambiguity.
+	v1.post("/ai/tasks/summary", http.HandlerFunc(a.AI.EnqueueSummary))
+	v1.post("/ai/tasks/qa", http.HandlerFunc(a.AI.EnqueueQA))
+	v1.post("/ai/tasks/prompt-extract", http.HandlerFunc(a.AI.EnqueuePromptExtract))
+	v1.get("/ai/tasks", http.HandlerFunc(a.AI.ListTasks))
+	v1.get("/ai/tasks/:id", http.HandlerFunc(a.AI.GetTask))
+	v1.post("/ai/tasks/:id/cancel", http.HandlerFunc(a.AI.CancelTask))
+	v1.get("/ai/prompts", http.HandlerFunc(a.AI.ListPrompts))
+	v1.get("/ai/prompts/:id", http.HandlerFunc(a.AI.GetPrompt))
+	v1.delete("/ai/prompts/:id", http.HandlerFunc(a.AI.DeletePrompt))
+	v1.get("/ai/documents/:id/summary", http.HandlerFunc(a.AI.GetDocumentSummary))
+
 	if v1.err != nil {
 		return v1.err
 	}

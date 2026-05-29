@@ -412,6 +412,295 @@ New columns: `documents.quality_score`, `document_metadata.is_prompt_candidate`,
 - Tag suggestions and similarity resolutions always require explicit user confirmation
 - For very large corpora (50k+ documents) tune `ORGANIZE_MAX_COMPARE_PER_BUCKET` and `ORGANIZE_SIMILARITY_BATCH_SIZE`
 
+## V0.5: AI-Assisted Organization, Q&A, and Knowledge Reconstruction
+
+V0.5 adds an AI task queue, per-document summaries, document-grounded Q&A, and prompt extraction. All AI operations are opt-in and traceable to their source documents.
+
+### Privacy Constraints (Hard Rules)
+
+1. **No whole-library chat** — Q&A answers are grounded only in explicitly selected documents
+2. **Documents not sent by default** — the AI receives only documents the user explicitly selects
+3. **No content in logs** — full Markdown content is never written to server logs
+4. **No hardcoded API keys** — keys come from `AI_API_KEY` env var only
+5. **AI off by default** — `AI_ENABLED=false` until explicitly turned on
+6. **Source tracking** — every AI-generated document records its source document IDs in `document_sources`
+7. **Saveable output** — all AI outputs are saved as Markdown documents in the vault
+
+### AI Features
+
+- **Document Summary** — enqueue from the Vault tab; result saved as a new Markdown document with source link
+- **Q&A** — ask a question grounded in selected documents; answer with citations; result saved as Markdown
+- **Prompt Extraction** — extract a reusable LLM prompt from any document; saved to the Prompt Library
+- **Prompt Library** — browse, copy, filter by scenario, delete extracted prompts
+- **AI Task Queue** — track pending/running/completed/failed tasks; cancel pending tasks
+
+### AI Configuration
+
+| Variable | Default | Description |
+|---|---|---|
+| `AI_ENABLED` | `false` | Enable AI features (must be explicitly set to `true`) |
+| `AI_PROVIDER` | `local_mock` | `local_mock` \| `openai_compatible` |
+| `AI_BASE_URL` | — | OpenAI-compatible endpoint (e.g. `https://api.openai.com/v1`) |
+| `AI_API_KEY` | — | API key for the provider |
+| `AI_MODEL` | `gpt-4o-mini` | Model name to use |
+| `AI_MAX_CONTEXT_TOKENS` | `8000` | Max tokens to include in context window |
+| `AI_MAX_RETRIES` | `2` | Max task retries before marking failed |
+| `AI_TASK_WORKERS` | `2` | Number of background worker goroutines |
+| `AI_SUMMARY_ENABLED` | `true` | Enable document summary tasks |
+| `AI_QA_ENABLED` | `true` | Enable Q&A tasks |
+| `AI_PROMPT_EXTRACT_ENABLED` | `true` | Enable prompt extraction tasks |
+
+### AI API
+
+```
+POST /api/v1/ai/tasks/summary          # enqueue summary: {"document_id":"..."}
+POST /api/v1/ai/tasks/qa               # enqueue Q&A: {"question":"...","document_ids":["..."]}
+POST /api/v1/ai/tasks/prompt-extract   # enqueue prompt extraction: {"document_id":"..."}
+GET  /api/v1/ai/tasks                  # list tasks (?status=pending|running|completed|failed)
+GET  /api/v1/ai/tasks/:id              # get task
+POST /api/v1/ai/tasks/:id/cancel       # cancel pending task
+GET  /api/v1/ai/documents/:id/summary  # get AI summary for a document
+GET  /api/v1/ai/prompts                # list prompt library (?scenario=...)
+GET  /api/v1/ai/prompts/:id            # get prompt
+DELETE /api/v1/ai/prompts/:id          # delete prompt
+```
+
+### V0.5 Database Tables
+
+| Table | Purpose |
+|---|---|
+| `ai_tasks` | AI task queue (pending → running → completed/failed/cancelled) |
+| `document_ai_summaries` | Structured per-document AI summaries |
+| `prompts` | Prompt library (extracted or manually created) |
+| `document_chunks` | Heading-split chunks for context assembly |
+
+### V0.5 Current Limitations
+
+- No vector search or semantic similarity — context is assembled by selecting documents explicitly
+- No streaming responses — tasks are asynchronous; poll task status or refresh the AI Tasks page
+- No whole-library chat — by design; always select specific documents
+- `local_mock` provider returns deterministic stub responses; switch to `openai_compatible` for real AI
+
+## V0.6: System Observability, Testing & Benchmarking
+
+V0.6 focuses on production hardening: system health monitoring, consistency checks, comprehensive testing, and performance benchmarking.
+
+### New Features
+
+#### System Observability
+
+- **GET `/api/v1/system/health`** — Overall system health status
+  - Database connectivity
+  - Storage availability
+  - Search index status
+  - AI provider status
+
+- **GET `/api/v1/system/stats`** — Aggregate statistics
+  - Document, collection, tag counts
+  - Storage usage
+  - AI task queue depth
+  - Import job statistics
+
+- **POST `/api/v1/system/doctor`** — Consistency checks
+  - Storage object integrity (missing files)
+  - Document version consistency
+  - Content hash verification
+  - FTS index coverage
+  - Tag reference integrity
+  - Collection reference integrity
+  - Source document integrity
+  - Import job consistency
+  - AI task consistency
+
+#### Testing Infrastructure
+
+- **Go tests** — 7 test suites covering core functionality
+  - `internal/database/migrate_test.go` — Migration idempotency and table creation
+  - `internal/storage/local_test.go` — Local storage operations
+  - `internal/document/service_test.go` — Document CRUD and versioning
+  - `internal/search/index_test.go` — FTS indexing and search
+  - `internal/organize/duplicate_test.go` — Duplicate detection
+  - `internal/ai/task_test.go` — AI task queue and processing
+  - `internal/system/service_test.go` — System health and doctor checks
+
+- **Test fixtures** — 11 Markdown files in `testdata/markdown/`
+  - Simple, complex, frontmatter, code blocks
+  - Links, images, tables
+  - Duplicate pairs for testing
+  - Similar documents for testing
+  - Large documents for performance testing
+
+- **E2E tests** — Playwright smoke tests
+  - Navigation to all pages
+  - API endpoint verification
+  - Health, stats, doctor endpoints
+
+#### Performance Benchmarking
+
+- **`cmd/bench/main.go`** — Benchmark tool
+  - Configurable document count
+  - Search query performance
+  - Indexing throughput
+  - JSON output for automation
+
+```bash
+# Run benchmark with 1000 documents and 20 search queries
+go run ./cmd/bench --docs 1000 --queries 20
+
+# JSON output for CI
+go run ./cmd/bench --docs 500 --queries 10 --json
+```
+
+### Makefile Targets
+
+```bash
+make test          # Run all tests
+make test-go       # Run Go tests
+make test-web      # Run frontend type-check and build
+make test-e2e      # Run Playwright E2E tests (requires: cd e2e && pnpm install && pnpm exec playwright install)
+make doctor        # Run doctor check against running server
+make bench         # Run benchmark (1000 docs, 20 queries)
+```
+
+### System Health API
+
+Check system health:
+
+```bash
+curl http://localhost:8080/api/v1/system/health
+```
+
+Response:
+```json
+{
+  "status": "ok",
+  "database": "ok",
+  "storage": "ok",
+  "search": "ok",
+  "ai": "disabled"
+}
+```
+
+### System Stats API
+
+Get aggregate statistics:
+
+```bash
+curl http://localhost:8080/api/v1/system/stats
+```
+
+Response:
+```json
+{
+  "documents": 150,
+  "versions": 420,
+  "collections": 12,
+  "tags": 45,
+  "import_jobs": 3,
+  "indexed_documents": 150,
+  "pending_indexes": 0,
+  "failed_indexes": 0,
+  "ai_tasks": 5,
+  "prompts": 8
+}
+```
+
+### Doctor API
+
+Run consistency checks:
+
+```bash
+# Run all checks
+curl -X POST http://localhost:8080/api/v1/system/doctor \
+  -H 'Content-Type: application/json' \
+  -d '{"checks":[]}'
+
+# Run specific checks
+curl -X POST http://localhost:8080/api/v1/system/doctor \
+  -H 'Content-Type: application/json' \
+  -d '{"checks":["storage_objects","document_versions","fts_index"]}'
+```
+
+Response:
+```json
+{
+  "status": "ok",
+  "checks": [
+    {
+      "name": "storage_objects",
+      "status": "ok",
+      "total": 150,
+      "failed": 0,
+      "items": []
+    },
+    {
+      "name": "document_versions",
+      "status": "ok",
+      "total": 150,
+      "failed": 0,
+      "items": []
+    }
+  ]
+}
+```
+
+### Running Tests
+
+```bash
+# Run all Go tests
+go test ./...
+
+# Run specific package tests
+go test ./internal/document
+go test ./internal/search
+go test ./internal/system
+
+# Run with coverage
+go test -cover ./...
+
+# Run E2E tests
+cd e2e
+pnpm install
+pnpm exec playwright install
+pnpm test
+```
+
+### Benchmark Results
+
+Example benchmark output:
+
+```
+Cloud Vault Benchmark Results
+============================
+Documents created: 1000
+Create duration: 2.345s (2.35 ms/doc)
+Search queries: 20
+Total search duration: 156ms
+Average search time: 7.8ms
+Indexed documents: 1000
+Index coverage: 100.0%
+```
+
+JSON output:
+```json
+{
+  "doc_count": 1000,
+  "create_duration_ms": 2345,
+  "search_queries": 20,
+  "search_duration_ms": 156,
+  "avg_search_ms": 7,
+  "indexed_docs": 1000
+}
+```
+
+### V0.6 Current Limitations
+
+- E2E tests require manual Playwright installation
+- Benchmark uses local storage only (no cloud storage benchmarking)
+- Doctor checks are read-only (no auto-repair)
+- No scheduled doctor runs (must be triggered manually)
+- No metrics export (Prometheus/Graphite)
+
 ## Current Limitations
 
 - No multi-user collaboration

@@ -19,7 +19,9 @@ import (
 	midsecurity "github.com/spcent/plumego/middleware/security"
 	"github.com/spcent/plumego/middleware/timeout"
 
+	"cloud-vault/internal/ai"
 	"cloud-vault/internal/collection"
+	"cloud-vault/internal/system"
 	"cloud-vault/internal/config"
 	"cloud-vault/internal/database"
 	"cloud-vault/internal/document"
@@ -41,7 +43,10 @@ type App struct {
 	Search     *search.Handler
 	Organize   *organize.Handler
 	Collection *collection.Handler
+	AI         *ai.Handler
+	System     *system.Handler
 	indexer    *search.Indexer
+	aiWorkers  []*ai.Worker
 }
 
 // New constructs the App: opens the database, initialises storage, and wires middleware.
@@ -139,6 +144,29 @@ func New(cfg config.Config) (*App, error) {
 	collectionSvc := collection.NewService(collectionRepo)
 	collectionHandler := collection.NewHandler(collectionSvc, app.Logger())
 
+	// AI handler (V0.5).
+	aiRepo := ai.NewRepository(db.DB)
+	aiProvider := buildAIProvider(cfg.AI)
+	aiDocSaver := &aiDocumentSaver{docSvc: docSvc, aiRepo: aiRepo}
+	aiSvc := ai.NewService(aiRepo, store, cfg.AI, aiProvider, aiDocSaver)
+	aiHandler := ai.NewHandler(aiSvc, cfg.AI.Enabled, app.Logger())
+
+	var aiWorkers []*ai.Worker
+	if cfg.AI.Enabled {
+		n := cfg.AI.TaskWorkers
+		if n <= 0 {
+			n = 1
+		}
+		for i := 0; i < n; i++ {
+			workerLogger := app.Logger().WithFields(plumelog.Fields{"worker": i})
+			aiWorkers = append(aiWorkers, ai.NewWorker(aiSvc, workerLogger, cfg.AI.MaxRetries))
+		}
+	}
+
+	// System handler (V0.6).
+	systemSvc := system.NewService(db.DB, store, cfg.AI)
+	systemHandler := system.NewHandler(systemSvc, app.Logger())
+
 	return &App{
 		Core:       app,
 		Cfg:        cfg,
@@ -149,7 +177,10 @@ func New(cfg config.Config) (*App, error) {
 		Search:     searchHandler,
 		Organize:   organizeHandler,
 		Collection: collectionHandler,
+		AI:         aiHandler,
+		System:     systemHandler,
 		indexer:    indexer,
+		aiWorkers:  aiWorkers,
 	}, nil
 }
 
@@ -172,6 +203,11 @@ func (a *App) Start(ctx context.Context) error {
 
 	// Start background indexer (cancelled when ctx is done).
 	go a.indexer.Run(ctx)
+
+	// Start AI task workers.
+	for _, w := range a.aiWorkers {
+		go w.Run(ctx)
+	}
 
 	shutdownErr := make(chan error, 1)
 	go func() {
@@ -212,6 +248,33 @@ func buildStorage(cfg config.Config) (storage.ObjectStorage, error) {
 	default:
 		return nil, fmt.Errorf("unknown storage provider: %q", cfg.Storage.Provider)
 	}
+}
+
+func buildAIProvider(cfg config.AIConfig) ai.LLMProvider {
+	if cfg.Provider == "openai_compatible" && cfg.BaseURL != "" {
+		return ai.NewOpenAIProvider(cfg.BaseURL, cfg.APIKey, cfg.Model)
+	}
+	return ai.NewMockProvider()
+}
+
+// aiDocumentSaver saves AI-generated content as a vault document and records source links.
+type aiDocumentSaver struct {
+	docSvc *document.Service
+	aiRepo *ai.Repository
+}
+
+func (s *aiDocumentSaver) SaveAIDocument(ctx context.Context, title, content, _ string, sourceIDs []string) (string, error) {
+	result, err := s.docSvc.Create(ctx, document.CreateRequest{
+		Title:   title,
+		Content: content,
+	})
+	if err != nil {
+		return "", err
+	}
+	for _, srcID := range sourceIDs {
+		_ = s.aiRepo.SaveSourceLink(result.ID, srcID, "ai_generated")
+	}
+	return result.ID, nil
 }
 
 // routeReg is a helper that collects route registration errors.

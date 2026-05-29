@@ -6,6 +6,7 @@ import { MarkdownEditor } from '../editor/MarkdownEditor'
 import { APIResponseError } from '../api/client'
 import { type DocumentDetail, type DocumentSummary, documentsAPI } from '../api/documents'
 import { type Tag, tagsAPI } from '../api/tags'
+import { enqueueSummary, enqueuePromptExtract } from '../api/ai'
 
 const DEFAULT_CONTENT = '# Untitled\n\nStart writing…\n'
 
@@ -291,6 +292,20 @@ export default function VaultPage({ initialDocId, highlightQuery = '', onDocumen
               className="text-xs text-red-500 hover:text-red-600 transition-colors"
             >
               Delete
+            </button>
+            <button
+              onClick={() => enqueueSummary(selectedId!).catch(() => {})}
+              title="Enqueue AI summary"
+              className="text-xs text-muted-foreground hover:text-foreground transition-colors border border-border rounded px-2 py-0.5"
+            >
+              ✦ Summarize
+            </button>
+            <button
+              onClick={() => enqueuePromptExtract(selectedId!).catch(() => {})}
+              title="Extract prompt from document"
+              className="text-xs text-muted-foreground hover:text-foreground transition-colors border border-border rounded px-2 py-0.5"
+            >
+              ⊞ Extract Prompt
             </button>
           </>
         )}
