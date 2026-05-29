@@ -26,3 +26,17 @@ allowed_imports:
 test_commands:
   - go test -race -timeout 60s ./x/observability/tracer/...
   - go vet ./x/observability/tracer/...
+
+forbidden_imports:
+  - x/tenant/**
+  - x/ai/**
+  - x/gateway/**
+
+review_checklist:
+  - Keep tracer setup and provider configuration explicit in the app lifecycle
+  - Do not add hidden global tracer state; pass the tracer via context or constructor injection
+  - Keep transport-layer tracing in middleware/tracing; keep provider configuration here
+
+agent_hints:
+  - Wire the tracer provider in main.go lifecycle (Start/Shutdown), not in init() or package-level vars
+  - Span propagation helpers belong in middleware/tracing; keep configuration and exporter setup here

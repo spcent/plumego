@@ -23,3 +23,17 @@ allowed_imports:
 test_commands:
   - go test -race -timeout 60s ./x/observability/windowmetrics/...
   - go vet ./x/observability/windowmetrics/...
+
+forbidden_imports:
+  - x/tenant/**
+  - x/ai/**
+  - x/gateway/**
+
+review_checklist:
+  - Keep window configuration (size, rotation interval) explicit and per-instance
+  - Do not add export or scrape endpoint ownership here
+  - Keep thread-safe window rotation correct under concurrent access
+
+agent_hints:
+  - Window metrics are an aggregation layer; wire them as a collector adapter between metric emitters and x/observability export
+  - Keep window size and rotation interval as constructor parameters, not package-level state

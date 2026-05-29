@@ -27,3 +27,20 @@ allowed_imports:
 test_commands:
   - go test -race -timeout 60s ./x/gateway/protocolmw/...
   - go vet ./x/gateway/protocolmw/...
+
+forbidden_imports:
+  - core/**
+  - store/**
+  - x/tenant/**
+  - x/ai/**
+  - x/messaging/**
+  - x/observability/**
+
+review_checklist:
+  - Keep protocol middleware composable and stateless
+  - Do not add business policy into protocol-level middleware
+  - Avoid coupling protocol middleware to specific gateway implementations
+
+agent_hints:
+  - Protocol middleware wraps existing protocol adapters; keep wiring explicit in the app layer
+  - Prefer small focused middleware functions over monolithic protocol handlers

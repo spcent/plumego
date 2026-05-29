@@ -15,6 +15,12 @@ type Config struct {
 	Policy *headers.Policy
 }
 
+// DefaultConfig returns a Config that applies the default security header policy.
+// Pass DefaultConfig() (or an empty Config{}) to Middleware to use the default policy.
+func DefaultConfig() Config {
+	return Config{}
+}
+
 // Middleware applies a security header policy to responses.
 //
 // This middleware adds security-related HTTP headers to responses to protect

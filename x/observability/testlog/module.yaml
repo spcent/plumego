@@ -23,3 +23,17 @@ allowed_imports:
 test_commands:
   - go test -race -timeout 60s ./x/observability/testlog/...
   - go vet ./x/observability/testlog/...
+
+forbidden_imports:
+  - x/tenant/**
+  - x/ai/**
+  - x/gateway/**
+
+review_checklist:
+  - Use only in test code; do not import in production packages
+  - Keep captured entries queryable by level and message
+  - Do not add export or transport functionality
+
+agent_hints:
+  - Use testlog.Recorder as the StructuredLogger in tests that need to assert log output
+  - Keep test assertions focused on meaningful fields; avoid over-specifying log format

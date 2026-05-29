@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"math"
 	"net/http"
 	"strconv"
 
@@ -17,28 +18,43 @@ import (
 const (
 	codeItemCreateInvalidJSON    = "item.create.invalid_json"
 	codeItemCreateBodyRequired   = "item.create.body_required"
+	codeItemCreateFailed         = "item.create.failed"
 	codeItemFieldsRequired       = "item.fields.required"
-	codeItemUpdateFieldsRequired = "item.update.fields.required"
+	codeItemUpdateFieldsRequired = "item.update.fields_required"
+	codeItemUpdateFailed         = "item.update.failed"
 	codeItemNotFound             = "item.not_found"
 	codeItemUpdateInvalidJSON    = "item.update.invalid_json"
 	codeItemUpdateBodyRequired   = "item.update.body_required"
+	codeItemListFailed           = "item.list.failed"
 	codeItemListInvalidParam     = "item.list.invalid_param"
 	codeItemPatchInvalidJSON     = "item.patch.invalid_json"
 	codeItemPatchBodyRequired    = "item.patch.body_required"
 	codeItemPatchNoFields        = "item.patch.no_fields"
+	codeItemPatchFailed          = "item.patch.failed"
+	codeItemDeleteFailed         = "item.delete.failed"
 )
+
+// noLimit is passed as maxVal to parseQueryInt when no upper bound is needed.
+// Using math.MaxInt means the clamp condition (n > maxVal) will never trigger
+// for any realistic query parameter value.
+const noLimit = math.MaxInt
 
 // ItemRepository is the minimal persistence contract that ItemHandler depends on.
 // All methods accept a context so callers can propagate request deadlines and
 // cancellation to real storage backends. Pass a concrete implementation from
 // routes.go; pass a stub in tests.
+//
+// The error return on mutating methods distinguishes storage failures (non-nil error)
+// from "not found" (bool false, nil error) so handlers can return 500 vs 404.
+// Real backends propagate ctx to the underlying driver; the in-memory implementation
+// checks ctx.Err() before acquiring its lock so the contract holds for both.
 type ItemRepository interface {
-	Create(ctx context.Context, name, description string) item.Item
+	Create(ctx context.Context, name, description string) (item.Item, error)
 	Get(ctx context.Context, id string) (item.Item, bool)
-	List(ctx context.Context) []item.Item
-	Update(ctx context.Context, id, name, description string) (item.Item, bool)
-	Patch(ctx context.Context, id, name, description string) (item.Item, bool)
-	Delete(ctx context.Context, id string) bool
+	List(ctx context.Context, offset, limit int) ([]item.Item, int, error)
+	Update(ctx context.Context, id, name, description string) (item.Item, bool, error)
+	Patch(ctx context.Context, id, name, description string) (item.Item, bool, error)
+	Delete(ctx context.Context, id string) (bool, error)
 }
 
 // ItemHandler demonstrates constructor injection: declare the dependency as an
@@ -130,13 +146,17 @@ func (h ItemHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	created := h.Repo.Create(r.Context(), req.Name, req.Description)
+	created, err := h.Repo.Create(r.Context(), req.Name, req.Description)
+	if err != nil {
+		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+			Type(contract.TypeInternal).
+			Code(codeItemCreateFailed).
+			Message("failed to create item").
+			Build()))
+		return
+	}
 	logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusCreated, created, nil))
 }
-
-// noLimit is the sentinel value for parseQueryInt's maxVal parameter.
-// Pass noLimit (-1) to allow any value above minVal without capping.
-const noLimit = -1
 
 // List handles GET /api/v1/items with basic limit/offset pagination.
 // Items are returned in stable creation order.
@@ -144,6 +164,8 @@ const noLimit = -1
 // not embedded in the data payload, demonstrating the canonical meta parameter usage.
 // The meta offset field reflects the requested offset, not a clamped internal value,
 // so clients always know exactly where their page begins relative to the full list.
+// Pagination is delegated to the repository so real storage backends can issue a
+// single LIMIT/OFFSET query rather than loading every row into memory.
 //
 //	GET /api/v1/items                    → 200 data:[…] meta:{total:N,limit:20,offset:0}
 //	GET /api/v1/items?limit=5            → first 5 items; limit capped at 100
@@ -176,17 +198,17 @@ func (h ItemHandler) List(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	all := h.Repo.List(r.Context())
-	total := len(all)
-	// start is the clamped slice index; offset is preserved for the meta field
-	// so callers always see the offset they requested, not an internal adjustment.
-	start := offset
-	if start > len(all) {
-		start = len(all)
-	}
-	page := all[start:]
-	if len(page) > limit {
-		page = page[:limit]
+	// Delegate pagination to the repository. The meta offset field carries the
+	// requested offset (not a clamped value) so clients always know exactly where
+	// their page was requested relative to the full list.
+	page, total, err := h.Repo.List(r.Context(), offset, limit)
+	if err != nil {
+		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+			Type(contract.TypeInternal).
+			Code(codeItemListFailed).
+			Message("failed to list items").
+			Build()))
+		return
 	}
 
 	logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusOK, page, map[string]any{
@@ -200,8 +222,8 @@ func (h ItemHandler) List(w http.ResponseWriter, r *http.Request) {
 // Returns (defaultVal, true) when the parameter is absent.
 // Returns (0, false) when the parameter is present but not a valid integer or is below minVal;
 // the caller should write a 400 error in that case.
-// When maxVal >= 0, values above maxVal are silently clamped to maxVal.
-// Pass noLimit (-1) for maxVal to allow any value above minVal without capping.
+// When n > maxVal, the value is silently clamped to maxVal.
+// Pass noLimit (math.MaxInt) for maxVal to allow any value above minVal without capping.
 func parseQueryInt(r *http.Request, key string, defaultVal, minVal, maxVal int) (int, bool) {
 	raw := r.URL.Query().Get(key)
 	if raw == "" {
@@ -211,7 +233,7 @@ func parseQueryInt(r *http.Request, key string, defaultVal, minVal, maxVal int) 
 	if err != nil || n < minVal {
 		return 0, false
 	}
-	if maxVal >= 0 && n > maxVal {
+	if n > maxVal {
 		return maxVal, true
 	}
 	return n, true
@@ -277,7 +299,15 @@ func (h ItemHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	updated, ok := h.Repo.Update(r.Context(), id, req.Name, req.Description)
+	updated, ok, err := h.Repo.Update(r.Context(), id, req.Name, req.Description)
+	if err != nil {
+		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+			Type(contract.TypeInternal).
+			Code(codeItemUpdateFailed).
+			Message("failed to update item").
+			Build()))
+		return
+	}
 	if !ok {
 		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeNotFound).
@@ -331,7 +361,15 @@ func (h ItemHandler) Patch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	updated, ok := h.Repo.Patch(r.Context(), id, req.Name, req.Description)
+	updated, ok, err := h.Repo.Patch(r.Context(), id, req.Name, req.Description)
+	if err != nil {
+		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+			Type(contract.TypeInternal).
+			Code(codeItemPatchFailed).
+			Message("failed to patch item").
+			Build()))
+		return
+	}
 	if !ok {
 		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeNotFound).
@@ -351,7 +389,16 @@ func (h ItemHandler) Patch(w http.ResponseWriter, r *http.Request) {
 //	DELETE /api/v1/items/missing → 404 TypeNotFound
 func (h ItemHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	id := router.Param(r, "id")
-	if !h.Repo.Delete(r.Context(), id) {
+	ok, err := h.Repo.Delete(r.Context(), id)
+	if err != nil {
+		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+			Type(contract.TypeInternal).
+			Code(codeItemDeleteFailed).
+			Message("failed to delete item").
+			Build()))
+		return
+	}
+	if !ok {
 		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeNotFound).
 			Code(codeItemNotFound).

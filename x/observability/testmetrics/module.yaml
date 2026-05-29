@@ -23,3 +23,17 @@ allowed_imports:
 test_commands:
   - go test -race -timeout 60s ./x/observability/testmetrics/...
   - go vet ./x/observability/testmetrics/...
+
+forbidden_imports:
+  - x/tenant/**
+  - x/ai/**
+  - x/gateway/**
+
+review_checklist:
+  - Use only in test code; do not import in production packages
+  - Keep captured metric records queryable by name and tag
+  - Do not add export or scrape functionality
+
+agent_hints:
+  - Use testmetrics.Collector as the AggregateCollector in handler and service tests
+  - Prefer assertions on specific metric names over full record snapshots

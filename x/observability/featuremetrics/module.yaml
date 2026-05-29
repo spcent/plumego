@@ -23,3 +23,17 @@ allowed_imports:
 test_commands:
   - go test -race -timeout 60s ./x/observability/featuremetrics/...
   - go vet ./x/observability/featuremetrics/...
+
+forbidden_imports:
+  - x/tenant/**
+  - x/ai/**
+  - x/gateway/**
+
+review_checklist:
+  - Do not add feature flag evaluation or storage here
+  - Keep metric helpers thin wrappers over metrics.AggregateCollector
+  - Do not own the export path
+
+agent_hints:
+  - Feature metrics are tag helpers over metrics.AggregateCollector; keep them focused on tag construction
+  - Evaluation and rollout decisions belong in the calling layer, not here

@@ -15,10 +15,10 @@ import (
 
 	"github.com/spcent/plumego/middleware"
 	"github.com/spcent/plumego/middleware/bodylimit"
-	"github.com/spcent/plumego/middleware/singleflight"
 	"github.com/spcent/plumego/middleware/compression"
 	"github.com/spcent/plumego/middleware/debug"
 	"github.com/spcent/plumego/middleware/httpmetrics"
+	"github.com/spcent/plumego/middleware/singleflight"
 	"github.com/spcent/plumego/middleware/timeout"
 	"github.com/spcent/plumego/middleware/tracing"
 )

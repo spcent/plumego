@@ -28,3 +28,20 @@ allowed_imports:
 test_commands:
   - go test -race -timeout 60s ./x/gateway/transform/...
   - go vet ./x/gateway/transform/...
+
+forbidden_imports:
+  - core/**
+  - store/**
+  - x/tenant/**
+  - x/ai/**
+  - x/messaging/**
+  - x/observability/**
+
+review_checklist:
+  - Keep transforms pure, composable, and side-effect-free
+  - Do not add routing decisions to transform helpers
+  - Keep body rewriting helpers explicit and covered by tests
+
+agent_hints:
+  - Transforms are value operations; prefer immutable helpers over in-place mutation
+  - Keep path normalization and header transforms in separate focused helpers

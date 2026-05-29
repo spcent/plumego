@@ -142,11 +142,6 @@
     },
     {
       "path": "reference/standard-service/internal/handler/items.go",
-      "symbol": "codeItemNameRequired",
-      "type": "TypeRequired"
-    },
-    {
-      "path": "reference/standard-service/internal/handler/items.go",
       "symbol": "codeItemNotFound",
       "type": "TypeNotFound"
     },
@@ -194,6 +189,41 @@
       "path": "reference/standard-service/internal/handler/items.go",
       "symbol": "codeItemPatchNoFields",
       "type": "TypeRequired"
+    },
+    {
+      "path": "reference/standard-service/internal/handler/items.go",
+      "symbol": "codeItemFieldsRequired",
+      "type": "TypeRequired"
+    },
+    {
+      "path": "reference/standard-service/internal/handler/items.go",
+      "symbol": "codeItemUpdateFieldsRequired",
+      "type": "TypeRequired"
+    },
+    {
+      "path": "reference/standard-service/internal/handler/items.go",
+      "symbol": "codeItemCreateFailed",
+      "type": "TypeInternal"
+    },
+    {
+      "path": "reference/standard-service/internal/handler/items.go",
+      "symbol": "codeItemListFailed",
+      "type": "TypeInternal"
+    },
+    {
+      "path": "reference/standard-service/internal/handler/items.go",
+      "symbol": "codeItemUpdateFailed",
+      "type": "TypeInternal"
+    },
+    {
+      "path": "reference/standard-service/internal/handler/items.go",
+      "symbol": "codeItemPatchFailed",
+      "type": "TypeInternal"
+    },
+    {
+      "path": "reference/standard-service/internal/handler/items.go",
+      "symbol": "codeItemDeleteFailed",
+      "type": "TypeInternal"
     }
   ]
 }

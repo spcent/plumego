@@ -11,9 +11,9 @@ import (
 	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/middleware"
+	"github.com/spcent/plumego/middleware/abuseguard"
 	"github.com/spcent/plumego/middleware/auth"
 	"github.com/spcent/plumego/middleware/bodylimit"
-	"github.com/spcent/plumego/middleware/abuseguard"
 	"github.com/spcent/plumego/middleware/recovery"
 	"github.com/spcent/plumego/security/authn"
 )

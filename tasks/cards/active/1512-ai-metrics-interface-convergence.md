@@ -1,5 +1,7 @@
 # 1512 — x/ai/metrics interface convergence decision
 
+State: active
+
 ## Context
 
 `x/ai/metrics.Collector` and `metrics.AggregateCollector` (stable root) are two
