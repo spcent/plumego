@@ -38,9 +38,15 @@ func NewMemoryStore() *MemoryStore {
 }
 
 // Create stores an item with the provided name and description and returns the new item.
-// context.Context is accepted so callers can propagate deadlines to real storage backends;
-// the in-memory implementation does not block and therefore does not inspect it.
-func (s *MemoryStore) Create(_ context.Context, name, description string) Item {
+// Returns Item{} immediately when ctx is already cancelled so handlers can detect
+// deadline expiry without acquiring the store lock. In a real backend Create would
+// return (Item, error) and propagate ctx to the database call; the in-memory
+// signature omits the error return for simplicity, so callers distinguish
+// cancellation by checking ctx.Err() after the call when needed.
+func (s *MemoryStore) Create(ctx context.Context, name, description string) Item {
+	if ctx.Err() != nil {
+		return Item{}
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -88,9 +94,12 @@ func (s *MemoryStore) List(ctx context.Context) []Item {
 
 // Update replaces the name and description of an existing item and returns the updated item.
 // CreatedAt and ID are immutable; all other fields are replaced by this operation.
+// Returns (Item{}, false) immediately when ctx is already cancelled.
 // It reports false when no item with that id exists.
-// context.Context is accepted so callers can propagate deadlines to real storage backends.
-func (s *MemoryStore) Update(_ context.Context, id, name, description string) (Item, bool) {
+func (s *MemoryStore) Update(ctx context.Context, id, name, description string) (Item, bool) {
+	if ctx.Err() != nil {
+		return Item{}, false
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -130,8 +139,11 @@ func (s *MemoryStore) Patch(ctx context.Context, id, name, description string) (
 }
 
 // Delete removes an item by id and reports whether it existed.
-// context.Context is accepted so callers can propagate deadlines to real storage backends.
-func (s *MemoryStore) Delete(_ context.Context, id string) bool {
+// Returns false immediately when ctx is already cancelled.
+func (s *MemoryStore) Delete(ctx context.Context, id string) bool {
+	if ctx.Err() != nil {
+		return false
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 

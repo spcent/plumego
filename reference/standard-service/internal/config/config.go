@@ -104,6 +104,16 @@ func applyEnv(cfg *Config, lookupEnv func(string) (string, bool)) {
 			}
 		}
 	}
+	// clearable sets dest to the trimmed value even when empty.
+	// Use this for fields where an empty string is a meaningful override — for
+	// example APP_WRITE_KEY="" explicitly disables the write guard even when the
+	// .env file set a key. The str helper silently skips empty values, which
+	// would make it impossible to clear a key that was set in .env.
+	clearable := func(key string, dest *string) {
+		if val, ok := lookupEnv(key); ok {
+			*dest = strings.TrimSpace(val)
+		}
+	}
 	int64f := func(key string, dest *int64) {
 		if val, ok := lookupEnv(key); ok {
 			if n, err := strconv.ParseInt(strings.TrimSpace(val), 10, 64); err == nil {
@@ -122,7 +132,7 @@ func applyEnv(cfg *Config, lookupEnv func(string) (string, bool)) {
 	str("APP_ENV_FILE", &cfg.App.EnvFile)
 	str("APP_SERVICE_NAME", &cfg.App.ServiceName)
 	int64f("APP_MAX_BODY_BYTES", &cfg.App.MaxBodyBytes)
-	str("APP_WRITE_KEY", &cfg.App.WriteKey)
+	clearable("APP_WRITE_KEY", &cfg.App.WriteKey)
 	boolf("APP_TLS_ENABLED", &cfg.Core.TLS.Enabled)
 	str("APP_TLS_CERT_FILE", &cfg.Core.TLS.CertFile)
 	str("APP_TLS_KEY_FILE", &cfg.Core.TLS.KeyFile)

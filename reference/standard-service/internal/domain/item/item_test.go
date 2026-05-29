@@ -237,6 +237,20 @@ func TestMemoryStorePatch(t *testing.T) {
 }
 
 func TestMemoryStoreContextCancellation(t *testing.T) {
+	t.Run("cancelled ctx returns zero Item from Create", func(t *testing.T) {
+		s := NewMemoryStore()
+		cancelled, cancel := context.WithCancel(context.Background())
+		cancel()
+		got := s.Create(cancelled, "item", "an item")
+		if got.ID != "" {
+			t.Fatalf("Create with cancelled ctx: want zero Item, got %+v", got)
+		}
+		// Store must remain empty — the cancelled create must not have side effects.
+		if items := s.List(ctx); len(items) != 0 {
+			t.Fatalf("Create with cancelled ctx: store should be empty, got %d items", len(items))
+		}
+	})
+
 	t.Run("cancelled ctx returns false from Get", func(t *testing.T) {
 		s := NewMemoryStore()
 		created := s.Create(ctx, "item", "an item")
@@ -261,6 +275,23 @@ func TestMemoryStoreContextCancellation(t *testing.T) {
 		}
 	})
 
+	t.Run("cancelled ctx returns false from Update", func(t *testing.T) {
+		s := NewMemoryStore()
+		created := s.Create(ctx, "item", "an item")
+
+		cancelled, cancel := context.WithCancel(context.Background())
+		cancel()
+		_, ok := s.Update(cancelled, created.ID, "renamed", "new desc")
+		if ok {
+			t.Fatal("Update with cancelled ctx: want false, got true")
+		}
+		// Original item must be unchanged.
+		got, exists := s.Get(ctx, created.ID)
+		if !exists || got.Name != "item" {
+			t.Fatalf("Update with cancelled ctx: original item changed; got %+v", got)
+		}
+	})
+
 	t.Run("cancelled ctx returns false from Patch", func(t *testing.T) {
 		s := NewMemoryStore()
 		created := s.Create(ctx, "item", "an item")
@@ -270,6 +301,21 @@ func TestMemoryStoreContextCancellation(t *testing.T) {
 		_, ok := s.Patch(cancelled, created.ID, "renamed", "")
 		if ok {
 			t.Fatal("Patch with cancelled ctx: want false, got true")
+		}
+	})
+
+	t.Run("cancelled ctx returns false from Delete", func(t *testing.T) {
+		s := NewMemoryStore()
+		created := s.Create(ctx, "item", "an item")
+
+		cancelled, cancel := context.WithCancel(context.Background())
+		cancel()
+		if s.Delete(cancelled, created.ID) {
+			t.Fatal("Delete with cancelled ctx: want false, got true")
+		}
+		// Item must still exist — the cancelled delete must not have side effects.
+		if _, ok := s.Get(ctx, created.ID); !ok {
+			t.Fatal("Delete with cancelled ctx: item was deleted but should still exist")
 		}
 	})
 }

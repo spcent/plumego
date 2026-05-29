@@ -59,7 +59,43 @@ Canonical files:
 - `internal/handler/items.go`
 - `internal/config/config.go`
 
-Run it with:
+## Response shape
+
+Every endpoint uses a single canonical envelope via `contract.WriteResponse` and
+`contract.WriteError`. No ad hoc JSON helpers or per-handler response structs.
+
+**Success** (`contract.WriteResponse`):
+```json
+{
+  "data":       { ... },
+  "meta":       { "total": 42, "limit": 20, "offset": 0 },
+  "request_id": "01HX..."
+}
+```
+`meta` is omitted when `nil` is passed. `data` is `null` for 204 No Content
+responses (body is suppressed entirely by the contract layer).
+
+**Error** (`contract.WriteError`):
+```json
+{
+  "error": {
+    "type":    "TypeRequired",
+    "code":    "item.fields.required",
+    "message": "one or more required fields are missing",
+    "details": {
+      "name":        "field is required",
+      "description": "field is required"
+    }
+  },
+  "request_id": "01HX..."
+}
+```
+`type` drives HTTP status (TypeRequired → 400, TypeNotFound → 404,
+TypeUnauthorized → 401, TypeUnavailable → 503). `code` is machine-readable and
+namespaced (`<resource>.<operation>.<reason>`). `details` contains per-field
+annotations for validation errors.
+
+## Run it
 
 ```bash
 cd reference/standard-service
