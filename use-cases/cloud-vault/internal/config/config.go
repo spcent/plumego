@@ -13,14 +13,15 @@ import (
 
 // Config holds all application configuration.
 type Config struct {
-	Core    core.AppConfig
-	App     AppConfig
-	DB      DBConfig
-	Storage StorageConfig
-	Local   LocalConfig
-	Qiniu   QiniuConfig
-	Import  ImportConfig
-	Search  SearchConfig
+	Core     core.AppConfig
+	App      AppConfig
+	DB       DBConfig
+	Storage  StorageConfig
+	Local    LocalConfig
+	Qiniu    QiniuConfig
+	Import   ImportConfig
+	Search   SearchConfig
+	Organize OrganizeConfig
 }
 
 // AppConfig holds app-local configuration.
@@ -59,6 +60,25 @@ type QiniuConfig struct {
 // ImportConfig holds importer configuration.
 type ImportConfig struct {
 	MaxFileSizeMB int64
+}
+
+// OrganizeConfig holds V0.4 organize configuration.
+type OrganizeConfig struct {
+	DuplicateDetectionEnabled  bool
+	SimilarityDetectionEnabled bool
+	TagSuggestionEnabled       bool
+	TopicBuildEnabled          bool
+
+	NearDuplicateThreshold float64
+	RelatedThreshold       float64
+
+	MaxComparePerBucket   int
+	SimilarityBatchSize   int
+
+	AutoArchiveDuplicates   bool
+	AutoApplyTagSuggestions bool
+
+	PromptCandidateDetection bool
 }
 
 // SearchConfig holds full-text search configuration.
@@ -110,6 +130,19 @@ func Defaults() Config {
 			MaxContentSizeMB:     5,
 			SnippetTokens:        20,
 			HistoryLimit:         100,
+		},
+		Organize: OrganizeConfig{
+			DuplicateDetectionEnabled:  true,
+			SimilarityDetectionEnabled: true,
+			TagSuggestionEnabled:       true,
+			TopicBuildEnabled:          true,
+			NearDuplicateThreshold:     0.85,
+			RelatedThreshold:           0.70,
+			MaxComparePerBucket:        1000,
+			SimilarityBatchSize:        500,
+			AutoArchiveDuplicates:      false,
+			AutoApplyTagSuggestions:    false,
+			PromptCandidateDetection:   true,
 		},
 	}
 }

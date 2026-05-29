@@ -3,8 +3,12 @@ import VaultPage from './pages/VaultPage'
 import ImportPage from './pages/ImportPage'
 import SearchPage from './pages/SearchPage'
 import IndexPage from './pages/IndexPage'
+import DuplicatesPage from './pages/DuplicatesPage'
+import CollectionsPage from './pages/CollectionsPage'
+import ReviewPage from './pages/ReviewPage'
+import TopicsPage from './pages/TopicsPage'
 
-type Page = 'vault' | 'search' | 'import' | 'index'
+type Page = 'vault' | 'search' | 'import' | 'index' | 'duplicates' | 'collections' | 'review' | 'topics'
 
 interface OpenDoc {
   id: string
@@ -23,7 +27,7 @@ export default function App() {
   return (
     <div className="h-screen flex flex-col overflow-hidden">
       {/* Tab navigation */}
-      <nav className="h-9 flex items-center gap-1 px-3 border-b border-border bg-background shrink-0">
+      <nav className="h-9 flex items-center gap-1 px-3 border-b border-border bg-background shrink-0 overflow-x-auto">
         <TabButton active={page === 'vault'} onClick={() => setPage('vault')}>
           ☁ Vault
         </TabButton>
@@ -35,6 +39,19 @@ export default function App() {
         </TabButton>
         <TabButton active={page === 'index'} onClick={() => setPage('index')}>
           ⊙ Index
+        </TabButton>
+        <span className="text-muted-foreground mx-1 text-xs">|</span>
+        <TabButton active={page === 'duplicates'} onClick={() => setPage('duplicates')}>
+          ⋈ Duplicates
+        </TabButton>
+        <TabButton active={page === 'collections'} onClick={() => setPage('collections')}>
+          ▤ Collections
+        </TabButton>
+        <TabButton active={page === 'topics'} onClick={() => setPage('topics')}>
+          ◉ Topics
+        </TabButton>
+        <TabButton active={page === 'review'} onClick={() => setPage('review')}>
+          ✓ Review
         </TabButton>
       </nav>
 
@@ -50,6 +67,10 @@ export default function App() {
         {page === 'search' && <SearchPage onOpenDocument={handleOpenFromSearch} />}
         {page === 'import' && <ImportPage />}
         {page === 'index' && <IndexPage />}
+        {page === 'duplicates' && <DuplicatesPage />}
+        {page === 'collections' && <CollectionsPage />}
+        {page === 'topics' && <TopicsPage />}
+        {page === 'review' && <ReviewPage />}
       </div>
     </div>
   )

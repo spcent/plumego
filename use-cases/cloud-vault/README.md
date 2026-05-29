@@ -289,6 +289,129 @@ The highlight is non-destructive — it never modifies document content and disa
 | `document_index_status` | Per-document indexing state and hash |
 | `search_history` | Recent search queries |
 
+## V0.4: Organize, Deduplicate & Collections
+
+V0.4 adds rule-based document organization: duplicate detection, similarity analysis, tag suggestions, topic clustering, quality scoring, prompt candidate identification, and a collection system.
+
+No AI, no vector database, no external search engine — all features use SQLite + lightweight heuristics.
+
+### Features
+
+- **Exact duplicate detection** — groups documents sharing the same content hash; user chooses which to keep and what to do with the rest (archive / mark duplicate / ignore)
+- **Near-duplicate & similarity detection** — Jaccard similarity on text shingles within buckets (same tag, import job, directory, title prefix); configurable thresholds
+- **Similar documents sidebar** — per-document similar doc list; ignore or confirm each pair
+- **Collections** — named groups of document references; add, remove, reorder, note; create from search results or topic conversion
+- **Tag suggestions** — rule-based candidates extracted from path, title, headings; user confirms each suggestion
+- **Topic clustering** — rule-based topics from existing tags and path directories; convert any topic to a collection
+- **Review queue** — unified inbox for duplicates, similar pairs, tag suggestions, prompt candidates, low-quality docs; bulk Run All
+- **Prompt candidate detection** — keyword heuristics to flag documents that look like LLM prompts
+- **Quality scoring** — rule-based score (0–100) based on title length, word count, headings, code blocks, favorite status, duplicate status
+
+### Duplicate Detection
+
+```bash
+# Via UI: Duplicates tab → Detect Duplicates
+# Via API:
+curl -X POST http://localhost:8080/api/v1/organize/detect-duplicates
+curl http://localhost:8080/api/v1/organize/duplicates
+
+# Resolve: keep one, archive the rest
+curl -X POST http://localhost:8080/api/v1/organize/duplicates/resolve \
+  -H 'Content-Type: application/json' \
+  -d '{"keep_document_id":"01...","duplicate_document_ids":["01..."],"action":"archive"}'
+```
+
+`action` values: `archive` | `mark_duplicate` | `ignore`
+
+### Similarity Detection
+
+```bash
+curl -X POST http://localhost:8080/api/v1/organize/detect-similarity
+curl http://localhost:8080/api/v1/documents/{id}/similar
+curl -X POST http://localhost:8080/api/v1/organize/similarity/{id}/ignore
+curl -X POST http://localhost:8080/api/v1/organize/similarity/{id}/confirm
+```
+
+### Collections API
+
+```
+GET    /api/v1/collections
+POST   /api/v1/collections
+GET    /api/v1/collections/:id
+PUT    /api/v1/collections/:id
+DELETE /api/v1/collections/:id
+POST   /api/v1/collections/:id/documents
+DELETE /api/v1/collections/:id/documents/:document_id
+PUT    /api/v1/collections/:id/documents/reorder
+POST   /api/v1/collections/from-search
+```
+
+### Tag Suggestions API
+
+```
+POST /api/v1/organize/suggest-tags
+GET  /api/v1/documents/:id/tag-suggestions
+POST /api/v1/tag-suggestions/:id/accept
+POST /api/v1/tag-suggestions/:id/reject
+POST /api/v1/tag-suggestions/batch/accept
+```
+
+### Topics API
+
+```
+POST /api/v1/organize/build-topics
+GET  /api/v1/topics
+GET  /api/v1/topics/:id
+```
+
+To convert a topic to a collection, call `POST /api/v1/collections/from-search` with the topic's document IDs.
+
+### Review Queue API
+
+```
+GET /api/v1/review/queue?type=duplicates|similar|tag_suggestions|prompt_candidates|low_quality
+```
+
+### Organize Configuration
+
+| Variable | Default | Description |
+|---|---|---|
+| `ORGANIZE_DUPLICATE_DETECTION` | `true` | Enable exact duplicate detection |
+| `ORGANIZE_SIMILARITY_DETECTION` | `true` | Enable near-duplicate detection |
+| `ORGANIZE_TAG_SUGGESTION` | `true` | Enable tag suggestions |
+| `ORGANIZE_TOPIC_BUILD` | `true` | Enable topic building |
+| `ORGANIZE_NEAR_DUPLICATE_THRESHOLD` | `0.85` | Jaccard threshold for near-duplicate |
+| `ORGANIZE_RELATED_THRESHOLD` | `0.70` | Jaccard threshold for related |
+| `ORGANIZE_MAX_COMPARE_PER_BUCKET` | `1000` | Max pairs compared per bucket |
+| `ORGANIZE_AUTO_ARCHIVE_DUPLICATES` | `false` | Never auto-archives without user confirmation |
+| `ORGANIZE_AUTO_APPLY_TAG_SUGGESTIONS` | `false` | Never auto-applies tags without confirmation |
+| `ORGANIZE_PROMPT_CANDIDATE_DETECTION` | `true` | Enable prompt candidate identification |
+
+### V0.4 Database Tables
+
+| Table | Purpose |
+|---|---|
+| `document_similarity` | Detected similarity pairs (exact / near / related) |
+| `collections` | Named document collections |
+| `collection_documents` | Collection membership with sort order |
+| `document_sources` | Document provenance links |
+| `tag_suggestions` | Pending / accepted / rejected tag proposals |
+| `topics` | Rule-derived topic clusters |
+| `topic_documents` | Topic membership with score |
+| `organize_jobs` | Long-running organize operation history |
+| `document_fingerprints` | Lightweight text fingerprints for similarity |
+
+New columns: `documents.quality_score`, `document_metadata.is_prompt_candidate`, `document_metadata.prompt_score`
+
+### V0.4 Current Limitations
+
+- V0.4 does **not** use AI, large language models, or vector databases
+- Near-duplicate detection uses Jaccard similarity on text shingles — may produce false positives and false negatives; tune thresholds via config
+- Similarity is only computed within buckets (same tag/import job/directory/title prefix) to avoid O(N²) comparisons
+- System **never** automatically deletes documents
+- Tag suggestions and similarity resolutions always require explicit user confirmation
+- For very large corpora (50k+ documents) tune `ORGANIZE_MAX_COMPARE_PER_BUCKET` and `ORGANIZE_SIMILARITY_BATCH_SIZE`
+
 ## Current Limitations
 
 - No multi-user collaboration

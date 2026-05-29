@@ -15,6 +15,7 @@ var migrations = []migration{
 	{version: 1, up: migrate001},
 	{version: 2, up: migrate002},
 	{version: 3, up: migrate003},
+	{version: 4, up: migrate004},
 }
 
 // Migrate applies all pending migrations in ascending version order.
@@ -236,6 +237,138 @@ CREATE INDEX IF NOT EXISTS idx_documents_source_type   ON documents(source_type)
 CREATE INDEX IF NOT EXISTS idx_documents_import_job_id ON documents(import_job_id);
 CREATE INDEX IF NOT EXISTS idx_documents_review_status ON documents(review_status);
 CREATE INDEX IF NOT EXISTS idx_documents_is_favorite   ON documents(is_favorite);
+`)
+	return err
+}
+
+// migrate004 adds V0.4 organize: similarity, collections, topics, tag suggestions, quality scoring.
+func migrate004(tx *sql.Tx) error {
+	docCols := []struct{ name, def string }{
+		{"quality_score", "REAL NOT NULL DEFAULT 0"},
+	}
+	for _, col := range docCols {
+		if err := addColumnIfNotExists(tx, "documents", col.name, col.def); err != nil {
+			return fmt.Errorf("add documents.%s: %w", col.name, err)
+		}
+	}
+	metaCols := []struct{ name, def string }{
+		{"is_prompt_candidate", "INTEGER NOT NULL DEFAULT 0"},
+		{"prompt_score", "REAL NOT NULL DEFAULT 0"},
+	}
+	for _, col := range metaCols {
+		if err := addColumnIfNotExists(tx, "document_metadata", col.name, col.def); err != nil {
+			return fmt.Errorf("add document_metadata.%s: %w", col.name, err)
+		}
+	}
+	_, err := tx.Exec(`
+CREATE TABLE IF NOT EXISTS document_similarity (
+  id               TEXT PRIMARY KEY,
+  document_id_a    TEXT NOT NULL,
+  document_id_b    TEXT NOT NULL,
+  similarity_type  TEXT NOT NULL,
+  similarity_score REAL NOT NULL,
+  reason           TEXT,
+  status           TEXT NOT NULL DEFAULT 'pending',
+  created_at       TEXT NOT NULL,
+  updated_at       TEXT NOT NULL,
+  FOREIGN KEY(document_id_a) REFERENCES documents(id),
+  FOREIGN KEY(document_id_b) REFERENCES documents(id)
+);
+CREATE INDEX IF NOT EXISTS idx_document_similarity_a
+  ON document_similarity(document_id_a);
+CREATE INDEX IF NOT EXISTS idx_document_similarity_b
+  ON document_similarity(document_id_b);
+CREATE INDEX IF NOT EXISTS idx_document_similarity_score
+  ON document_similarity(similarity_score DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_document_similarity_pair
+  ON document_similarity(document_id_a, document_id_b, similarity_type);
+CREATE TABLE IF NOT EXISTS collections (
+  id          TEXT PRIMARY KEY,
+  name        TEXT NOT NULL,
+  description TEXT,
+  type        TEXT NOT NULL DEFAULT 'manual',
+  status      TEXT NOT NULL DEFAULT 'active',
+  created_at  TEXT NOT NULL,
+  updated_at  TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_collections_type ON collections(type);
+CREATE TABLE IF NOT EXISTS collection_documents (
+  collection_id TEXT    NOT NULL,
+  document_id   TEXT    NOT NULL,
+  sort_order    INTEGER NOT NULL DEFAULT 0,
+  note          TEXT,
+  created_at    TEXT    NOT NULL,
+  PRIMARY KEY(collection_id, document_id),
+  FOREIGN KEY(collection_id) REFERENCES collections(id),
+  FOREIGN KEY(document_id)   REFERENCES documents(id)
+);
+CREATE TABLE IF NOT EXISTS document_sources (
+  document_id        TEXT NOT NULL,
+  source_document_id TEXT NOT NULL,
+  source_type        TEXT NOT NULL DEFAULT 'related',
+  created_at         TEXT NOT NULL,
+  PRIMARY KEY(document_id, source_document_id),
+  FOREIGN KEY(document_id)        REFERENCES documents(id),
+  FOREIGN KEY(source_document_id) REFERENCES documents(id)
+);
+CREATE TABLE IF NOT EXISTS tag_suggestions (
+  id          TEXT PRIMARY KEY,
+  document_id TEXT NOT NULL,
+  tag_id      TEXT,
+  tag_name    TEXT NOT NULL,
+  source      TEXT NOT NULL,
+  confidence  REAL NOT NULL DEFAULT 0,
+  status      TEXT NOT NULL DEFAULT 'pending',
+  created_at  TEXT NOT NULL,
+  updated_at  TEXT NOT NULL,
+  FOREIGN KEY(document_id) REFERENCES documents(id),
+  FOREIGN KEY(tag_id)      REFERENCES tags(id)
+);
+CREATE INDEX IF NOT EXISTS idx_tag_suggestions_document ON tag_suggestions(document_id);
+CREATE INDEX IF NOT EXISTS idx_tag_suggestions_status   ON tag_suggestions(status);
+CREATE TABLE IF NOT EXISTS topics (
+  id          TEXT PRIMARY KEY,
+  name        TEXT NOT NULL,
+  description TEXT,
+  source      TEXT NOT NULL DEFAULT 'rule',
+  status      TEXT NOT NULL DEFAULT 'active',
+  created_at  TEXT NOT NULL,
+  updated_at  TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS topic_documents (
+  topic_id    TEXT NOT NULL,
+  document_id TEXT NOT NULL,
+  score       REAL NOT NULL DEFAULT 0,
+  source      TEXT NOT NULL DEFAULT 'rule',
+  created_at  TEXT NOT NULL,
+  PRIMARY KEY(topic_id, document_id),
+  FOREIGN KEY(topic_id)    REFERENCES topics(id),
+  FOREIGN KEY(document_id) REFERENCES documents(id)
+);
+CREATE TABLE IF NOT EXISTS organize_jobs (
+  id              TEXT PRIMARY KEY,
+  job_type        TEXT NOT NULL,
+  status          TEXT NOT NULL DEFAULT 'pending',
+  total_items     INTEGER NOT NULL DEFAULT 0,
+  processed_items INTEGER NOT NULL DEFAULT 0,
+  failed_items    INTEGER NOT NULL DEFAULT 0,
+  error_message   TEXT,
+  started_at      TEXT,
+  finished_at     TEXT,
+  created_at      TEXT NOT NULL,
+  updated_at      TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_organize_jobs_status ON organize_jobs(status);
+CREATE TABLE IF NOT EXISTS document_fingerprints (
+  document_id  TEXT PRIMARY KEY,
+  title_norm   TEXT,
+  simhash      TEXT,
+  heading_hash TEXT,
+  keyword_hash TEXT,
+  created_at   TEXT NOT NULL,
+  updated_at   TEXT NOT NULL,
+  FOREIGN KEY(document_id) REFERENCES documents(id)
+);
 `)
 	return err
 }

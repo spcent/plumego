@@ -19,10 +19,12 @@ import (
 	midsecurity "github.com/spcent/plumego/middleware/security"
 	"github.com/spcent/plumego/middleware/timeout"
 
+	"cloud-vault/internal/collection"
 	"cloud-vault/internal/config"
 	"cloud-vault/internal/database"
 	"cloud-vault/internal/document"
 	"cloud-vault/internal/importer"
+	"cloud-vault/internal/organize"
 	"cloud-vault/internal/search"
 	"cloud-vault/internal/storage"
 	"cloud-vault/internal/tag"
@@ -30,14 +32,16 @@ import (
 
 // App holds application-wide dependencies.
 type App struct {
-	Core     *core.App
-	Cfg      config.Config
-	DB       *database.DB
-	Docs     *document.Handler
-	Tags     *tag.Handler
-	Importer *importer.Handler
-	Search   *search.Handler
-	indexer  *search.Indexer
+	Core       *core.App
+	Cfg        config.Config
+	DB         *database.DB
+	Docs       *document.Handler
+	Tags       *tag.Handler
+	Importer   *importer.Handler
+	Search     *search.Handler
+	Organize   *organize.Handler
+	Collection *collection.Handler
+	indexer    *search.Indexer
 }
 
 // New constructs the App: opens the database, initialises storage, and wires middleware.
@@ -125,15 +129,27 @@ func New(cfg config.Config) (*App, error) {
 		})
 	})
 
+	// Organize handler (V0.4).
+	organizeRepo := organize.NewRepository(db)
+	organizeSvc := organize.NewService(organizeRepo, store, cfg.Organize)
+	organizeHandler := organize.NewHandler(organizeSvc, app.Logger())
+
+	// Collection handler (V0.4).
+	collectionRepo := collection.NewRepository(db)
+	collectionSvc := collection.NewService(collectionRepo)
+	collectionHandler := collection.NewHandler(collectionSvc, app.Logger())
+
 	return &App{
-		Core:     app,
-		Cfg:      cfg,
-		DB:       db,
-		Docs:     docs,
-		Tags:     tags,
-		Importer: imp,
-		Search:   searchHandler,
-		indexer:  indexer,
+		Core:       app,
+		Cfg:        cfg,
+		DB:         db,
+		Docs:       docs,
+		Tags:       tags,
+		Importer:   imp,
+		Search:     searchHandler,
+		Organize:   organizeHandler,
+		Collection: collectionHandler,
+		indexer:    indexer,
 	}, nil
 }
 

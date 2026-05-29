@@ -69,6 +69,48 @@ func (a *App) RegisterRoutes() error {
 	v1.post("/imports/:id/retry", http.HandlerFunc(a.Importer.RetryJob))
 	v1.get("/imports/:id/items", http.HandlerFunc(a.Importer.ListItems))
 
+	// V0.4: Organize — static sub-paths before :id to avoid ambiguity.
+	v1.post("/organize/detect-duplicates", http.HandlerFunc(a.Organize.DetectDuplicates))
+	v1.get("/organize/duplicates", http.HandlerFunc(a.Organize.ListDuplicates))
+	v1.post("/organize/duplicates/resolve", http.HandlerFunc(a.Organize.ResolveDuplicates))
+	v1.post("/organize/detect-similarity", http.HandlerFunc(a.Organize.DetectSimilarity))
+	v1.post("/organize/suggest-tags", http.HandlerFunc(a.Organize.SuggestTags))
+	v1.post("/organize/build-topics", http.HandlerFunc(a.Organize.BuildTopics))
+	v1.post("/organize/score-quality", http.HandlerFunc(a.Organize.ScoreQuality))
+	v1.post("/organize/detect-prompt-candidates", http.HandlerFunc(a.Organize.DetectPromptCandidates))
+	v1.post("/organize/run-all", http.HandlerFunc(a.Organize.RunAll))
+	v1.get("/organize/jobs", http.HandlerFunc(a.Organize.ListJobs))
+	v1.get("/organize/jobs/:id", http.HandlerFunc(a.Organize.GetJob))
+	v1.post("/organize/similarity/:id/ignore", http.HandlerFunc(a.Organize.IgnoreSimilarity))
+	v1.post("/organize/similarity/:id/confirm", http.HandlerFunc(a.Organize.ConfirmSimilarity))
+
+	// V0.4: Topics
+	v1.get("/topics", http.HandlerFunc(a.Organize.ListTopics))
+	v1.get("/topics/:id", http.HandlerFunc(a.Organize.GetTopic))
+
+	// V0.4: Document similar + tag suggestions (under /documents/:id)
+	v1.get("/documents/:id/similar", http.HandlerFunc(a.Organize.GetSimilarDocuments))
+	v1.get("/documents/:id/tag-suggestions", http.HandlerFunc(a.Organize.GetTagSuggestions))
+
+	// V0.4: Tag suggestions actions — batch before :id to avoid ambiguity.
+	v1.post("/tag-suggestions/batch/accept", http.HandlerFunc(a.Organize.BatchAcceptTagSuggestions))
+	v1.post("/tag-suggestions/:id/accept", http.HandlerFunc(a.Organize.AcceptTagSuggestion))
+	v1.post("/tag-suggestions/:id/reject", http.HandlerFunc(a.Organize.RejectTagSuggestion))
+
+	// V0.4: Collections — from-search before :id to avoid ambiguity.
+	v1.post("/collections/from-search", http.HandlerFunc(a.Collection.CreateFromSearch))
+	v1.get("/collections", http.HandlerFunc(a.Collection.List))
+	v1.post("/collections", http.HandlerFunc(a.Collection.Create))
+	v1.get("/collections/:id", http.HandlerFunc(a.Collection.GetByID))
+	v1.put("/collections/:id", http.HandlerFunc(a.Collection.Update))
+	v1.delete("/collections/:id", http.HandlerFunc(a.Collection.Delete))
+	v1.post("/collections/:id/documents", http.HandlerFunc(a.Collection.AddDocument))
+	v1.put("/collections/:id/documents/reorder", http.HandlerFunc(a.Collection.Reorder))
+	v1.delete("/collections/:id/documents/:document_id", http.HandlerFunc(a.Collection.RemoveDocument))
+
+	// V0.4: Review queue
+	v1.get("/review/queue", http.HandlerFunc(a.Organize.GetReviewQueue))
+
 	if v1.err != nil {
 		return v1.err
 	}
