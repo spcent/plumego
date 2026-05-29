@@ -12,6 +12,8 @@ Companion docs: `docs/CODEX_WORKFLOW.md` (workflow), `docs/AGENT_CONTEXT_BUDGET.
 
 Machine-readable: `specs/task-routing.yaml`, `specs/checks.yaml`, `specs/dependency-rules.yaml`, `specs/extension-taxonomy.yaml`, `specs/module-manifest.schema.yaml`, `specs/stop-condition-handlers.yaml`, `specs/agent-quality-rules.yaml`, `specs/change-recipes/`. Canonical wiring: `reference/standard-service`.
 
+CLI tool: `cmd/plumego` provides agent-assist commands, validation runners, code generation, dev server, scaffold, and task bundling. Run `go run ./cmd/plumego --help` to explore subcommands; `make bundle TASK=<recipe> MODULE=<path>` generates task execution bundles.
+
 Conflict order: (1) security/boundary rules here → (2) `docs/CANONICAL_STYLE_GUIDE.md` → (3) machine-readable specs → (4) existing local patterns.
 
 ## 2. Non-Negotiables
@@ -36,6 +38,10 @@ Stable roots: `core`, `router`, `contract`, `middleware`, `security`, `store`, `
 Extension roots: `x/ai`, `x/data`, `x/fileapi`, `x/frontend`, `x/gateway`, `x/messaging`, `x/observability`, `x/openapi`, `x/resilience`, `x/rest`, `x/rpc`, `x/tenant`, `x/validate`, `x/websocket`
 
 Default landing zones: kernel/lifecycle/transport/auth/storage → stable root; product capability/protocol/features → `x/*`; app wiring/DI/bootstrap → `reference/standard-service`; workflow/specs/quality → `docs/` or `specs/`; plans/sequencing → `tasks/`.
+
+Extension maturity: **beta** (production-ready with caveats) → `x/frontend`, `x/gateway`, `x/messaging`, `x/observability`, `x/rest`, `x/tenant`, `x/websocket`; **experimental** (APIs may change) → `x/ai`, `x/data`, `x/fileapi`, `x/openapi`, `x/resilience`, `x/rpc`, `x/validate`. Full dashboard: `docs/EXTENSION_MATURITY.md` and `specs/extension-maturity.yaml`.
+
+Reference starting points: plain JSON API → `reference/standard-service`; hardened production (auth, tracing, metrics, tenant) → `reference/production-service`; REST CRUD → `reference/with-rest`; multi-tenant → `reference/with-tenant`; LLM/AI → `reference/with-ai`; WebSocket → `reference/with-websocket`; gRPC → `reference/with-rpc`; async events/pubsub → `reference/with-events`; inbound webhooks → `reference/with-webhook`; reverse proxy → `reference/with-gateway`; embedded static assets → `reference/with-frontend`; health/metrics routes → `reference/with-ops`; benchmarking → `reference/benchmark`.
 
 Boundary reminders:
 
@@ -80,6 +86,8 @@ Exported symbol changes: enumerate callers (`rg -n --glob '*.go' 'SymbolName' .`
 
 ## 6. Validation
 
+Quick gate for current diff: `make validate-diff` (auto-selects minimal profile based on changed paths). Full CI: `make gates`.
+
 Run: (1) target module checks from `<module>/module.yaml`, (2) boundary checks, (3) repo-wide gates only when gate profile requires.
 
 Baseline boundary and manifest checks:
@@ -118,6 +126,8 @@ Update docs only for behavior, API, config, security, lifecycle, or boundary cha
 Milestones: `tasks/milestones/active/M-NNN-short-name/M-NNN.md`. When executing: read Context files first, stay inside Affected Modules, follow Tasks in order, use spec branch, record blockers, run full acceptance criteria, package PR with `docs/github-workflows/milestone-pr-template.md`.
 
 Scaffold: `make new-milestone`, `make new-plan`, `make new-card`, `make new-verify`, `make run-card C=active/NNNN-slug`, `make milestone-status M=active/M-NNN`.
+
+Task cards: `tasks/cards/active/NNNN-slug.md`. Cards are narrower than milestones — use them for focused, time-boxed changes within a single module. Execute: `make run-card C=active/NNNN-slug` (validates, bundles, and runs via codex). Active cards live in `tasks/cards/active/`; completed in `tasks/cards/done/`.
 
 ## 9. Anti-Patterns
 
