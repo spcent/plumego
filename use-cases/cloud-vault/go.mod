@@ -5,6 +5,7 @@ go 1.26.0
 replace github.com/spcent/plumego => ../..
 
 require (
+	github.com/BurntSushi/toml v1.3.2
 	github.com/oklog/ulid/v2 v2.1.0
 	github.com/qiniu/go-sdk/v7 v7.25.2
 	github.com/spcent/plumego v0.0.0-00010101000000-000000000000
@@ -12,7 +13,6 @@ require (
 )
 
 require (
-	github.com/BurntSushi/toml v1.3.2 // indirect
 	github.com/alex-ant/gomath v0.0.0-20160516115720-89013a210a82 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/gammazero/toposort v0.1.1 // indirect

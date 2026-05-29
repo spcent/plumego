@@ -21,15 +21,15 @@ type userRow struct {
 
 // sessionRow represents a session database row.
 type sessionRow struct {
-	ID         string
-	UserID     string
-	TokenHash  string
-	UserAgent  sql.NullString
-	IPAddress  sql.NullString
-	ExpiresAt  string
-	RevokedAt  sql.NullString
-	LastUsedAt string
-	CreatedAt  string
+	ID          string
+	UserID      string
+	SessionHash string
+	UserAgent   sql.NullString
+	IPAddress   sql.NullString
+	ExpiresAt   string
+	RevokedAt   sql.NullString
+	CreatedAt   string
+	UpdatedAt   string
 }
 
 // securityEventRow represents a security event database row.

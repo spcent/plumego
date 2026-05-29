@@ -523,7 +523,7 @@ V0.6 focuses on production hardening: system health monitoring, consistency chec
   - `internal/ai/task_test.go` — AI task queue and processing
   - `internal/system/service_test.go` — System health and doctor checks
 
-- **Test fixtures** — 11 Markdown files in `testdata/markdown/`
+- **Test fixtures** — 11 Markdown files in `e2e/testdata/markdown/`
   - Simple, complex, frontmatter, code blocks
   - Links, images, tables
   - Duplicate pairs for testing
