@@ -143,11 +143,15 @@ func (h ImportHandler) Import(w http.ResponseWriter, r *http.Request) {
 		result.StatementsExecuted++
 	}
 
-	status := http.StatusOK
 	if result.Errors > 0 && result.StatementsExecuted == 0 {
-		status = http.StatusUnprocessableEntity
+		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+			Type(contract.TypeInvalidRequest).
+			Message("SQL import failed").
+			Detail("result", result).
+			Build()))
+		return
 	}
-	logWriteErr(h.Logger, contract.WriteResponse(w, r, status, result, nil))
+	logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusOK, result, nil))
 }
 
 // splitSQL splits a SQL script into individual statements using a character-level

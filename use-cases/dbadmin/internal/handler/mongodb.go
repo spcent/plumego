@@ -1146,7 +1146,7 @@ func (h MongoDBHandler) SchemaSample(w http.ResponseWriter, r *http.Request) {
 
 	// Analyze field types
 	fieldStats := make(map[string]map[string]int) // field -> type -> count
-	fieldSamples := make(map[string][]any)         // field -> sample values
+	fieldSamples := make(map[string][]any)        // field -> sample values
 
 	for cursor.Next(ctx) {
 		var doc bson.M
@@ -1346,12 +1346,12 @@ func (h MongoDBHandler) CollectionStats(w http.ResponseWriter, r *http.Request) 
 	}
 
 	logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusOK, map[string]any{
-		"count":            count,
-		"size":             size,
-		"avgObjSize":       avgObjSize,
-		"storageSize":      storageSize,
-		"totalIndexSize":   totalIndexSize,
-		"indexes":          indexes,
+		"count":          count,
+		"size":           size,
+		"avgObjSize":     avgObjSize,
+		"storageSize":    storageSize,
+		"totalIndexSize": totalIndexSize,
+		"indexes":        indexes,
 	}, nil))
 }
 

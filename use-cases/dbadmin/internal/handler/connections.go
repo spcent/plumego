@@ -19,12 +19,12 @@ import (
 
 // ConnectionHandler handles CRUD operations for saved DB connections.
 type ConnectionHandler struct {
-	Connections   *connection.Store
-	Manager       *dbmanager.Manager
-	RedisManager  *redismanager.Manager
-	MongoManager  *mongomanager.Manager
-	ESManager     *esmanager.Manager
-	Logger        plumelog.StructuredLogger
+	Connections  *connection.Store
+	Manager      *dbmanager.Manager
+	RedisManager *redismanager.Manager
+	MongoManager *mongomanager.Manager
+	ESManager    *esmanager.Manager
+	Logger       plumelog.StructuredLogger
 }
 
 // List returns all saved connections (passwords redacted).
