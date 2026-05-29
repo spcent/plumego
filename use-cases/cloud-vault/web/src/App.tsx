@@ -17,6 +17,7 @@ const PromptsPage = lazy(() => import('./pages/PromptsPage'))
 const SystemPage = lazy(() => import('./pages/SystemPage'))
 const AccountPage = lazy(() => import('./pages/AccountPage'))
 const SecurityPage = lazy(() => import('./pages/SecurityPage'))
+const SetupPage = lazy(() => import('./pages/SetupPage'))
 
 type Page = 'vault' | 'search' | 'import' | 'index' | 'duplicates' | 'collections' | 'review' | 'topics' | 'ai' | 'prompts' | 'system' | 'account' | 'security'
 
@@ -26,7 +27,7 @@ interface OpenDoc {
 }
 
 function AppContent() {
-  const { user, loading, logout } = useAuth()
+  const { user, loading, setupRequired, logout } = useAuth()
   const { t } = useI18n()
   const [page, setPage] = useState<Page>('vault')
   const [openDoc, setOpenDoc] = useState<OpenDoc | null>(null)
@@ -36,6 +37,16 @@ function AppContent() {
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-lg">{t.common.loading}</div>
       </div>
+    )
+  }
+
+  if (setupRequired) {
+    return (
+      <Suspense fallback={<div className="flex items-center justify-center min-h-screen">
+        <div className="text-lg">{t.common.loading}</div>
+      </div>}>
+        <SetupPage />
+      </Suspense>
     )
   }
 
@@ -123,6 +134,8 @@ function AppContent() {
           {page === 'ai' && <AITasksPage />}
           {page === 'prompts' && <PromptsPage />}
           {page === 'system' && <SystemPage />}
+          {page === 'account' && <AccountPage />}
+          {page === 'security' && <SecurityPage />}
         </Suspense>
       </div>
     </div>

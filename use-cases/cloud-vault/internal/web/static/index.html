@@ -5,9 +5,24 @@
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Markdown Cloud Vault</title>
-    <script type="module" crossorigin src="/assets/index-CvavXuNF.js"></script>
+    <script>
+      // Anti-flicker: apply theme before React mounts
+      (function() {
+        try {
+          var theme = localStorage.getItem('theme');
+          if (theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark');
+          } else if (theme === 'light') {
+            document.documentElement.classList.remove('dark');
+          } else if (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            document.documentElement.classList.add('dark');
+          }
+        } catch (e) {}
+      })();
+    </script>
+    <script type="module" crossorigin src="/assets/index-B3y2A7K1.js"></script>
     <link rel="modulepreload" crossorigin href="/assets/vendor-react-CtwmVtAv.js">
-    <link rel="stylesheet" crossorigin href="/assets/index-CyHarZEI.css">
+    <link rel="stylesheet" crossorigin href="/assets/index-DLBoUjJc.css">
   </head>
   <body>
     <div id="root"></div>

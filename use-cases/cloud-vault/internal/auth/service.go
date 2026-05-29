@@ -140,12 +140,12 @@ func (s *Service) Login(ctx context.Context, username, pwd, userAgent, ipAddress
 	expiresAt := time.Now().UTC().Add(time.Duration(s.config.SessionTTLHours) * time.Hour)
 
 	session := &Session{
-		ID:        idgen.New(),
-		UserID:    user.ID,
-		TokenHash: tokenHash,
-		UserAgent: userAgent,
-		IPAddress: ipAddress,
-		ExpiresAt: expiresAt,
+		ID:          idgen.New(),
+		UserID:      user.ID,
+		SessionHash: tokenHash,
+		UserAgent:   userAgent,
+		IPAddress:   ipAddress,
+		ExpiresAt:   expiresAt,
 	}
 
 	if err := s.repo.CreateSession(ctx, session); err != nil {
@@ -371,4 +371,49 @@ func (s *Service) BootstrapAdmin(ctx context.Context) error {
 	})
 
 	return nil
+}
+
+// Setup creates the first admin user via web UI (only when no users exist)
+func (s *Service) Setup(ctx context.Context, username, email, pwd string) (*User, error) {
+	count, err := s.repo.GetUserCount(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check user count: %w", err)
+	}
+
+	if count > 0 {
+		return nil, fmt.Errorf("setup already completed: users already exist")
+	}
+
+	if err := s.validatePasswordStrength(pwd); err != nil {
+		return nil, err
+	}
+
+	hash, err := password.HashPassword(pwd)
+	if err != nil {
+		return nil, fmt.Errorf("failed to hash password: %w", err)
+	}
+
+	admin := &User{
+		ID:           idgen.New(),
+		Username:     username,
+		Email:        email,
+		PasswordHash: hash,
+		Role:         "admin",
+		Locale:       "en-US",
+		Theme:        "system",
+	}
+
+	if err := s.repo.CreateUser(ctx, admin); err != nil {
+		return nil, fmt.Errorf("failed to create admin user: %w", err)
+	}
+
+	_ = s.repo.CreateSecurityEvent(ctx, &SecurityEvent{
+		ID:        idgen.New(),
+		UserID:    admin.ID,
+		EventType: "admin_setup",
+		Details:   fmt.Sprintf("Admin user %s created via setup", admin.Username),
+		CreatedAt: time.Now().UTC(),
+	})
+
+	return admin, nil
 }

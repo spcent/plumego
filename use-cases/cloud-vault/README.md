@@ -701,8 +701,394 @@ JSON output:
 - No scheduled doctor runs (must be triggered manually)
 - No metrics export (Prometheus/Graphite)
 
+## V0.7: Authentication, i18n & Theme System
+
+V0.7 adds foundational productization features: session-based authentication, internationalization (3 locales), theme system (light/dark/system), and account management.
+
+### Features
+
+- **Session-based authentication** — secure cookie-based sessions with automatic renewal
+- **Admin setup flow** — first-time setup wizard to create initial admin account
+- **Login rate limiting** — configurable failed login attempt limits with automatic lockout
+- **Password management** — secure password change with current password verification
+- **Account settings** — update display name, email, locale, and theme preferences
+- **Security page** — view active sessions, revoke sessions, view security events
+- **Theme system** — light/dark/system theme with persistent preferences
+- **i18n support** — English, 简体中文, 繁體中文 with automatic language detection
+- **Route protection** — all API endpoints protected except public auth routes
+- **Security events** — audit trail for login, logout, password changes, session revocation
+- **Doctor auth checks** — system health checks for auth-related issues
+
+### Getting Started
+
+#### First-Time Setup
+
+When you first access the application, you'll see a setup page to create your admin account:
+
+1. Visit `http://localhost:8080`
+2. Fill in username, email, and password (minimum 10 characters)
+3. Click "Create Admin Account"
+4. You'll be automatically logged in and redirected to the main application
+
+#### Configuration
+
+Auth settings in `config.toml`:
+
+```toml
+[auth]
+enabled = true
+session_ttl_hours = 168              # 7 days
+cookie_name = "markdown_vault_session"
+secure_cookie = false                # Set to true in production with HTTPS
+max_login_failures = 5
+login_failure_window_minutes = 15
+lockout_minutes = 30
+password_min_length = 10
+bootstrap_admin_enabled = false      # Set to true for automated setup
+
+[auth.bootstrap_admin]
+username = "admin"
+email = "admin@example.com"
+password = "Change-Me-Strong-Password-123"
+```
+
+#### Environment Variable Override
+
+```bash
+MARKDOWN_VAULT_AUTH_ENABLED=true
+MARKDOWN_VAULT_AUTH_SESSION_TTL_HOURS=168
+MARKDOWN_VAULT_AUTH_SECURE_COOKIE=true
+```
+
+### Authentication API
+
+All auth endpoints are under `/api/v1/auth`.
+
+#### Public Endpoints (no authentication required)
+
+```http
+POST /api/v1/auth/setup
+```
+Create initial admin account (only works when no users exist).
+
+Request:
+```json
+{
+  "username": "admin",
+  "email": "admin@example.com",
+  "password": "StrongPassword123"
+}
+```
+
+```http
+GET /api/v1/auth/status
+```
+Check if system is initialized.
+
+Response:
+```json
+{
+  "data": {
+    "initialized": true
+  }
+}
+```
+
+```http
+POST /api/v1/auth/login
+```
+Login with username/email and password.
+
+Request:
+```json
+{
+  "username": "admin",
+  "password": "StrongPassword123"
+}
+```
+
+Response sets `Set-Cookie` header with session token.
+
+```http
+GET /api/v1/health
+```
+System health check (always public).
+
+#### Protected Endpoints (require authentication)
+
+```http
+POST /api/v1/auth/logout
+```
+Logout and revoke current session.
+
+```http
+GET /api/v1/auth/me
+```
+Get current user profile.
+
+```http
+PUT /api/v1/auth/me
+```
+Update user profile.
+
+Request:
+```json
+{
+  "display_name": "Admin User",
+  "email": "admin@example.com",
+  "locale": "en-US",
+  "theme": "dark"
+}
+```
+
+```http
+POST /api/v1/auth/change-password
+```
+Change password (requires current password).
+
+Request:
+```json
+{
+  "current_password": "OldPassword123",
+  "new_password": "NewStrongPassword456"
+}
+```
+
+```http
+GET /api/v1/auth/sessions
+```
+List all active sessions for current user.
+
+Response:
+```json
+{
+  "data": {
+    "sessions": [
+      {
+        "id": "01K...",
+        "user_agent": "Mozilla/5.0...",
+        "ip_address": "192.168.1.100",
+        "created_at": "2026-05-29T10:00:00Z",
+        "expires_at": "2026-06-05T10:00:00Z"
+      }
+    ]
+  }
+}
+```
+
+```http
+POST /api/v1/auth/sessions/revoke-all
+```
+Revoke all sessions except current.
+
+All other API endpoints (`/api/v1/documents`, `/api/v1/search`, etc.) now require authentication and return `401 Unauthorized` if not logged in.
+
+### Security Features
+
+#### Password Requirements
+
+- Minimum 10 characters (configurable via `password_min_length`)
+- Must contain at least one uppercase letter
+- Must contain at least one lowercase letter
+- Must contain at least one digit
+- Passwords are hashed using PBKDF2-SHA512 (210,000 iterations)
+
+#### Session Security
+
+- Session tokens stored in HttpOnly cookies (not accessible via JavaScript)
+- Session tokens hashed using SHA-256 before storage
+- Configurable session TTL (default 7 days)
+- Secure cookie flag for HTTPS deployments
+- SameSite=Lax to prevent CSRF
+
+#### Rate Limiting
+
+- Failed login attempts tracked per username
+- After 5 failed attempts within 15 minutes, account locked for 30 minutes
+- Rate limit counter resets after successful login
+- All rate limit violations logged as security events
+
+#### Security Events
+
+All authentication actions are logged to `security_events` table:
+
+- `login_success` / `login_failed`
+- `logout`
+- `password_changed`
+- `session_revoked`
+- `account_locked`
+- `admin_setup` / `admin_bootstrap`
+
+View security events in the Security page or via API:
+
+```http
+GET /api/v1/auth/security-events?limit=50&offset=0
+```
+
+### Theme System
+
+Three theme modes available:
+
+- **Light** — light background with dark text
+- **Dark** — dark background with light text
+- **System** — follow OS preference (via `prefers-color-scheme`)
+
+Theme preference stored in user profile and synced to localStorage for instant application on page load.
+
+Change theme via:
+1. Account settings page → Theme dropdown
+2. API: `PUT /api/v1/auth/me` with `{"theme": "dark"}`
+
+### Internationalization (i18n)
+
+Supported locales:
+
+- `en-US` — English (US)
+- `zh-CN` — 简体中文 (Simplified Chinese)
+- `zh-TW` — 繁體中文 (Traditional Chinese)
+
+Locale preference stored in user profile and synced to localStorage.
+
+Change locale via:
+1. Account settings page → Language dropdown
+2. API: `PUT /api/v1/auth/me` with `{"locale": "zh-CN"}`
+
+i18n covers:
+- Navigation tabs (Vault, Search, Import, etc.)
+- Common actions (Save, Cancel, Delete, etc.)
+- Auth pages (Login, Setup, Account, Security)
+- Form labels and error messages
+- Theme names (Light, Dark, System)
+- Locale names (English, 简体中文, 繁體中文)
+
+### Frontend Pages
+
+#### Setup Page
+- Shown on first visit when no users exist
+- Creates initial admin account
+- Auto-login after successful setup
+
+#### Login Page
+- Username/email + password form
+- Error messages for invalid credentials
+- Rate limit warnings when account locked
+
+#### Account Settings Page
+- Update display name, email
+- Change locale (language)
+- Change theme (light/dark/system)
+- Save button to persist changes
+
+#### Security Page
+- Change password (requires current password)
+- View active sessions with device info
+- Revoke individual sessions
+- Revoke all other sessions button
+- View security event audit log
+
+### Database Schema
+
+New tables in migration 006:
+
+| Table | Purpose |
+|---|---|
+| `users` | User accounts with profile preferences |
+| `user_sessions` | Active session tokens with metadata |
+| `login_attempts` | Failed login tracking for rate limiting |
+| `security_events` | Audit log for authentication actions |
+
+### System Doctor Auth Checks
+
+Run auth-related health checks:
+
+```bash
+curl -X POST http://localhost:8080/api/v1/system/doctor \
+  -H 'Content-Type: application/json' \
+  -d '{"checks":["auth"]}'
+```
+
+Checks:
+- `users_table_exists` — verify users table exists
+- `has_admin_user` — at least one admin user exists
+- `expired_sessions` — count of expired but not revoked sessions
+- `orphaned_sessions` — sessions referencing non-existent users
+- `orphaned_security_events` — security events referencing non-existent users
+
+### Security Best Practices
+
+1. **Enable HTTPS in production**
+   - Set `secure_cookie = true` in config
+   - Configure reverse proxy (nginx/caddy) with SSL certificate
+   - Redirect all HTTP traffic to HTTPS
+
+2. **Use strong passwords**
+   - Minimum 10 characters enforced
+   - Consider requiring special characters for admin accounts
+
+3. **Regular password rotation**
+   - Change admin password periodically
+   - All sessions automatically revoked after password change
+
+4. **Monitor security events**
+   - Check Security page regularly
+   - Look for unusual login patterns or locations
+   - Revoke suspicious sessions immediately
+
+5. **Disable bootstrap after setup**
+   - Set `bootstrap_admin_enabled = false` after initial setup
+   - Prevents accidental admin account creation
+
+6. **Backup database regularly**
+   - `users` table contains hashed passwords
+   - `user_sessions` contains active session tokens
+   - `security_events` contains audit trail
+
+### V0.7 Current Limitations
+
+- Single-user or small-scale private deployment only
+- No OAuth/SSO integration
+- No role-based access control (RBAC)
+- No multi-tenancy
+- No email verification
+- No password reset via email
+- No two-factor authentication (2FA)
+- Rate limiting is per-username only (no IP-based limiting)
+- Session cleanup requires manual triggering or scheduled job
+- i18n covers core UI but not all error messages
+- Bootstrap admin requires server restart after config changes
+
+### Migration from V0.6
+
+If upgrading from V0.6:
+
+1. Backup your database: `cp data/app.db data/app.db.backup`
+2. Stop the running application
+3. Run migration: `go run ./cmd/server` (migration 006 runs automatically)
+4. Access the application — you'll see the setup page
+5. Create your admin account
+6. All existing documents and data remain intact
+
+If you want to skip the setup page, enable bootstrap admin in `config.toml` before starting:
+
+```toml
+[auth]
+enabled = true
+bootstrap_admin_enabled = true
+
+[auth.bootstrap_admin]
+username = "admin"
+email = "admin@example.com"
+password = "Change-Me-Strong-Password-123"
+```
+
+The bootstrap admin will be created automatically on startup, and you can login immediately.
+
 ## Current Limitations
 
-- No multi-user collaboration
-- No authentication / authorization
+- No multi-user collaboration (single admin account only)
 - No semantic or vector search
+- No OAuth/SSO integration
+- No role-based access control (RBAC)
+- No multi-tenancy support
+- No two-factor authentication (2FA)
+- No email verification or password reset

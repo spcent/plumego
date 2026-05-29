@@ -205,9 +205,9 @@ func (r *Repository) CreateSession(ctx context.Context, session *Session) error 
 	}
 
 	_, err := r.db.ExecContext(ctx, `
-		INSERT INTO user_sessions (id, user_id, token_hash, user_agent, ip_address, expires_at, last_used_at, created_at)
+		INSERT INTO user_sessions (id, user_id, session_hash, user_agent, ip_address, expires_at, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-		session.ID, session.UserID, session.TokenHash,
+		session.ID, session.UserID, session.SessionHash,
 		userAgent, ipAddress,
 		session.ExpiresAt.UTC().Format(time.RFC3339),
 		now, now,
@@ -223,16 +223,16 @@ func (r *Repository) CreateSession(ctx context.Context, session *Session) error 
 // GetSessionByID retrieves a session by ID.
 func (r *Repository) GetSessionByID(ctx context.Context, id string) (*Session, error) {
 	row := r.db.QueryRowContext(ctx, `
-		SELECT id, user_id, token_hash, user_agent, ip_address, expires_at, revoked_at, last_used_at, created_at
+		SELECT id, user_id, session_hash, user_agent, ip_address, expires_at, revoked_at, created_at, updated_at
 		FROM user_sessions
 		WHERE id = ?`, id)
 
-	var sessionRow sessionRow
+	var sr sessionRow
 	err := row.Scan(
-		&sessionRow.ID, &sessionRow.UserID, &sessionRow.TokenHash,
-		&sessionRow.UserAgent, &sessionRow.IPAddress,
-		&sessionRow.ExpiresAt, &sessionRow.RevokedAt,
-		&sessionRow.LastUsedAt, &sessionRow.CreatedAt,
+		&sr.ID, &sr.UserID, &sr.SessionHash,
+		&sr.UserAgent, &sr.IPAddress,
+		&sr.ExpiresAt, &sr.RevokedAt,
+		&sr.CreatedAt, &sr.UpdatedAt,
 	)
 
 	if err != nil {
@@ -242,22 +242,22 @@ func (r *Repository) GetSessionByID(ctx context.Context, id string) (*Session, e
 		return nil, fmt.Errorf("auth: get session by id: %w", err)
 	}
 
-	return sessionRow.toSession(), nil
+	return sr.toSession(), nil
 }
 
-// GetSessionByTokenHash retrieves a session by token hash.
+// GetSessionByTokenHash retrieves a session by session hash.
 func (r *Repository) GetSessionByTokenHash(ctx context.Context, tokenHash string) (*Session, error) {
 	row := r.db.QueryRowContext(ctx, `
-		SELECT id, user_id, token_hash, user_agent, ip_address, expires_at, revoked_at, last_used_at, created_at
+		SELECT id, user_id, session_hash, user_agent, ip_address, expires_at, revoked_at, created_at, updated_at
 		FROM user_sessions
-		WHERE token_hash = ?`, tokenHash)
+		WHERE session_hash = ?`, tokenHash)
 
-	var sessionRow sessionRow
+	var sr sessionRow
 	err := row.Scan(
-		&sessionRow.ID, &sessionRow.UserID, &sessionRow.TokenHash,
-		&sessionRow.UserAgent, &sessionRow.IPAddress,
-		&sessionRow.ExpiresAt, &sessionRow.RevokedAt,
-		&sessionRow.LastUsedAt, &sessionRow.CreatedAt,
+		&sr.ID, &sr.UserID, &sr.SessionHash,
+		&sr.UserAgent, &sr.IPAddress,
+		&sr.ExpiresAt, &sr.RevokedAt,
+		&sr.CreatedAt, &sr.UpdatedAt,
 	)
 
 	if err != nil {
@@ -267,16 +267,16 @@ func (r *Repository) GetSessionByTokenHash(ctx context.Context, tokenHash string
 		return nil, fmt.Errorf("auth: get session by token hash: %w", err)
 	}
 
-	return sessionRow.toSession(), nil
+	return sr.toSession(), nil
 }
 
-// UpdateSessionLastUsed updates the last_used_at timestamp for a session.
+// UpdateSessionLastUsed updates the updated_at timestamp for a session.
 func (r *Repository) UpdateSessionLastUsed(ctx context.Context, id string) error {
 	now := time.Now().UTC().Format(time.RFC3339)
 
 	_, err := r.db.ExecContext(ctx, `
 		UPDATE user_sessions
-		SET last_used_at = ?
+		SET updated_at = ?
 		WHERE id = ?`,
 		now, id,
 	)
@@ -336,7 +336,7 @@ func (r *Repository) RevokeAllUserSessions(ctx context.Context, userID string) e
 // ListUserSessions returns all sessions for a user.
 func (r *Repository) ListUserSessions(ctx context.Context, userID string) ([]*Session, error) {
 	rows, err := r.db.QueryContext(ctx, `
-		SELECT id, user_id, token_hash, user_agent, ip_address, expires_at, revoked_at, last_used_at, created_at
+		SELECT id, user_id, session_hash, user_agent, ip_address, expires_at, revoked_at, created_at, updated_at
 		FROM user_sessions
 		WHERE user_id = ?
 		ORDER BY created_at DESC`, userID)
@@ -348,17 +348,17 @@ func (r *Repository) ListUserSessions(ctx context.Context, userID string) ([]*Se
 
 	var sessions []*Session
 	for rows.Next() {
-		var sessionRow sessionRow
+		var sr sessionRow
 		err := rows.Scan(
-			&sessionRow.ID, &sessionRow.UserID, &sessionRow.TokenHash,
-			&sessionRow.UserAgent, &sessionRow.IPAddress,
-			&sessionRow.ExpiresAt, &sessionRow.RevokedAt,
-			&sessionRow.LastUsedAt, &sessionRow.CreatedAt,
+			&sr.ID, &sr.UserID, &sr.SessionHash,
+			&sr.UserAgent, &sr.IPAddress,
+			&sr.ExpiresAt, &sr.RevokedAt,
+			&sr.CreatedAt, &sr.UpdatedAt,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("auth: scan session: %w", err)
 		}
-		sessions = append(sessions, sessionRow.toSession())
+		sessions = append(sessions, sr.toSession())
 	}
 
 	if err = rows.Err(); err != nil {
@@ -396,7 +396,7 @@ func (r *Repository) RecordLoginAttempt(ctx context.Context, attempt *LoginAttem
 	}
 
 	_, err := r.db.ExecContext(ctx, `
-		INSERT INTO login_attempts (id, identifier, ip_address, success, created_at)
+		INSERT INTO login_attempts (id, login_identifier, ip_address, success, created_at)
 		VALUES (?, ?, ?, ?, ?)`,
 		attempt.ID, attempt.Identifier, ipAddress, attempt.Success,
 		attempt.CreatedAt.UTC().Format(time.RFC3339),
@@ -417,7 +417,7 @@ func (r *Repository) CountRecentLoginFailures(ctx context.Context, identifier st
 	err := r.db.QueryRowContext(ctx, `
 		SELECT COUNT(*)
 		FROM login_attempts
-		WHERE identifier = ? AND success = FALSE AND created_at >= ?`,
+		WHERE login_identifier = ? AND success = FALSE AND created_at >= ?`,
 		identifier, since,
 	).Scan(&count)
 
@@ -445,7 +445,7 @@ func (r *Repository) CreateSecurityEvent(ctx context.Context, event *SecurityEve
 	}
 
 	_, err := r.db.ExecContext(ctx, `
-		INSERT INTO security_events (id, user_id, event_type, ip_address, user_agent, details, created_at)
+		INSERT INTO security_events (id, user_id, event_type, ip_address, user_agent, detail_json, created_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?)`,
 		event.ID, userID, event.EventType, ipAddress, userAgent, details,
 		event.CreatedAt.UTC().Format(time.RFC3339),
@@ -461,7 +461,7 @@ func (r *Repository) CreateSecurityEvent(ctx context.Context, event *SecurityEve
 // ListSecurityEvents returns security events with pagination.
 func (r *Repository) ListSecurityEvents(ctx context.Context, limit, offset int) ([]*SecurityEvent, error) {
 	rows, err := r.db.QueryContext(ctx, `
-		SELECT id, user_id, event_type, ip_address, user_agent, details, created_at
+		SELECT id, user_id, event_type, ip_address, user_agent, detail_json, created_at
 		FROM security_events
 		ORDER BY created_at DESC
 		LIMIT ? OFFSET ?`, limit, offset)

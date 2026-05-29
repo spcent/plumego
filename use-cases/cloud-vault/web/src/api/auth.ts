@@ -23,6 +23,20 @@ export interface Session {
   created_at: string
 }
 
+export interface SetupRequest {
+  username: string
+  email: string
+  password: string
+}
+
+export interface SetupResponse {
+  user: User
+}
+
+export interface AuthStatusResponse {
+  initialized: boolean
+}
+
 export interface LoginRequest {
   username: string
   password: string
@@ -46,6 +60,8 @@ export interface ChangePasswordRequest {
 }
 
 export const authAPI = {
+  setup: (req: SetupRequest) => client.post<SetupResponse>('/api/v1/auth/setup', req),
+  getStatus: () => client.get<AuthStatusResponse>('/api/v1/auth/status'),
   login: (req: LoginRequest) => client.post<LoginResponse>('/api/v1/auth/login', req),
   logout: () => client.post<void>('/api/v1/auth/logout', {}),
   getMe: () => client.get<User>('/api/v1/auth/me'),

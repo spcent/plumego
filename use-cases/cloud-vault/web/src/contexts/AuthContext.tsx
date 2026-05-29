@@ -1,10 +1,12 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
-import { authAPI, User, LoginRequest, UpdateProfileRequest, ChangePasswordRequest } from '../api/auth'
+import { authAPI, User, LoginRequest, UpdateProfileRequest, ChangePasswordRequest, SetupRequest } from '../api/auth'
 
 interface AuthContextType {
   user: User | null
   loading: boolean
+  setupRequired: boolean
   login: (req: LoginRequest) => Promise<void>
+  setup: (req: SetupRequest) => Promise<void>
   logout: () => Promise<void>
   updateProfile: (req: UpdateProfileRequest) => Promise<void>
   changePassword: (req: ChangePasswordRequest) => Promise<void>
@@ -16,10 +18,33 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined)
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
+  const [setupRequired, setSetupRequired] = useState(false)
 
   useEffect(() => {
-    refreshUser()
+    checkSetupAndRefresh()
   }, [])
+
+  const checkSetupAndRefresh = async () => {
+    try {
+      const status = await authAPI.getStatus()
+      setSetupRequired(!status.initialized)
+
+      if (status.initialized) {
+        const currentUser = await authAPI.getMe()
+        setUser(currentUser)
+      }
+    } catch {
+      setUser(null)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const setup = async (req: SetupRequest) => {
+    const response = await authAPI.setup(req)
+    setUser(response.user)
+    setSetupRequired(false)
+  }
 
   const refreshUser = async () => {
     try {
@@ -59,7 +84,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       value={{
         user,
         loading,
+        setupRequired,
         login,
+        setup,
         logout,
         updateProfile,
         changePassword,

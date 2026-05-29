@@ -45,6 +45,18 @@ export interface Translations {
     email: string
     locale: string
     theme: string
+    passwordMismatch: string
+    passwordTooShort: string
+    invalidCurrentPassword: string
+    signingIn: string
+  }
+  setup: {
+    title: string
+    description: string
+    createAccount: string
+    creating: string
+    setupFailed: string
+    alreadyInitialized: string
   }
   pages: {
     vault: {
@@ -111,6 +123,8 @@ export interface Translations {
       title: string
       sessions: string
       password: string
+      revokeAll: string
+      revoke: string
     }
   }
   themes: {
@@ -172,6 +186,18 @@ export const enUS: Translations = {
     email: 'Email',
     locale: 'Language',
     theme: 'Theme',
+    passwordMismatch: 'Passwords do not match',
+    passwordTooShort: 'Password must be at least 10 characters',
+    invalidCurrentPassword: 'Invalid current password',
+    signingIn: 'Signing in...',
+  },
+  setup: {
+    title: 'Initial Setup',
+    description: 'Create your admin account to get started',
+    createAccount: 'Create Admin Account',
+    creating: 'Setting up...',
+    setupFailed: 'Setup failed',
+    alreadyInitialized: 'System already initialized',
   },
   pages: {
     vault: {
@@ -238,6 +264,8 @@ export const enUS: Translations = {
       title: 'Security',
       sessions: 'Sessions',
       password: 'Password',
+      revokeAll: 'Revoke All Other Sessions',
+      revoke: 'Revoke',
     },
   },
   themes: {
@@ -299,6 +327,18 @@ export const zhCN: Translations = {
     email: '邮箱',
     locale: '语言',
     theme: '主题',
+    passwordMismatch: '两次输入的密码不匹配',
+    passwordTooShort: '密码必须至少 10 个字符',
+    invalidCurrentPassword: '当前密码错误',
+    signingIn: '登录中...',
+  },
+  setup: {
+    title: '初始设置',
+    description: '创建管理员账户以开始使用',
+    createAccount: '创建管理员账户',
+    creating: '设置中...',
+    setupFailed: '设置失败',
+    alreadyInitialized: '系统已初始化',
   },
   pages: {
     vault: {
@@ -365,6 +405,8 @@ export const zhCN: Translations = {
       title: '安全',
       sessions: '会话',
       password: '密码',
+      revokeAll: '撤销所有其他会话',
+      revoke: '撤销',
     },
   },
   themes: {
@@ -426,6 +468,18 @@ export const zhTW: Translations = {
     email: '電子郵件',
     locale: '語言',
     theme: '主題',
+    passwordMismatch: '密碼不匹配',
+    passwordTooShort: '密碼必須至少 10 個字元',
+    invalidCurrentPassword: '當前密碼錯誤',
+    signingIn: '登入中...',
+  },
+  setup: {
+    title: '初始設定',
+    description: '建立管理員帳戶以開始使用',
+    createAccount: '建立管理員帳戶',
+    creating: '設定中...',
+    setupFailed: '設定失敗',
+    alreadyInitialized: '系統已初始化',
   },
   pages: {
     vault: {
@@ -492,6 +546,8 @@ export const zhTW: Translations = {
       title: '安全',
       sessions: '工作階段',
       password: '密碼',
+      revokeAll: '撤銷所有其他工作階段',
+      revoke: '撤銷',
     },
   },
   themes: {

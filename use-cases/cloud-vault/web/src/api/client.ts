@@ -14,6 +14,9 @@ export class APIResponseError extends Error {
   }
 }
 
+// Prevent multiple simultaneous redirects
+let isRedirecting = false
+
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(path, {
     headers: { 'Content-Type': 'application/json', ...options?.headers },
@@ -23,6 +26,19 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const body = await res.json().catch(() => null)
 
   if (!res.ok) {
+    // Handle 401 Unauthorized - redirect to login (except for auth endpoints)
+    if (
+      res.status === 401 &&
+      !path.includes('/api/v1/auth/login') &&
+      !path.includes('/api/v1/auth/setup') &&
+      !isRedirecting
+    ) {
+      isRedirecting = true
+      window.location.href = '/login'
+      // Delay error throw to allow redirect to complete
+      await new Promise(resolve => setTimeout(resolve, 100))
+    }
+
     const err = body?.error as APIError | undefined
     throw new APIResponseError(
       err?.code ?? 'UNKNOWN_ERROR',

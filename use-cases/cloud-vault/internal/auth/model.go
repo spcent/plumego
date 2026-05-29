@@ -83,9 +83,9 @@ func (r *userRow) toUser() *User {
 // toSession converts a sessionRow to a Session.
 func (r *sessionRow) toSession() *Session {
 	session := &Session{
-		ID:        r.ID,
-		UserID:    r.UserID,
-		TokenHash: r.TokenHash,
+		ID:          r.ID,
+		UserID:      r.UserID,
+		SessionHash: r.SessionHash,
 	}
 
 	if r.UserAgent.Valid {
@@ -103,8 +103,8 @@ func (r *sessionRow) toSession() *Session {
 	if t, err := time.Parse(time.RFC3339, r.ExpiresAt); err == nil {
 		session.ExpiresAt = t
 	}
-	if t, err := time.Parse(time.RFC3339, r.LastUsedAt); err == nil {
-		session.LastUsedAt = t
+	if t, err := time.Parse(time.RFC3339, r.UpdatedAt); err == nil {
+		session.UpdatedAt = t
 	}
 	if t, err := time.Parse(time.RFC3339, r.CreatedAt); err == nil {
 		session.CreatedAt = t

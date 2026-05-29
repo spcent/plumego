@@ -27,7 +27,9 @@ func (a *App) RegisterRoutes() error {
 	v1.get("/health", http.HandlerFunc(a.healthLive))
 
 	// V0.7: Auth endpoints
-	// Login is always public
+	// Setup, Status, and Login are always public
+	v1.post("/auth/setup", http.HandlerFunc(a.Auth.Setup))
+	v1.get("/auth/status", http.HandlerFunc(a.Auth.GetStatus))
 	v1.post("/auth/login", http.HandlerFunc(a.Auth.Login))
 	// Other auth endpoints require authentication when auth is enabled
 	v1.post("/auth/logout", a.requireAuth(http.HandlerFunc(a.Auth.Logout)))

@@ -25,6 +25,60 @@ func NewHandler(svc *Service, config Config, logger plumelog.StructuredLogger) *
 	}
 }
 
+// Setup handles POST /api/v1/auth/setup
+func (h *Handler) Setup(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Username string `json:"username"`
+		Email    string `json:"email"`
+		Password string `json:"password"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, r, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	if req.Username == "" || req.Password == "" {
+		writeError(w, r, http.StatusBadRequest, "Username and password are required")
+		return
+	}
+
+	user, err := h.svc.Setup(r.Context(), req.Username, req.Email, req.Password)
+	if err != nil {
+		if err.Error() == "setup already completed: users already exist" {
+			writeError(w, r, http.StatusConflict, err.Error())
+			return
+		}
+		h.logger.Error("setup failed", plumelog.Fields{"error": err.Error()})
+		writeError(w, r, http.StatusInternalServerError, "Failed to create admin user")
+		return
+	}
+
+	// Auto-login after setup
+	userAgent := r.Header.Get("User-Agent")
+	ipAddress := getIPAddress(r)
+	_, _, token, err := h.svc.Login(r.Context(), user.Username, req.Password, userAgent, ipAddress)
+	if err != nil {
+		h.logger.Error("auto-login after setup failed", plumelog.Fields{"error": err.Error()})
+	}
+
+	if token != "" {
+		http.SetCookie(w, &http.Cookie{
+			Name:     h.config.CookieName,
+			Value:    token,
+			Path:     "/",
+			HttpOnly: true,
+			Secure:   h.config.SecureCookie,
+			SameSite: http.SameSiteLaxMode,
+			MaxAge:   h.config.SessionTTLHours * 3600,
+		})
+	}
+
+	writeJSON(w, http.StatusCreated, map[string]interface{}{
+		"user": user,
+	})
+}
+
 // Login handles POST /api/v1/auth/login
 func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 	var req struct {
@@ -75,6 +129,24 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		"user":    user,
 		"session": session,
 	})
+}
+
+// GetStatus handles GET /api/v1/auth/status
+func (h *Handler) GetStatus(w http.ResponseWriter, r *http.Request) {
+	userCount, err := h.svc.repo.GetUserCount(r.Context())
+	if err != nil {
+		h.logger.Error("failed to get user count", plumelog.Fields{"error": err.Error()})
+		writeError(w, r, http.StatusInternalServerError, "Failed to check auth status")
+		return
+	}
+
+	status := struct {
+		Initialized bool `json:"initialized"`
+	}{
+		Initialized: userCount > 0,
+	}
+
+	writeJSON(w, http.StatusOK, status)
 }
 
 // Logout handles POST /api/v1/auth/logout
