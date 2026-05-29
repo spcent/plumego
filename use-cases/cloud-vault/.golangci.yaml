@@ -1,0 +1,136 @@
+# golangci-lint configuration for cloud-vault
+# Documentation: https://golangci-lint.run/usage/configuration/
+
+run:
+  timeout: 5m
+  tests: true
+
+linters:
+  enable:
+    # Bug detection
+    - errcheck
+    - govet
+    - staticcheck
+    - unused
+    - ineffassign
+    - typecheck
+
+    # Code quality
+    - gocyclo
+    - gocritic
+    - gofmt
+    - goimports
+    - revive
+    - unconvert
+
+    # Best practices
+    - bodyclose
+    - noctx
+    - rowserrcheck
+    - sqlclosecheck
+
+    # Style
+    - stylecheck
+    - unparam
+    - wastedassign
+
+    # Performance
+    - prealloc
+
+  disable:
+    - depguard  # Too restrictive for use-case apps
+    - gomnd     # Magic numbers are fine in business logic
+    - gochecknoglobals  # Globals are sometimes necessary
+    - gochecknoinits    # init() is sometimes needed
+
+linters-settings:
+  gocyclo:
+    min-complexity: 20
+
+  gocritic:
+    enabled-tags:
+      - diagnostic
+      - style
+      - performance
+    disabled-checks:
+      - ifElseChain
+      - singleCaseSwitch
+      - whyNoLint
+
+  revive:
+    rules:
+      - name: exported
+        disabled: true
+      - name: package-comments
+        disabled: true
+      - name: blank-imports
+      - name: context-as-argument
+      - name: context-keys-type
+      - name: dot-imports
+      - name: error-return
+      - name: error-strings
+      - name: error-naming
+      - name: if-return
+      - name: increment-decrement
+      - name: var-naming
+      - name: var-declaration
+      - name: range
+      - name: receiver-naming
+      - name: time-naming
+      - name: unexported-return
+      - name: indent-error-flow
+      - name: errorf
+
+  errcheck:
+    check-type-assertions: true
+    check-blank: false
+
+  govet:
+    enable:
+      - shadow
+    disable:
+      - fieldalignment  # Too strict
+
+  goimports:
+    local-prefixes: cloud-vault
+
+  stylecheck:
+    checks: ["all", "-ST1000", "-ST1003"]
+
+issues:
+  exclude-rules:
+    # Exclude some linters from running on tests files
+    - path: _test\.go
+      linters:
+        - gocyclo
+        - errcheck
+        - gosec
+        - unparam
+        - stylecheck
+
+    # Exclude known issues
+    - text: "G104:"
+      linters:
+        - gosec
+
+    # Exclude some staticcheck messages
+    - linters:
+        - staticcheck
+      text: "SA9003:"
+
+    # Exclude lll issues for long lines with URLs
+    - linters:
+        - lll
+      source: "^// ?https?://"
+
+  max-issues-per-linter: 0
+  max-same-issues: 0
+  new: false
+
+severity:
+  default-severity: error
+  rules:
+    - linters:
+        - gofmt
+        - goimports
+      severity: warning

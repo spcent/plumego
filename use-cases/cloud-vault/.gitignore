@@ -23,7 +23,9 @@ internal/web/static/assets
 # Binary executables
 bench
 bin/
-server
+./server
 
 # Test binaries
 *.test
+
+data/*
