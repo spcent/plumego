@@ -32,7 +32,7 @@ const (
 	HostHeader        = "Host"
 	ContentTypeHeader = "Content-Type"
 	UserAgentHeader   = "User-Agent"
-	GatusUserAgent    = "Gatusplume/1.0"
+	GatusUserAgent    = "Guardus/1.0"
 
 	TypeDNS      Type = "DNS"
 	TypeTCP      Type = "TCP"
