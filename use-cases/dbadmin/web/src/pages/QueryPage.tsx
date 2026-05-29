@@ -45,7 +45,9 @@ export default function QueryPage() {
 
   useEffect(() => {
     if (!connId) return
-    api.databases(connId).then(setDatabases).catch(e => showToast(e.message))
+    api.resources(connId)
+      .then(nodes => setDatabases(nodes.filter(n => n.type === 'sql_database').map(n => n.name)))
+      .catch(e => showToast(e.message))
   }, [connId])
 
   const loadHistory = useCallback(async () => {

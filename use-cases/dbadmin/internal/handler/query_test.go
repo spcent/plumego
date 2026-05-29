@@ -118,9 +118,9 @@ func TestHasWhereClause_present(t *testing.T) {
 		"UPDATE t SET x=1 WHERE id=1",
 		"DELETE FROM T\tWHERE id=1",
 		"DELETE FROM T\nWHERE id=1",
-		"DELETE FROM T\rWHERE id=1",    // Windows CR
+		"DELETE FROM T\rWHERE id=1",   // Windows CR
 		"DELETE FROM T\r\nWHERE id=1", // Windows CRLF
-		"DELETE FROM T WHERE",          // trailing WHERE
+		"DELETE FROM T WHERE",         // trailing WHERE
 		"SELECT * FROM t WHERE 1=1",
 	}
 	for _, sql := range cases {
@@ -154,10 +154,10 @@ func TestHasMultipleStatements(t *testing.T) {
 		want bool
 	}{
 		{"SELECT 1", false},
-		{"SELECT 1;", false},                              // trailing semicolon only
-		{"SELECT 1; SELECT 2", true},                     // two statements
-		{"SELECT 'a;b'", false},                          // semicolon inside string
-		{`SELECT "a;b"`, false},                          // semicolon inside double-quoted string
+		{"SELECT 1;", false},         // trailing semicolon only
+		{"SELECT 1; SELECT 2", true}, // two statements
+		{"SELECT 'a;b'", false},      // semicolon inside string
+		{`SELECT "a;b"`, false},      // semicolon inside double-quoted string
 		{"INSERT INTO t VALUES ('x'); DROP TABLE t", true},
 		{"SELECT 1;\n", false}, // trailing whitespace only
 	}

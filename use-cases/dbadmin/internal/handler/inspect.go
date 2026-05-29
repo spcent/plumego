@@ -3,6 +3,7 @@ package handler
 import (
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/spcent/plumego/contract"
 	plumelog "github.com/spcent/plumego/log"
@@ -40,44 +41,6 @@ func (h InspectHandler) openInspector(r *http.Request) (dbmanager.Inspector, *co
 	default:
 		return nil, conn, fmt.Errorf("unsupported driver: %s", conn.Driver)
 	}
-}
-
-// Databases lists schemas/databases for a connection.
-func (h InspectHandler) Databases(w http.ResponseWriter, r *http.Request) {
-	ins, _, err := h.openInspector(r)
-	if err != nil {
-		h.writeInspectErr(w, r, err)
-		return
-	}
-	dbs, err := ins.Databases(r.Context())
-	if err != nil {
-		h.Logger.Error("list databases", plumelog.Fields{"error": err.Error()})
-		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
-			Type(contract.TypeInternal).Message("failed to list databases").Build()))
-		return
-	}
-	logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusOK, dbs, map[string]any{"count": len(dbs)}))
-}
-
-// Tables lists tables and views in a database.
-func (h InspectHandler) Tables(w http.ResponseWriter, r *http.Request) {
-	ins, conn, err := h.openInspector(r)
-	if err != nil {
-		h.writeInspectErr(w, r, err)
-		return
-	}
-	db := router.Param(r, "db")
-	if conn.Driver == connection.DriverSQLite {
-		db = "" // SQLite ignores the db param
-	}
-	tables, err := ins.Tables(r.Context(), db)
-	if err != nil {
-		h.Logger.Error("list tables", plumelog.Fields{"error": err.Error()})
-		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
-			Type(contract.TypeInternal).Message("failed to list tables").Build()))
-		return
-	}
-	logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusOK, tables, map[string]any{"count": len(tables)}))
 }
 
 // TableStructure returns columns, indexes, and foreign keys for a table.
@@ -194,6 +157,49 @@ func (h InspectHandler) ForeignKeys(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusOK, fks, map[string]any{"count": len(fks)}))
+}
+
+// SchemaDoc returns a Markdown document of all table DDLs in the database.
+func (h InspectHandler) SchemaDoc(w http.ResponseWriter, r *http.Request) {
+	ins, conn, err := h.openInspector(r)
+	if err != nil {
+		h.writeInspectErr(w, r, err)
+		return
+	}
+	db := router.Param(r, "db")
+	if conn.Driver == connection.DriverSQLite {
+		db = ""
+	}
+
+	tables, err := ins.Tables(r.Context(), db)
+	if err != nil {
+		h.Logger.Error("list tables for schema doc", plumelog.Fields{"error": err.Error()})
+		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+			Type(contract.TypeInternal).Message("failed to list tables").Build()))
+		return
+	}
+
+	var sb strings.Builder
+	dbLabel := db
+	if dbLabel == "" {
+		dbLabel = router.Param(r, "db")
+	}
+	sb.WriteString(fmt.Sprintf("# Schema: %s\n\n", dbLabel))
+
+	for _, tbl := range tables {
+		sb.WriteString(fmt.Sprintf("## `%s`\n\n", tbl.Name))
+		ddl, _ := ins.CreateTableDDL(r.Context(), db, tbl.Name)
+		if ddl != "" {
+			sb.WriteString("```sql\n")
+			sb.WriteString(ddl)
+			sb.WriteString("\n```\n\n")
+		}
+	}
+
+	type schemaDocResp struct {
+		Markdown string `json:"markdown"`
+	}
+	logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusOK, schemaDocResp{Markdown: sb.String()}, nil))
 }
 
 func (h InspectHandler) writeInspectErr(w http.ResponseWriter, r *http.Request, err error) {

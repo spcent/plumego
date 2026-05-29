@@ -25,8 +25,9 @@ const (
 	DriverMySQL  DriverType = "mysql"
 	DriverSQLite DriverType = "sqlite"
 
+	DriverRedis DriverType = "redis" // supported: save/load config; driver not yet implemented
+
 	// Planned drivers — not yet implemented:
-	// DriverRedis         DriverType = "redis"
 	// DriverMongoDB       DriverType = "mongodb"
 	// DriverElasticsearch DriverType = "elasticsearch"
 )
@@ -35,22 +36,25 @@ var (
 	ErrNotFound  = errors.New("connection: not found")
 	ErrDuplicate = errors.New("connection: ID already exists")
 
-	idKeyPrefix   = "conn:"
-	listKey       = "conn:__index__"
+	idKeyPrefix = "conn:"
+	listKey     = "conn:__index__"
 )
 
 // Connection is a saved database connection configuration.
 type Connection struct {
-	ID           string     `json:"id"`
-	Name         string     `json:"name"`
-	Driver       DriverType `json:"driver"`
-	Host         string     `json:"host,omitempty"`
-	Port         int        `json:"port,omitempty"`
-	Database     string     `json:"database,omitempty"`
-	Username     string     `json:"username,omitempty"`
-	Password     string     `json:"password,omitempty"`      // stored encrypted when SavePassword=true
-	FilePath     string     `json:"file_path,omitempty"`     // for SQLite
-	Options      string     `json:"options,omitempty"`       // extra DSN params
+	ID       string     `json:"id"`
+	Name     string     `json:"name"`
+	Driver   DriverType `json:"driver"`
+	Host     string     `json:"host,omitempty"`
+	Port     int        `json:"port,omitempty"`
+	Database string     `json:"database,omitempty"`
+	Username string     `json:"username,omitempty"`
+	Password string     `json:"password,omitempty"`  // stored encrypted when SavePassword=true
+	FilePath string     `json:"file_path,omitempty"` // for SQLite
+	Options  string     `json:"options,omitempty"`   // extra DSN params
+	// Redis-specific fields (used when Driver = "redis")
+	RedisDBIndex     int       `json:"redis_db_index,omitempty"`    // logical DB index 0-15, default 0
+	TLSEnabled       bool      `json:"tls_enabled,omitempty"`       // use TLS/SSL
 	Readonly         bool      `json:"readonly,omitempty"`          // disallow all write operations
 	SavePassword     bool      `json:"save_password,omitempty"`     // persist password to disk
 	UploadedFile     bool      `json:"uploaded_file,omitempty"`     // file_path is a server-managed temp file

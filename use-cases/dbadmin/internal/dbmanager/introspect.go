@@ -5,7 +5,7 @@ import "context"
 // TableInfo describes a table or view.
 type TableInfo struct {
 	Name    string `json:"name"`
-	Type    string `json:"type"`    // TABLE or VIEW
+	Type    string `json:"type"` // TABLE or VIEW
 	Comment string `json:"comment,omitempty"`
 	Engine  string `json:"engine,omitempty"` // MySQL only
 	Rows    int64  `json:"rows,omitempty"`
@@ -34,12 +34,12 @@ type IndexInfo struct {
 
 // ForeignKeyInfo describes a foreign key constraint.
 type ForeignKeyInfo struct {
-	Name       string `json:"name"`
-	Column     string `json:"column"`
-	RefTable   string `json:"ref_table"`
-	RefColumn  string `json:"ref_column"`
-	OnDelete   string `json:"on_delete,omitempty"`
-	OnUpdate   string `json:"on_update,omitempty"`
+	Name      string `json:"name"`
+	Column    string `json:"column"`
+	RefTable  string `json:"ref_table"`
+	RefColumn string `json:"ref_column"`
+	OnDelete  string `json:"on_delete,omitempty"`
+	OnUpdate  string `json:"on_update,omitempty"`
 }
 
 // Inspector provides database introspection for a specific connection.

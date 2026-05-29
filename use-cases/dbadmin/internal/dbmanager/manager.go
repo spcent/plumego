@@ -110,7 +110,6 @@ func (m *Manager) Test(c *connection.Connection) error {
 	return nil
 }
 
-
 // redactDSN masks the password in a MySQL DSN for safe use in log/error messages.
 // Input:  "user:secret@tcp(host:3306)/db?..."
 // Output: "user:***@tcp(host:3306)/db?..."

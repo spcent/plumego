@@ -12,13 +12,15 @@ import (
 
 	"dbadmin/internal/dbmanager"
 	"dbadmin/internal/domain/connection"
+	"dbadmin/internal/redismanager"
 )
 
 // ConnectionHandler handles CRUD operations for saved DB connections.
 type ConnectionHandler struct {
-	Connections *connection.Store
-	Manager     *dbmanager.Manager
-	Logger      plumelog.StructuredLogger
+	Connections  *connection.Store
+	Manager      *dbmanager.Manager
+	RedisManager *redismanager.Manager
+	Logger       plumelog.StructuredLogger
 }
 
 // List returns all saved connections (passwords redacted).
@@ -147,6 +149,15 @@ func (h ConnectionHandler) Test(w http.ResponseWriter, r *http.Request) {
 			Type(contract.TypeInternal).Message("failed to get connection").Build()))
 		return
 	}
+	if c.Driver == connection.DriverRedis {
+		if err := h.RedisManager.Test(r.Context(), c); err != nil {
+			logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusOK,
+				map[string]any{"ok": false, "error": err.Error()}, nil))
+			return
+		}
+		logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusOK, map[string]any{"ok": true}, nil))
+		return
+	}
 	if err := h.Manager.Test(c); err != nil {
 		logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusOK,
 			map[string]any{"ok": false, "error": err.Error()}, nil))
@@ -172,8 +183,18 @@ func validateConnection(c *connection.Connection) error {
 		if c.FilePath == "" {
 			return fmt.Errorf("file_path is required for sqlite")
 		}
+	case connection.DriverRedis:
+		if c.Host == "" {
+			return fmt.Errorf("host is required for redis")
+		}
+		if c.Port == 0 {
+			c.Port = 6379
+		}
+		if c.RedisDBIndex < 0 || c.RedisDBIndex > 15 {
+			return fmt.Errorf("redis_db_index must be 0-15")
+		}
 	default:
-		return fmt.Errorf("driver must be 'mysql' or 'sqlite'")
+		return fmt.Errorf("driver must be 'mysql', 'sqlite', or 'redis'")
 	}
 	return nil
 }

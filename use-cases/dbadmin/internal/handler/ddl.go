@@ -51,7 +51,9 @@ func (h DDLHandler) CreateTable(w http.ResponseWriter, r *http.Request) {
 		h.writeConnErr(w, r, err)
 		return
 	}
-	if guardReadonly(conn, w, r, h.Logger) { return }
+	if guardReadonly(conn, w, r, h.Logger) {
+		return
+	}
 	var req createTableRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
@@ -103,7 +105,9 @@ func (h DDLHandler) AlterTable(w http.ResponseWriter, r *http.Request) {
 		h.writeConnErr(w, r, err)
 		return
 	}
-	if guardReadonly(conn, w, r, h.Logger) { return }
+	if guardReadonly(conn, w, r, h.Logger) {
+		return
+	}
 	table := router.Param(r, "table")
 	var req alterTableRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -150,7 +154,9 @@ func (h DDLHandler) DropTable(w http.ResponseWriter, r *http.Request) {
 		h.writeConnErr(w, r, err)
 		return
 	}
-	if guardReadonly(conn, w, r, h.Logger) { return }
+	if guardReadonly(conn, w, r, h.Logger) {
+		return
+	}
 	table := router.Param(r, "table")
 	var fqn string
 	switch conn.Driver {

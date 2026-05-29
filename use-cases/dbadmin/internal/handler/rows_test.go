@@ -111,8 +111,8 @@ func TestBuildWhereFromPK_invalidIdent(t *testing.T) {
 func TestQuoteIdent_mysql(t *testing.T) {
 	cases := []struct{ in, want string }{
 		{"name", "`name`"},
-		{"my`col", "`my``col`"},   // backtick escaped
-		{"a``b", "`a````b`"},      // double backtick
+		{"my`col", "`my``col`"}, // backtick escaped
+		{"a``b", "`a````b`"},    // double backtick
 	}
 	for _, c := range cases {
 		got := quoteIdent(c.in, connection.DriverMySQL)
@@ -125,7 +125,7 @@ func TestQuoteIdent_mysql(t *testing.T) {
 func TestQuoteIdent_sqlite(t *testing.T) {
 	cases := []struct{ in, want string }{
 		{"name", `"name"`},
-		{`my"col`, `"my""col"`},   // double-quote escaped
+		{`my"col`, `"my""col"`}, // double-quote escaped
 		{`a""b`, `"a""""b"`},
 	}
 	for _, c := range cases {

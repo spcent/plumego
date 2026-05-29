@@ -23,10 +23,12 @@ import (
 	kvstore "github.com/spcent/plumego/store/kv"
 
 	"dbadmin/internal/config"
+	"dbadmin/internal/datasource"
 	"dbadmin/internal/dbmanager"
 	"dbadmin/internal/domain/connection"
 	"dbadmin/internal/domain/history"
 	"dbadmin/internal/domain/session"
+	"dbadmin/internal/redismanager"
 )
 
 // App holds application-wide dependencies.
@@ -37,6 +39,9 @@ type App struct {
 	ConnectionStore *connection.Store
 	HistoryStore    *history.Store
 	DBManager       *dbmanager.Manager
+	RedisManager    *redismanager.Manager
+	SQLAdapter      *datasource.SQLAdapter
+	RedisAdapter    *datasource.RedisAdapter
 	UploadDir       string
 }
 
@@ -105,13 +110,18 @@ func New(cfg config.Config) (*App, error) {
 		return nil, fmt.Errorf("create upload dir: %w", err)
 	}
 
+	mgr := dbmanager.NewManager()
+	redisMgr := redismanager.NewManager()
 	return &App{
 		Core:            coreApp,
 		Cfg:             cfg,
 		SessionStore:    session.NewStore(sessKV),
 		ConnectionStore: connStore,
 		HistoryStore:    history.NewStore(histKV),
-		DBManager:       dbmanager.NewManager(),
+		DBManager:       mgr,
+		RedisManager:    redisMgr,
+		SQLAdapter:      datasource.NewSQLAdapter(mgr),
+		RedisAdapter:    datasource.NewRedisAdapter(redisMgr),
 		UploadDir:       uploadDir,
 	}, nil
 }

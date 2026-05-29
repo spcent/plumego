@@ -3,7 +3,7 @@ import { Outlet, Link, useNavigate } from 'react-router-dom'
 import { api, type Connection } from '../api'
 import { useTheme } from '../ThemeContext'
 import { useI18n } from '../i18n'
-import DatabaseTree from '../components/DatabaseTree'
+import ResourceExplorer from '../components/ResourceExplorer'
 
 export const ConnectionsCtx = createContext<Connection[]>([])
 
@@ -97,8 +97,8 @@ export default function MainLayout() {
           </Link>
         </div>
 
-        {/* Database tree — takes all remaining vertical space */}
-        <DatabaseTree connections={connections} onRefresh={refreshConnections} />
+        {/* Resource Explorer — data-source-aware tree, replaces DatabaseTree */}
+        <ResourceExplorer connections={connections} onRefresh={refreshConnections} />
 
         {/* Sidebar footer: logged-in user + logout */}
         <div

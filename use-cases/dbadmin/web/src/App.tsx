@@ -10,6 +10,7 @@ import DataPage from './pages/DataPage'
 import StructurePage from './pages/StructurePage'
 import QueryPage from './pages/QueryPage'
 import SettingsPage from './pages/SettingsPage'
+import RedisKeyPanel from './pages/RedisKeyPanel'
 
 export default function App() {
   return (
@@ -27,6 +28,7 @@ export default function App() {
             <Route path="conn/:connId/db/:dbName/tables/:tableName/data" element={<DataPage />} />
             <Route path="conn/:connId/db/:dbName/tables/:tableName/structure" element={<StructurePage />} />
             <Route path="conn/:connId/query" element={<QueryPage />} />
+            <Route path="conn/:connId/redis/:redisDb" element={<RedisKeyPanel />} />
             <Route path="settings" element={<SettingsPage />} />
           </Route>
         </Routes>

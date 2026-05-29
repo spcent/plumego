@@ -72,9 +72,21 @@ func (a *App) RegisterRoutes() error {
 		Logger:      a.Core.Logger(),
 	}
 	connH := handler.ConnectionHandler{
-		Connections: a.ConnectionStore,
-		Manager:     a.DBManager,
-		Logger:      a.Core.Logger(),
+		Connections:  a.ConnectionStore,
+		Manager:      a.DBManager,
+		RedisManager: a.RedisManager,
+		Logger:       a.Core.Logger(),
+	}
+	resourceH := handler.ResourceHandler{
+		Connections:  a.ConnectionStore,
+		SQLAdapter:   a.SQLAdapter,
+		RedisAdapter: a.RedisAdapter,
+		Logger:       a.Core.Logger(),
+	}
+	redisH := handler.RedisHandler{
+		Connections:  a.ConnectionStore,
+		RedisManager: a.RedisManager,
+		Logger:       a.Core.Logger(),
 	}
 	sqliteH := handler.SQLiteHandler{
 		Connections:    a.ConnectionStore,
@@ -99,9 +111,15 @@ func (a *App) RegisterRoutes() error {
 	protected.delete("/api/connections/:id", guard(http.HandlerFunc(connH.Delete)))
 	protected.post("/api/connections/:id/test", guard(http.HandlerFunc(connH.Test)))
 
-	// Database introspection.
-	protected.get("/api/conn/:id/databases", guard(http.HandlerFunc(inspectH.Databases)))
-	protected.get("/api/conn/:id/db/:db/tables", guard(http.HandlerFunc(inspectH.Tables)))
+	// Unified resource tree — driver-agnostic.
+	// GET /api/connections/:id/resources?parentId=<path>
+	// Returns ResourceNode[] for SQL (sql_database, sql_table, sql_view).
+	// Future: returns redis_db, mongo_collection, es_index nodes for those drivers.
+	protected.get("/api/connections/:id/resources", guard(http.HandlerFunc(resourceH.ListResources)))
+
+	// Database introspection — table-level and below.
+	// Database and table listing is served by the unified /resources endpoint above.
+	protected.get("/api/conn/:id/db/:db/schema-doc", guard(http.HandlerFunc(inspectH.SchemaDoc)))
 	protected.get("/api/conn/:id/db/:db/tables/:table/structure", guard(http.HandlerFunc(inspectH.TableStructure)))
 	protected.get("/api/conn/:id/db/:db/tables/:table/columns", guard(http.HandlerFunc(inspectH.Columns)))
 	protected.get("/api/conn/:id/db/:db/tables/:table/indexes", guard(http.HandlerFunc(inspectH.Indexes)))
@@ -129,6 +147,14 @@ func (a *App) RegisterRoutes() error {
 	protected.get("/api/conn/:id/history", guard(http.HandlerFunc(queryH.ListHistory)))
 	protected.delete("/api/conn/:id/history", guard(http.HandlerFunc(queryH.ClearHistory)))
 	protected.delete("/api/conn/:id/history/:entryId", guard(http.HandlerFunc(queryH.DeleteHistory)))
+
+	// Redis operations — Redis-specific route group.
+	protected.get("/api/conn/:id/redis/databases", guard(http.HandlerFunc(redisH.ListDBs)))
+	protected.get("/api/conn/:id/redis/:dbIndex/keys", guard(http.HandlerFunc(redisH.ListKeys)))
+	protected.get("/api/conn/:id/redis/:dbIndex/key", guard(http.HandlerFunc(redisH.GetKey)))
+	protected.patch("/api/conn/:id/redis/:dbIndex/key/ttl", guard(http.HandlerFunc(redisH.SetTTL)))
+	protected.delete("/api/conn/:id/redis/:dbIndex/key", guard(http.HandlerFunc(redisH.DeleteKey)))
+	protected.post("/api/conn/:id/redis/:dbIndex/command", guard(http.HandlerFunc(redisH.Command)))
 
 	// SQLite file upload and download.
 	protected.post("/api/sqlite/upload", guard(http.HandlerFunc(sqliteH.Upload)))

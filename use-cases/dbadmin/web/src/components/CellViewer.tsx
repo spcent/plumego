@@ -9,13 +9,21 @@ interface Parsed {
   raw: string
   prettyJson?: string
   minifiedJson?: string
+  blobSize?: number
+  hexPreview?: string
 }
 
 function parseValue(value: unknown): Parsed {
   if (value === null || value === undefined) return { type: 'null', raw: 'NULL' }
   if (value === '') return { type: 'empty', raw: '' }
   const raw = String(value)
-  if (raw.startsWith('<BLOB ')) return { type: 'blob', raw }
+  if (raw.startsWith('<BLOB ')) {
+    const pipeIdx = raw.indexOf('|')
+    const sizeMatch = raw.match(/^<BLOB (\d+) bytes/)
+    const blobSize = sizeMatch ? parseInt(sizeMatch[1], 10) : 0
+    const hexPreview = pipeIdx !== -1 ? raw.slice(pipeIdx + 1, -1) : ''
+    return { type: 'blob', raw, blobSize, hexPreview }
+  }
   try {
     const obj = JSON.parse(raw)
     return {
@@ -27,6 +35,25 @@ function parseValue(value: unknown): Parsed {
   } catch {
     return { type: 'text', raw }
   }
+}
+
+function formatHexDump(hex: string): string {
+  const bytes: string[] = []
+  for (let i = 0; i < hex.length; i += 2) {
+    bytes.push(hex.slice(i, i + 2))
+  }
+  const lines: string[] = []
+  for (let i = 0; i < bytes.length; i += 16) {
+    const chunk = bytes.slice(i, i + 16)
+    const hexPart = chunk.map((b, j) => (j === 8 ? ' ' : '') + b).join(' ')
+    const asciiPart = chunk.map(b => {
+      const code = parseInt(b, 16)
+      return code >= 32 && code < 127 ? String.fromCharCode(code) : '.'
+    }).join('')
+    const offset = i.toString(16).padStart(4, '0')
+    lines.push(`${offset}  ${hexPart.padEnd(49)}  ${asciiPart}`)
+  }
+  return lines.join('\n')
 }
 
 interface CellViewerProps {
@@ -58,22 +85,26 @@ export default function CellViewer({ column, value, onClose }: CellViewerProps) 
 
   const typeBadge: Record<ContentType, React.ReactNode> = {
     null: (
-      <span className="text-xs bg-gray-100 dark:bg-gray-700 text-gray-500 px-1.5 py-0.5 rounded font-mono">
+      <span className="text-xs px-1.5 py-0.5 rounded font-mono"
+        style={{ background: 'var(--bg-muted)', color: 'var(--text-muted)' }}>
         NULL
       </span>
     ),
     empty: (
-      <span className="text-xs bg-gray-100 dark:bg-gray-700 text-gray-500 px-1.5 py-0.5 rounded font-mono">
+      <span className="text-xs px-1.5 py-0.5 rounded font-mono"
+        style={{ background: 'var(--bg-muted)', color: 'var(--text-muted)' }}>
         {t('cell.empty')}
       </span>
     ),
     blob: (
-      <span className="text-xs bg-orange-100 dark:bg-orange-900/40 text-orange-600 dark:text-orange-400 px-1.5 py-0.5 rounded font-mono">
+      <span className="text-xs px-1.5 py-0.5 rounded font-mono"
+        style={{ background: 'var(--warning)22', color: 'var(--warning)' }}>
         {t('cell.blob')}
       </span>
     ),
     json: (
-      <span className="text-xs bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300 px-1.5 py-0.5 rounded font-mono">
+      <span className="text-xs px-1.5 py-0.5 rounded font-mono"
+        style={{ background: 'var(--accent)22', color: 'var(--accent)' }}>
         JSON
       </span>
     ),
@@ -83,24 +114,47 @@ export default function CellViewer({ column, value, onClose }: CellViewerProps) 
   function renderContent() {
     if (parsed.type === 'null') {
       return (
-        <div className="flex items-center justify-center h-24 text-gray-300 dark:text-gray-600 italic text-2xl font-mono select-none">
+        <div className="flex items-center justify-center h-24 italic text-2xl font-mono select-none"
+          style={{ color: 'var(--text-subtle)' }}>
           NULL
         </div>
       )
     }
     if (parsed.type === 'empty') {
       return (
-        <div className="flex items-center justify-center h-24 text-gray-400 italic gap-2">
+        <div className="flex items-center justify-center h-24 italic gap-2"
+          style={{ color: 'var(--text-muted)' }}>
           <span>{t('cell.empty')}</span>
-          <span className="font-mono text-gray-500">&quot;&quot;</span>
+          <span className="font-mono">&quot;&quot;</span>
         </div>
       )
     }
     if (parsed.type === 'blob') {
+      const hexDump = parsed.hexPreview ? formatHexDump(parsed.hexPreview) : ''
+      const previewBytes = parsed.hexPreview ? parsed.hexPreview.length / 2 : 0
       return (
         <div className="p-4 space-y-3">
-          <div className="font-mono text-sm text-orange-600 dark:text-orange-400">{parsed.raw}</div>
-          <div className="text-xs text-gray-400 italic">{t('cell.blob_note')}</div>
+          <div className="flex items-center gap-3">
+            <span className="font-mono text-sm" style={{ color: 'var(--warning)' }}>
+              BLOB — {parsed.blobSize?.toLocaleString()} bytes
+            </span>
+            {parsed.blobSize !== undefined && previewBytes < parsed.blobSize && (
+              <span className="text-xs" style={{ color: 'var(--text-subtle)' }}>
+                (showing first {previewBytes} bytes)
+              </span>
+            )}
+          </div>
+          {hexDump && (
+            <pre
+              className="rounded p-3 text-xs font-mono leading-relaxed overflow-auto"
+              style={{ background: 'var(--bg-muted)', color: 'var(--text-default)', border: '1px solid var(--border-subtle)' }}
+            >
+              {hexDump}
+            </pre>
+          )}
+          {!hexDump && (
+            <div className="text-xs italic" style={{ color: 'var(--text-subtle)' }}>{t('cell.blob_note')}</div>
+          )}
         </div>
       )
     }
@@ -108,46 +162,59 @@ export default function CellViewer({ column, value, onClose }: CellViewerProps) 
       ? parsed.prettyJson!
       : parsed.raw
     return (
-      <pre className="p-4 text-xs font-mono text-gray-800 dark:text-gray-200 whitespace-pre-wrap break-all leading-relaxed">
+      <pre className="p-4 text-xs font-mono whitespace-pre-wrap break-all leading-relaxed"
+        style={{ color: 'var(--text-default)' }}>
         {content}
       </pre>
     )
   }
 
-  const tabCls = (active: boolean) =>
-    `px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
-      active
-        ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-        : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
-    }`
-
   const canCopyRaw = parsed.type !== 'null' && parsed.type !== 'empty'
+
+  const tabStyle = (active: boolean): React.CSSProperties => ({
+    padding: '8px 16px',
+    fontSize: 13,
+    fontWeight: active ? 500 : 400,
+    borderBottom: active ? '2px solid var(--accent)' : '2px solid transparent',
+    color: active ? 'var(--accent)' : 'var(--text-muted)',
+    background: 'transparent',
+    marginBottom: -1,
+  })
+
+  const btnStyle: React.CSSProperties = {
+    border: '1px solid var(--border-strong)',
+    color: 'var(--text-default)',
+    background: 'var(--bg-muted)',
+  }
 
   return (
     <div
       className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
       onClick={e => { if (e.target === e.currentTarget) onClose() }}
     >
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-2xl w-full max-w-2xl flex flex-col" style={{ maxHeight: '80vh' }}>
+      <div className="rounded-lg shadow-2xl w-full max-w-2xl flex flex-col"
+        style={{ maxHeight: '80vh', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)' }}>
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700 shrink-0">
+        <div className="flex items-center justify-between px-4 py-3 shrink-0"
+          style={{ borderBottom: '1px solid var(--border-subtle)' }}>
           <div className="flex items-center gap-2 min-w-0">
-            <span className="font-mono font-semibold text-gray-800 dark:text-gray-100 truncate">{column}</span>
+            <span className="font-mono font-semibold truncate" style={{ color: 'var(--text-strong)' }}>{column}</span>
             {typeBadge[parsed.type]}
           </div>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 ml-3 shrink-0 text-xl leading-none"
+            className="ml-3 shrink-0 text-xl leading-none"
+            style={{ color: 'var(--text-subtle)' }}
           >✕</button>
         </div>
 
         {/* Tabs — only for JSON */}
         {parsed.type === 'json' && (
-          <div className="flex border-b border-gray-200 dark:border-gray-700 px-4 shrink-0">
-            <button className={tabCls(activeTab === 'pretty')} onClick={() => setActiveTab('pretty')}>
+          <div className="flex px-4 shrink-0" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+            <button style={tabStyle(activeTab === 'pretty')} onClick={() => setActiveTab('pretty')}>
               {t('cell.tab.pretty')}
             </button>
-            <button className={tabCls(activeTab === 'raw')} onClick={() => setActiveTab('raw')}>
+            <button style={tabStyle(activeTab === 'raw')} onClick={() => setActiveTab('raw')}>
               {t('cell.tab.raw')}
             </button>
           </div>
@@ -159,16 +226,19 @@ export default function CellViewer({ column, value, onClose }: CellViewerProps) 
         </div>
 
         {/* Footer */}
-        <div className="flex justify-end gap-2 px-4 py-3 border-t border-gray-200 dark:border-gray-700 shrink-0">
+        <div className="flex justify-end gap-2 px-4 py-3 shrink-0"
+          style={{ borderTop: '1px solid var(--border-subtle)' }}>
           {parsed.type === 'json' && (
             <>
               <button
                 onClick={() => copy(parsed.minifiedJson!)}
-                className="text-sm px-3 py-1.5 border border-gray-200 dark:border-gray-600 rounded text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+                className="text-sm px-3 py-1.5 rounded"
+                style={btnStyle}
               >{t('cell.copy_minified')}</button>
               <button
                 onClick={() => copy(parsed.prettyJson!)}
-                className="text-sm px-3 py-1.5 border border-gray-200 dark:border-gray-600 rounded text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+                className="text-sm px-3 py-1.5 rounded"
+                style={btnStyle}
               >{t('cell.copy_pretty')}</button>
             </>
           )}
@@ -181,7 +251,8 @@ export default function CellViewer({ column, value, onClose }: CellViewerProps) 
           {!canCopyRaw && (
             <button
               onClick={onClose}
-              className="text-sm px-3 py-1.5 border border-gray-200 dark:border-gray-600 rounded text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+              className="text-sm px-3 py-1.5 rounded"
+              style={btnStyle}
             >{t('confirm.cancel')}</button>
           )}
         </div>

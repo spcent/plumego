@@ -41,14 +41,14 @@ func Defaults() Config {
 	return Config{
 		Core: coreCfg,
 		App: AppConfig{
-			EnvFile:      ".env",
-			ServiceName:  "dbadmin",
+			EnvFile:        ".env",
+			ServiceName:    "dbadmin",
 			MaxBodyBytes:   512 << 20, // 512 MiB (accommodates large SQLite uploads)
-		MaxUploadBytes: 512 << 20, // 512 MiB per SQLite file
-			DataDir:      "./data",
-			AdminUser:    "admin",
-			AdminPassword: "admin",
-			Version:      "dev",
+			MaxUploadBytes: 512 << 20, // 512 MiB per SQLite file
+			DataDir:        "./data",
+			AdminUser:      "admin",
+			AdminPassword:  "admin",
+			Version:        "dev",
 		},
 	}
 }

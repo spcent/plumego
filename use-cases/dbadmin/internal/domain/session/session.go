@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	sessionTTL    = 24 * time.Hour
+	sessionTTL     = 24 * time.Hour
 	tokenKeyPrefix = "session:"
 )
 

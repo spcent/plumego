@@ -104,10 +104,10 @@ func (ins *Inspector) Indexes(ctx context.Context, _, table string) ([]dbmanager
 	}
 	defer rows.Close()
 	type indexRow struct {
-		Seq    int
-		Name   string
-		Unique int
-		Origin string
+		Seq     int
+		Name    string
+		Unique  int
+		Origin  string
 		Partial int
 	}
 	var indexRows []indexRow

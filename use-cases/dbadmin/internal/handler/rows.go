@@ -2,6 +2,7 @@ package handler
 
 import (
 	"database/sql"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -76,32 +77,41 @@ func (h RowHandler) List(w http.ResponseWriter, r *http.Request) {
 	page, pageSize = normalizePagination(page, pageSize)
 	offset := (page - 1) * pageSize
 
-	// Build ORDER BY — validate sortColumn against inspector when non-empty.
-	orderBy := ""
-	if sortCol := sanitizeIdentifier(q.Get("sortColumn")); sortCol != "" {
+	// Fetch column list once — reused for sort, filter, and selectedColumns validation.
+	// An empty colSet means the inspector was unavailable; validation falls back to DB errors.
+	sortColRaw := sanitizeIdentifier(q.Get("sortColumn"))
+	colSet := make(map[string]bool)
+	if sortColRaw != "" || q.Get("filters") != "" || q.Get("selectedColumns") != "" {
 		inspector := h.newInspector(conn, db)
 		if inspCols, inspErr := inspector.Columns(r.Context(), dbName, table); inspErr == nil {
-			found := false
 			for _, c := range inspCols {
-				if c.Name == sortCol {
-					found = true
-					break
-				}
+				colSet[c.Name] = true
 			}
-			if !found {
-				logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
-					Type(contract.TypeBadRequest).Message("unknown sort column").Build()))
-				return
-			}
+		} else if sortColRaw != "" {
+			// Cannot validate sort column — fail safe rather than proceed unvalidated.
+			h.Logger.Warn("inspector unavailable for sort validation", plumelog.Fields{"error": inspErr.Error()})
+			logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+				Type(contract.TypeInternal).Message("failed to inspect table columns").Build()))
+			return
+		}
+	}
+
+	// Build ORDER BY — sortColumn must exist in the column set when colSet is populated.
+	orderBy := ""
+	if sortColRaw != "" {
+		if len(colSet) > 0 && !colSet[sortColRaw] {
+			logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+				Type(contract.TypeBadRequest).Message("unknown sort column").Build()))
+			return
 		}
 		dir := "ASC"
 		if strings.EqualFold(q.Get("sortDirection"), "desc") {
 			dir = "DESC"
 		}
-		orderBy = fmt.Sprintf(" ORDER BY %s %s", quoteIdent(sortCol, conn.Driver), dir)
+		orderBy = fmt.Sprintf(" ORDER BY %s %s", quoteIdent(sortColRaw, conn.Driver), dir)
 	}
 
-	// Parse filters from JSON and build WHERE clause.
+	// Parse filters from JSON, validate column names, then build WHERE clause.
 	var where string
 	var whereArgs []any
 	if filtersJSON := q.Get("filters"); filtersJSON != "" {
@@ -111,6 +121,20 @@ func (h RowHandler) List(w http.ResponseWriter, r *http.Request) {
 				Type(contract.TypeBadRequest).Message("invalid filters JSON").Build()))
 			return
 		}
+		// Reject unknown or empty column names when we have column metadata.
+		for _, f := range filters {
+			col := sanitizeIdentifier(f.Column)
+			if col == "" {
+				logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+					Type(contract.TypeBadRequest).Message("invalid filter column name").Build()))
+				return
+			}
+			if len(colSet) > 0 && !colSet[col] {
+				logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+					Type(contract.TypeBadRequest).Message("unknown filter column: "+col).Build()))
+				return
+			}
+		}
 		where, whereArgs, err = buildFiltersWhere(filters, conn.Driver)
 		if err != nil {
 			logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
@@ -119,14 +143,21 @@ func (h RowHandler) List(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Resolve selected columns — fall back to * when none specified.
+	// Resolve selected columns — validate against colSet when available; fall back to *.
 	selectExpr := "*"
 	if selCols := q.Get("selectedColumns"); selCols != "" {
 		var quoted []string
 		for _, p := range strings.Split(selCols, ",") {
-			if col := sanitizeIdentifier(strings.TrimSpace(p)); col != "" {
-				quoted = append(quoted, quoteIdent(col, conn.Driver))
+			col := sanitizeIdentifier(strings.TrimSpace(p))
+			if col == "" {
+				continue
 			}
+			if len(colSet) > 0 && !colSet[col] {
+				logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+					Type(contract.TypeBadRequest).Message("unknown selected column: "+col).Build()))
+				return
+			}
+			quoted = append(quoted, quoteIdent(col, conn.Driver))
 		}
 		if len(quoted) > 0 {
 			selectExpr = strings.Join(quoted, ", ")
@@ -188,7 +219,9 @@ func (h RowHandler) Create(w http.ResponseWriter, r *http.Request) {
 		h.writeErr(w, r, err)
 		return
 	}
-	if guardReadonly(conn, w, r, h.Logger) { return }
+	if guardReadonly(conn, w, r, h.Logger) {
+		return
+	}
 	var req insertRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
@@ -222,7 +255,9 @@ func (h RowHandler) Update(w http.ResponseWriter, r *http.Request) {
 		h.writeErr(w, r, err)
 		return
 	}
-	if guardReadonly(conn, w, r, h.Logger) { return }
+	if guardReadonly(conn, w, r, h.Logger) {
+		return
+	}
 	var req updateRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
@@ -292,7 +327,9 @@ func (h RowHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		h.writeErr(w, r, err)
 		return
 	}
-	if guardReadonly(conn, w, r, h.Logger) { return }
+	if guardReadonly(conn, w, r, h.Logger) {
+		return
+	}
 	var req deleteRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
@@ -399,7 +436,9 @@ func scanRows(rows *sql.Rows, cols []string) ([]map[string]any, error) {
 				if utf8.Valid(b) {
 					row[col] = string(b)
 				} else {
-					row[col] = fmt.Sprintf("<BLOB %d bytes>", len(b))
+					const blobPreviewLen = 64
+					preview := hex.EncodeToString(b[:min(blobPreviewLen, len(b))])
+					row[col] = fmt.Sprintf("<BLOB %d bytes|%s>", len(b), preview)
 				}
 			} else {
 				row[col] = v

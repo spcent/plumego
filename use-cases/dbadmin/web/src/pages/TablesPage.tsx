@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { api, type TableInfo, type DangerousStatement, ApiError } from '../api'
+import { api, type ResourceNode, type DangerousStatement, ApiError } from '../api'
 import ConfirmDialog from '../components/ConfirmDialog'
 import { useToast } from '../components/Toast'
 import { useI18n } from '../i18n'
@@ -8,7 +8,7 @@ import { useCurrentConn } from './MainLayout'
 
 export default function TablesPage() {
   const { connId, dbName } = useParams<{ connId: string; dbName: string }>()
-  const [tables, setTables] = useState<TableInfo[]>([])
+  const [tables, setTables] = useState<ResourceNode[]>([])
   const [dropTarget, setDropTarget] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
   const [newTableName, setNewTableName] = useState('')
@@ -16,6 +16,7 @@ export default function TablesPage() {
   const [importSql, setImportSql] = useState('')
   const [importing, setImporting] = useState(false)
   const [importConfirm, setImportConfirm] = useState<{ dangerous: DangerousStatement[] } | null>(null)
+  const [copyingSchema, setCopyingSchema] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { showToast } = useToast()
   const { t } = useI18n()
@@ -24,17 +25,31 @@ export default function TablesPage() {
 
   useEffect(() => {
     if (!connId || !dbName) return
-    api.tables(connId, dbName).then(setTables).catch(e => showToast(e.message))
+    api.resources(connId, dbName).then(setTables).catch(e => showToast(e.message))
   }, [connId, dbName])
 
   async function handleDropTable() {
     if (!dropTarget) return
     try {
       await api.dropTable(connId!, dbName!, dropTarget)
-      setTables(t => t.filter(x => x.name !== dropTarget))
+      setTables(ts => ts.filter(x => x.name !== dropTarget))
       setDropTarget(null)
     } catch (e) {
       showToast(e instanceof Error ? e.message : 'Drop failed')
+    }
+  }
+
+  async function handleCopySchema() {
+    if (!connId || !dbName) return
+    setCopyingSchema(true)
+    try {
+      const r = await api.schemaDoc(connId, dbName)
+      await navigator.clipboard.writeText(r.markdown)
+      showToast(t('tables.copy_schema.success'), 'success')
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : 'Copy failed')
+    } finally {
+      setCopyingSchema(false)
     }
   }
 
@@ -75,6 +90,13 @@ export default function TablesPage() {
           Tables — <span className="text-blue-600">{dbName}</span>
         </h1>
         <div className="flex gap-2">
+          <button
+            onClick={handleCopySchema}
+            disabled={copyingSchema || tables.length === 0}
+            className="bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-3 py-2 rounded text-sm hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50"
+          >
+            {copyingSchema ? t('tables.copy_schema.loading') : t('tables.copy_schema')}
+          </button>
           <Link
             to={`/conn/${connId}/query`}
             className="bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-3 py-2 rounded text-sm hover:bg-gray-200 dark:hover:bg-gray-600"
@@ -112,52 +134,58 @@ export default function TablesPage() {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-            {tables.map(tbl => (
-              <tr key={tbl.name} className="hover:bg-gray-50 dark:hover:bg-gray-800">
-                <td className="px-4 py-2">
-                  <Link
-                    to={`/conn/${connId}/db/${dbName}/tables/${tbl.name}/data`}
-                    className="text-blue-600 hover:underline font-mono font-medium"
-                  >
-                    {tbl.name}
-                  </Link>
-                </td>
-                <td className="px-4 py-2 text-gray-500 dark:text-gray-400 text-xs">{tbl.type}</td>
-                <td className="px-4 py-2 text-gray-500 dark:text-gray-400 text-xs">{tbl.engine || '-'}</td>
-                <td className="px-4 py-2 text-gray-500 dark:text-gray-400 text-right tabular-nums text-xs">
-                  {tbl.rows?.toLocaleString() || '-'}
-                </td>
-                <td className="px-4 py-2 text-gray-400 text-xs truncate max-w-xs">{tbl.comment || ''}</td>
-                <td className="px-4 py-2 text-right whitespace-nowrap">
-                  <Link
-                    to={`/conn/${connId}/db/${dbName}/tables/${tbl.name}/data`}
-                    className="inline-flex items-center text-xs text-gray-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 px-2 py-1 rounded mr-1"
-                  >
-                    {t('tables.action.data')}
-                  </Link>
-                  <Link
-                    to={`/conn/${connId}/db/${dbName}/tables/${tbl.name}/structure?tab=columns`}
-                    className="inline-flex items-center text-xs text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 px-2 py-1 rounded mr-1"
-                  >
-                    {t('tables.action.fields')}
-                  </Link>
-                  <Link
-                    to={`/conn/${connId}/db/${dbName}/tables/${tbl.name}/structure?tab=indexes`}
-                    className="inline-flex items-center text-xs text-gray-500 hover:text-violet-600 hover:bg-violet-50 dark:hover:bg-violet-900/30 px-2 py-1 rounded mr-1"
-                  >
-                    {t('tables.action.indexes')}
-                  </Link>
-                  {!isReadonly && (
-                    <button
-                      onClick={() => setDropTarget(tbl.name)}
-                      className="text-xs text-red-400 hover:text-red-600 px-2 py-1 rounded hover:bg-red-50 dark:hover:bg-red-900/30"
+            {tables.map(node => {
+              const tableType = (node.meta?.table_type as string) || ''
+              const engine    = (node.meta?.engine    as string) || ''
+              const rows      =  node.meta?.rows      as number | undefined
+              const comment   = (node.meta?.comment   as string) || ''
+              return (
+                <tr key={node.name} className="hover:bg-gray-50 dark:hover:bg-gray-800">
+                  <td className="px-4 py-2">
+                    <Link
+                      to={`/conn/${connId}/db/${dbName}/tables/${node.name}/data`}
+                      className="text-blue-600 hover:underline font-mono font-medium"
                     >
-                      {t('tables.action.drop')}
-                    </button>
-                  )}
-                </td>
-              </tr>
-            ))}
+                      {node.name}
+                    </Link>
+                  </td>
+                  <td className="px-4 py-2 text-gray-500 dark:text-gray-400 text-xs">{tableType}</td>
+                  <td className="px-4 py-2 text-gray-500 dark:text-gray-400 text-xs">{engine || '-'}</td>
+                  <td className="px-4 py-2 text-gray-500 dark:text-gray-400 text-right tabular-nums text-xs">
+                    {rows?.toLocaleString() || '-'}
+                  </td>
+                  <td className="px-4 py-2 text-gray-400 text-xs truncate max-w-xs">{comment}</td>
+                  <td className="px-4 py-2 text-right whitespace-nowrap">
+                    <Link
+                      to={`/conn/${connId}/db/${dbName}/tables/${node.name}/data`}
+                      className="inline-flex items-center text-xs text-gray-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 px-2 py-1 rounded mr-1"
+                    >
+                      {t('tables.action.data')}
+                    </Link>
+                    <Link
+                      to={`/conn/${connId}/db/${dbName}/tables/${node.name}/structure?tab=columns`}
+                      className="inline-flex items-center text-xs text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 px-2 py-1 rounded mr-1"
+                    >
+                      {t('tables.action.fields')}
+                    </Link>
+                    <Link
+                      to={`/conn/${connId}/db/${dbName}/tables/${node.name}/structure?tab=indexes`}
+                      className="inline-flex items-center text-xs text-gray-500 hover:text-violet-600 hover:bg-violet-50 dark:hover:bg-violet-900/30 px-2 py-1 rounded mr-1"
+                    >
+                      {t('tables.action.indexes')}
+                    </Link>
+                    {!isReadonly && (
+                      <button
+                        onClick={() => setDropTarget(node.name)}
+                        className="text-xs text-red-400 hover:text-red-600 px-2 py-1 rounded hover:bg-red-50 dark:hover:bg-red-900/30"
+                      >
+                        {t('tables.action.drop')}
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              )
+            })}
             {tables.length === 0 && (
               <tr>
                 <td colSpan={6} className="px-4 py-8 text-center text-gray-400">{t('tables.empty')}</td>

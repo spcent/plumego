@@ -155,6 +155,26 @@ const en: Dict = {
 
   // Tables toolbar
   'tables.import': 'Import SQL',
+  'tables.copy_schema': 'Copy Schema',
+  'tables.copy_schema.success': 'Schema copied',
+  'tables.copy_schema.loading': 'Copying…',
+
+  // Connections filter
+  'connections.filter.all': 'All',
+  'connections.filter.mysql': 'MySQL',
+  'connections.filter.sqlite': 'SQLite',
+  'connections.filter.redis': 'Redis',
+  'connections.duplicate': 'Duplicate',
+
+  // Redis
+  'redis.form.password': 'AUTH Password',
+  'redis.form.password_placeholder': 'Optional — leave blank if no AUTH',
+  'redis.form.db_index': 'DB Index',
+  'redis.form.db_index_hint': '0–15, default 0',
+  'redis.form.tls': 'Use TLS / SSL',
+  'redis.driver_coming_soon': 'Redis driver is coming in the next release. Connection config is saved and ready.',
+  'redis.panel.title': 'Redis Key Browser',
+  'redis.panel.hint': 'Key browsing, TTL inspection, and command execution will be available once the Redis driver is released.',
 
   // Cell viewer
   'cell.tab.raw': 'Raw',
@@ -192,6 +212,43 @@ const en: Dict = {
   'confirm.cancel': 'Cancel',
   'confirm.delete': 'Delete',
   'confirm.drop': 'Drop',
+
+  // Redis Key Browser
+  'redis.browser.pattern': 'Pattern',
+  'redis.browser.pattern_placeholder': 'key:* filter (default *)',
+  'redis.browser.search': 'Search',
+  'redis.browser.load_more': 'Load more',
+  'redis.browser.empty': 'No keys found',
+  'redis.browser.loading': 'Loading…',
+  'redis.browser.key_count': '{n} keys',
+  'redis.browser.db': 'DB {n}',
+  'redis.browser.ttl_none': 'no expiry',
+  'redis.browser.ttl_sec': '{n}s',
+
+  // Redis Key Inspector
+  'redis.key.ttl': 'TTL',
+  'redis.key.type': 'Type',
+  'redis.key.encoding': 'Encoding',
+  'redis.key.set_ttl': 'Set TTL',
+  'redis.key.ttl_hint': 'seconds; -1 to remove expiry',
+  'redis.key.delete': 'Delete Key',
+  'redis.key.delete_confirm': 'Delete key "{key}"? This cannot be undone.',
+  'redis.key.copy': 'Copy',
+  'redis.key.loading': 'Loading…',
+  'redis.key.not_found': 'Key not found',
+  'redis.key.stream_length': 'Length: {n}',
+  'redis.key.stream_groups': 'Groups: {n}',
+  'redis.key.list_length': '{n} items',
+  'redis.key.set_size': '{n} members',
+  'redis.key.hash_fields': '{n} fields',
+
+  // Redis Command Console
+  'redis.command.title': 'Command Console',
+  'redis.command.placeholder': 'e.g. GET mykey',
+  'redis.command.run': 'Run',
+  'redis.command.running': 'Running…',
+  'redis.command.readonly_blocked': 'Blocked: write command on read-only connection',
+  'redis.command.forbidden': 'Forbidden command',
 }
 
 const zh: Dict = {
@@ -331,6 +388,26 @@ const zh: Dict = {
 
   // Tables toolbar
   'tables.import': '导入 SQL',
+  'tables.copy_schema': '复制 Schema',
+  'tables.copy_schema.success': '已复制 Schema',
+  'tables.copy_schema.loading': '复制中…',
+
+  // Connections filter
+  'connections.filter.all': '全部',
+  'connections.filter.mysql': 'MySQL',
+  'connections.filter.sqlite': 'SQLite',
+  'connections.filter.redis': 'Redis',
+  'connections.duplicate': '复制',
+
+  // Redis
+  'redis.form.password': 'AUTH 密码',
+  'redis.form.password_placeholder': '可选，无 AUTH 时留空',
+  'redis.form.db_index': 'DB 索引',
+  'redis.form.db_index_hint': '0–15，默认 0',
+  'redis.form.tls': '使用 TLS / SSL',
+  'redis.driver_coming_soon': 'Redis 驱动将在下一个版本发布。连接配置已保存。',
+  'redis.panel.title': 'Redis Key 浏览器',
+  'redis.panel.hint': 'Key 浏览、TTL 查看和命令执行功能将在 Redis 驱动发布后可用。',
 
   // Settings
   'settings.title': '设置',
@@ -382,6 +459,43 @@ const zh: Dict = {
   'confirm.cancel': '取消',
   'confirm.delete': '删除',
   'confirm.drop': '删除',
+
+  // Redis Key Browser
+  'redis.browser.pattern': '匹配模式',
+  'redis.browser.pattern_placeholder': 'key:* 过滤（默认 *）',
+  'redis.browser.search': '搜索',
+  'redis.browser.load_more': '加载更多',
+  'redis.browser.empty': '未找到 Key',
+  'redis.browser.loading': '加载中…',
+  'redis.browser.key_count': '{n} 个 Key',
+  'redis.browser.db': 'DB {n}',
+  'redis.browser.ttl_none': '永不过期',
+  'redis.browser.ttl_sec': '{n}s',
+
+  // Redis Key Inspector
+  'redis.key.ttl': 'TTL',
+  'redis.key.type': '类型',
+  'redis.key.encoding': '编码',
+  'redis.key.set_ttl': '设置 TTL',
+  'redis.key.ttl_hint': '秒；-1 表示删除过期',
+  'redis.key.delete': '删除 Key',
+  'redis.key.delete_confirm': '删除 Key "{key}"？此操作不可撤销。',
+  'redis.key.copy': '复制',
+  'redis.key.loading': '加载中…',
+  'redis.key.not_found': 'Key 不存在',
+  'redis.key.stream_length': '长度：{n}',
+  'redis.key.stream_groups': '消费组：{n}',
+  'redis.key.list_length': '{n} 个元素',
+  'redis.key.set_size': '{n} 个成员',
+  'redis.key.hash_fields': '{n} 个字段',
+
+  // Redis Command Console
+  'redis.command.title': '命令控制台',
+  'redis.command.placeholder': '例如 GET mykey',
+  'redis.command.run': '执行',
+  'redis.command.running': '执行中…',
+  'redis.command.readonly_blocked': '已拦截：只读连接不允许写命令',
+  'redis.command.forbidden': '禁止的命令',
 }
 
 const dicts: Record<Locale, Dict> = { en, zh }

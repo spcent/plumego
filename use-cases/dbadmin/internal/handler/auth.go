@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/spcent/plumego/contract"
-	"github.com/spcent/plumego/security/authn"
 	plumelog "github.com/spcent/plumego/log"
+	"github.com/spcent/plumego/security/authn"
 
 	dbauthn "dbadmin/internal/domain/authn"
 	"dbadmin/internal/domain/session"

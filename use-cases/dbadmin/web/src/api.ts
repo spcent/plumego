@@ -41,8 +41,11 @@ export const api = {
     req<void>('DELETE', `/connections/${id}${deleteFile ? '?deleteFile=true' : ''}`),
   testConnection: (id: string) => req<{ ok: boolean; error?: string }>('POST', `/connections/${id}/test`),
 
-  databases: (id: string) => req<string[]>('GET', `/conn/${id}/databases`),
-  tables: (id: string, db: string) => req<TableInfo[]>('GET', `/conn/${id}/db/${db}/tables`),
+  // Unified resource tree — works for all datasource types.
+  // parentId is ResourceNode.path; omit to list top-level nodes (databases for SQL).
+  resources: (id: string, parentId?: string) =>
+    req<ResourceNode[]>('GET', `/connections/${id}/resources${parentId ? `?parentId=${encodeURIComponent(parentId)}` : ''}`),
+
   tableStructure: (id: string, db: string, table: string) =>
     req<TableStructure>('GET', `/conn/${id}/db/${db}/tables/${table}/structure`),
 
@@ -75,6 +78,9 @@ export const api = {
   dropTable: (id: string, db: string, table: string) =>
     req<void>('DELETE', `/conn/${id}/db/${db}/tables/${table}?confirm=true`),
 
+  schemaDoc: (id: string, db: string) =>
+    req<{ markdown: string }>('GET', `/conn/${id}/db/${db}/schema-doc`),
+
   exportURL: (id: string, db: string, table: string, format: 'csv' | 'sql',
              opts?: { includeSchema?: boolean; includeData?: boolean }) => {
     const q = new URLSearchParams({ format })
@@ -86,29 +92,68 @@ export const api = {
   importSQL: (id: string, db: string, sql: string, confirmDangerous = false) =>
     req<ImportResult>('POST', `/conn/${id}/db/${db}/import`, { sql, confirmDangerous }),
 
-  uploadSQLite: async (file: File): Promise<{ file_path: string; size: number; original_name: string }> => {
-    const form = new FormData()
-    form.append('file', file)
-    const res = await fetch(`${BASE}/sqlite/upload`, {
-      method: 'POST',
-      credentials: 'include',
-      body: form,
+  uploadSQLite: (
+    file: File,
+    onProgress?: (pct: number) => void,
+  ): Promise<{ file_path: string; size: number; original_name: string }> => {
+    return new Promise((resolve, reject) => {
+      const form = new FormData()
+      form.append('file', file)
+      const xhr = new XMLHttpRequest()
+      xhr.open('POST', `${BASE}/sqlite/upload`)
+      xhr.withCredentials = true
+      if (onProgress) {
+        xhr.upload.onprogress = (e) => {
+          if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100))
+        }
+      }
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try {
+            const json = JSON.parse(xhr.responseText)
+            resolve(json.data !== undefined ? json.data : json)
+          } catch {
+            reject(new ApiError('Invalid response'))
+          }
+        } else {
+          try {
+            const errBody = JSON.parse(xhr.responseText)
+            reject(new ApiError(errBody?.error?.message || xhr.statusText, errBody?.error?.details))
+          } catch {
+            reject(new ApiError(xhr.statusText))
+          }
+        }
+      }
+      xhr.onerror = () => reject(new ApiError('Upload failed'))
+      xhr.send(form)
     })
-    if (!res.ok) {
-      const errBody = await res.json().catch(() => ({ error: { message: res.statusText } }))
-      throw new ApiError(errBody?.error?.message || res.statusText, errBody?.error?.details)
-    }
-    const json = await res.json()
-    return json.data !== undefined ? json.data : json
   },
 
   sqliteDownloadURL: (id: string) => `${BASE}/conn/${id}/sqlite/download`,
+
+  // ── Redis API ──────────────────────────────────────────────────────────────
+  redisListDBs: (id: string) => req<{ databases: RedisDB[] }>('GET', `/conn/${id}/redis/databases`),
+  redisListKeys: (id: string, dbIndex: number, params?: RedisKeyParams) => {
+    const q = new URLSearchParams()
+    if (params?.pattern) q.set('pattern', params.pattern)
+    if (params?.cursor != null) q.set('cursor', String(params.cursor))
+    if (params?.count) q.set('count', String(params.count))
+    return req<RedisKeysResponse>('GET', `/conn/${id}/redis/${dbIndex}/keys?${q}`)
+  },
+  redisGetKey: (id: string, dbIndex: number, key: string) =>
+    req<RedisKeyDetail>('GET', `/conn/${id}/redis/${dbIndex}/key?key=${encodeURIComponent(key)}`),
+  redisSetTTL: (id: string, dbIndex: number, key: string, ttl: number) =>
+    req<{ ok: boolean }>('PATCH', `/conn/${id}/redis/${dbIndex}/key/ttl`, { key, ttl }),
+  redisDeleteKey: (id: string, dbIndex: number, key: string) =>
+    req<{ ok: boolean }>('DELETE', `/conn/${id}/redis/${dbIndex}/key`, { key, confirm: true }),
+  redisCommand: (id: string, dbIndex: number, command: string) =>
+    req<RedisCommandResult>('POST', `/conn/${id}/redis/${dbIndex}/command`, { command }),
 }
 
 export interface Connection {
   id: string
   name: string
-  driver: 'mysql' | 'sqlite'
+  driver: 'mysql' | 'sqlite' | 'redis'
   host?: string
   port?: number
   database?: string
@@ -116,18 +161,13 @@ export interface Connection {
   password?: string
   file_path?: string
   options?: string
+  // Redis-specific
+  redis_db_index?: number  // 0-15, default 0
+  tls_enabled?: boolean
   readonly?: boolean
   save_password?: boolean
   uploaded_file?: boolean
   original_filename?: string
-}
-
-export interface TableInfo {
-  name: string
-  type: string
-  comment?: string
-  engine?: string
-  rows?: number
 }
 
 export interface ColumnInfo {
@@ -216,6 +256,42 @@ export interface ImportResult {
 }
 export interface DangerousStatement { index: number; snippet: string; reason: string }
 
+// ── Data Workbench resource model ──────────────────────────────────────────
+
+export type DataSourceType =
+  | 'mysql'
+  | 'sqlite'
+  | 'redis'         // config accepted; full driver in progress
+  | 'mongodb'       // reserved — not yet implemented
+  | 'elasticsearch' // reserved — not yet implemented
+
+export type ResourceNodeType =
+  // SQL types (available now)
+  | 'sql_database'
+  | 'sql_table'
+  | 'sql_view'
+  // Redis types (reserved)
+  | 'redis_db'
+  | 'redis_key'
+  // MongoDB types (reserved)
+  | 'mongo_database'
+  | 'mongo_collection'
+  // Elasticsearch types (reserved)
+  | 'es_index'
+  | 'es_alias'
+  | 'es_data_stream'
+
+export interface ResourceNode {
+  id: string
+  name: string
+  type: ResourceNodeType
+  parent_id?: string
+  datasource_type: DataSourceType
+  /** Slash-separated identifier: "mydb" for a database, "mydb/users" for a table. */
+  path: string
+  meta?: Record<string, unknown>
+}
+
 export interface HistoryEntry {
   id: string
   conn_id: string
@@ -224,4 +300,58 @@ export interface HistoryEntry {
   duration_ms: number
   error?: string
   created_at: string
+}
+
+// ── Redis types ────────────────────────────────────────────────────────────
+
+export interface RedisDB {
+  index: number
+  keys: number
+}
+
+export interface RedisKeyEntry {
+  key: string
+  type: string
+  ttl: number // seconds; -1 = no expiry, -2 = not found
+}
+
+export interface RedisKeyParams {
+  pattern?: string
+  cursor?: number
+  count?: number
+}
+
+export interface RedisKeysResponse {
+  keys: RedisKeyEntry[]
+  nextCursor: number
+  done: boolean
+}
+
+export interface RedisZSetMember {
+  member: string
+  score: number
+}
+
+export interface RedisStreamInfo {
+  length: number
+  groups: number
+}
+
+export interface RedisKeyDetail {
+  key: string
+  type: string
+  ttl: number
+  encoding?: string
+  string?: string
+  hash?: Record<string, string>
+  list?: string[]
+  set?: string[]
+  zset?: RedisZSetMember[]
+  stream?: RedisStreamInfo
+}
+
+export interface RedisCommandResult {
+  result: unknown
+  error?: string
+  timeMs: number
 }
