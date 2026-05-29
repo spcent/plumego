@@ -536,6 +536,20 @@ const en: Dict = {
   'mongodb.p1.common.ms': 'ms',
   'mongodb.p1.common.seconds': 'seconds',
   'mongodb.p1.common.minutes': 'minutes',
+
+  // Elasticsearch (preparation — P0 not yet implemented)
+  'connections.filter.elasticsearch': 'Elasticsearch',
+  'elasticsearch.form.nodes': 'Cluster Nodes',
+  'elasticsearch.form.nodes_hint': 'Comma-separated list of node URLs (e.g., http://host:9200)',
+  'elasticsearch.form.or_basic': '— or use basic host:port —',
+  'elasticsearch.form.api_key': 'API Key',
+  'elasticsearch.form.api_key_placeholder': 'Optional, alternative to username/password',
+  'elasticsearch.form.insecure_skip_tls': 'Skip TLS certificate verification',
+  'elasticsearch.driver_coming_soon': 'Elasticsearch index browsing will be available in a future release.',
+  'elasticsearch.readonly': 'READ ONLY',
+  'elasticsearch.coming_soon': 'Elasticsearch Index Browser',
+  'elasticsearch.coming_soon_hint': 'Search DSL query, document browsing, and mapping viewer will be available soon.',
+  'elasticsearch.p0_features': 'Planned: search DSL, document viewer, mapping inspector, index settings, readonly mode',
 }
 
 const zh: Dict = {
@@ -1070,6 +1084,20 @@ const zh: Dict = {
   'mongodb.p1.common.ms': '毫秒',
   'mongodb.p1.common.seconds': '秒',
   'mongodb.p1.common.minutes': '分钟',
+
+  // Elasticsearch (preparation — P0 not yet implemented)
+  'connections.filter.elasticsearch': 'Elasticsearch',
+  'elasticsearch.form.nodes': '集群节点',
+  'elasticsearch.form.nodes_hint': '逗号分隔的节点 URL 列表（如 http://host:9200）',
+  'elasticsearch.form.or_basic': '— 或使用基本 host:port —',
+  'elasticsearch.form.api_key': 'API Key',
+  'elasticsearch.form.api_key_placeholder': '可选，用户名/密码的替代方式',
+  'elasticsearch.form.insecure_skip_tls': '跳过 TLS 证书验证',
+  'elasticsearch.driver_coming_soon': 'Elasticsearch 索引浏览功能将在后续版本中提供。',
+  'elasticsearch.readonly': '只读',
+  'elasticsearch.coming_soon': 'Elasticsearch 索引浏览器',
+  'elasticsearch.coming_soon_hint': 'Search DSL 查询、文档浏览和 mapping 查看器即将推出。',
+  'elasticsearch.p0_features': '计划功能：Search DSL、文档查看器、Mapping 检查器、索引设置、只读模式',
 }
 
 const dicts: Record<Locale, Dict> = { en, zh }

@@ -29,6 +29,7 @@ import (
 	"dbadmin/internal/domain/history"
 	"dbadmin/internal/domain/mongohistory"
 	"dbadmin/internal/domain/session"
+	"dbadmin/internal/esmanager"
 	"dbadmin/internal/mongomanager"
 	"dbadmin/internal/redismanager"
 )
@@ -44,9 +45,11 @@ type App struct {
 	DBManager         *dbmanager.Manager
 	RedisManager      *redismanager.Manager
 	MongoManager      *mongomanager.Manager
+	ESManager         *esmanager.Manager
 	SQLAdapter        *datasource.SQLAdapter
 	RedisAdapter      *datasource.RedisAdapter
 	MongoAdapter      *datasource.MongoAdapter
+	ESAdapter         *datasource.ESAdapter
 	UploadDir         string
 }
 
@@ -125,6 +128,7 @@ func New(cfg config.Config) (*App, error) {
 	mgr := dbmanager.NewManager()
 	redisMgr := redismanager.NewManager()
 	mongoMgr := mongomanager.NewManager()
+	esMgr := esmanager.NewManager()
 	return &App{
 		Core:              coreApp,
 		Cfg:               cfg,
@@ -135,9 +139,11 @@ func New(cfg config.Config) (*App, error) {
 		DBManager:         mgr,
 		RedisManager:      redisMgr,
 		MongoManager:      mongoMgr,
+		ESManager:         esMgr,
 		SQLAdapter:        datasource.NewSQLAdapter(mgr),
 		RedisAdapter:      datasource.NewRedisAdapter(redisMgr),
 		MongoAdapter:      datasource.NewMongoAdapter(mongoMgr),
+		ESAdapter:         datasource.NewESAdapter(esMgr),
 		UploadDir:         uploadDir,
 	}, nil
 }

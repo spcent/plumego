@@ -14,7 +14,7 @@ const emptyConn: Partial<Connection> = {
   name: '',
 }
 
-type DriverFilter = 'all' | 'mysql' | 'sqlite' | 'redis' | 'mongodb'
+type DriverFilter = 'all' | 'mysql' | 'sqlite' | 'redis' | 'mongodb' | 'elasticsearch'
 
 export default function ConnectionsPage() {
   const [conns, setConns] = useState<Connection[]>([])
@@ -100,7 +100,7 @@ export default function ConnectionsPage() {
 
       {conns.length > 0 && (
         <div className="flex gap-1 mb-3">
-          {(['all', 'mysql', 'sqlite', 'redis', 'mongodb'] as DriverFilter[]).map(f => (
+          {(['all', 'mysql', 'sqlite', 'redis', 'mongodb', 'elasticsearch'] as DriverFilter[]).map(f => (
             <button
               key={f}
               onClick={() => setDriverFilter(f)}
@@ -146,7 +146,9 @@ export default function ConnectionsPage() {
                   ? (c.uploaded_file ? (c.original_filename || c.file_path) : c.file_path)
                   : c.driver === 'mongodb'
                     ? (c.mongo_uri || `${c.host}:${c.port}`)
-                    : `${c.host}:${c.port}/${c.database}`}
+                    : c.driver === 'elasticsearch'
+                      ? (c.es_nodes?.join(', ') || `${c.host}:${c.port}`)
+                      : `${c.host}:${c.port}/${c.database}`}
               </div>
             </div>
             {testing[c.id] && (
@@ -343,6 +345,7 @@ function ConnectionForm({ conn, onChange }: { conn: Partial<Connection>; onChang
           <option value="sqlite">SQLite</option>
           <option value="redis">Redis</option>
           <option value="mongodb">MongoDB</option>
+          <option value="elasticsearch">Elasticsearch</option>
         </select>
       </div>
       {conn.driver === 'sqlite' ? (
@@ -547,6 +550,73 @@ function ConnectionForm({ conn, onChange }: { conn: Partial<Connection>; onChang
             style={{ background: 'var(--warning)18', border: '1px solid var(--warning)44', color: 'var(--warning)' }}
           >
             {t('mongodb.driver_coming_soon')}
+          </div>
+        </>
+      ) : conn.driver === 'elasticsearch' ? (
+        <>
+          <div>
+            <label className={labelCls} style={labelStyle}>{t('elasticsearch.form.nodes')}</label>
+            <input
+              value={(conn.es_nodes || []).join(', ')}
+              onChange={e => onChange({ ...conn, es_nodes: e.target.value.split(',').map(s => s.trim()).filter(Boolean) })}
+              className={inputCls}
+              style={inputStyle}
+              placeholder="http://localhost:9200, http://node2:9200"
+            />
+            <p className="text-xs mt-1" style={{ color: 'var(--text-subtle)' }}>
+              {t('elasticsearch.form.nodes_hint')}
+            </p>
+          </div>
+          <div
+            className="text-center text-xs py-1.5"
+            style={{ color: 'var(--text-subtle)' }}
+          >
+            {t('elasticsearch.form.or_basic')}
+          </div>
+          <div className="flex gap-2">
+            <div className="flex-1">
+              <label className={labelCls} style={labelStyle}>{t('connections.form.host')}</label>
+              <input value={conn.host || ''} onChange={field('host')} className={inputCls} style={inputStyle} placeholder="localhost" />
+            </div>
+            <div className="w-24">
+              <label className={labelCls} style={labelStyle}>{t('connections.form.port')}</label>
+              <input value={conn.port || 9200} onChange={field('port')} type="number" className={inputCls} style={inputStyle} />
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <div className="flex-1">
+              <label className={labelCls} style={labelStyle}>{t('connections.form.username')}</label>
+              <input value={conn.username || ''} onChange={field('username')} className={inputCls} style={inputStyle} />
+            </div>
+            <div className="flex-1">
+              <label className={labelCls} style={labelStyle}>{t('connections.form.password')}</label>
+              <input value={conn.password || ''} onChange={field('password')} type="password" className={inputCls} style={inputStyle} />
+            </div>
+          </div>
+          <div>
+            <label className={labelCls} style={labelStyle}>{t('elasticsearch.form.api_key')}</label>
+            <input
+              value={conn.es_api_key || ''}
+              onChange={field('es_api_key')}
+              type="password"
+              className={inputCls}
+              style={inputStyle}
+              placeholder={t('elasticsearch.form.api_key_placeholder')}
+            />
+          </div>
+          <label className="flex items-center gap-2 cursor-pointer text-sm" style={{ color: 'var(--text-default)' }}>
+            <input
+              type="checkbox"
+              checked={!!conn.es_insecure_skip_tls}
+              onChange={e => onChange({ ...conn, es_insecure_skip_tls: e.target.checked })}
+            />
+            {t('elasticsearch.form.insecure_skip_tls')}
+          </label>
+          <div
+            className="px-3 py-2 rounded text-xs"
+            style={{ background: 'var(--warning)18', border: '1px solid var(--warning)44', color: 'var(--warning)' }}
+          >
+            {t('elasticsearch.driver_coming_soon')}
           </div>
         </>
       ) : (

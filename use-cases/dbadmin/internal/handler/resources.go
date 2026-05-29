@@ -22,6 +22,7 @@ type ResourceHandler struct {
 	SQLAdapter   *datasource.SQLAdapter
 	RedisAdapter *datasource.RedisAdapter
 	MongoAdapter *datasource.MongoAdapter
+	ESAdapter    *datasource.ESAdapter
 	Logger       plumelog.StructuredLogger
 }
 
@@ -93,6 +94,8 @@ func (h ResourceHandler) driverFor(conn *connection.Connection) datasource.DataS
 		return h.RedisAdapter
 	case connection.DriverMongoDB:
 		return h.MongoAdapter
+	case connection.DriverElasticsearch:
+		return h.ESAdapter
 	default:
 		return nil
 	}
@@ -105,6 +108,8 @@ func buildConnectionConfig(conn *connection.Connection) datasource.ConnectionCon
 		return datasource.RedisConfig{Conn: conn}
 	case connection.DriverMongoDB:
 		return datasource.MongoConfig{Conn: conn}
+	case connection.DriverElasticsearch:
+		return datasource.ESConfig{Conn: conn}
 	default:
 		return datasource.SQLConfig{Conn: conn}
 	}

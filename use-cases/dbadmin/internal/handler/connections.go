@@ -12,17 +12,19 @@ import (
 
 	"dbadmin/internal/dbmanager"
 	"dbadmin/internal/domain/connection"
+	"dbadmin/internal/esmanager"
 	"dbadmin/internal/mongomanager"
 	"dbadmin/internal/redismanager"
 )
 
 // ConnectionHandler handles CRUD operations for saved DB connections.
 type ConnectionHandler struct {
-	Connections  *connection.Store
-	Manager      *dbmanager.Manager
-	RedisManager *redismanager.Manager
-	MongoManager *mongomanager.Manager
-	Logger       plumelog.StructuredLogger
+	Connections   *connection.Store
+	Manager       *dbmanager.Manager
+	RedisManager  *redismanager.Manager
+	MongoManager  *mongomanager.Manager
+	ESManager     *esmanager.Manager
+	Logger        plumelog.StructuredLogger
 }
 
 // List returns all saved connections (passwords redacted).
@@ -169,6 +171,15 @@ func (h ConnectionHandler) Test(w http.ResponseWriter, r *http.Request) {
 		logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusOK, map[string]any{"ok": true}, nil))
 		return
 	}
+	if c.Driver == connection.DriverElasticsearch {
+		if err := h.ESManager.Test(r.Context(), c); err != nil {
+			logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusOK,
+				map[string]any{"ok": false, "error": err.Error()}, nil))
+			return
+		}
+		logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusOK, map[string]any{"ok": true}, nil))
+		return
+	}
 	if err := h.Manager.Test(c); err != nil {
 		logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusOK,
 			map[string]any{"ok": false, "error": err.Error()}, nil))
@@ -211,8 +222,18 @@ func validateConnection(c *connection.Connection) error {
 		if c.MongoURI == "" && c.Port == 0 {
 			c.Port = 27017
 		}
+	case connection.DriverElasticsearch:
+		if len(c.ESNodes) == 0 && c.Host == "" {
+			return fmt.Errorf("es_nodes or host is required for elasticsearch")
+		}
+		if c.Port == 0 && len(c.ESNodes) == 0 {
+			c.Port = 9200
+		}
+		if len(c.ESNodes) == 0 {
+			c.ESNodes = []string{fmt.Sprintf("http://%s:%d", c.Host, c.Port)}
+		}
 	default:
-		return fmt.Errorf("driver must be 'mysql', 'sqlite', 'redis', or 'mongodb'")
+		return fmt.Errorf("driver must be 'mysql', 'sqlite', 'redis', 'mongodb', or 'elasticsearch'")
 	}
 	return nil
 }

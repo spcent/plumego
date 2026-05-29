@@ -12,6 +12,7 @@ import QueryPage from './pages/QueryPage'
 import SettingsPage from './pages/SettingsPage'
 import RedisKeyPanel from './pages/RedisKeyPanel'
 import MongoCollectionPanel from './pages/MongoCollectionPanel'
+import ElasticsearchIndexPanel from './pages/ElasticsearchIndexPanel'
 
 export default function App() {
   return (
@@ -32,6 +33,9 @@ export default function App() {
             <Route path="conn/:connId/redis/:redisDb" element={<RedisKeyPanel />} />
             <Route path="conn/:connId/mongo/:mongoDb/collections" element={<MongoCollectionPanel />} />
             <Route path="conn/:connId/mongo/:mongoDb/:mongoColl/documents" element={<MongoCollectionPanel />} />
+            <Route path="conn/:connId/es/:esIndex" element={<ElasticsearchIndexPanel />} />
+            <Route path="conn/:connId/es/alias/:esAlias" element={<ElasticsearchIndexPanel />} />
+            <Route path="conn/:connId/es/data-stream/:esDataStream" element={<ElasticsearchIndexPanel />} />
             <Route path="settings" element={<SettingsPage />} />
           </Route>
         </Routes>

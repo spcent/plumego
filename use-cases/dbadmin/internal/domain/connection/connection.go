@@ -25,11 +25,9 @@ const (
 	DriverMySQL  DriverType = "mysql"
 	DriverSQLite DriverType = "sqlite"
 
-	DriverRedis   DriverType = "redis"   // supported: save/load config; driver not yet implemented
-	DriverMongoDB DriverType = "mongodb" // supported: save/load config; driver not yet implemented
-
-	// Planned drivers — not yet implemented:
-	// DriverElasticsearch DriverType = "elasticsearch"
+	DriverRedis         DriverType = "redis"         // supported: save/load config; driver not yet implemented
+	DriverMongoDB       DriverType = "mongodb"       // supported: save/load config; driver not yet implemented
+	DriverElasticsearch DriverType = "elasticsearch" // supported: save/load config; driver not yet implemented
 )
 
 var (
@@ -61,6 +59,14 @@ type Connection struct {
 	MongoAuthDB     string `json:"mongo_auth_db,omitempty"`     // authentication database (default: admin)
 	MongoTLSEnabled bool   `json:"mongo_tls_enabled,omitempty"` // use TLS/SSL for MongoDB
 	MongoReplicaSet string `json:"mongo_replica_set,omitempty"` // replica set name (optional)
+
+	// Elasticsearch-specific fields (used when Driver = "elasticsearch")
+	ESNodes           []string `json:"es_nodes,omitempty"`             // ["http://host:9200", ...]
+	ESUsername        string   `json:"es_username,omitempty"`          // basic auth username
+	ESPassword        string   `json:"es_password,omitempty"`          // basic auth password
+	ESAPIKey          string   `json:"es_api_key,omitempty"`           // API key (alternative to basic auth)
+	ESCACert          string   `json:"es_ca_cert,omitempty"`           // CA cert path (optional)
+	ESInsecureSkipTLS bool     `json:"es_insecure_skip_tls,omitempty"` // skip TLS verification
 
 	Readonly         bool      `json:"readonly,omitempty"`          // disallow all write operations
 	SavePassword     bool      `json:"save_password,omitempty"`     // persist password to disk

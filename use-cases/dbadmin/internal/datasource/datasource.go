@@ -33,10 +33,10 @@ const (
 	NodeMongoDatabase   ResourceNodeType = "mongo_database"
 	NodeMongoCollection ResourceNodeType = "mongo_collection"
 
-	// Reserved — Elasticsearch driver (not yet implemented):
-	// NodeESIndex      ResourceNodeType = "es_index"
-	// NodeESAlias      ResourceNodeType = "es_alias"
-	// NodeESDataStream ResourceNodeType = "es_data_stream"
+	// Elasticsearch node types — config accepted; driver not yet fully implemented.
+	NodeESIndex      ResourceNodeType = "es_index"
+	NodeESAlias      ResourceNodeType = "es_alias"
+	NodeESDataStream ResourceNodeType = "es_data_stream"
 )
 
 // ResourceNode is a single node in the data-source resource tree.

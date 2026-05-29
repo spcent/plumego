@@ -15,10 +15,9 @@ function nodeIcon(type: ResourceNodeType): React.ReactNode {
     case 'redis_key':       return <span style={{ ...s, fontSize: 10, color: '#fb923c' }}>⬡</span>
     case 'mongo_database':  return <span style={{ ...s, color: '#4ade80', fontWeight: 700 }}>M</span>
     case 'mongo_collection':return <span style={{ ...s, fontSize: 10, color: '#22d3ee' }}>C</span>
-    // Reserved — future drivers:
-    // case 'es_index':        return <span style={s}>I</span>
-    // case 'es_alias':        return <span style={{ ...s, fontSize: 10 }}>~</span>
-    // case 'es_data_stream':  return <span style={{ ...s, fontSize: 10 }}>↓</span>
+    case 'es_index':        return <span style={{ ...s, color: '#fbbf24', fontWeight: 700 }}>E</span>
+    case 'es_alias':        return <span style={{ ...s, fontSize: 10, color: '#a78bfa' }}>~</span>
+    case 'es_data_stream':  return <span style={{ ...s, fontSize: 10, color: '#34d399' }}>↓</span>
     default:                return <span style={{ ...s, fontSize: 10 }}>•</span>
   }
 }
@@ -55,6 +54,12 @@ function nodeUrl(connId: string, node: ResourceNode): string | null {
       const coll = node.path.slice(slash + 1)
       return `/conn/${connId}/mongo/${encodeURIComponent(db)}/${encodeURIComponent(coll)}/documents`
     }
+    case 'es_index':
+      return `/conn/${connId}/es/${encodeURIComponent(node.path)}`
+    case 'es_alias':
+      return `/conn/${connId}/es/alias/${encodeURIComponent(node.path)}`
+    case 'es_data_stream':
+      return `/conn/${connId}/es/data-stream/${encodeURIComponent(node.path)}`
     default:
       return null
   }
@@ -133,7 +138,7 @@ interface Props {
 }
 
 export default function ResourceExplorer({ connections, onRefresh: _onRefresh }: Props) {
-  const params = useParams<{ connId?: string; dbName?: string; tableName?: string; redisDb?: string; mongoDb?: string; mongoColl?: string }>()
+  const params = useParams<{ connId?: string; dbName?: string; tableName?: string; redisDb?: string; mongoDb?: string; mongoColl?: string; esIndex?: string; esAlias?: string; esDataStream?: string }>()
   const location = useLocation()
   const navigate = useNavigate()
   const { t } = useI18n()
@@ -376,6 +381,12 @@ function nodeIsActive(
       const coll = node.path.slice(slash + 1)
       return params.mongoDb === db && params.mongoColl === coll
     }
+    case 'es_index':
+      return params.esIndex === node.path
+    case 'es_alias':
+      return params.esAlias === node.path
+    case 'es_data_stream':
+      return params.esDataStream === node.path
     default:
       return false
   }

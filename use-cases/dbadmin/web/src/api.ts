@@ -215,12 +215,37 @@ export const api = {
 
   mongoClearHistory: (connId: string) =>
     req<void>('DELETE', `/connections/${connId}/mongo/history`),
+
+  // ── Elasticsearch API ─────────────────────────────────────────────────────
+  esListIndices: (connId: string) =>
+    req<{ indices: ESIndexInfo[] }>('GET', `/connections/${connId}/es/indices`),
+
+  esGetIndexInfo: (connId: string, index: string) =>
+    req<ESIndexDetail>('GET', `/connections/${connId}/es/indices/${encodeURIComponent(index)}`),
+
+  esSearch: (connId: string, index: string, query: string) =>
+    req<ESSearchResponse>('POST', `/connections/${connId}/es/indices/${encodeURIComponent(index)}/search`, { query }),
+
+  esGetMapping: (connId: string, index: string) =>
+    req<ESMappingResponse>('GET', `/connections/${connId}/es/indices/${encodeURIComponent(index)}/mapping`),
+
+  esGetSettings: (connId: string, index: string) =>
+    req<ESSettingsResponse>('GET', `/connections/${connId}/es/indices/${encodeURIComponent(index)}/settings`),
+
+  esGetAliases: (connId: string) =>
+    req<ESAliasInfo[]>('GET', `/connections/${connId}/es/aliases`),
+
+  esGetDataStreams: (connId: string) =>
+    req<ESDataStreamInfo[]>('GET', `/connections/${connId}/es/data-streams`),
+
+  esGetDocument: (connId: string, index: string, id: string) =>
+    req<ESDocument>('GET', `/connections/${connId}/es/indices/${encodeURIComponent(index)}/documents/${encodeURIComponent(id)}`),
 }
 
 export interface Connection {
   id: string
   name: string
-  driver: 'mysql' | 'sqlite' | 'redis' | 'mongodb'
+  driver: 'mysql' | 'sqlite' | 'redis' | 'mongodb' | 'elasticsearch'
   host?: string
   port?: number
   database?: string
@@ -235,6 +260,13 @@ export interface Connection {
   mongo_auth_db?: string       // authentication database (default: admin)
   mongo_tls_enabled?: boolean  // use TLS/SSL
   mongo_replica_set?: string   // replica set name (optional)
+  // Elasticsearch-specific
+  es_nodes?: string[]            // ["http://host:9200", ...]
+  es_username?: string           // basic auth username
+  es_password?: string           // basic auth password
+  es_api_key?: string            // API key (alternative to basic auth)
+  es_ca_cert?: string            // CA cert path (optional)
+  es_insecure_skip_tls?: boolean // skip TLS verification
   // Common flags
   tls_enabled?: boolean
   readonly?: boolean
@@ -533,4 +565,71 @@ export interface MongoPipelineEntry {
   result_count: number
   error?: string
   created_at: string
+}
+
+// ── Elasticsearch Types ─────────────────────────────────────────────────────
+
+export interface ESIndexInfo {
+  name: string
+  health: 'green' | 'yellow' | 'red'
+  status: 'open' | 'close'
+  docs_count: number
+  store_size: number
+}
+
+export interface ESIndexDetail {
+  name: string
+  health: string
+  status: string
+  docs_count: number
+  store_size: number
+  aliases: string[]
+  mapping: Record<string, unknown>
+  settings: Record<string, unknown>
+}
+
+export interface ESSearchResponse {
+  took: number
+  timed_out: boolean
+  hits: {
+    total: { value: number; relation: string }
+    max_score: number | null
+    hits: Array<{
+      _index: string
+      _id: string
+      _score: number | null
+      _source: Record<string, unknown>
+    }>
+  }
+}
+
+export interface ESMappingResponse {
+  mappings: Record<string, unknown>
+}
+
+export interface ESSettingsResponse {
+  settings: Record<string, unknown>
+}
+
+export interface ESAliasInfo {
+  alias: string
+  index: string
+  filter?: Record<string, unknown>
+  routing?: { index?: string; search?: string }
+  is_write_index?: boolean
+}
+
+export interface ESDataStreamInfo {
+  name: string
+  timestamp_field: string
+  indices: Array<{ index_name: string; index_uuid: string }>
+  generation: number
+  status: string
+}
+
+export interface ESDocument {
+  _index: string
+  _id: string
+  _version?: number
+  _source: Record<string, unknown>
 }
