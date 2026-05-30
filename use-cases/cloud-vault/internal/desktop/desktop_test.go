@@ -96,12 +96,15 @@ func TestService_GetRuntimeInfo(t *testing.T) {
 
 func TestService_ScanPreview(t *testing.T) {
 	cfg := DefaultConfig()
+
+	// Create a temporary directory with test files — and set DataDir to it
+	// so the scan validation (source must be inside DataDir) passes.
+	tmpDir := t.TempDir()
+	cfg.DataDir = tmpDir
+
 	logger := plumelog.NewLogger()
 
 	svc := NewService(&cfg, nil, logger)
-
-	// Create a temporary directory with test files
-	tmpDir := t.TempDir()
 
 	// Create test markdown files
 	testFiles := []string{

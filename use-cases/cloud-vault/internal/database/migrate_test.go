@@ -95,8 +95,8 @@ func TestMigrate_Idempotent(t *testing.T) {
 	if err := db.QueryRow("SELECT COUNT(*) FROM schema_migrations").Scan(&count); err != nil {
 		t.Fatalf("count migrations: %v", err)
 	}
-	if count != 6 {
-		t.Errorf("expected 6 migrations, got %d", count)
+	if count != 7 {
+		t.Errorf("expected 7 migrations, got %d", count)
 	}
 }
 
@@ -134,11 +134,11 @@ func TestMigrate_SchemaMigrationsTable(t *testing.T) {
 		}
 	}
 
-	if len(versions) != 6 {
-		t.Errorf("expected 6 versions, got %d", len(versions))
+	if len(versions) != 7 {
+		t.Errorf("expected 7 versions, got %d", len(versions))
 	}
 
-	// Verify versions are 1-6
+	// Verify versions are 1-7
 	for i, v := range versions {
 		if v != i+1 {
 			t.Errorf("version %d at index %d", v, i)

@@ -38,7 +38,7 @@ func setupSearch(t *testing.T) (*Service, *document.Service, *database.DB) {
 	// Search service
 	searchRepo := NewRepository(db)
 	searchEngine := NewFTSEngine(db, 50)
-	searchSvc := NewService(searchEngine, searchRepo, store, config.SearchConfig{Enabled: true})
+	searchSvc := NewService(searchEngine, searchRepo, store, config.SearchConfig{Enabled: true, IndexOnSave: true})
 
 	// Wire index hook (same pattern as app.go)
 	docSvc.SetIndexHook(func(ctx context.Context, ev document.IndexEvent) {

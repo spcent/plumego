@@ -18,6 +18,7 @@ var migrations = []migration{
 	{version: 4, up: migrate004},
 	{version: 5, up: migrate005},
 	{version: 6, up: migrate006},
+	{version: 7, up: migrate007},
 }
 
 // Migrate applies all pending migrations in ascending version order.
@@ -542,6 +543,44 @@ CREATE TABLE IF NOT EXISTS security_events (
 CREATE INDEX IF NOT EXISTS idx_security_events_user_id    ON security_events(user_id);
 CREATE INDEX IF NOT EXISTS idx_security_events_type       ON security_events(event_type);
 CREATE INDEX IF NOT EXISTS idx_security_events_created_at ON security_events(created_at);
+`)
+	return err
+}
+
+// migrate007 fixes document_ai_summaries schema: document_id must have UNIQUE constraint
+// for ON CONFLICT(document_id) to work in UpsertSummary.
+func migrate007(tx *sql.Tx) error {
+	_, err := tx.Exec(`
+-- Create new table with UNIQUE constraint on document_id
+CREATE TABLE IF NOT EXISTS document_ai_summaries_new (
+  id              TEXT PRIMARY KEY,
+  document_id     TEXT NOT NULL UNIQUE,
+  summary         TEXT NOT NULL,
+  key_points_json TEXT,
+  actions_json    TEXT,
+  code_refs_json  TEXT,
+  provider        TEXT,
+  model           TEXT,
+  created_at      TEXT NOT NULL,
+  FOREIGN KEY(document_id) REFERENCES documents(id)
+);
+
+-- Copy existing data (keep latest per document_id if duplicates exist)
+INSERT OR IGNORE INTO document_ai_summaries_new
+  SELECT * FROM document_ai_summaries
+  WHERE id IN (
+    SELECT id FROM document_ai_summaries
+    GROUP BY document_id
+    ORDER BY created_at DESC
+  );
+
+-- Drop old table and rename new one
+DROP TABLE IF EXISTS document_ai_summaries;
+ALTER TABLE document_ai_summaries_new RENAME TO document_ai_summaries;
+
+-- Recreate index
+CREATE INDEX IF NOT EXISTS idx_document_ai_summaries_document_id
+  ON document_ai_summaries(document_id);
 `)
 	return err
 }

@@ -20,7 +20,7 @@ rm -rf "$DIST"
 mkdir -p "$DIST/server" "$DIST/desktop"
 
 # Tests
-echo "Running tests..."
+echo "Running full test suite..."
 go test ./... -count=1
 
 # Frontend

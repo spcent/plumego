@@ -152,8 +152,8 @@ func TestMigration_UpgradePaths(t *testing.T) {
 			if err := db.QueryRow("SELECT COUNT(*) FROM schema_migrations").Scan(&migrationCount); err != nil {
 				t.Fatalf("count migrations: %v", err)
 			}
-			if migrationCount != 6 {
-				t.Errorf("expected 6 migrations, got %d (upgrade from %s)", migrationCount, tt.fromDesc)
+			if migrationCount != 7 {
+				t.Errorf("expected 7 migrations, got %d (upgrade from %s)", migrationCount, tt.fromDesc)
 			}
 
 			// Test idempotency: run migrate again

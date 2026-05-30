@@ -31,3 +31,5 @@ bin/
 *.test
 
 data/*
+
+config.toml
