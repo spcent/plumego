@@ -37,7 +37,7 @@ public_entrypoints:
   - ErrNilProvider
   - ErrNilRequest
   - ErrRateLimitExceeded
-  - NewResilientProviderE
+  - NewResilientProvider
 
 allowed_imports:
   - stdlib
