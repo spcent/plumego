@@ -101,7 +101,7 @@ go run ./internal/checks/reference-layout
 go run ./internal/checks/public-entrypoints-sync
 ```
 
-Add `extension-maturity`, `extension-beta-evidence`, `deprecation-inventory -strict` per gate profile (`docs/operations/agent-code-quality-rules.md §6`). Full CI: `make gates` (runs above + `go vet ./...`, format, race tests; run `gofmt -w` first). Docs-only: skip Go gates unless code/config/generated/examples changed.
+Add `extension-maturity`, `extension-beta-evidence`, `deprecation-inventory -strict` per gate profile (`docs/operations/agent-code-quality-rules.md §6`). Full Go gates: `make gates` (runs above + `go vet ./...`, format, race tests, coverage, and the `website/src/generated` staleness check; run `gofmt -w` first). Website content/API checks and the static site build run separately via `make website-gates` (slow; also run as dedicated CI steps). Docs-only: skip Go gates unless code/config/generated/examples changed.
 
 Summarize validation as: command, status, key failure, next step.
 

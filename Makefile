@@ -1,7 +1,7 @@
 # plumego — root Makefile
 # Minimal targets. Most work happens via codex --yolo or go toolchain directly.
 
-.PHONY: help bundle validate-diff validate-diff-dry milestone check-spec check-plan check-card check-verify new-milestone new-plan new-card new-verify run-card milestone-status gates fmt vet test test-race reference-vet reference-test workerfleet-mongo-test setup-hooks website-sync
+.PHONY: help bundle validate-diff validate-diff-dry milestone check-spec check-plan check-card check-verify new-milestone new-plan new-card new-verify run-card milestone-status gates website-gates fmt vet test test-race reference-vet reference-test workerfleet-mongo-test setup-hooks website-sync
 
 # Default: show help
 help:
@@ -371,7 +371,6 @@ gates: ## Run all required quality gates (mirrors CI)
 	  echo "Unformatted files:"; echo "$$UNFORMATTED"; exit 1; \
 	fi
 	go test -race -timeout 60s ./...
-	go test -timeout 20s ./...
 	$(MAKE) reference-test
 	go test -coverprofile=/tmp/plumego-stable.cover ./core ./router ./middleware/... ./contract ./security/... ./store/... >/tmp/plumego-stable-cover.log
 	@TOTAL=$$(go tool cover -func=/tmp/plumego-stable.cover | awk '/^total:/ {gsub("%","",$$3); print $$3}'); \
@@ -383,7 +382,6 @@ gates: ## Run all required quality gates (mirrors CI)
 	}
 	cd cmd/plumego && go vet ./...
 	cd cmd/plumego && go test -race -timeout 60s ./...
-	cd cmd/plumego && go test -timeout 60s ./...
 	@TMPDIR=$$(mktemp -d); \
 	git diff -- website/src/generated > "$$TMPDIR/before"; \
 	cd website && pnpm sync; \
@@ -393,9 +391,12 @@ gates: ## Run all required quality gates (mirrors CI)
 	  echo "website generated files are stale. Run: cd website && pnpm sync"; \
 	  exit 1; \
 	fi
+	@echo "All gates passed. Run 'make website-gates' to validate the docs website build."
+
+website-gates: ## Validate the docs website: content/API checks + static build
 	cd website && pnpm check
 	cd website && pnpm build
-	@echo "All gates passed."
+	@echo "Website gates passed."
 
 fmt: ## Format all Go source files in-place
 	gofmt -w .

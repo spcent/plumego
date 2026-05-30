@@ -29,7 +29,8 @@ Zero runtime dependencies in stable roots. Extensions under `x/*` may use extern
 
 ```bash
 make validate-diff          # minimal gate profile for current diff (preferred)
-make gates                  # full CI: vet, race tests, boundary checks, coverage ≥70%
+make gates                  # Go gates: vet, race tests, boundary checks, coverage ≥70%
+make website-gates          # docs website: content/API checks + static build (slow)
 make fmt                    # gofmt -w all Go files (run before gates)
 
 go run ./internal/checks/dependency-rules
