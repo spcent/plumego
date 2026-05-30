@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"fmt"
 	"strings"
 	"time"
 
@@ -354,16 +353,32 @@ func buildListWhere(q ListQuery) ([]string, []any) {
 }
 
 func buildOrderClause(q ListQuery) string {
-	col := "updated_at"
-	switch q.SortBy {
-	case "created_at", "title", "size_bytes":
-		col = q.SortBy
+	const (
+		colUpdatedAt = "updated_at"
+		colCreatedAt = "created_at"
+		colTitle     = "title"
+		colSizeBytes = "size_bytes"
+
+		dirAsc  = "ASC"
+		dirDesc = "DESC"
+	)
+
+	col := colUpdatedAt
+	switch strings.ToLower(q.SortBy) {
+	case colCreatedAt:
+		col = colCreatedAt
+	case colTitle:
+		col = colTitle
+	case colSizeBytes:
+		col = colSizeBytes
 	}
-	dir := "DESC"
-	if strings.ToUpper(q.Order) == "ASC" {
-		dir = "ASC"
+
+	dir := dirDesc
+	if strings.EqualFold(q.Order, dirAsc) {
+		dir = dirAsc
 	}
-	return fmt.Sprintf("ORDER BY %s %s", col, dir)
+
+	return "ORDER BY " + col + " " + dir
 }
 
 // --- scan helpers ---
