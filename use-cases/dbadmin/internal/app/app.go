@@ -55,6 +55,7 @@ type App struct {
 	ESAdapter         *datasource.ESAdapter
 	UploadDir         string
 	QueryRegistry     *handler.QueryRegistry
+	StartTime         time.Time // Track app start time for uptime monitoring
 }
 
 // New constructs the App with all middleware and shared dependencies wired.
@@ -158,6 +159,7 @@ func New(cfg config.Config) (*App, error) {
 		ESAdapter:         datasource.NewESAdapter(esMgr),
 		UploadDir:         uploadDir,
 		QueryRegistry:     handler.NewQueryRegistry(),
+		StartTime:         time.Now(),
 	}, nil
 }
 

@@ -77,9 +77,11 @@ func TestParseID_number(t *testing.T) {
 	if err != nil {
 		t.Fatalf("parseID(123) error=%v", err)
 	}
-	// JSON unmarshal converts to float64
-	if f, ok := id.(float64); !ok || f != 123.0 {
-		t.Errorf("parseID(123)=%v (%T), want 123.0 (float64)", id, id)
+	// parseID accepts only ObjectID hex strings or plain string IDs.
+	// This prevents user-controlled JSON values from being interpreted as other BSON scalar types.
+	// So "123" is returned as string "123", not float64 123.0.
+	if s, ok := id.(string); !ok || s != "123" {
+		t.Errorf("parseID(123)=%v (%T), want \"123\" (string)", id, id)
 	}
 }
 

@@ -39,6 +39,10 @@ func (a *App) RegisterRoutes() error {
 		ESManager:    a.ESManager,
 		Logger:       a.Core.Logger(),
 	}
+	runtimeStatsH := handler.RuntimeStatsHandler{
+		Logger:    a.Core.Logger(),
+		StartTime: a.StartTime,
+	}
 	authH := handler.AuthHandler{
 		AdminUser:     a.Cfg.App.AdminUser,
 		AdminPassword: a.Cfg.App.AdminPassword,
@@ -59,6 +63,7 @@ func (a *App) RegisterRoutes() error {
 	root.get("/readyz", http.HandlerFunc(healthH.Ready))
 	root.get("/pool-stats", http.HandlerFunc(poolStatsH.GetAllStats))
 	root.get("/pool-stats/sql", http.HandlerFunc(poolStatsH.GetSQLPoolStats))
+	root.get("/runtime-stats", http.HandlerFunc(runtimeStatsH.GetStats))
 	root.post("/api/auth/login", http.HandlerFunc(authH.Login))
 	if root.err != nil {
 		return root.err

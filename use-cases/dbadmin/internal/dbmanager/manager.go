@@ -15,6 +15,7 @@ import (
 	_ "modernc.org/sqlite"
 
 	"dbadmin/internal/domain/connection"
+	"dbadmin/internal/retry"
 )
 
 var ErrUnknownDriver = errors.New("dbmanager: unknown driver")
@@ -58,22 +59,34 @@ func (m *Manager) Open(c *connection.Connection) (*sql.DB, error) {
 		driverName = "sqlite"
 	}
 
-	db, err := sql.Open(driverName, dsn)
+	// Use retry logic for connection creation to handle transient failures
+	ctx := context.Background()
+	cfg := retry.DefaultConfig()
+
+	db, err := retry.WithResult[*sql.DB](ctx, cfg, func() (*sql.DB, error) {
+		db, err := sql.Open(driverName, dsn)
+		if err != nil {
+			// Use redactDSN so the password is never included in error messages.
+			return nil, fmt.Errorf("open %s connection (%s): %w", c.Driver, redactDSN(dsn), err)
+		}
+
+		// Configure connection pool for production stability
+		db.SetMaxOpenConns(25)                  // Max 25 concurrent connections
+		db.SetMaxIdleConns(5)                   // Keep 5 idle connections ready
+		db.SetConnMaxLifetime(5 * time.Minute)  // Recycle connections after 5 min
+		db.SetConnMaxIdleTime(10 * time.Minute) // Close idle connections after 10 min
+
+		if err := db.PingContext(ctx); err != nil {
+			db.Close()
+			return nil, fmt.Errorf("ping %s: %w", c.Driver, err)
+		}
+
+		return db, nil
+	})
 	if err != nil {
-		// Use redactDSN so the password is never included in error messages.
-		return nil, fmt.Errorf("open %s connection (%s): %w", c.Driver, redactDSN(dsn), err)
+		return nil, err
 	}
 
-	// Configure connection pool for production stability
-	db.SetMaxOpenConns(25)                  // Max 25 concurrent connections
-	db.SetMaxIdleConns(5)                   // Keep 5 idle connections ready
-	db.SetConnMaxLifetime(5 * time.Minute)  // Recycle connections after 5 min
-	db.SetConnMaxIdleTime(10 * time.Minute) // Close idle connections after 10 min
-
-	if err := db.PingContext(context.Background()); err != nil {
-		db.Close()
-		return nil, fmt.Errorf("ping %s: %w", c.Driver, err)
-	}
 	m.pools[c.ID] = db
 	return db, nil
 }

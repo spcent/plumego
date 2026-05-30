@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"dbadmin/internal/domain/connection"
+	"dbadmin/internal/retry"
 
 	"github.com/redis/go-redis/v9"
 )
@@ -54,10 +55,30 @@ func (m *Manager) Open(c *connection.Connection, dbIndex int) (*redis.Client, er
 		delete(m.clients, key)
 	}
 
-	cl, err := m.build(c, dbIndex)
+	// Use retry logic for connection creation to handle transient failures
+	ctx := context.Background()
+	cfg := retry.DefaultConfig()
+
+	cl, err := retry.WithResult[*redis.Client](ctx, cfg, func() (*redis.Client, error) {
+		client, err := m.build(c, dbIndex)
+		if err != nil {
+			return nil, err
+		}
+
+		// Validate connection with a ping
+		pingCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
+		defer cancel()
+		if err := client.Ping(pingCtx).Err(); err != nil {
+			client.Close()
+			return nil, fmt.Errorf("ping: %w", err)
+		}
+
+		return client, nil
+	})
 	if err != nil {
 		return nil, err
 	}
+
 	m.clients[key] = cl
 	return cl, nil
 }

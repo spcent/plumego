@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"dbadmin/internal/domain/connection"
+	"dbadmin/internal/retry"
 
 	"github.com/elastic/go-elasticsearch/v8"
 )
@@ -48,7 +49,13 @@ func (m *Manager) Open(conn *connection.Connection) (*elasticsearch.Client, erro
 		delete(m.clients, conn.ID)
 	}
 
-	cl, err := m.createClient(conn)
+	// Use retry logic for connection creation to handle transient failures
+	cfg := retry.DefaultConfig()
+	ctx := context.Background()
+
+	cl, err := retry.WithResult[*elasticsearch.Client](ctx, cfg, func() (*elasticsearch.Client, error) {
+		return m.createClient(conn)
+	})
 	if err != nil {
 		return nil, err
 	}

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"dbadmin/internal/domain/connection"
+	"dbadmin/internal/retry"
 
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -45,7 +46,13 @@ func (m *Manager) Open(conn *connection.Connection) (*mongo.Client, error) {
 		delete(m.clients, conn.ID)
 	}
 
-	client, err := m.createClient(conn)
+	// Use retry logic for connection creation to handle transient failures
+	ctx := context.Background()
+	cfg := retry.DefaultConfig()
+
+	client, err := retry.WithResult[*mongo.Client](ctx, cfg, func() (*mongo.Client, error) {
+		return m.createClient(conn)
+	})
 	if err != nil {
 		return nil, err
 	}
