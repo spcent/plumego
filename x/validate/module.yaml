@@ -9,7 +9,7 @@ summary: Explicit request binding and validation helpers for application handler
 
 entrypoint_reads:
   - AGENTS.md
-  - docs/CANONICAL_STYLE_GUIDE.md
+  - docs/reference/canonical-style-guide.md
   - specs/repo.yaml
   - specs/task-routing.yaml
   - specs/dependency-rules.yaml
@@ -87,8 +87,8 @@ landing_zones:
 
 docs_sync_contract:
   on_status_change:
-    - docs/EXTENSION_MATURITY.md
-    - docs/ROADMAP.md
+    - docs/concepts/extension-maturity.md
+    - docs/release/roadmap.md
     - specs/extension-maturity.yaml
   on_api_change:
     - docs/modules/x/validate/README.md

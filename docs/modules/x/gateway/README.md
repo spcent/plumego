@@ -10,7 +10,7 @@
 - Included in repository release scope with beta compatibility obligations
 - Promoted at `v0.2.0` after release-backed evidence showed no exported
   `x/gateway/*` API changes across refs `d2c25c3` and `ec70358`, with `edge`
-  owner sign-off recorded in `docs/extension-evidence/x-gateway.md`
+  owner sign-off recorded in `docs/evidence/extension/x-gateway.md`
 
 ## Use this module when
 
@@ -67,13 +67,13 @@ gateway handlers through `app.Any` or `app.AddRoute`, then prepare and serve via
 ## Beta readiness
 
 `x/gateway` satisfies the current coverage and boundary portions of
-`docs/EXTENSION_STABILITY_POLICY.md`: gateway construction, backend pools,
+`docs/reference/extension-stability-policy.md`: gateway construction, backend pools,
 proxy registration, route registration, circuit-breaker lifecycle, balancer,
 backend, health, rewrite, transform, cache, and protocol middleware behavior
 have focused tests.
 
 The module is beta. The beta evidence in
-`docs/extension-evidence/x-gateway.md` records two release refs, matching API
+`docs/evidence/extension/x-gateway.md` records two release refs, matching API
 snapshots, no exported API changes, and `edge` owner sign-off. Discovery
 backend selection remains caller-owned and must not become a gateway default.
 

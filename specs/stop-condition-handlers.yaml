@@ -37,8 +37,8 @@ handlers:
     escalation: Record in the milestone spec's Open Questions section. Do not widen the stable root.
     unblock_by: rfc_or_scope_reduction
     docs:
-      - docs/architecture/core-boundary.md
-      - docs/architecture/extension-boundary.md
+      - docs/concepts/core-boundary.md
+      - docs/concepts/extension-boundary.md
       - specs/dependency-rules.yaml
     recipe: specs/change-recipes/new-extension-module.yaml
 
@@ -96,7 +96,7 @@ handlers:
     unblock_by: human_review
     docs:
       - AGENTS.md
-      - docs/CANONICAL_STYLE_GUIDE.md
+      - docs/reference/canonical-style-guide.md
       - specs/repo.yaml
 
   feature_catalog_in_stable_root:
@@ -111,8 +111,8 @@ handlers:
     escalation: Record the proposed x/* target in the task card before implementing.
     unblock_by: scope_confirmed_in_task_card
     docs:
-      - docs/architecture/core-boundary.md
-      - docs/architecture/extension-boundary.md
+      - docs/concepts/core-boundary.md
+      - docs/concepts/extension-boundary.md
     recipe: specs/change-recipes/new-extension-module.yaml
 
   hidden_registration_attempt:
@@ -127,7 +127,7 @@ handlers:
     unblock_by: design_change
     docs:
       - AGENTS.md
-      - docs/CANONICAL_STYLE_GUIDE.md
+      - docs/reference/canonical-style-guide.md
 
   auth_policy_in_transport_middleware:
     description: >
@@ -143,7 +143,7 @@ handlers:
     docs:
       - middleware/module.yaml
       - x/tenant/module.yaml
-      - docs/architecture/core-boundary.md
+      - docs/concepts/core-boundary.md
 
   missing_tests_for_behavior_change:
     description: A behavior change has no associated tests, or the test scope is insufficient.

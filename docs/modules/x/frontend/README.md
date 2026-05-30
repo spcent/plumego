@@ -14,7 +14,7 @@
   fallback, and basic mount behavior. Basic benchmarks cover normal and
   precompressed asset serving.
 - Release-backed API snapshot evidence and `frontend` owner sign-off are
-  recorded in `docs/extension-evidence/x-frontend.md`.
+  recorded in `docs/evidence/extension/x-frontend.md`.
 
 ## Use this module when
 
@@ -164,7 +164,7 @@ arrive as explicit exported `With*` helpers.
   `Registrar`, `Mount`, `Option`, `NewMountFromDir`, `NewMountFS`,
   `NewHandlerFS`, `RegisterFromDir`, `RegisterFS`, and the `With*` options.
 - Current-head snapshot:
-  `docs/extension-evidence/snapshots/first-batch/x-frontend-head.snapshot`.
+  `docs/evidence/extension/snapshots/first-batch/x-frontend-head.snapshot`.
 - Current-head snapshots are development evidence only; they do not clear the
   release-backed `api_snapshot_missing` blocker.
 - Release evidence must show at least two consecutive minor releases without

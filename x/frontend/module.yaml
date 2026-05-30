@@ -11,12 +11,12 @@ summary: Static and embedded frontend serving helpers for explicit mounting.
 # - current-head snapshots and gates are development evidence only
 # - two consecutive minor release refs without exported x/frontend API churn
 # - frontend owner sign-off
-# - passing repository release gate from the final candidate release state; current head gate evidence is recorded in docs/extension-evidence/x-frontend.md
+# - passing repository release gate from the final candidate release state; current head gate evidence is recorded in docs/evidence/extension/x-frontend.md
 
 entrypoint_reads:
   - AGENTS.md
-  - docs/CANONICAL_STYLE_GUIDE.md
-  - docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md
+  - docs/reference/canonical-style-guide.md
+  - docs/concepts/agent-first-repo-blueprint.md
   - specs/repo.yaml
   - specs/task-routing.yaml
   - specs/dependency-rules.yaml
@@ -122,8 +122,8 @@ landing_zones:
 
 docs_sync_contract:
   on_status_change:
-    - docs/EXTENSION_MATURITY.md
-    - docs/ROADMAP.md
+    - docs/concepts/extension-maturity.md
+    - docs/release/roadmap.md
     - specs/extension-maturity.yaml
   on_api_change:
     - docs/modules/x/frontend/README.md

@@ -21,7 +21,7 @@ Graduate `x/validate` from Experimental to Beta by implementing a `Validator` in
 - Superseded note: `x/validate` now remains part of the main module; `go.mod`
   files under `x/**` are forbidden. It may import `contract` but not any other `x/*`.
 - No external validation library dependency (e.g., no `go-playground/validator`). Stdlib only.
-- After promotion, update `specs/extension-maturity.yaml` and `docs/EXTENSION_MATURITY.md`.
+- After promotion, update `specs/extension-maturity.yaml` and `docs/concepts/extension-maturity.md`.
 
 ---
 
@@ -38,7 +38,7 @@ Graduate `x/validate` from Experimental to Beta by implementing a `Validator` in
 ## Affected Modules
 
 - **Primary:** `x/validate`
-- **Secondary:** `contract` (read-only reference), `specs/extension-maturity.yaml`, `docs/EXTENSION_MATURITY.md`
+- **Secondary:** `contract` (read-only reference), `specs/extension-maturity.yaml`, `docs/concepts/extension-maturity.md`
 
 ---
 
@@ -58,7 +58,7 @@ Graduate `x/validate` from Experimental to Beta by implementing a `Validator` in
 - [ ] `x/validate/example_test.go`: runnable godoc example showing a handler using `Bind[T]` and `contract.WriteError`.
 - [ ] `x/validate/module.yaml`: update `status` field to `beta`.
 - [ ] `specs/extension-maturity.yaml`: promote `x/validate` status to `beta`.
-- [ ] `docs/EXTENSION_MATURITY.md`: update maturity table row for `x/validate`.
+- [ ] `docs/concepts/extension-maturity.md`: update maturity table row for `x/validate`.
 
 ### Phase 3 — Test (sequential)
 
@@ -113,7 +113,7 @@ Expected: all exit 0; `gofmt -l` outputs nothing.
 - [ ] `gofmt -l ./x/validate/` produces no output.
 - [ ] `x/validate/module.yaml` status is `beta`.
 - [ ] `specs/extension-maturity.yaml` reflects beta status.
-- [ ] `docs/EXTENSION_MATURITY.md` maturity table updated.
+- [ ] `docs/concepts/extension-maturity.md` maturity table updated.
 - [ ] Godoc example in `example_test.go` is runnable.
 - [ ] Branch `milestone/M-012-input-validation` pushed.
 - [ ] PR open, title `milestone(M-012): Input Validation Bridge`.

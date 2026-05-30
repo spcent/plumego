@@ -58,6 +58,6 @@ The primer path is always `docs/modules/<import-path>/README.md`.
 ## Maturity Status
 
 Extension maturity (experimental / beta / ga) is tracked in
-`docs/EXTENSION_MATURITY.md`. Module manifests (`<package>/module.yaml`) are
+`docs/concepts/extension-maturity.md`. Module manifests (`<package>/module.yaml`) are
 the machine-readable source of truth for status, owner, risk, and validation
 commands.

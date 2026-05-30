@@ -103,7 +103,7 @@ This table must not exceed 4 rows and must not reproduce the full routing table.
 
 **Must not appear on:**
 - Homepage (`src/pages/index.astro`)
-- Getting Started (`src/content/docs/docs/getting-started.mdx`)
+- Getting Started (`src/content/docs/docs/start/getting-started.mdx`)
 - Any module primer
 - Architecture page (beyond a single card link to the concept page)
 
@@ -195,7 +195,7 @@ appears on two or more pages, all occurrences must:
 2. Either be the same pattern, or explicitly name both patterns and explain the difference on each
    page where both appear.
 
-**Canonical source of truth:** `docs/CANONICAL_STYLE_GUIDE.md` defines the authoritative form for
+**Canonical source of truth:** `docs/reference/canonical-style-guide.md` defines the authoritative form for
 all public API patterns. Website pages are downstream — when in doubt, match the style guide.
 
 **Examples of violations:**

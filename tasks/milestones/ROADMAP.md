@@ -51,7 +51,7 @@ coverage.
 | M-018 | Multi-Tenant Admin Reference | [✓] | M-010 | Archived; reference/with-tenant-admin using x/tenant primitives |
 | M-019 | Module Ecosystem Foundation | [✓] | M-017 | Archived; community extension schema, plumego add command, authoring guide |
 | M-020 | Community Discovery & Documentation Overhaul | [✓] | M-008 | Archived; README overhaul, stdlib comparison table, stable root pkg.go.dev doc comments |
-| M-021 | Agent-First Ecosystem Visibility | [✓] | M-019 | Archived; docs/AGENT_FIRST.md, quality-gates workflow updates, README agent-first section |
+| M-021 | Agent-First Ecosystem Visibility | [✓] | M-019 | Archived; docs/concepts/agent-first.md, quality-gates workflow updates, README agent-first section |
 | M-022 | Repo Surface Audit Remediation | [→] | — | Implementation complete locally with verify artifact; awaiting push and PR packaging before merge |
 | M-023 | AI Resilience Convergence | [→] | — | Card implementation complete locally; verify/PR packaging still pending before merge |
 | M-024 | Stable-Tier Metadata and Control-Plane Clarity | [→] | M-022, M-023 | All planned cards completed locally; verify/PR packaging still pending before merge |

@@ -10,7 +10,7 @@ It checks that each candidate:
 - matches the owner and status in the target `module.yaml`
 - points to an existing evidence document
 - lists release refs that resolve to git commits when refs are present
-- lists API snapshots that exist under `docs/extension-evidence/snapshots/`
+- lists API snapshots that exist under `docs/evidence/extension/snapshots/`
   when snapshots are present
 - has blockers that match the recorded release refs, API snapshots, and owner
   sign-off state

@@ -1,7 +1,7 @@
 name: analysis-only
 scope: ambiguity reduction before coding
 steps:
-  - Read AGENTS.md, select the matching specs/task-routing.yaml entry, and use docs/AGENT_CONTEXT_BUDGET.md if the context package is unclear.
+  - Read AGENTS.md, select the matching specs/task-routing.yaml entry, and use docs/operations/agent-context-budget.md if the context package is unclear.
   - Identify the owning stable root, x/* family, or reference app entrypoint.
   - Declare in-scope paths, out-of-scope paths, and likely touched files.
   - List primary risks, including boundary drift, compatibility, fail-open behavior, and missing tests.

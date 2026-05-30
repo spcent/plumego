@@ -11,8 +11,8 @@ verifiable gate output.
 - Target ref: a concrete git commit.
 - Tag shape: a pre-v1 or release-candidate tag, for example `v0.1.0-rc.1`.
 - Release notes: implemented behavior only.
-- Stable root API snapshots: files under `docs/stable-api/snapshots/`.
-- Extension evidence snapshots: files under `docs/extension-evidence/snapshots/`.
+- Stable root API snapshots: files under `docs/evidence/stable-api/snapshots/`.
+- Extension evidence snapshots: files under `docs/evidence/extension/snapshots/`.
 - Gate output: recorded command list and pass/fail result.
 
 ## Required Commands

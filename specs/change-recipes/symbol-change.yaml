@@ -1,7 +1,7 @@
 name: symbol-change
 scope: exported symbol removal, rename, or behavior change
 steps:
-  - Read AGENTS.md, the matching specs/task-routing.yaml entry, docs/AGENT_CODE_QUALITY_RULES.md, specs/agent-quality-rules.yaml, and the target module manifest; add docs/CODEX_WORKFLOW.md or specs/repo.yaml only if public API ownership is unclear.
+  - Read AGENTS.md, the matching specs/task-routing.yaml entry, docs/operations/agent-code-quality-rules.md, specs/agent-quality-rules.yaml, and the target module manifest; add docs/operations/codex-workflow.md or specs/repo.yaml only if public API ownership is unclear.
   - Enumerate every caller first with rg before editing.
   - Decide how each caller will be handled: migrate, update assertion, or explicit discard with TODO.
   - Apply the symbol change and update every caller in the same change.

@@ -258,7 +258,7 @@ DB-wide clear opt-in, atomic mutation, and append support.
   queue size, and dropped work can be observed through metrics and an optional
   callback.
 - Current-head exported API snapshots for distributed, leaderboard, and Redis
-  surfaces are recorded under `docs/extension-evidence/snapshots/x-cache/`.
+  surfaces are recorded under `docs/evidence/extension/snapshots/x-cache/`.
   They do not replace release-ref comparisons.
 - Leaderboard behavior is explicitly Plumego-local ranked-data behavior with
   bounded in-process score range scans, not a Redis compatibility promise.
@@ -273,7 +273,7 @@ DB-wide clear opt-in, atomic mutation, and append support.
   still missing.
 
 Eighth-pass stabilization evidence is recorded in
-`docs/extension-evidence/x-cache.md`. `x/data/cache/module.yaml` remains
+`docs/evidence/extension/x-cache.md`. `x/data/cache/module.yaml` remains
 `experimental` until the extension stability policy is satisfied.
 
 ## First files to read

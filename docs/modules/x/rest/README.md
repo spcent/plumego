@@ -10,7 +10,7 @@
 - Included in repository release scope with beta compatibility obligations
 - Promoted at `v0.2.0` after release-backed evidence showed no exported
   `x/rest` API changes across refs `d2c25c3` and `ec70358`, with
-  `platform-api` owner sign-off recorded in `docs/extension-evidence/x-rest.md`
+  `platform-api` owner sign-off recorded in `docs/evidence/extension/x-rest.md`
 
 ## Use this module when
 
@@ -119,11 +119,11 @@ func RegisterRoutes(r *router.Router, repository rest.Repository[User]) {
 ## Beta readiness
 
 `x/rest` satisfies the current coverage and boundary portions of
-`docs/EXTENSION_STABILITY_POLICY.md`: documented route registration,
+`docs/reference/extension-stability-policy.md`: documented route registration,
 controller defaults, query parsing, pagination, invalid-argument behavior, and
 not-implemented negative paths have focused tests.
 
-The module is beta. The beta evidence in `docs/extension-evidence/x-rest.md`
+The module is beta. The beta evidence in `docs/evidence/extension/x-rest.md`
 records two release refs, matching API snapshots, no exported API changes, and
 `platform-api` owner sign-off.
 

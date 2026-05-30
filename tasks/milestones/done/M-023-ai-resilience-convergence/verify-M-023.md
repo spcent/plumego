@@ -6,7 +6,7 @@ Verified Cards: `2060`, `2061`
 
 ## Scope Check
 
-- In-scope files touched: `x/ai/resilience/provider.go`, `x/ai/resilience/provider_test.go`, `docs/modules/x/ai/README.md`, `docs/architecture/x-ai-resilience-boundary.md`, `specs/deprecation-inventory.yaml`, and the archived `2060` / `2061` task cards
+- In-scope files touched: `x/ai/resilience/provider.go`, `x/ai/resilience/provider_test.go`, `docs/modules/x/ai/README.md`, `docs/concepts/x-ai-resilience-boundary.md`, `specs/deprecation-inventory.yaml`, and the archived `2060` / `2061` task cards
 - Out-of-scope files touched: none
 
 ## Ownership Check

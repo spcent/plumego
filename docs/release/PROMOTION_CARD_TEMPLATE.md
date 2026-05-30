@@ -12,7 +12,7 @@ with actual values. Do not leave any section empty.
 
 **Owner:** `<owner>`
 **Release refs:** `<older-ref>` → `<newer-ref>`
-**Evidence doc:** `docs/extension-evidence/x-<family>.md`
+**Evidence doc:** `docs/evidence/extension/x-<family>.md`
 
 ### Evidence Summary
 
@@ -20,7 +20,7 @@ with actual values. Do not leave any section empty.
 | --- | --- |
 | Two release refs recorded | ✓ `<older-ref>`, `<newer-ref>` |
 | API unchanged between refs | ✓ confirmed by `extension-release-evidence` |
-| Release-backed snapshots on record | ✓ `docs/extension-evidence/snapshots/x-<family>/` |
+| Release-backed snapshots on record | ✓ `docs/evidence/extension/snapshots/x-<family>/` |
 | Behavior coverage complete | ✓ (list key test files) |
 | Primer documents current behavior | ✓ `docs/modules/x/<family>/README.md` |
 | Owner sign-off | ✓ recorded in evidence doc |
@@ -34,15 +34,15 @@ go run ./internal/checks/extension-release-evidence \
   -module ./x/<family>/... \
   -base <older-ref> \
   -head <newer-ref> \
-  -out-dir docs/extension-evidence/snapshots/x-<family>
+  -out-dir docs/evidence/extension/snapshots/x-<family>
 ```
 
 ```
 module  ./x/<family>/...
 base    <older-ref>
 head    <newer-ref>
-base_snapshot   docs/extension-evidence/snapshots/x-<family>/base.snapshot
-head_snapshot   docs/extension-evidence/snapshots/x-<family>/head.snapshot
+base_snapshot   docs/evidence/extension/snapshots/x-<family>/base.snapshot
+head_snapshot   docs/evidence/extension/snapshots/x-<family>/head.snapshot
 api     unchanged
 snapshots match
 ```
@@ -62,18 +62,18 @@ make gates
 ### Files Changed
 
 - `x/<family>/module.yaml` — `status: experimental` → `status: beta`
-- `docs/extension-evidence/x-<family>.md` — added Release Evidence and Owner Sign-Off sections, set Evidence state to complete
+- `docs/evidence/extension/x-<family>.md` — added Release Evidence and Owner Sign-Off sections, set Evidence state to complete
 - `specs/extension-beta-evidence.yaml` — updated `current_status`, `release_refs`, `api_snapshots`, `owner_signoff`, `blockers`
-- `docs/extension-evidence/snapshots/x-<family>/base.snapshot` — new
-- `docs/extension-evidence/snapshots/x-<family>/head.snapshot` — new
-- `docs/EXTENSION_MATURITY.md` — updated dashboard row
+- `docs/evidence/extension/snapshots/x-<family>/base.snapshot` — new
+- `docs/evidence/extension/snapshots/x-<family>/head.snapshot` — new
+- `docs/concepts/extension-maturity.md` — updated dashboard row
 - `README.md` — updated support matrix
 - `README_CN.md` — updated support matrix
 
 ### Owner Sign-Off
 
 > I confirm that `x/<family>` meets the beta criteria in
-> docs/EXTENSION_STABILITY_POLICY.md and accept the beta compatibility
+> docs/reference/extension-stability-policy.md and accept the beta compatibility
 > obligations for the documented `x/<family>` public surface.
 
 — `<owner>`, `<date>`

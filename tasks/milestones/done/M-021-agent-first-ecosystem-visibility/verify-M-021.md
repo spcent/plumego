@@ -6,7 +6,7 @@ Verified Cards: direct milestone execution
 
 ## Scope Check
 
-- In-scope files touched: `docs/AGENT_FIRST.md`, `.github/workflows/quality-gates.yml`, `README.md`, `README_CN.md`, and M-021 control-plane files.
+- In-scope files touched: `docs/concepts/agent-first.md`, `.github/workflows/quality-gates.yml`, `README.md`, `README_CN.md`, and M-021 control-plane files.
 - Out-of-scope files touched: none identified.
 
 ## Ownership Check
@@ -23,7 +23,7 @@ Verified Cards: direct milestone execution
 
 | Check | Result |
 | --- | --- |
-| `docs/AGENT_FIRST.md` exists | PASS |
+| `docs/concepts/agent-first.md` exists | PASS |
 | guide word count 600-900 words | PASS, 626 words |
 | consolidated quality-gates workflow exists | PASS |
 | workflow YAML parses | PASS |

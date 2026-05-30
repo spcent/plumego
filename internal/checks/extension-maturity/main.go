@@ -71,7 +71,7 @@ func maturityReport(repoRoot string) ([]string, []string, error) {
 		return nil, nil, err
 	}
 
-	content, err := os.ReadFile(filepath.Join(repoRoot, "docs", "EXTENSION_MATURITY.md"))
+	content, err := os.ReadFile(filepath.Join(repoRoot, "docs", "concepts", "extension-maturity.md"))
 	if err != nil {
 		return nil, nil, err
 	}
@@ -104,17 +104,17 @@ func maturityReport(repoRoot string) ([]string, []string, error) {
 		}
 		row, ok := findDashboardRow(dashboard, path)
 		if !ok {
-			violations = append(violations, fmt.Sprintf("docs/EXTENSION_MATURITY.md missing row for %s", path))
+			violations = append(violations, fmt.Sprintf("docs/concepts/extension-maturity.md missing row for %s", path))
 			continue
 		}
 		if !strings.Contains(row, "| "+state.Status+" |") {
-			violations = append(violations, fmt.Sprintf("docs/EXTENSION_MATURITY.md row for %s missing status %q", path, state.Status))
+			violations = append(violations, fmt.Sprintf("docs/concepts/extension-maturity.md row for %s missing status %q", path, state.Status))
 		}
 		if !strings.Contains(row, "| "+state.Risk+" |") {
-			violations = append(violations, fmt.Sprintf("docs/EXTENSION_MATURITY.md row for %s missing risk %q", path, state.Risk))
+			violations = append(violations, fmt.Sprintf("docs/concepts/extension-maturity.md row for %s missing risk %q", path, state.Risk))
 		}
 		if !strings.Contains(row, "| "+state.Owner+" |") {
-			violations = append(violations, fmt.Sprintf("docs/EXTENSION_MATURITY.md row for %s missing owner %q", path, state.Owner))
+			violations = append(violations, fmt.Sprintf("docs/concepts/extension-maturity.md row for %s missing owner %q", path, state.Owner))
 		}
 		if candidate, ok := candidates[path]; ok {
 			violations = append(violations, candidateDashboardViolations(row, candidate)...)
@@ -312,9 +312,9 @@ func candidateDashboardViolations(row string, candidate betaCandidate) []string 
 	var violations []string
 	link := strings.TrimPrefix(filepath.ToSlash(candidate.EvidenceDoc), "docs/")
 	if candidate.EvidenceDoc == "" {
-		violations = append(violations, fmt.Sprintf("docs/EXTENSION_MATURITY.md row for %s has beta candidate without evidence_doc", candidate.Module))
-	} else if !strings.Contains(row, "("+link+")") {
-		violations = append(violations, fmt.Sprintf("docs/EXTENSION_MATURITY.md row for %s missing evidence link %s", candidate.Module, link))
+		violations = append(violations, fmt.Sprintf("docs/concepts/extension-maturity.md row for %s has beta candidate without evidence_doc", candidate.Module))
+	} else if !strings.Contains(row, "("+link+")") && !strings.Contains(row, "(../"+link+")") {
+		violations = append(violations, fmt.Sprintf("docs/concepts/extension-maturity.md row for %s missing evidence link %s", candidate.Module, link))
 	}
 
 	requiredText := map[string]string{
@@ -328,7 +328,7 @@ func candidateDashboardViolations(row string, candidate betaCandidate) []string 
 			continue
 		}
 		if !strings.Contains(row, text) {
-			violations = append(violations, fmt.Sprintf("docs/EXTENSION_MATURITY.md row for %s missing blocker text %q", candidate.Module, text))
+			violations = append(violations, fmt.Sprintf("docs/concepts/extension-maturity.md row for %s missing blocker text %q", candidate.Module, text))
 		}
 	}
 	return violations
@@ -348,7 +348,7 @@ func signalDashboardViolations(row string, signal maturitySignal) []string {
 			continue
 		}
 		if !strings.Contains(row, value) {
-			violations = append(violations, fmt.Sprintf("docs/EXTENSION_MATURITY.md row for %s missing %s %q", signal.Module, field, value))
+			violations = append(violations, fmt.Sprintf("docs/concepts/extension-maturity.md row for %s missing %s %q", signal.Module, field, value))
 		}
 	}
 	return violations

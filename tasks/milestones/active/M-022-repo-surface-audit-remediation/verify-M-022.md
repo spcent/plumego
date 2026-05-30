@@ -52,7 +52,7 @@ Verified Cards: `1503`, `1504`, `1505`, `1506`, `1507`, `1508`, `1509`, `1510`, 
 
 ## Open Issues
 
-- Branch push and PR packaging from `docs/github-workflows/milestone-pr-template.md` remain workflow steps outside this local implementation run.
+- Branch push and PR packaging from `docs/assets/github-workflows/milestone-pr-template.md` remain workflow steps outside this local implementation run.
 
 ## Final Verdict
 

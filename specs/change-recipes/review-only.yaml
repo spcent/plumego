@@ -1,7 +1,7 @@
 name: review-only
 scope: code review and risk assessment without implementation
 steps:
-  - Read AGENTS.md, the matching specs/task-routing.yaml entry, docs/AGENT_CODE_QUALITY_RULES.md review contract, and the relevant module manifests or specs for the touched area.
+  - Read AGENTS.md, the matching specs/task-routing.yaml entry, docs/operations/agent-code-quality-rules.md review contract, and the relevant module manifests or specs for the touched area.
   - Inspect the diff or target files with a boundary-first review mindset.
   - Prioritize findings about module ownership drift, hidden coupling, compatibility risk, fail-open behavior, and missing tests.
   - Report findings first, ordered by severity, with file-level references and the quality review output contract.

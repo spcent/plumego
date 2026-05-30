@@ -123,7 +123,7 @@ Files in `src/generated/` are created by the sync scripts. Do not edit them by h
 | --- | --- | --- |
 | `modules.ts` | `specs/repo.yaml`, `specs/task-routing.yaml` | `sync-modules.mjs` |
 | `releases.ts` | `README.md` | `sync-release-meta.mjs` |
-| `roadmap.ts` | `docs/ROADMAP.md` | `sync-roadmap.mjs` |
+| `roadmap.ts` | `docs/release/roadmap.md` | `sync-roadmap.mjs` |
 | `translation-lag.ts` | git log of `src/content/docs/` | `check-translation-lag.mjs` |
 
 ---

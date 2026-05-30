@@ -11,7 +11,7 @@ export const ROUTING_SCENARIOS = {
       "startWith": [
         "middleware/module.yaml",
         "docs/modules/middleware/README.md",
-        "docs/CANONICAL_STYLE_GUIDE.md"
+        "docs/reference/canonical-style-guide.md"
       ],
       "avoid": [
         "core",
@@ -29,7 +29,7 @@ export const ROUTING_SCENARIOS = {
       "destination": "contract/ + router/",
       "startWith": [
         "AGENTS.md",
-        "docs/CANONICAL_STYLE_GUIDE.md",
+        "docs/reference/canonical-style-guide.md",
         "specs/change-recipes/http-endpoint-bugfix.yaml",
         "reference/standard-service/internal/app/routes.go",
         "contract/module.yaml",
@@ -53,7 +53,7 @@ export const ROUTING_SCENARIOS = {
         "AGENTS.md",
         "specs/change-recipes/tenant-policy-change.yaml",
         "x/tenant/module.yaml",
-        "docs/architecture/X_TENANT_BLUEPRINT.md",
+        "docs/concepts/x-tenant-blueprint.md",
         "docs/modules/x/tenant/README.md"
       ],
       "avoid": [
@@ -221,7 +221,7 @@ export const ROUTING_SCENARIOS = {
       "startWith": [
         "middleware/module.yaml",
         "docs/modules/middleware/README.md",
-        "docs/CANONICAL_STYLE_GUIDE.md"
+        "docs/reference/canonical-style-guide.md"
       ],
       "avoid": [
         "core",
@@ -239,7 +239,7 @@ export const ROUTING_SCENARIOS = {
       "destination": "contract/ + router/",
       "startWith": [
         "AGENTS.md",
-        "docs/CANONICAL_STYLE_GUIDE.md",
+        "docs/reference/canonical-style-guide.md",
         "specs/change-recipes/http-endpoint-bugfix.yaml",
         "reference/standard-service/internal/app/routes.go",
         "contract/module.yaml",
@@ -263,7 +263,7 @@ export const ROUTING_SCENARIOS = {
         "AGENTS.md",
         "specs/change-recipes/tenant-policy-change.yaml",
         "x/tenant/module.yaml",
-        "docs/architecture/X_TENANT_BLUEPRINT.md",
+        "docs/concepts/x-tenant-blueprint.md",
         "docs/modules/x/tenant/README.md"
       ],
       "avoid": [

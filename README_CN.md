@@ -127,14 +127,14 @@ Plumego 使用 agent-first 控制面维护仓库：`docs/` 解释架构，`specs
 记录可由机器检查的边界，`tasks/` 定义可审查的执行单元，`reference/`
 展示规范装配方式。`internal/checks/` 下的检查会在本地和 CI 中执行关键边界验证，
 让自动化修改带着可审查证据进入 review，而不是依赖隐含约定。完整模型和采用路径见
-[`docs/AGENT_FIRST.md`](./docs/AGENT_FIRST.md)。
+[`docs/concepts/agent-first.md`](./docs/concepts/agent-first.md)。
 
 ## 获取帮助
 
-- 从 [`docs/getting-started.md`](./docs/getting-started.md) 开始，查看最小可运行教程。
+- 从 [`docs/start/getting-started.md`](./docs/start/getting-started.md) 开始，查看最小可运行教程。
 - 使用 [`reference/standard-service`](./reference/standard-service) 作为规范应用结构。
-- 阅读 [`docs/CANONICAL_STYLE_GUIDE.md`](./docs/CANONICAL_STYLE_GUIDE.md)，了解处理器、中间件、路由和依赖注入约定。
+- 阅读 [`docs/reference/canonical-style-guide.md`](./docs/reference/canonical-style-guide.md)，了解处理器、中间件、路由和依赖注入约定。
 - 浏览 [`docs/modules`](./docs/modules)，查看各包的模块导读。
-- 查看 [`docs/ADOPTION_PATH.md`](./docs/ADOPTION_PATH.md)，了解 5 分钟、30 分钟和 1 天采用路径。
-- 查看 [`docs/troubleshooting.md`](./docs/troubleshooting.md)，解决常见问题：路由冻结、中间件顺序、JWT 验证错误和生命周期问题。
-- 查看 [`docs/benchmarks/README.md`](./docs/benchmarks/README.md)，了解与 Chi、Gin、Echo 的性能对比。
+- 查看 [`docs/start/adoption-path.md`](./docs/start/adoption-path.md)，了解 5 分钟、30 分钟和 1 天采用路径。
+- 查看 [`docs/start/troubleshooting.md`](./docs/start/troubleshooting.md)，解决常见问题：路由冻结、中间件顺序、JWT 验证错误和生命周期问题。
+- 查看 [`docs/evidence/benchmarks/README.md`](./docs/evidence/benchmarks/README.md)，了解与 Chi、Gin、Echo 的性能对比。

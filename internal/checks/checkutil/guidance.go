@@ -73,14 +73,14 @@ func annotateDepRules(v string) annotation {
 			return annotation{
 				fix:   fmt.Sprintf("Move code using %s out of %s. Options: (1) pass behavior via constructor injection, (2) extract the interface to contract/, (3) move the feature to the owning x/* package.", pkg, module),
 				rule:  "specs/dependency-rules.yaml — stable_must_not_depend_on_extension",
-				guide: "docs/architecture/core-boundary.md",
+				guide: "docs/concepts/core-boundary.md",
 			}
 		}
 		if strings.HasPrefix(imp, "github.com/spcent/plumego") && strings.Contains(imp, "reference/") {
 			return annotation{
 				fix:   "Library packages must not import reference apps. Reference apps are application wiring examples, not library dependencies.",
 				rule:  "specs/dependency-rules.yaml — library_must_not_depend_on_reference",
-				guide: "docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md",
+				guide: "docs/concepts/agent-first-repo-blueprint.md",
 			}
 		}
 		if imp == "github.com/spcent/plumego" {
@@ -93,7 +93,7 @@ func annotateDepRules(v string) annotation {
 		return annotation{
 			fix:   fmt.Sprintf("Check the allow/deny list for your module in specs/dependency-rules.yaml and remove or relocate the import of %s.", imp),
 			rule:  "specs/dependency-rules.yaml — modules.<your-module>.deny",
-			guide: "docs/architecture/core-boundary.md",
+			guide: "docs/concepts/core-boundary.md",
 		}
 	}
 
@@ -102,7 +102,7 @@ func annotateDepRules(v string) annotation {
 		return annotation{
 			fix:   "The module.yaml allowed_imports field lists a package that specs/dependency-rules.yaml denies. Remove the entry from allowed_imports or update the deny rule with approval.",
 			rule:  "specs/dependency-rules.yaml — modules.<module>.deny",
-			guide: "docs/architecture/core-boundary.md",
+			guide: "docs/concepts/core-boundary.md",
 		}
 	}
 
@@ -111,7 +111,7 @@ func annotateDepRules(v string) annotation {
 		return annotation{
 			fix:   "The module.yaml forbidden_imports field conflicts with the allow list in specs/dependency-rules.yaml. Align both files: either remove from forbidden_imports or remove from allow.",
 			rule:  "specs/dependency-rules.yaml",
-			guide: "docs/architecture/core-boundary.md",
+			guide: "docs/concepts/core-boundary.md",
 		}
 	}
 
@@ -171,14 +171,14 @@ func annotateModuleManifests(v string) annotation {
 		return annotation{
 			fix:   "Create the documentation file referenced in doc_paths, or update doc_paths to point to an existing file.",
 			rule:  "specs/module-manifest.schema.yaml",
-			guide: "docs/CODEX_WORKFLOW.md — docs sync",
+			guide: "docs/operations/codex-workflow.md — docs sync",
 		}
 	}
 	if strings.Contains(v, "missing strict_boundary") {
 		return annotation{
 			fix:   "Add strict_boundary: <boundary-name> to the stable root module.yaml. Examples: kernel, transport_contracts, route_matching, transport_middleware.",
 			rule:  "specs/module-manifest.schema.yaml",
-			guide: "docs/architecture/core-boundary.md",
+			guide: "docs/concepts/core-boundary.md",
 		}
 	}
 	if strings.Contains(v, "missing module.yaml") {
@@ -197,42 +197,42 @@ func annotateAgentWorkflow(v string) annotation {
 		return annotation{
 			fix:   fmt.Sprintf("Add %q to the paths list under layers.extension in specs/repo.yaml, OR remove the directory if it was created by mistake.", pkg),
 			rule:  "specs/repo.yaml — layers.extension.paths",
-			guide: "docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md",
+			guide: "docs/concepts/agent-first-repo-blueprint.md",
 		}
 	}
 	if strings.Contains(v, "references missing start_with path") {
 		return annotation{
 			fix:   "Create the missing file referenced in start_with, or update specs/task-routing.yaml to point to an existing path.",
 			rule:  "specs/task-routing.yaml",
-			guide: "docs/CODEX_WORKFLOW.md",
+			guide: "docs/operations/codex-workflow.md",
 		}
 	}
 	if strings.Contains(v, "must declare at least one start_with path") {
 		return annotation{
 			fix:   "Add a start_with list to the task entry in specs/task-routing.yaml with at least one valid file path.",
 			rule:  "specs/task-routing.yaml",
-			guide: "docs/CODEX_WORKFLOW.md",
+			guide: "docs/operations/codex-workflow.md",
 		}
 	}
 	if strings.Contains(v, "does not reference workflow recipe") {
 		return annotation{
 			fix:   "Add the recipe path to the change_recipes list in specs/repo.yaml.",
 			rule:  "specs/repo.yaml — change_recipes",
-			guide: "docs/CODEX_WORKFLOW.md",
+			guide: "docs/operations/codex-workflow.md",
 		}
 	}
 	if strings.Contains(v, "empty directory") {
 		return annotation{
 			fix:   "Remove the empty directory, or add real package contents (at minimum a doc.go or a .go source file).",
 			rule:  "AGENTS.md",
-			guide: "docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md",
+			guide: "docs/concepts/agent-first-repo-blueprint.md",
 		}
 	}
 	if strings.Contains(v, "primary family must declare subordinate_families") {
 		return annotation{
 			fix:   "Add a subordinate_families list to the primary family module.yaml listing its subordinate package paths.",
 			rule:  "specs/extension-taxonomy.yaml",
-			guide: "docs/architecture/extension-boundary.md",
+			guide: "docs/concepts/extension-boundary.md",
 		}
 	}
 	return annotation{}
@@ -247,7 +247,7 @@ func annotateReferenceLayout(v string) annotation {
 		return annotation{
 			fix:   fmt.Sprintf("Remove the import of %q from reference/standard-service. The canonical reference app must depend only on stable roots and stdlib. Move this usage to a scenario reference app (reference/with-*) or to the owning x/* package.", imp),
 			rule:  "specs/dependency-rules.yaml — library_must_not_depend_on_reference / reference app purity",
-			guide: "docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md",
+			guide: "docs/concepts/agent-first-repo-blueprint.md",
 		}
 	}
 	if strings.Contains(v, "missing required path") {
@@ -255,14 +255,14 @@ func annotateReferenceLayout(v string) annotation {
 		return annotation{
 			fix:   fmt.Sprintf("Create the required file or directory: %s", path),
 			rule:  "internal/checks/reference-layout",
-			guide: "docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md",
+			guide: "docs/concepts/agent-first-repo-blueprint.md",
 		}
 	}
 	if strings.Contains(v, "x/* taxonomy") {
 		return annotation{
 			fix:   "Check that x/* module.yaml files correctly declare subordinate_families (primary) and parent_family (subordinate). See specs/extension-taxonomy.yaml.",
 			rule:  "specs/extension-taxonomy.yaml",
-			guide: "docs/architecture/extension-boundary.md",
+			guide: "docs/concepts/extension-boundary.md",
 		}
 	}
 	return annotation{}
@@ -286,7 +286,7 @@ func annotatePublicEntrypointsSync(v string) annotation {
 		return annotation{
 			fix:   "Either remove the stale entry from module.yaml public_entrypoints, or ensure the exported symbol exists in the module source. If the symbol was renamed, update both source and module.yaml in the same PR.",
 			rule:  "AGENTS.md — Symbol Change Protocol: update module.yaml when removing or renaming exported symbols",
-			guide: "docs/CANONICAL_STYLE_GUIDE.md",
+			guide: "docs/reference/canonical-style-guide.md",
 		}
 	}
 	return annotation{}

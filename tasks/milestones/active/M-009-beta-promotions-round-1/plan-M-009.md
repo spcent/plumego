@@ -6,7 +6,7 @@ evidence now available after v1.1.0: x/ai stable-tier subpackages (provider,
 session, tool, streaming), x/tenant, x/gateway/discovery core-static, and
 x/data/file plus x/data/idempotency. Update module.yaml status fields, generate
 release-to-release API snapshots, record owner sign-off, and reflect all changes
-in docs/EXTENSION_MATURITY.md.
+in docs/concepts/extension-maturity.md.
 Constraints: two release refs required (v1.0.0 + v1.1.0), no runtime behavior
 changes, no stable-root public API additions, owner sign-off must be explicit.
 Affected Modules: extension evidence, x/ai, x/tenant, x/gateway/discovery, x/data.
@@ -23,10 +23,10 @@ Affected Modules: extension evidence, x/ai, x/tenant, x/gateway/discovery, x/dat
 
 | Card | Goal | Primary Module | Owned Files | Depends On | Quick Gates |
 |------|------|----------------|-------------|------------|-------------|
-| 1367 | Promote x/tenant to beta | x/tenant | `specs/extension-beta-evidence.yaml`, `docs/extension-evidence/x-tenant.md`, `x/tenant/module.yaml`, `docs/EXTENSION_MATURITY.md` | M-008 | `extension-beta-evidence`, `extension-maturity` |
-| 1370 | Promote x/ai provider, session, tool, streaming to beta | x/ai | `specs/extension-beta-evidence.yaml`, `docs/extension-evidence/x-ai-provider.md`, `docs/extension-evidence/x-ai-session.md`, `docs/extension-evidence/x-ai-tool.md`, `docs/extension-evidence/x-ai-streaming.md`, `x/ai/provider/module.yaml`, `x/ai/session/module.yaml`, `x/ai/tool/module.yaml`, `x/ai/streaming/module.yaml` | M-008 | `extension-beta-evidence`, `extension-maturity` |
-| 1371 | Promote x/data/file and x/data/idempotency to beta | x/data | `specs/extension-beta-evidence.yaml`, `docs/extension-evidence/x-data.md`, `x/data/file/module.yaml`, `x/data/idempotency/module.yaml` | M-008 | `extension-beta-evidence`, `extension-maturity` |
-| 1372 | Promote x/gateway/discovery core-static to beta | x/gateway | `specs/extension-beta-evidence.yaml`, `docs/extension-evidence/x-discovery.md`, `x/gateway/discovery/module.yaml` | M-008 | `extension-beta-evidence`, `extension-maturity` |
+| 1367 | Promote x/tenant to beta | x/tenant | `specs/extension-beta-evidence.yaml`, `docs/evidence/extension/x-tenant.md`, `x/tenant/module.yaml`, `docs/concepts/extension-maturity.md` | M-008 | `extension-beta-evidence`, `extension-maturity` |
+| 1370 | Promote x/ai provider, session, tool, streaming to beta | x/ai | `specs/extension-beta-evidence.yaml`, `docs/evidence/extension/x-ai-provider.md`, `docs/evidence/extension/x-ai-session.md`, `docs/evidence/extension/x-ai-tool.md`, `docs/evidence/extension/x-ai-streaming.md`, `x/ai/provider/module.yaml`, `x/ai/session/module.yaml`, `x/ai/tool/module.yaml`, `x/ai/streaming/module.yaml` | M-008 | `extension-beta-evidence`, `extension-maturity` |
+| 1371 | Promote x/data/file and x/data/idempotency to beta | x/data | `specs/extension-beta-evidence.yaml`, `docs/evidence/extension/x-data.md`, `x/data/file/module.yaml`, `x/data/idempotency/module.yaml` | M-008 | `extension-beta-evidence`, `extension-maturity` |
+| 1372 | Promote x/gateway/discovery core-static to beta | x/gateway | `specs/extension-beta-evidence.yaml`, `docs/evidence/extension/x-discovery.md`, `x/gateway/discovery/module.yaml` | M-008 | `extension-beta-evidence`, `extension-maturity` |
 
 ## Dependency Edges
 
@@ -60,6 +60,6 @@ Affected Modules: extension evidence, x/ai, x/tenant, x/gateway/discovery, x/dat
 - all four promotion cards completed
 - x/ai provider, session, tool, streaming; x/tenant; x/gateway/discovery; x/data/file
   and x/data/idempotency all show status = beta in their module.yaml files
-- docs/EXTENSION_MATURITY.md reflects all promotions
+- docs/concepts/extension-maturity.md reflects all promotions
 - verify report shows pass
 - milestone acceptance criteria ready for PR packaging

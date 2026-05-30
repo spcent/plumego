@@ -2,12 +2,12 @@ version: 1
 
 authority:
   human_readable:
-    - docs/AGENT_CODE_QUALITY_RULES.md
+    - docs/operations/agent-code-quality-rules.md
   companions:
     - AGENTS.md
-    - docs/CODEX_WORKFLOW.md
-    - docs/AGENT_CONTEXT_BUDGET.md
-    - docs/CANONICAL_STYLE_GUIDE.md
+    - docs/operations/codex-workflow.md
+    - docs/operations/agent-context-budget.md
+    - docs/reference/canonical-style-guide.md
     - specs/repo.yaml
     - specs/dependency-rules.yaml
     - specs/checks.yaml
@@ -59,7 +59,7 @@ preflight:
     - context_package_exceeds_task_scope
 
 context_budget:
-  authority: docs/AGENT_CONTEXT_BUDGET.md
+  authority: docs/operations/agent-context-budget.md
   packages:
     startup:
       purpose: Initial task orientation.
@@ -77,14 +77,14 @@ context_budget:
       purpose: Findings-first review.
       default_reads:
         - startup package
-        - docs/AGENT_CODE_QUALITY_RULES.md review output contract
+        - docs/operations/agent-code-quality-rules.md review output contract
         - relevant module manifests or specs for the diff area
     control_plane:
       purpose: Workflow, architecture, quality, boundary, or spec rule changes.
       default_reads:
         - startup package
-        - docs/CODEX_WORKFLOW.md
-        - docs/AGENT_CODE_QUALITY_RULES.md
+        - docs/operations/codex-workflow.md
+        - docs/operations/agent-code-quality-rules.md
         - directly changed specs
   split_before_implementation_when:
     - more_than_one_primary_module

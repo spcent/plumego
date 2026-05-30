@@ -172,4 +172,4 @@ keyedLimiter.Delete("192.168.1.1")
 - `go vet ./x/resilience/...`
 
 For the detailed AI boundary decision, see
-`docs/architecture/x-ai-resilience-boundary.md`.
+`docs/concepts/x-ai-resilience-boundary.md`.

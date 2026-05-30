@@ -11,8 +11,8 @@ strict_boundary: kernel
 
 entrypoint_reads:
   - AGENTS.md
-  - docs/CANONICAL_STYLE_GUIDE.md
-  - docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md
+  - docs/reference/canonical-style-guide.md
+  - docs/concepts/agent-first-repo-blueprint.md
   - specs/repo.yaml
   - specs/task-routing.yaml
   - specs/dependency-rules.yaml
@@ -129,7 +129,7 @@ landing_zones:
 
 docs_sync_contract:
   on_api_change:
-    - docs/stable-api/snapshots/core-head.snapshot
+    - docs/evidence/stable-api/snapshots/core-head.snapshot
     - docs/modules/core/README.md
   on_behavior_change:
     - docs/modules/core/README.md

@@ -339,7 +339,7 @@ func hasMarkdownHeading(content, heading string) bool {
 }
 
 func agentQualityControlPlaneViolations(repoRoot string) ([]string, error) {
-	const qualityDoc = "docs/AGENT_CODE_QUALITY_RULES.md"
+	const qualityDoc = "docs/operations/agent-code-quality-rules.md"
 	const qualitySpec = "specs/agent-quality-rules.yaml"
 
 	var violations []string
@@ -354,15 +354,15 @@ func agentQualityControlPlaneViolations(repoRoot string) ([]string, error) {
 	}
 
 	requiredRefs := map[string][]string{
-		"AGENTS.md":                             {qualityDoc, qualitySpec},
-		"docs/CODEX_WORKFLOW.md":                {qualityDoc, qualitySpec},
-		"docs/README.md":                        {qualityDoc},
-		"specs/checks.yaml":                     {qualitySpec},
-		"specs/change-recipes/fix-bug.yaml":     {qualityDoc, qualitySpec},
-		"specs/change-recipes/review-only.yaml": {qualityDoc},
+		"AGENTS.md":                                             {qualityDoc, qualitySpec},
+		"docs/operations/codex-workflow.md":                     {qualityDoc, qualitySpec},
+		"docs/README.md":                                        {qualityDoc},
+		"specs/checks.yaml":                                     {qualitySpec},
+		"specs/change-recipes/fix-bug.yaml":                     {qualityDoc, qualitySpec},
+		"specs/change-recipes/review-only.yaml":                 {qualityDoc},
 		"specs/change-recipes/stable-root-boundary-review.yaml": {qualityDoc, qualitySpec},
 		"specs/change-recipes/symbol-change.yaml":               {qualityDoc, qualitySpec},
-		"specs/repo.yaml": {qualityDoc, qualitySpec},
+		"specs/repo.yaml":                                       {qualityDoc, qualitySpec},
 	}
 	for relPath, refs := range requiredRefs {
 		content, err := os.ReadFile(filepath.Join(repoRoot, filepath.FromSlash(relPath)))

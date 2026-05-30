@@ -7,14 +7,14 @@ metadata:
     - Not a replacement for module manifests
     - Not a full package catalog
   read_after:
-    - docs/CANONICAL_STYLE_GUIDE.md
+    - docs/reference/canonical-style-guide.md
     - specs/repo.yaml
     - specs/task-routing.yaml
   rules:
     - Add entries only for packages where the wrong package choice causes notable rework.
     - Keep start_with and avoid paths concrete and bounded.
     - Prefer package-level role labels over long prose.
-    - Constructor-pattern work must start with docs/CANONICAL_STYLE_GUIDE.md and the owning module manifest; do not make repo-wide constructor changes from this index.
+    - Constructor-pattern work must start with docs/reference/canonical-style-guide.md and the owning module manifest; do not make repo-wide constructor changes from this index.
 
 role_definitions:
   app_surface: App-facing transport or capability entrypoint.

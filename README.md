@@ -132,23 +132,23 @@ architecture, `specs/` records machine-checkable boundaries, `tasks/` defines
 reviewable execution units, and `reference/` shows canonical wiring. The checks
 under `internal/checks/` enforce the most important boundaries locally and in
 CI, so automated changes produce reviewable evidence instead of relying on
-implicit convention. See [`docs/AGENT_FIRST.md`](./docs/AGENT_FIRST.md) for the
+implicit convention. See [`docs/concepts/agent-first.md`](./docs/concepts/agent-first.md) for the
 external model and adoption path, and
-[`docs/agent-first-operating-reference.md`](./docs/agent-first-operating-reference.md)
+[`docs/operations/agent-first-operating-reference.md`](./docs/operations/agent-first-operating-reference.md)
 for the detailed internal operating reference.
 
 ## Getting Help
 
-- Start with [`docs/getting-started.md`](./docs/getting-started.md) for the
+- Start with [`docs/start/getting-started.md`](./docs/start/getting-started.md) for the
   smallest runnable walkthrough.
 - Use [`reference/standard-service`](./reference/standard-service) as the
   canonical app layout.
-- Read [`docs/CANONICAL_STYLE_GUIDE.md`](./docs/CANONICAL_STYLE_GUIDE.md) for
+- Read [`docs/reference/canonical-style-guide.md`](./docs/reference/canonical-style-guide.md) for
   handler, middleware, routing, and dependency-injection conventions.
 - Browse [`docs/modules`](./docs/modules) for package-specific primers.
-- Check [`docs/ADOPTION_PATH.md`](./docs/ADOPTION_PATH.md) for the 5-minute,
+- Check [`docs/start/adoption-path.md`](./docs/start/adoption-path.md) for the 5-minute,
   30-minute, and 1-day adoption path.
-- See [`docs/troubleshooting.md`](./docs/troubleshooting.md) for common
+- See [`docs/start/troubleshooting.md`](./docs/start/troubleshooting.md) for common
   problems: route freeze, middleware order, JWT errors, and lifecycle issues.
-- See [`docs/benchmarks/README.md`](./docs/benchmarks/README.md) for
+- See [`docs/evidence/benchmarks/README.md`](./docs/evidence/benchmarks/README.md) for
   performance comparisons with Chi, Gin, and Echo.

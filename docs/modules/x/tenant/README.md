@@ -9,7 +9,7 @@
 - `beta` in the Plumego v1.1 support matrix
 - Included in repository release scope with beta compatibility obligations for
   the documented public surface
-- Promotion evidence is recorded in `docs/extension-evidence/x-tenant.md` with
+- Promotion evidence is recorded in `docs/evidence/extension/x-tenant.md` with
   `v1.0.0` to `v1.1.0` release-backed API snapshots.
 
 ## Use this module when
@@ -36,7 +36,7 @@
 ## First files to read
 
 - `x/tenant/module.yaml`
-- `docs/architecture/X_TENANT_BLUEPRINT.md`
+- `docs/concepts/x-tenant-blueprint.md`
 - the owning subpackage under `x/tenant/*`
 - `AGENTS.md` tenant boundary rules
 
@@ -99,7 +99,7 @@ Current example-backed and test-backed coverage includes:
 ## Beta readiness
 
 `x/tenant` satisfies the current coverage and boundary portions of
-`docs/EXTENSION_STABILITY_POLICY.md`: resolution ordering, policy deny paths,
+`docs/reference/extension-stability-policy.md`: resolution ordering, policy deny paths,
 quota exhaustion, rate-limit isolation, tenant-aware store/db fail-closed
 behavior, and the combined resolve → policy → quota → ratelimit chain have
 focused tests.

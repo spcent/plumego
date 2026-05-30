@@ -10,7 +10,7 @@ projection without pulling in a third-party migration framework.
 
 ## Status
 
-`experimental` — API not frozen. See [`docs/EXTENSION_MATURITY.md`](../../../../EXTENSION_MATURITY.md).
+`experimental` — API not frozen. See [`docs/concepts/extension-maturity.md`](../../../../concepts/extension-maturity.md).
 
 ## Use this module when
 

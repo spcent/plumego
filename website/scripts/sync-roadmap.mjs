@@ -15,7 +15,7 @@ function parsePhases(markdown) {
 }
 
 export async function syncRoadmap() {
-  const roadmap = await readRepoFile('docs/ROADMAP.md');
+  const roadmap = await readRepoFile('docs/release/roadmap.md');
   const currentBaseline = markdownBulletList(
     roadmap.match(/## Current Baseline\s+([\s\S]*?)(?=\n## |\s*$)/)?.[1] ?? '',
   );

@@ -8,13 +8,13 @@ Go module: `github.com/spcent/plumego` | Go 1.26+ | Main module: stdlib only unl
 
 Default read path: `AGENTS.md` → matching `specs/task-routing.yaml` entry → its `start_with` files → target `<module>/module.yaml` → extra docs only when preflight identifies a concrete need.
 
-Companion docs: `docs/CODEX_WORKFLOW.md` (workflow), `docs/AGENT_CONTEXT_BUDGET.md` (context packages), `docs/AGENT_CODE_QUALITY_RULES.md` (quality + gate profiles), `docs/CANONICAL_STYLE_GUIDE.md` (style), `docs/EXTENSION_MATURITY.md` (maturity), `docs/architecture/` (boundary docs).
+Companion docs: `docs/operations/codex-workflow.md` (workflow), `docs/operations/agent-context-budget.md` (context packages), `docs/operations/agent-code-quality-rules.md` (quality + gate profiles), `docs/reference/canonical-style-guide.md` (style), `docs/concepts/extension-maturity.md` (maturity), `docs/concepts/` (boundary docs).
 
 Machine-readable: `specs/task-routing.yaml`, `specs/checks.yaml`, `specs/dependency-rules.yaml`, `specs/extension-taxonomy.yaml`, `specs/module-manifest.schema.yaml`, `specs/stop-condition-handlers.yaml`, `specs/agent-quality-rules.yaml`, `specs/change-recipes/`. Canonical wiring: `reference/standard-service`.
 
 CLI tool: `cmd/plumego` provides agent-assist commands, validation runners, code generation, dev server, scaffold, and task bundling. Run `go run ./cmd/plumego --help` to explore subcommands; `make bundle TASK=<recipe> MODULE=<path>` generates task execution bundles.
 
-Conflict order: (1) security/boundary rules here → (2) `docs/CANONICAL_STYLE_GUIDE.md` → (3) machine-readable specs → (4) existing local patterns.
+Conflict order: (1) security/boundary rules here → (2) `docs/reference/canonical-style-guide.md` → (3) machine-readable specs → (4) existing local patterns.
 
 ## 2. Non-Negotiables
 
@@ -39,7 +39,7 @@ Extension roots: `x/ai`, `x/data`, `x/fileapi`, `x/frontend`, `x/gateway`, `x/me
 
 Default landing zones: kernel/lifecycle/transport/auth/storage → stable root; product capability/protocol/features → `x/*`; app wiring/DI/bootstrap → `reference/standard-service`; workflow/specs/quality → `docs/` or `specs/`; plans/sequencing → `tasks/`.
 
-Extension maturity: **beta** (production-ready with caveats) → `x/frontend`, `x/gateway`, `x/messaging`, `x/observability`, `x/rest`, `x/tenant`, `x/websocket`; **experimental** (APIs may change) → `x/ai`, `x/data`, `x/fileapi`, `x/openapi`, `x/resilience`, `x/rpc`, `x/validate`. Full dashboard: `docs/EXTENSION_MATURITY.md` and `specs/extension-maturity.yaml`.
+Extension maturity: **beta** (production-ready with caveats) → `x/frontend`, `x/gateway`, `x/messaging`, `x/observability`, `x/rest`, `x/tenant`, `x/websocket`; **experimental** (APIs may change) → `x/ai`, `x/data`, `x/fileapi`, `x/openapi`, `x/resilience`, `x/rpc`, `x/validate`. Full dashboard: `docs/concepts/extension-maturity.md` and `specs/extension-maturity.yaml`.
 
 Reference starting points: plain JSON API → `reference/standard-service`; hardened production (auth, tracing, metrics, tenant) → `reference/production-service`; REST CRUD → `reference/with-rest`; multi-tenant → `reference/with-tenant`; LLM/AI → `reference/with-ai`; WebSocket → `reference/with-websocket`; gRPC → `reference/with-rpc`; event-driven pubsub architecture → `reference/with-events`; messaging feature integration into existing service → `reference/with-messaging`; inbound webhooks → `reference/with-webhook`; reverse proxy → `reference/with-gateway`; embedded static assets → `reference/with-frontend`; health/metrics routes → `reference/with-ops`; benchmarking → `reference/benchmark`.
 
@@ -101,19 +101,19 @@ go run ./internal/checks/reference-layout
 go run ./internal/checks/public-entrypoints-sync
 ```
 
-Add `extension-maturity`, `extension-beta-evidence`, `deprecation-inventory -strict` per gate profile (`docs/AGENT_CODE_QUALITY_RULES.md §6`). Full CI: `make gates` (runs above + `go vet ./...`, format, race tests; run `gofmt -w` first). Docs-only: skip Go gates unless code/config/generated/examples changed.
+Add `extension-maturity`, `extension-beta-evidence`, `deprecation-inventory -strict` per gate profile (`docs/operations/agent-code-quality-rules.md §6`). Full CI: `make gates` (runs above + `go vet ./...`, format, race tests; run `gofmt -w` first). Docs-only: skip Go gates unless code/config/generated/examples changed.
 
 Summarize validation as: command, status, key failure, next step.
 
 ## 7. Docs Sync
 
-Update docs only for behavior, API, config, security, lifecycle, or boundary changes. Typical targets: `README.md`, `README_CN.md`, `AGENTS.md`, `docs/AGENT_CONTEXT_BUDGET.md`, `env.example`, affected `docs/modules/` primers, `docs/EXTENSION_MATURITY.md`, `docs/ROADMAP.md`, `docs/stable-api/`. Document implemented behavior only.
+Update docs only for behavior, API, config, security, lifecycle, or boundary changes. Typical targets: `README.md`, `README_CN.md`, `AGENTS.md`, `docs/operations/agent-context-budget.md`, `env.example`, affected `docs/modules/` primers, `docs/concepts/extension-maturity.md`, `docs/release/roadmap.md`, `docs/evidence/stable-api/`. Document implemented behavior only.
 
 `docs/modules/` naming: stable roots use bare names (`core/`, `contract/`); extensions mirror import paths (`x/ai/`, `x/data/cache/`). See `docs/modules/INDEX.md`. Run `make website-sync` after editing sources below; include generated files in the same commit.
 
 | Source file | Generated file |
 |---|---|
-| `docs/ROADMAP.md` | `website/src/generated/roadmap.ts` |
+| `docs/release/roadmap.md` | `website/src/generated/roadmap.ts` |
 | `docs/modules/*/README.md` | `website/src/generated/modules.ts` |
 | `specs/task-routing.yaml` | `website/src/generated/routing.ts` |
 | `README.md` / `specs/task-routing.yaml` | `website/src/generated/releases.ts` |
@@ -123,7 +123,7 @@ Update docs only for behavior, API, config, security, lifecycle, or boundary cha
 
 ## 8. Milestones
 
-Milestones: `tasks/milestones/active/M-NNN-short-name/M-NNN.md`. When executing: read Context files first, stay inside Affected Modules, follow Tasks in order, use spec branch, record blockers, run full acceptance criteria, package PR with `docs/github-workflows/milestone-pr-template.md`.
+Milestones: `tasks/milestones/active/M-NNN-short-name/M-NNN.md`. When executing: read Context files first, stay inside Affected Modules, follow Tasks in order, use spec branch, record blockers, run full acceptance criteria, package PR with `docs/assets/github-workflows/milestone-pr-template.md`.
 
 Scaffold: `make new-milestone`, `make new-plan`, `make new-card`, `make new-verify`, `make run-card C=active/NNNN-slug`, `make milestone-status M=active/M-NNN`.
 

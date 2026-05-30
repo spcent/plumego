@@ -68,7 +68,7 @@ Stable root changes that commonly require caller updates:
 
 ## Tracking an experimental extension toward stability
 
-Experimental packages move toward stability through explicit tier promotion in `module.yaml`. The promotion is announced in `docs/ROADMAP.md` and the public releases page.
+Experimental packages move toward stability through explicit tier promotion in `module.yaml`. The promotion is announced in `docs/release/roadmap.md` and the public releases page.
 
 ### Watch for tier promotion
 
@@ -77,7 +77,7 @@ Experimental packages move toward stability through explicit tier promotion in `
 cat x/ai/module.yaml | grep -A3 "stability\|status\|tier"
 
 # Subscribe to ROADMAP.md changes on the branch you track.
-git log --oneline -- docs/ROADMAP.md
+git log --oneline -- docs/release/roadmap.md
 ```
 
 ### Wrap experimental dependencies behind an interface

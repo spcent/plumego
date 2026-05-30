@@ -92,5 +92,5 @@ BenchmarkEchoChain{1,3,5}{NoOp,JSON}
 ## Update Results
 
 When capturing release evidence, run the full suite and append the verbatim
-output to `docs/benchmarks/results-vX.Y.Z.md` with the machine, Go version,
+output to `docs/evidence/benchmarks/results-vX.Y.Z.md` with the machine, Go version,
 command, and date.

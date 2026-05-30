@@ -68,7 +68,7 @@ make gates
 
 ## 追踪 experimental 扩展向 stable 晋升
 
-Experimental 包通过 `module.yaml` 中的明确层级晋升逐步走向 stable。晋升信息会在 `docs/ROADMAP.md` 和公开发布页上公告。
+Experimental 包通过 `module.yaml` 中的明确层级晋升逐步走向 stable。晋升信息会在 `docs/release/roadmap.md` 和公开发布页上公告。
 
 ### 关注层级晋升
 
@@ -77,7 +77,7 @@ Experimental 包通过 `module.yaml` 中的明确层级晋升逐步走向 stable
 cat x/ai/module.yaml | grep -A3 "stability\|status\|tier"
 
 # 订阅你追踪的分支上 ROADMAP.md 的变更。
-git log --oneline -- docs/ROADMAP.md
+git log --oneline -- docs/release/roadmap.md
 ```
 
 ### 用接口包装 experimental 依赖

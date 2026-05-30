@@ -11,7 +11,7 @@ parent_family: x/rpc
 
 entrypoint_reads:
   - AGENTS.md
-  - docs/CANONICAL_STYLE_GUIDE.md
+  - docs/reference/canonical-style-guide.md
   - specs/repo.yaml
   - specs/task-routing.yaml
   - specs/dependency-rules.yaml
