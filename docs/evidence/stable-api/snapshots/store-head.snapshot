@@ -91,6 +91,7 @@ symbol	github.com/spcent/plumego/store/idempotency	var	ErrInvalidKey	var ErrInva
 symbol	github.com/spcent/plumego/store/idempotency	var	ErrInvalidRecord	var ErrInvalidRecord = errors.New("idempotency: invalid record")
 symbol	github.com/spcent/plumego/store/idempotency	var	ErrNotFound	var ErrNotFound = errors.New("idempotency: record not found")
 symbol	github.com/spcent/plumego/store/idempotency	var	ErrRequestMismatch	var ErrRequestMismatch = errors.New("idempotency: request hash mismatch")
+symbol	github.com/spcent/plumego/store/kv	func	DefaultOptions	func DefaultOptionsfunc(dataDir string) Options
 symbol	github.com/spcent/plumego/store/kv	func	NewKVStore	func NewKVStorefunc(opts Options) (*KVStore, error)
 symbol	github.com/spcent/plumego/store/kv	method	KVStore.Close	func (KVStore) Closefunc() error
 symbol	github.com/spcent/plumego/store/kv	method	KVStore.Delete	func (KVStore) Deletefunc(key string) error

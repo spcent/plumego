@@ -16,7 +16,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/spcent/plumego/internal/httpx"
+	"github.com/spcent/plumego/internal/httputil"
 )
 
 // SignatureEncoding defines how the signature is encoded in headers.
@@ -149,7 +149,7 @@ func VerifyHMAC(r *http.Request, cfg HMACConfig) (VerifyResult, error) {
 	if cfg.IPAllowlist != nil {
 		resolver := cfg.IPResolver
 		if resolver == nil {
-			resolver = httpx.ClientIP
+			resolver = httputil.ClientIP
 		}
 		ip := strings.TrimSpace(resolver(r))
 		result.IP = ip

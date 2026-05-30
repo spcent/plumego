@@ -1,6 +1,6 @@
 # plumego extension api snapshot v1
 module	github.com/spcent/plumego
-pattern	./metrics
+pattern	./metrics/...
 symbol	github.com/spcent/plumego/metrics	const	MetricHTTPRequest	const MetricHTTPRequest = "http_request"
 symbol	github.com/spcent/plumego/metrics	func	NewBaseMetricsCollector	func NewBaseMetricsCollectorfunc() *BaseMetricsCollector
 symbol	github.com/spcent/plumego/metrics	func	NewHTTPRecord	func NewHTTPRecordfunc(method, path string, status int, duration time.Duration) MetricRecord

@@ -1,6 +1,6 @@
 # plumego extension api snapshot v1
 module	github.com/spcent/plumego
-pattern	./log
+pattern	./log/...
 symbol	github.com/spcent/plumego/log	const	DEBUG	const DEBUG Level = -1
 symbol	github.com/spcent/plumego/log	const	ERROR	const ERROR Level = 2
 symbol	github.com/spcent/plumego/log	const	FATAL	const FATAL Level = 3

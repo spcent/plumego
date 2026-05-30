@@ -1,6 +1,6 @@
 # plumego extension api snapshot v1
 module	github.com/spcent/plumego
-pattern	./health
+pattern	./health/...
 symbol	github.com/spcent/plumego/health	const	StatusDegraded	const StatusDegraded HealthState = "degraded"
 symbol	github.com/spcent/plumego/health	const	StatusHealthy	const StatusHealthy HealthState = "healthy"
 symbol	github.com/spcent/plumego/health	const	StatusUnhealthy	const StatusUnhealthy HealthState = "unhealthy"

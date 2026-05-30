@@ -190,6 +190,32 @@ func TestClientIP_ForwardedFor(t *testing.T) {
 	}
 }
 
+func TestClientIP_SkipsMalformedForwardedEntries(t *testing.T) {
+	r := httptest.NewRequest(http.MethodGet, "/", nil)
+	r.Header.Set(HeaderForwardedFor, "unknown, 203.0.113.3")
+	if ip := ClientIP(r); ip != "203.0.113.3" {
+		t.Errorf("ClientIP = %q, want 203.0.113.3", ip)
+	}
+}
+
+func TestClientIP_MalformedHeadersFallBackToRemoteAddr(t *testing.T) {
+	r := httptest.NewRequest(http.MethodGet, "/", nil)
+	r.Header.Set(HeaderForwardedFor, "unknown")
+	r.Header.Set(HeaderRealIP, "also-unknown")
+	r.RemoteAddr = "192.0.2.9:54321"
+	if ip := ClientIP(r); ip != "192.0.2.9" {
+		t.Errorf("ClientIP = %q, want 192.0.2.9", ip)
+	}
+}
+
+func TestClientIP_IPv6ForwardedFor(t *testing.T) {
+	r := httptest.NewRequest(http.MethodGet, "/", nil)
+	r.Header.Set(HeaderForwardedFor, "2001:db8::1")
+	if ip := ClientIP(r); ip != "2001:db8::1" {
+		t.Errorf("ClientIP = %q, want 2001:db8::1", ip)
+	}
+}
+
 func TestClientIP_RealIP(t *testing.T) {
 	r := httptest.NewRequest(http.MethodGet, "/", nil)
 	r.Header.Set(HeaderRealIP, "9.10.11.12")

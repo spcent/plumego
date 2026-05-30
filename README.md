@@ -76,7 +76,8 @@ Pick the scenario that matches your project:
 | An AI-backed service | `reference/with-ai` → `x/ai/provider` |
 | A service with rich messaging/webhooks | `reference/with-messaging` → `x/messaging` |
 | A gRPC + HTTP service | `reference/with-rpc` → `x/rpc` |
-| Observability (Prometheus / OpenTelemetry) | `x/observability` |
+| Observability (Prometheus / OpenTelemetry) | `reference/with-observability` → `x/observability` |
+| A tenant administration console | `reference/with-tenant-admin` → `x/tenant` |
 
 All paths keep `reference/standard-service` as the base layout. Extensions are
 explicit additions, not alternate bootstraps.

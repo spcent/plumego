@@ -75,7 +75,8 @@ go run main.go
 | AI 驱动的服务 | `reference/with-ai` → `x/ai/provider` |
 | 带消息队列/Webhook 的服务 | `reference/with-messaging` → `x/messaging` |
 | gRPC + HTTP 混合服务 | `reference/with-rpc` → `x/rpc` |
-| 可观测性（Prometheus / OpenTelemetry） | `x/observability` |
+| 可观测性（Prometheus / OpenTelemetry） | `reference/with-observability` → `x/observability` |
+| 租户管理控制台 | `reference/with-tenant-admin` → `x/tenant` |
 
 所有路径都以 `reference/standard-service` 为基础结构。扩展包是显式增量，而不是另一套应用启动框架。
 
