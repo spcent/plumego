@@ -53,11 +53,13 @@ Canonical files:
 - `main.go`
 - `internal/app/app.go`
 - `internal/app/routes.go`
-- `internal/domain/item/item.go`
+- `internal/config/config.go`
+- `internal/domain/item/item.go` — domain model
+- `internal/domain/item/store.go` — Repository interface + MemoryStore
+- `internal/domain/item/service.go` — Service interface + ItemService
 - `internal/handler/api.go`
 - `internal/handler/health.go`
 - `internal/handler/items.go`
-- `internal/config/config.go`
 
 ## Response shape
 

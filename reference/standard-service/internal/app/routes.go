@@ -19,10 +19,14 @@ func (a *App) RegisterRoutes() error {
 		ServiceName: a.Cfg.App.ServiceName,
 		Logger:      a.Core.Logger(),
 	}
-	// ItemHandler demonstrates constructor injection: the concrete domain store
-	// is created here and passed through the interface the handler declared.
+	// ItemHandler demonstrates the three-layer architecture: handler → service → repository.
+	// handler/items.go declares ItemRepository; routes.go wires item.ItemService as the
+	// concrete implementation. ItemService wraps item.NewMemoryStore() here; replace
+	// NewMemoryStore() with a database-backed item.Repository for production.
+	// Both item.ItemService and item.MemoryStore satisfy ItemRepository via structural
+	// typing, so handler tests can inject either without changing handler code.
 	items := handler.ItemHandler{
-		Repo:   item.NewMemoryStore(),
+		Repo:   item.NewItemService(item.NewMemoryStore()),
 		Logger: a.Core.Logger(),
 	}
 
@@ -83,10 +87,12 @@ type routeAdder interface {
 	Delete(path string, h http.Handler) error
 }
 
-// routeReg wraps a routeAdder and records the first registration error.
-// This lets the route table be written one route per line without per-call
-// error checks; inspect reg.err once after all registrations.
-// Only the first error is retained — route conflicts are programming mistakes
+// routeReg wraps a routeAdder and accumulates the first registration error.
+// Style guide §5 requires registration errors to be returned to the caller
+// (not logged and swallowed); this wrapper fulfills that requirement while
+// keeping the route table visually flat — one method + path + handler per line
+// with a single reg.err check at the end instead of a per-line if-block.
+// Only the first error is retained: route conflicts are programming mistakes
 // that surface one at a time; fix the first one to unblock the rest.
 type routeReg struct {
 	adder routeAdder
