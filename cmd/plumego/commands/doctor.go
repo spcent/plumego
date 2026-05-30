@@ -75,7 +75,7 @@ func (c *DoctorCmd) Run(ctx *Context, args []string) error {
 				Name:    fmt.Sprintf("spec: %s", specPath),
 				Status:  "failed",
 				Message: "missing",
-				Fix:     fmt.Sprintf("create %s — see docs/agent-first.md for the required format", specPath),
+				Fix:     fmt.Sprintf("create %s — see docs/concepts/agent-first.md for the required format", specPath),
 			})
 		}
 	}
@@ -120,9 +120,9 @@ func (c *DoctorCmd) Run(ctx *Context, args []string) error {
 
 	// ── 4. Agent-first docs ───────────────────────────────────────────────────
 	agentDocs := []string{
-		"docs/agent-first.md",
-		"docs/architecture/core-boundary.md",
-		"docs/architecture/extension-boundary.md",
+		"docs/concepts/agent-first.md",
+		"docs/concepts/core-boundary.md",
+		"docs/concepts/extension-boundary.md",
 	}
 	for _, docPath := range agentDocs {
 		full := filepath.Join(repoRoot, docPath)
@@ -137,7 +137,7 @@ func (c *DoctorCmd) Run(ctx *Context, args []string) error {
 				Name:    fmt.Sprintf("doc: %s", docPath),
 				Status:  "warning",
 				Message: "missing",
-				Fix:     fmt.Sprintf("create %s — see docs/agent-first.md for recommended content", docPath),
+				Fix:     fmt.Sprintf("create %s — see docs/concepts/agent-first.md for recommended content", docPath),
 			})
 		}
 	}

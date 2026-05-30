@@ -20,42 +20,23 @@ non_goals:
 
 allowed_imports:
   - stdlib
-  - contract
   - log
   - x/observability
-
-forbidden_imports:
-  - core/**
-  - router/**
-  - middleware/**
-  - security/**
-  - store/**
-  - health/**
-  - metrics/**
-  - x/ai/**
-  - x/data/**
-  - x/fileapi/**
-  - x/frontend/**
-  - x/gateway/**
-  - x/messaging/**
-  - x/openapi/**
-  - x/resilience/**
-  - x/rest/**
-  - x/rpc/**
-  - x/tenant/**
-  - x/validate/**
 
 test_commands:
   - go test -race -timeout 60s ./x/observability/tracer/...
   - go vet ./x/observability/tracer/...
 
+forbidden_imports:
+  - x/tenant/**
+  - x/ai/**
+  - x/gateway/**
+
 review_checklist:
-  - Keep trace context propagation aligned with contract.TraceContext
-  - Keep sampling decisions deterministic and configurable
-  - Do not leak span internals across the public surface
-  - Fail safe when no tracer is configured
+  - Keep tracer setup and provider configuration explicit in the app lifecycle
+  - Do not add hidden global tracer state; pass the tracer via context or constructor injection
+  - Keep transport-layer tracing in middleware/tracing; keep provider configuration here
 
 agent_hints:
-  - Read and write trace context via contract.TraceContext, not ad hoc keys
-  - Keep exporter and backend wiring in application code
-  - Start spans explicitly; avoid implicit global tracers
+  - Wire the tracer provider in main.go lifecycle (Start/Shutdown), not in init() or package-level vars
+  - Span propagation helpers belong in middleware/tracing; keep configuration and exporter setup here

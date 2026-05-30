@@ -362,7 +362,7 @@ gates: ## Run all required quality gates (mirrors CI)
 	TMP=$$(mktemp -d "$${TMPDIR:-/tmp}/plumego-stable-api.XXXXXX"); \
 	trap 'rm -rf "$$TMP"' EXIT; \
 	go run ./internal/checks/extension-api-snapshot -module ./core -out "$$TMP/core-head.snapshot"; \
-	go run ./internal/checks/extension-api-snapshot -compare docs/stable-api/snapshots/core-head.snapshot "$$TMP/core-head.snapshot"
+	go run ./internal/checks/extension-api-snapshot -compare docs/evidence/stable-api/snapshots/core-head.snapshot "$$TMP/core-head.snapshot"
 	go run ./internal/tools/doc-snippets
 	go vet ./...
 	$(MAKE) reference-vet

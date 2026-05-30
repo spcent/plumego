@@ -36,7 +36,7 @@ Use task cards when work should be:
 - scoped to one primary module when possible
 - easy to validate and easy to revert in one commit
 
-Task cards are workflow assets, not archival prose. Keep long-form planning in `docs/ROADMAP.md` and machine-readable rules in `specs/`.
+Task cards are workflow assets, not archival prose. Keep long-form planning in `docs/release/roadmap.md` and machine-readable rules in `specs/`.
 
 ## Card Format
 
@@ -75,7 +75,7 @@ Optional operational fields when useful:
 - choose one matching `specs/change-recipes/*.yaml` recipe when possible
 - keep the file set to five files or fewer
 - keep validation to three commands or fewer
-- record the smallest matching context package from `docs/AGENT_CONTEXT_BUDGET.md`
+- record the smallest matching context package from `docs/operations/agent-context-budget.md`
 - avoid mixing unrelated runtime, docs, and architecture changes in one card
 - keep the live queue short enough that the next card is obvious
 - archive completed cards promptly so `active/` remains a working queue rather than a history dump

@@ -9,14 +9,14 @@ Primary Module: docs
 Owned Files:
 - `AGENTS.md`
 - `docs/README.md`
-- `docs/AGENT_FIRST.md`
-- `docs/agent-first-operating-reference.md`
+- `docs/concepts/agent-first.md`
+- `docs/operations/agent-first-operating-reference.md`
 - `README.md`
 Depends On: none
 
 ## Goal
 
-Replace the case-only `docs/AGENT_FIRST.md` vs `docs/agent-first.md` split with
+Replace the case-only `docs/concepts/agent-first.md` vs `docs/agent-first.md` split with
 clearly distinguished internal vs external documentation names and references.
 
 ## Scope
@@ -36,8 +36,8 @@ links so agents do not have to infer intent from filename case.
 
 - `AGENTS.md`
 - `docs/README.md`
-- `docs/AGENT_FIRST.md`
-- `docs/agent-first-operating-reference.md`
+- `docs/concepts/agent-first.md`
+- `docs/operations/agent-first-operating-reference.md`
 - `README.md`
 
 ## Acceptance Tests
@@ -69,6 +69,6 @@ links so agents do not have to infer intent from filename case.
 ## Outcome
 
 Renamed the detailed internal guide to
-`docs/agent-first-operating-reference.md`, kept `docs/AGENT_FIRST.md` as the
+`docs/operations/agent-first-operating-reference.md`, kept `docs/concepts/agent-first.md` as the
 external overview, and updated authority and onboarding links so readers no
 longer need to infer intent from filename case alone.

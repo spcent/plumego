@@ -24,37 +24,23 @@ allowed_imports:
   - internal/httputil
   - x/gateway
 
-forbidden_imports:
-  - core/**
-  - router/**
-  - middleware/**
-  - security/**
-  - store/**
-  - health/**
-  - log/**
-  - metrics/**
-  - x/ai/**
-  - x/data/**
-  - x/fileapi/**
-  - x/frontend/**
-  - x/messaging/**
-  - x/observability/**
-  - x/openapi/**
-  - x/resilience/**
-  - x/rest/**
-  - x/rpc/**
-  - x/tenant/**
-  - x/validate/**
-
 test_commands:
   - go test -race -timeout 60s ./x/gateway/cache/...
   - go vet ./x/gateway/cache/...
 
+forbidden_imports:
+  - core/**
+  - store/**
+  - x/tenant/**
+  - x/ai/**
+  - x/messaging/**
+  - x/observability/**
+
 review_checklist:
-  - Keep cache key derivation collision-free and scheme/host/path aware
-  - Honor TTL and never serve responses past their intended expiry
-  - Keep caching opt-in and separate from upstream proxy logic
+  - Keep cache key strategies explicit and pluggable
+  - Do not introduce hidden global cache state
+  - Keep distributed cache adapters out of this package (owned by x/data)
 
 agent_hints:
-  - Wire caching as an explicit gateway stage, not implicit global behavior
-  - Keep cache storage swappable behind the package interface
+  - Cache key strategies are composable interfaces; prefer composition over inheritance
+  - In-memory store is the canonical implementation; wire storage alternatives via the Store interface

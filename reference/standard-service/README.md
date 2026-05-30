@@ -2,7 +2,7 @@
 
 `reference/standard-service` is Plumego's canonical reference application.
 
-Read this immediately after `docs/getting-started.md`. This directory is the
+Read this immediately after `docs/start/getting-started.md`. This directory is the
 default answer to "what should a Plumego application look like?"
 
 It is the single source of truth for:
@@ -121,6 +121,6 @@ behavior.
 Canonical next reads after this reference:
 
 1. `docs/README.md`
-2. `docs/CANONICAL_STYLE_GUIDE.md`
-3. `docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md`
+2. `docs/reference/canonical-style-guide.md`
+3. `docs/concepts/agent-first-repo-blueprint.md`
 4. `specs/task-routing.yaml`

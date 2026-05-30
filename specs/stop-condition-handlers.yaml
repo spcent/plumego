@@ -37,8 +37,8 @@ handlers:
     escalation: Record in the milestone spec's Open Questions section. Do not widen the stable root.
     unblock_by: rfc_or_scope_reduction
     docs:
-      - docs/architecture/core-boundary.md
-      - docs/architecture/extension-boundary.md
+      - docs/concepts/core-boundary.md
+      - docs/concepts/extension-boundary.md
       - specs/dependency-rules.yaml
     recipe: specs/change-recipes/new-extension-module.yaml
 
@@ -89,14 +89,14 @@ handlers:
       is ambiguous.
     resolution:
       - Record each conflicting source with the exact conflicting text.
-      - Apply the authority order from AGENTS.md section 1: (1) security/boundary rules, (2) CANONICAL_STYLE_GUIDE.md, (3) machine-readable specs, (4) existing local patterns.
+      - Apply the authority order from AGENTS.md section 1: (1) security/boundary rules, (2) docs/reference/canonical-style-guide.md, (3) machine-readable specs, (4) existing local patterns.
       - If the conflict is at level (3) vs (4), prefer the spec and flag the local pattern as drift.
       - If the conflict involves a security or boundary rule, halt and escalate.
     escalation: Create tasks/cards/blocked/<id>-conflict.md listing each conflicting source and the proposed resolution.
     unblock_by: human_review
     docs:
       - AGENTS.md
-      - docs/CANONICAL_STYLE_GUIDE.md
+      - docs/reference/canonical-style-guide.md
       - specs/repo.yaml
 
   feature_catalog_in_stable_root:
@@ -111,8 +111,8 @@ handlers:
     escalation: Record the proposed x/* target in the task card before implementing.
     unblock_by: scope_confirmed_in_task_card
     docs:
-      - docs/architecture/core-boundary.md
-      - docs/architecture/extension-boundary.md
+      - docs/concepts/core-boundary.md
+      - docs/concepts/extension-boundary.md
     recipe: specs/change-recipes/new-extension-module.yaml
 
   hidden_registration_attempt:
@@ -127,7 +127,7 @@ handlers:
     unblock_by: design_change
     docs:
       - AGENTS.md
-      - docs/CANONICAL_STYLE_GUIDE.md
+      - docs/reference/canonical-style-guide.md
 
   auth_policy_in_transport_middleware:
     description: >
@@ -143,7 +143,7 @@ handlers:
     docs:
       - middleware/module.yaml
       - x/tenant/module.yaml
-      - docs/architecture/core-boundary.md
+      - docs/concepts/core-boundary.md
 
   missing_tests_for_behavior_change:
     description: A behavior change has no associated tests, or the test scope is insufficient.

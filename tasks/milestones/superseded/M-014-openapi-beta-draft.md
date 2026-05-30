@@ -29,7 +29,7 @@ Graduate `x/openapi` from Experimental to Beta by implementing a `RouteInfo`-dri
 - `plumego generate spec` reads a compiled binary's embedded spec (via a new `x/openapi.Embed()` call) or a Go file that imports the app wiring. Implementation detail left to Phase 2 analysis.
 - `x/openapi` imports `router` (for `RouteInfo`) and `contract` (for `APIError` schema shape). It must not import any other stable root or `x/*` package.
 - No external OpenAPI library dependency. Stdlib JSON marshaling only.
-- After promotion, update `specs/extension-maturity.yaml` and `docs/EXTENSION_MATURITY.md`.
+- After promotion, update `specs/extension-maturity.yaml` and `docs/concepts/extension-maturity.md`.
 
 ---
 
@@ -47,7 +47,7 @@ Graduate `x/openapi` from Experimental to Beta by implementing a `RouteInfo`-dri
 ## Affected Modules
 
 - **Primary:** `x/openapi`
-- **Secondary:** `cmd/plumego`, `specs/extension-maturity.yaml`, `docs/EXTENSION_MATURITY.md`
+- **Secondary:** `cmd/plumego`, `specs/extension-maturity.yaml`, `docs/concepts/extension-maturity.md`
 
 ---
 
@@ -69,7 +69,7 @@ Graduate `x/openapi` from Experimental to Beta by implementing a `RouteInfo`-dri
 - [ ] `cmd/plumego/commands/generate.go`: `plumego generate spec [--format json|yaml] [--output path]` — reads routes from a provided Go file that calls `app.Prepare()` and registers a spec handler at `/_plumego/openapi.json`.
 - [ ] `x/openapi/module.yaml`: update `status` to `beta`.
 - [ ] `specs/extension-maturity.yaml`: promote `x/openapi` to `beta`.
-- [ ] `docs/EXTENSION_MATURITY.md`: update maturity table row for `x/openapi`.
+- [ ] `docs/concepts/extension-maturity.md`: update maturity table row for `x/openapi`.
 
 ### Phase 3 — Test (sequential)
 
@@ -128,7 +128,7 @@ Expected: all exit 0; `gofmt -l` outputs nothing.
 - [ ] Generated OpenAPI 3.1.0 JSON passes structural validation test.
 - [ ] `x/openapi/module.yaml` status is `beta`.
 - [ ] `specs/extension-maturity.yaml` reflects beta status.
-- [ ] `docs/EXTENSION_MATURITY.md` maturity table updated.
+- [ ] `docs/concepts/extension-maturity.md` maturity table updated.
 - [ ] `plumego generate spec` command is documented in `cmd/plumego/README.md`.
 - [ ] Branch `milestone/M-014-openapi-generation` pushed.
 - [ ] PR open, title `milestone(M-014): OpenAPI 3.1 Generation`.

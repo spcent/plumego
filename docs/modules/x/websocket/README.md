@@ -11,7 +11,7 @@
 - Promoted at `v0.2.0` after release-backed evidence showed no exported
   `x/websocket` API changes across refs `d2c25c3` and `ec70358`, with
   `realtime` owner sign-off recorded in
-  `docs/extension-evidence/x-websocket.md`
+  `docs/evidence/extension/x-websocket.md`
 
 ## Use this module when
 
@@ -142,7 +142,7 @@
 ## Beta readiness
 
 `x/websocket` satisfies the current coverage and boundary portions of
-`docs/EXTENSION_STABILITY_POLICY.md`: hub lifecycle, shutdown, capacity errors,
+`docs/reference/extension-stability-policy.md`: hub lifecycle, shutdown, capacity errors,
 broadcast no-op behavior, validation, security checks, and server setup failure
 paths have focused tests.
 
@@ -151,7 +151,7 @@ The current development-head runtime stable-readiness gate was recorded on
 extension evidence checks, and maturity checks.
 
 The module is beta. The beta evidence in
-`docs/extension-evidence/x-websocket.md` records two release refs, matching API
+`docs/evidence/extension/x-websocket.md` records two release refs, matching API
 snapshots, no exported API changes, and `realtime` owner sign-off.
 
 ## Canonical change shape

@@ -332,8 +332,8 @@ func apiSnapshotViolations(repoRoot string, cand candidate) []string {
 		if snapshot == "" {
 			continue
 		}
-		if !strings.HasPrefix(snapshot, "docs/extension-evidence/snapshots/") {
-			violations = append(violations, fmt.Sprintf("%s api_snapshot must live under docs/extension-evidence/snapshots/: %s", cand.Label(), snapshot))
+		if !strings.HasPrefix(snapshot, "docs/evidence/extension/snapshots/") {
+			violations = append(violations, fmt.Sprintf("%s api_snapshot must live under docs/evidence/extension/snapshots/: %s", cand.Label(), snapshot))
 			continue
 		}
 		info, err := os.Stat(filepath.Join(repoRoot, filepath.FromSlash(snapshot)))

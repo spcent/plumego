@@ -28,7 +28,7 @@
 ## First files to read
 
 - `middleware/module.yaml`
-- `docs/CANONICAL_STYLE_GUIDE.md`
+- `docs/reference/canonical-style-guide.md`
 - the target package under `middleware/*`
 
 ## Canonical change shape

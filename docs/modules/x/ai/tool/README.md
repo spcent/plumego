@@ -12,7 +12,7 @@ completion.
 ## Status
 
 `beta surface` — API unchanged across v1.0.0 → v1.1.0, owner sign-off recorded.  
-Parent family `x/ai` remains experimental. See [`docs/EXTENSION_MATURITY.md`](../../../../EXTENSION_MATURITY.md).
+Parent family `x/ai` remains experimental. See [`docs/concepts/extension-maturity.md`](../../../../concepts/extension-maturity.md).
 
 ## Use this module when
 

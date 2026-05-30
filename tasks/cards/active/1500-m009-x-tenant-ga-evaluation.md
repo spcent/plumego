@@ -7,8 +7,8 @@ State: active
 Primary Module: x/tenant
 Owned Files:
 - `specs/extension-beta-evidence.yaml`
-- `docs/extension-evidence/x-tenant.md`
-- `docs/EXTENSION_MATURITY.md`
+- `docs/evidence/extension/x-tenant.md`
+- `docs/concepts/extension-maturity.md`
 - `x/tenant/module.yaml`
 
 Goal:
@@ -20,10 +20,10 @@ Goal:
 Problem:
 x/tenant was promoted to beta at v1.1.0. GA promotion requires:
 1. Two consecutive minor releases without exported API changes (v1.1.x → v1.2.x).
-2. Checked-in API snapshots for both release refs in `docs/extension-evidence/snapshots/`.
+2. Checked-in API snapshots for both release refs in `docs/evidence/extension/snapshots/`.
 3. Owner sign-off recorded in `specs/extension-beta-evidence.yaml`.
 4. No open integration test failures across resolve → policy → quota → ratelimit chain.
-5. Updated `docs/EXTENSION_MATURITY.md` and `x/tenant/module.yaml` (`status: ga`).
+5. Updated `docs/concepts/extension-maturity.md` and `x/tenant/module.yaml` (`status: ga`).
 
 Scope:
 - Run `go run ./internal/checks/extension-release-evidence -module ./x/tenant -base v1.1.0 -head v1.2.0`
@@ -40,10 +40,10 @@ Non-goals:
 
 Files:
 - `specs/extension-beta-evidence.yaml`
-- `docs/extension-evidence/x-tenant.md`
-- `docs/EXTENSION_MATURITY.md`
+- `docs/evidence/extension/x-tenant.md`
+- `docs/concepts/extension-maturity.md`
 - `x/tenant/module.yaml`
-- `docs/ROADMAP.md`
+- `docs/release/roadmap.md`
 
 Tests:
 - `go test -race -timeout 60s ./x/tenant/...`
@@ -51,8 +51,8 @@ Tests:
 - `go run ./internal/checks/extension-maturity`
 
 Docs Sync:
-- Required: update `docs/EXTENSION_MATURITY.md`, `x/tenant/module.yaml` status,
-  `docs/ROADMAP.md` Phase 9, and `docs/modules/x/tenant/README.md` v-status table.
+- Required: update `docs/concepts/extension-maturity.md`, `x/tenant/module.yaml` status,
+  `docs/release/roadmap.md` Phase 9, and `docs/modules/x/tenant/README.md` v-status table.
 
 Done Definition:
 - `x/tenant` has `status: ga` in its module.yaml, OR
@@ -61,5 +61,5 @@ Done Definition:
 Notes:
 - x/tenant integration test in `x/tenant/integration_test.go` already covers the
   full resolve → policy → quota → ratelimit chain; confirm it passes before evaluation.
-- The promotion checklist is at `docs/EXTENSION_STABILITY_POLICY.md`.
+- The promotion checklist is at `docs/reference/extension-stability-policy.md`.
 - Owner sign-off must come from the `multitenancy` owner group.

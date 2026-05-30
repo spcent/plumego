@@ -43,10 +43,10 @@ the canonical family index for the tier split itself.
 The root `x/ai` family remains experimental. Beta evaluation is tracked only at
 the stable-tier subpackage level:
 
-- `provider`: `docs/extension-evidence/x-ai-provider.md`
-- `session`: `docs/extension-evidence/x-ai-session.md`
-- `streaming`: `docs/extension-evidence/x-ai-streaming.md`
-- `tool`: `docs/extension-evidence/x-ai-tool.md`
+- `provider`: `docs/evidence/extension/x-ai-provider.md`
+- `session`: `docs/evidence/extension/x-ai-session.md`
+- `streaming`: `docs/evidence/extension/x-ai-streaming.md`
+- `tool`: `docs/evidence/extension/x-ai-tool.md`
 
 These records are evidence for compatibility-oriented adoption of the named
 subpackage only. They do not promote `x/ai` as a family and do not cover
@@ -117,7 +117,7 @@ owns a cleanup goroutine only when constructed with a cleanup interval, and
 callers should call `Close` when that background cleanup is enabled.
 
 Boundary details are recorded in
-`docs/architecture/x-ai-resilience-boundary.md`. For v1 cleanup, do not migrate
+`docs/concepts/x-ai-resilience-boundary.md`. For v1 cleanup, do not migrate
 public types between `x/ai/*` and `x/resilience` inline with feature work.
 new generic breaker or limiter algorithms belong in `x/resilience`, while
 AI-provider wrapping, fallback, request keying, and AI error classification

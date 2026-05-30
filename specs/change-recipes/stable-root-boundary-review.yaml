@@ -1,7 +1,7 @@
 name: stable-root-boundary-review
 scope: review-only check for stable-root boundary safety
 steps:
-  - Read AGENTS.md, the matching specs/task-routing.yaml entry, docs/AGENT_CODE_QUALITY_RULES.md, specs/repo.yaml, specs/dependency-rules.yaml, specs/agent-quality-rules.yaml, and the touched stable-root manifests.
+  - Read AGENTS.md, the matching specs/task-routing.yaml entry, docs/operations/agent-code-quality-rules.md, specs/repo.yaml, specs/dependency-rules.yaml, specs/agent-quality-rules.yaml, and the touched stable-root manifests.
   - Classify changed files by stable root and identify any extension-family leakage or app-wiring drift.
   - Check for hidden globals, context service-location, net/http compatibility drift, and transport/business responsibility mixing.
   - Report findings first, ordered by severity, with file-level references, minimal fix guidance, and missing-test notes.

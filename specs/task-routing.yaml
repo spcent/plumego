@@ -7,7 +7,7 @@ context_policy:
     - AGENTS.md
     - specs/task-routing.yaml
   package_docs:
-    - docs/AGENT_CONTEXT_BUDGET.md
+    - docs/operations/agent-context-budget.md
   selection_order:
     - Read AGENTS.md.
     - Match the request to one tasks entry.
@@ -90,9 +90,9 @@ tasks:
     context_package: control-plane
     start_with:
       - AGENTS.md
-      - docs/AGENT_CONTEXT_BUDGET.md
-      - docs/CANONICAL_STYLE_GUIDE.md
-      - docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md
+      - docs/operations/agent-context-budget.md
+      - docs/reference/canonical-style-guide.md
+      - docs/concepts/agent-first-repo-blueprint.md
       - specs/repo.yaml
       - specs/task-routing.yaml
       - specs/dependency-rules.yaml
@@ -107,9 +107,9 @@ tasks:
     context_package: control-plane
     start_with:
       - AGENTS.md
-      - docs/AGENT_CONTEXT_BUDGET.md
-      - docs/CODEX_WORKFLOW.md
-      - docs/AGENT_CODE_QUALITY_RULES.md
+      - docs/operations/agent-context-budget.md
+      - docs/operations/codex-workflow.md
+      - docs/operations/agent-code-quality-rules.md
       - specs/task-routing.yaml
       - specs/agent-quality-rules.yaml
       - specs/checks.yaml
@@ -117,7 +117,7 @@ tasks:
     avoid:
       - reference/with-messaging
       - reference/with-gateway
-      - docs/stable-api/snapshots
+      - docs/evidence/stable-api/snapshots
 
   module_manifest:
     intent: Change module ownership, scope, test commands, or review guidance in module manifests.
@@ -135,8 +135,8 @@ tasks:
     context_package: implementation
     start_with:
       - AGENTS.md
-      - docs/CANONICAL_STYLE_GUIDE.md
-      - docs/AGENT_CODE_QUALITY_RULES.md
+      - docs/reference/canonical-style-guide.md
+      - docs/operations/agent-code-quality-rules.md
       - specs/change-recipes/symbol-change.yaml
       - specs/package-hotspots.yaml
     avoid:
@@ -160,7 +160,7 @@ tasks:
     context_package: implementation
     start_with:
       - AGENTS.md
-      - docs/CANONICAL_STYLE_GUIDE.md
+      - docs/reference/canonical-style-guide.md
       - specs/change-recipes/http-endpoint-bugfix.yaml
       - reference/standard-service/internal/app/routes.go
       - contract/module.yaml
@@ -176,7 +176,7 @@ tasks:
       - AGENTS.md
       - specs/change-recipes/tenant-policy-change.yaml
       - x/tenant/module.yaml
-      - docs/architecture/X_TENANT_BLUEPRINT.md
+      - docs/concepts/x-tenant-blueprint.md
       - docs/modules/x/tenant/README.md
     avoid:
       - middleware
@@ -222,7 +222,7 @@ tasks:
   app_bootstrap:
     intent: Change application bootstrap shape, main.go wiring, or core server construction.
     start_with:
-      - docs/CANONICAL_STYLE_GUIDE.md
+      - docs/reference/canonical-style-guide.md
       - specs/repo.yaml
       - reference/standard-service/main.go
       - reference/standard-service/internal/app/app.go
@@ -235,7 +235,7 @@ tasks:
   http_endpoint:
     intent: Add or change an HTTP route, handler, or route-group registration.
     start_with:
-      - docs/CANONICAL_STYLE_GUIDE.md
+      - docs/reference/canonical-style-guide.md
       - reference/standard-service/internal/app/routes.go
       - contract/module.yaml
       - router/module.yaml
@@ -247,7 +247,7 @@ tasks:
     start_with:
       - middleware/module.yaml
       - docs/modules/middleware/README.md
-      - docs/CANONICAL_STYLE_GUIDE.md
+      - docs/reference/canonical-style-guide.md
     avoid:
       - core
       - contract
@@ -319,7 +319,7 @@ tasks:
     start_with:
       - x/tenant/module.yaml
       - docs/modules/x/tenant/README.md
-      - docs/architecture/X_TENANT_BLUEPRINT.md
+      - docs/concepts/x-tenant-blueprint.md
     avoid:
       - middleware
       - store

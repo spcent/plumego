@@ -605,7 +605,7 @@ modules:
     path: x/ai
     layer: extension
     # status: experimental. AI gateway capabilities: providers, sessions, streaming, tools, resilience.
-    # Sub-packages may carry individual beta surfaces (see docs/EXTENSION_MATURITY.md).
+    # Sub-packages may carry individual beta surfaces (see docs/concepts/extension-maturity.md).
     # x/ai/metrics defines an AI-specific Collector interface deliberately distinct from the
     # stable metrics.AggregateCollector. See x/ai/metrics package doc for the boundary rationale.
     allow:

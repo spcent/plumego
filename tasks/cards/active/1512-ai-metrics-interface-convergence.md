@@ -1,10 +1,6 @@
 # 1512 — x/ai/metrics interface convergence decision
 
-Milestone: M-022
-Recipe: specs/change-recipes/analysis-only.yaml
-Priority: P2
 State: active
-Primary Module: x/ai/metrics
 
 ## Context
 

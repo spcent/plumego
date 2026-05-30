@@ -47,7 +47,7 @@ test_commands:
 
 doc_paths:
   - docs/modules/x/data/cache/README.md
-  - docs/extension-evidence/x-cache.md
+  - docs/evidence/extension/x-cache.md
 
 change_risks:
   - distributed cache correctness regression

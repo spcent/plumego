@@ -11,7 +11,7 @@ Owned Files:
 - `x/ai/tool/module.yaml`
 - `x/ai/module.yaml`
 - `docs/modules/x/ai/README.md`
-- `docs/EXTENSION_MATURITY.md`
+- `docs/concepts/extension-maturity.md`
 Depends On: 2062
 
 ## Goal
@@ -36,7 +36,7 @@ docs so the stable-tier evidence no longer relies on root `x/ai` prose alone.
 - `x/ai/tool/module.yaml`
 - `x/ai/module.yaml`
 - `docs/modules/x/ai/README.md`
-- `docs/EXTENSION_MATURITY.md`
+- `docs/concepts/extension-maturity.md`
 
 ## Acceptance Tests
 
@@ -50,7 +50,7 @@ docs so the stable-tier evidence no longer relies on root `x/ai` prose alone.
 ## Docs Sync
 
 - `docs/modules/x/ai/README.md`
-- `docs/EXTENSION_MATURITY.md`
+- `docs/concepts/extension-maturity.md`
 
 ## Validation
 

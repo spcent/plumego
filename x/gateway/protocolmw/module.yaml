@@ -24,37 +24,23 @@ allowed_imports:
   - x/gateway
   - x/gateway/protocol
 
-forbidden_imports:
-  - core/**
-  - router/**
-  - security/**
-  - store/**
-  - health/**
-  - log/**
-  - metrics/**
-  - x/ai/**
-  - x/data/**
-  - x/fileapi/**
-  - x/frontend/**
-  - x/messaging/**
-  - x/observability/**
-  - x/openapi/**
-  - x/resilience/**
-  - x/rest/**
-  - x/rpc/**
-  - x/tenant/**
-  - x/validate/**
-  - x/websocket/**
-
 test_commands:
   - go test -race -timeout 60s ./x/gateway/protocolmw/...
   - go vet ./x/gateway/protocolmw/...
 
+forbidden_imports:
+  - core/**
+  - store/**
+  - x/tenant/**
+  - x/ai/**
+  - x/messaging/**
+  - x/observability/**
+
 review_checklist:
-  - Keep middleware transport-only with no business policy
-  - Reuse x/gateway/protocol detection instead of re-implementing it
-  - Preserve net/http handler semantics
+  - Keep protocol middleware composable and stateless
+  - Do not add business policy into protocol-level middleware
+  - Avoid coupling protocol middleware to specific gateway implementations
 
 agent_hints:
-  - Compose protocol handling as middleware in the gateway chain
-  - Source protocol decisions from x/gateway/protocol
+  - Protocol middleware wraps existing protocol adapters; keep wiring explicit in the app layer
+  - Prefer small focused middleware functions over monolithic protocol handlers

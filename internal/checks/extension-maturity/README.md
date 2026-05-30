@@ -1,6 +1,6 @@
 # extension-maturity
 
-`extension-maturity` validates `docs/EXTENSION_MATURITY.md` against extension
+`extension-maturity` validates `docs/concepts/extension-maturity.md` against extension
 module manifests, machine-readable maturity signals, and beta-promotion
 evidence.
 

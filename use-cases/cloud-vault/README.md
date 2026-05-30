@@ -1,6 +1,229 @@
 # Markdown Cloud Vault
 
-A single-binary Go + React application for managing Markdown documents with object storage versioning.
+A local-first Markdown knowledge vault for your AI-generated notes.
+
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Version](https://img.shields.io/badge/version-1.0.0-green.svg)](docs/release-notes.md)
+
+[Download Desktop App](https://example.com/download) | [Deploy Server](docs/server-deploy.md) | [Documentation](docs/)
+
+---
+
+## Features
+
+- **Local-first storage** — Your Markdown stays on your machine (or your own cloud storage)
+- **Bulk import** — Import hundreds of Markdown files with scan preview, duplicate detection, and retry
+- **Full-text search** — SQLite FTS5 powers instant search across titles, content, and metadata
+- **Smart organization** — Collections, tags, review queue, and AI-powered topic grouping
+- **Optional AI** — Summarize, question, and extract insights (configure your own AI provider)
+- **Backup & restore** — Built-in backup with one-click restore
+- **Desktop & server** — Native desktop app (macOS/Windows/Linux) or self-hosted server
+
+## Quick Start
+
+### Desktop App
+
+1. Download the installer for your platform:
+   - [macOS (Apple Silicon)](https://example.com/downloads/Cloud-Vault-v1.0.0-macOS-arm64.dmg)
+   - [macOS (Intel)](https://example.com/downloads/Cloud-Vault-v1.0.0-macOS-amd64.dmg)
+   - [Windows](https://example.com/downloads/Cloud-Vault-v1.0.0-windows-amd64.exe)
+   - [Linux](https://example.com/downloads/Cloud-Vault-v1.0.0-linux-amd64.AppImage)
+
+2. Install and launch the application
+3. On first run, create an admin account
+4. Import your Markdown files: System → Import → Select Directory
+5. Start searching and organizing!
+
+See [Desktop Guide](docs/desktop.md) for detailed instructions.
+
+### Server Deployment
+
+1. Download the server binary:
+   ```bash
+   curl -L -o cloud-vault https://example.com/downloads/cloud-vault-v1.0.0-linux-amd64
+   chmod +x cloud-vault
+   ```
+
+2. Create config file:
+   ```bash
+   cp config.example.toml config.toml
+   # Edit config.toml as needed
+   ```
+
+3. Run the server:
+   ```bash
+   ./cloud-vault
+   ```
+
+4. Open http://localhost:8080 and create an admin account
+
+See [Server Deployment Guide](docs/server-deploy.md) for Docker, systemd, and HTTPS setup.
+
+## Configuration
+
+Configuration is loaded from `config.toml`, `.env` file, or environment variables (in that order, env vars take precedence).
+
+Key options:
+- `server.addr` — HTTP listen address (default: `:8080`)
+- `database.path` — SQLite database path (default: `./data/app.db`)
+- `storage.provider` — `local` or `qiniu` (default: `local`)
+- `auth.enabled` — Enable authentication (default: `false`)
+- `ai.enabled` — Enable AI features (default: `false`)
+
+See [Configuration Guide](docs/configuration.md) for all options.
+
+## Importing Markdown
+
+1. Navigate to System → Import
+2. Select a directory containing Markdown files
+3. Review scan preview (file count, size, duplicates)
+4. Click "Start Import"
+5. Monitor progress and retry failures
+
+See [Import Guide](docs/import.md) for advanced options.
+
+## Search & Organize
+
+- **Search** — Use the search bar to find documents by title, content, or metadata
+- **Collections** — Group related documents into collections
+- **Tags** — Add tags for flexible categorization
+- **Review queue** — Process unprocessed imports
+- **AI topics** — Get AI-powered topic suggestions (if enabled)
+
+See [Search Guide](docs/search.md) and [Organize Guide](docs/organize.md).
+
+## AI Features (Optional)
+
+AI features are disabled by default. To enable:
+
+1. Configure an OpenAI-compatible provider in `config.toml`:
+   ```toml
+   [ai]
+   enabled = true
+   provider = "openai_compatible"
+   base_url = "https://api.openai.com/v1"
+   api_key = "your-api-key"
+   model = "gpt-4"
+   ```
+
+2. Use AI features:
+   - Summarize documents
+   - Ask questions about selected documents
+   - Extract prompts from conversations
+   - Generate new documents from AI output
+
+**Privacy**: Only documents you explicitly select are sent to the AI provider.
+
+See [AI Guide](docs/ai.md) for details.
+
+## Backup & Restore
+
+### Create backup
+```bash
+curl -X POST http://localhost:8080/api/v1/system/backup \
+  -H 'Content-Type: application/json' \
+  -b cookie.txt
+```
+
+Or use the web UI: System → Backup → Create Backup
+
+### Restore from backup
+```bash
+./cloud-vault restore --file backups/backup-20260530-120000.zip --data-dir ./data
+```
+
+See [Backup & Restore Guide](docs/backup-restore.md).
+
+## Error Reporting & Diagnostics
+
+If you encounter issues, export a diagnostic bundle:
+
+1. Navigate to Settings → Diagnostics
+2. Click "Export Diagnostic Bundle"
+3. Download the generated zip file
+4. Share with support (if applicable)
+
+**Privacy**: Diagnostic bundles include redacted config, logs, and system info. They **do not** include Markdown content, database files, API keys, session tokens, or passwords.
+
+See [Diagnostics Guide](docs/diagnostics.md).
+
+## Privacy & Security
+
+- **LocalStorage mode** — All data stays on your machine
+- **QiniuStorage mode** — Data uploaded to your own Qiniu bucket (you control access)
+- **AI features** — Optional, only send documents you explicitly select
+- **Session cookies** — HttpOnly flag, secure flag recommended for production
+- **Diagnostic bundles** — Exclude Markdown content and secrets
+
+See [Privacy Policy](docs/privacy.md) and [Security Guide](docs/security.md).
+
+## Development
+
+### Prerequisites
+- Go 1.26+
+- Node.js 20+ and pnpm
+- (Optional) Wails CLI for desktop builds: `go install github.com/wailsapp/wails/v2/cmd/wails@latest`
+
+### Build from source
+
+```bash
+# Clone repository
+git clone https://github.com/example/cloud-vault.git
+cd cloud-vault
+
+# Build server
+make build
+
+# Run server
+./bin/markdown-vault
+
+# Build desktop app (requires Wails CLI)
+make desktop-build
+```
+
+### Run tests
+
+```bash
+# Go tests
+make test
+
+# Frontend tests
+cd web && pnpm test
+
+# E2E tests (requires Playwright)
+make test-e2e
+```
+
+See [Development Guide](docs/development.md).
+
+## License
+
+[MIT](LICENSE)
+
+## Current Limitations
+
+- V1.0 does not support multi-user real-time collaboration
+- V1.0 does not support cloud sync accounts
+- Auto-update check only notifies, does not silently install
+- AI features require user-configured model provider
+- Approximate duplicate and topic detection are suggestions, may not be fully accurate
+- QiniuStorage requires user to manage bucket permissions and backup strategy
+- macOS/Windows installers may show security warnings if not signed (see [Installation Guide](docs/installation.md))
+
+## Links
+
+- [Documentation](docs/)
+- [Release Notes](docs/release-notes.md)
+- [Changelog](CHANGELOG.md)
+- [Privacy Policy](docs/privacy.md)
+- [Security](docs/security.md)
+- [Landing Page Draft](landing/index.html)
+
+---
+
+# Developer Documentation
+
+The sections below contain detailed developer documentation for all versions.
 
 ## Technology Stack
 
@@ -129,6 +352,12 @@ All endpoints are under `/api/v1`. Successful responses use `{"data": ...}`, err
 | DELETE | `/api/v1/auth/sessions/:id` | Revoke specific session (protected) |
 | POST | `/api/v1/auth/sessions/revoke-all` | Revoke all other sessions (protected) |
 | GET | `/api/v1/auth/security-events` | List security events (protected) |
+| POST | `/api/v1/system/backup` | Create backup (protected) |
+| GET | `/api/v1/system/backups` | List backups (protected) |
+| GET | `/api/v1/system/backups/:name/download` | Download backup (protected) |
+| DELETE | `/api/v1/system/backups/:name` | Delete backup (protected) |
+| POST | `/api/v1/system/restore` | Restore from backup (protected, requires `confirm=RESTORE`) |
+| GET | `/api/v1/system/settings` | Get non-sensitive system settings (protected) |
 
 **Note:** Protected endpoints require a valid session cookie. See V0.7 documentation for authentication details.
 
@@ -1126,6 +1355,504 @@ password = "Change-Me-Strong-Password-123"
 
 The bootstrap admin will be created automatically on startup, and you can login immediately.
 
+## V0.8: Productization, Backup & Deployment
+
+V0.8 focuses on production readiness: configuration validation, backup/restore, deployment packaging, deployment-aware doctor checks, and comprehensive regression testing.
+
+### Configuration System
+
+#### Loading Priority
+
+Configuration is loaded in this order (later wins):
+
+1. **Defaults** — built-in defaults
+2. **config.toml** — TOML file (default: `./config.toml`, or `--config <path>`)
+3. **.env file** — KEY=VALUE pairs (default: `./.env`)
+4. **Environment variables** — `APP_*`, `AUTH_*`, `QINIU_*`, etc.
+5. **CLI flags** — `--addr`, `--db-path`, etc.
+
+```bash
+# Copy example configs
+cp config.example.toml config.toml
+cp env.example .env
+
+# Edit .env with your secrets
+nano .env
+
+# Run the server
+./cloud-vault --config config.toml
+```
+
+#### Configuration Validation
+
+On startup, Cloud Vault validates all configuration and refuses to start with invalid settings:
+
+| Section | Required Fields |
+|---|---|
+| `[server]` | `addr` non-empty, port 1–65535 |
+| `[database]` | `path` non-empty, parent dir writable |
+| `[storage.local]` | `root` non-empty, writable |
+| `[storage.qiniu]` | `access_key`, `secret_key`, `bucket`, `domain`, `region` all non-empty |
+| `[auth]` (enabled) | `cookie_name`, `session_ttl_hours > 0`, `password_min_length >= 8` |
+| `[ai]` (enabled + openai) | `base_url`, `api_key`, `model` non-empty |
+
+Validation errors are structured with field paths — secrets are never logged.
+
+#### Sensitive Field Masking
+
+All log output automatically masks sensitive fields:
+
+- `Qiniu.SecretKey` → `[REDACTED]`
+- `AI.APIKey` → `[REDACTED]`
+- `Auth.BootstrapAdmin.Password` → `[REDACTED]`
+
+### Backup & Restore
+
+#### Creating Backups
+
+**Via UI:** System tab → Backup Management → Create Backup
+
+**Via API:**
+```bash
+curl -X POST http://localhost:8080/api/v1/system/backup \
+  -H "Cookie: session=<your-session-cookie>"
+```
+
+**Via CLI:**
+```bash
+make backup
+```
+
+Backups are stored as `backups/cloud-vault-backup-YYYYMMDD-HHMMSS.zip` containing:
+- SQLite database (consistent snapshot via `VACUUM INTO`)
+- Local storage objects (if provider=local)
+- `manifest.json` with metadata
+
+#### Listing & Downloading Backups
+
+```bash
+# List all backups
+curl http://localhost:8080/api/v1/system/backups \
+  -H "Cookie: session=<your-session-cookie>"
+
+# Download a specific backup
+curl -O http://localhost:8080/api/v1/system/backups/cloud-vault-backup-20260530-120000.zip/download \
+  -H "Cookie: session=<your-session-cookie>"
+
+# Delete a backup
+curl -X DELETE http://localhost:8080/api/v1/system/backups/cloud-vault-backup-20260530-120000.zip \
+  -H "Cookie: session=<your-session-cookie>"
+```
+
+#### Restoring from Backup
+
+**Via CLI (recommended):**
+```bash
+# Stop the server first!
+./cloud-vault restore --file backups/cloud-vault-backup-20260530-120000.zip --data-dir ./data
+```
+
+Steps:
+1. Validates the backup zip exists and contains a valid manifest
+2. Extracts `app.db` to `<data-dir>/app.db.new`
+3. Extracts `objects/` to `<data-dir>/objects.new/`
+4. Atomically renames to replace existing files
+5. Prints "run doctor to verify"
+
+**Via API (requires confirmation):**
+```bash
+curl -X POST http://localhost:8080/api/v1/system/restore \
+  -H "Content-Type: application/json" \
+  -H "Cookie: session=<your-session-cookie>" \
+  -d '{"backup_name":"cloud-vault-backup-20260530-120000.zip","confirm":"RESTORE"}'
+```
+
+The API refuses if any active sessions exist (returns 409). Stop the server or revoke all sessions first.
+
+> **Note:** Qiniu mode backups include only the manifest — bucket contents must be restored using Qiniu's own backup tools.
+
+### Doctor Deployment Checks
+
+V0.8 adds 8 deployment-aware checks to the doctor system:
+
+| Check | What it verifies |
+|---|---|
+| `config_check` | All config sections pass `ValidateConfig()` |
+| `data_dir_check` | Data directory exists and is writable |
+| `storage_writable_check` | Can write/read/delete a test object |
+| `auth_security_check` | Auth enabled, admin exists, no disabled users with sessions |
+| `cookie_security_check` | `secure_cookie=true` (warns if false) |
+| `qiniu_config_check` | All Qiniu fields set, bucket accessible |
+| `backup_check` | Backups dir writable, last backup < 7 days |
+| `migration_check` | Schema version matches expected latest |
+
+Run deployment checks:
+
+```bash
+curl -X POST http://localhost:8080/api/v1/system/doctor \
+  -H "Content-Type: application/json" \
+  -H "Cookie: session=<your-session-cookie>" \
+  -d '{"checks":["config_check","data_dir_check","storage_writable_check","auth_security_check","cookie_security_check","backup_check","migration_check"]}'
+```
+
+### Migration Upgrade Path
+
+V0.8 includes comprehensive migration upgrade tests covering:
+
+- `empty → latest` (fresh install)
+- `v01 → latest` (documents + versions only)
+- `v03 → latest` (+ FTS, search history)
+- `v05 → latest` (+ AI tasks, prompts, sources)
+- `v07 → latest` (+ users, sessions, security events)
+- `latest → latest` (idempotency)
+
+All migrations are idempotent — running `db.Migrate()` multiple times is safe.
+
+### Release Build
+
+Build a production release package:
+
+```bash
+make release VERSION=1.0.0
+# or
+./scripts/release.sh 1.0.0
+```
+
+Produces `dist/cloud-vault-1.0.0-linux-amd64.tar.gz` containing:
+- `cloud-vault` binary (linux/amd64, statically linked)
+- `config.example.toml`
+- `.env.example`
+- `README.md`
+
+### Docker Deployment
+
+**Build the image:**
+```bash
+docker build -t cloud-vault:latest .
+```
+
+**Run with docker-compose:**
+```bash
+cp docker-compose.yml docker-compose.override.yml
+# Edit to set volumes, ports, environment
+docker-compose up -d
+```
+
+**Run standalone:**
+```bash
+docker run -d \
+  --name cloud-vault \
+  -p 8080:8080 \
+  -v ./data:/app/data \
+  -v ./backups:/app/backups \
+  -e AUTH_ENABLED=true \
+  -e AUTH_SECURE_COOKIE=true \
+  cloud-vault:latest
+```
+
+The Docker image uses a multi-stage build:
+1. **frontend-builder** — Node 20 Alpine, builds React app
+2. **backend-builder** — Go 1.26 Alpine, compiles Go binary
+3. **runtime** — Alpine Linux, minimal footprint
+
+### systemd Installation
+
+Install as a systemd service on Linux:
+
+```bash
+# Build release binary
+make release
+
+# Create system user
+sudo useradd --system --shell /sbin/nologin cloud-vault
+
+# Install
+sudo mkdir -p /opt/cloud-vault
+sudo cp dist/cloud-vault/cloud-vault /opt/cloud-vault/
+sudo cp config.example.toml /opt/cloud-vault/config.toml
+sudo mkdir -p /opt/cloud-vault/data /opt/cloud-vault/backups
+sudo chown -R cloud-vault:cloud-vault /opt/cloud-vault
+
+# Edit config
+sudo nano /opt/cloud-vault/config.toml
+
+# Install service
+sudo cp deploy/systemd/cloud-vault.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now cloud-vault
+```
+
+The systemd unit includes security hardening:
+- `ProtectSystem=strict` — prevents writes outside designated paths
+- `PrivateTmp=true` — isolates temporary files
+- `NoNewPrivileges=true` — prevents privilege escalation
+- `ReadWritePaths=/opt/cloud-vault/data /opt/cloud-vault/backups` — explicit write paths
+
+See `deploy/systemd/INSTALL.md` for full documentation.
+
+### Settings Page
+
+The Settings page (`Settings` tab) displays non-sensitive configuration:
+
+- App version
+- Storage provider (Local / Qiniu)
+- Auth enabled status
+- Search enabled status
+- AI enabled status
+- Database path
+- Storage root (local mode only)
+
+Secrets (API keys, passwords) are never shown.
+
+### Security Recommendations
+
+1. **Production: enable authentication**
+   ```toml
+   [auth]
+   enabled = true
+   secure_cookie = true
+   ```
+
+2. **Use HTTPS**
+   - Terminate TLS at a reverse proxy (nginx, Caddy, Traefik)
+   - Set `AUTH_SECURE_COOKIE=true`
+   - Redirect all HTTP to HTTPS
+
+3. **Never commit secrets to Git**
+   - Use `.env` file (add to `.gitignore`)
+   - Inject Qiniu/AI keys via environment variables
+   - Use a secrets manager in production (Vault, AWS Secrets Manager)
+
+4. **Never log secrets**
+   - Cloud Vault automatically masks sensitive fields in logs
+   - Do not override this behavior
+
+5. **Back up regularly**
+   - SQLite: `cloud-vault backup` or API
+   - Local storage: included in backup zip
+   - Qiniu: use Qiniu's own backup tools
+
+6. **Rotate passwords periodically**
+   - Change admin password via Security page
+   - All sessions automatically revoked after password change
+
+7. **Monitor security events**
+   - Check Security page for unusual login patterns
+   - Revoke suspicious sessions immediately
+
+### V0.8 Current Limitations
+
+- **Restore recommended offline** — concurrent writes during restore are undefined
+- **Qiniu mode doesn't auto-backup bucket contents** — use Qiniu's own backup tools
+- **Docker/systemd are examples** — production hardening (secrets management, health checks, TLS termination) is user responsibility
+- **No incremental backups** — every backup is a full snapshot
+- **No scheduled backup** — use external cron/systemd timer
+- **No backup encryption at rest** — zip is stored plain; encrypt if storing offsite
+- **No automatic rotation of old backups** — manual cleanup required
+- **Multi-user permissions and team collaboration not implemented**
+
+### Migration from V0.7
+
+If upgrading from V0.7:
+
+1. Backup your database: `cp data/app.db data/app.db.backup`
+2. Stop the running application
+3. Run migration: `./cloud-vault` (migration 008 runs automatically)
+4. Access the application — no setup required, all users and sessions preserved
+5. Review new deployment checks: System tab → Doctor → select deployment checks
+
+All existing documents, users, sessions, and data remain intact.
+
+## V0.9: Desktop Application (Wails)
+
+V0.9 wraps Cloud Vault in a Wails v2 desktop application with system tray, native directory picker, and desktop-optimized import experience.
+
+### Architecture
+
+```
+cmd/desktop/main.go          → Wails entry point
+internal/desktop/
+├── config.go                → DesktopConfig + platform data dirs
+├── server.go                → Local HTTP server (127.0.0.1:0 + token)
+├── service.go               → DesktopService: runtime info, scan preview
+├── bindings.go              → WailsBindings: methods exposed to frontend
+├── tray.go                  → TrayManager: systray icon + menu
+└── data_dir.go              → Open data directory in file manager
+internal/app/app.go          → HTTPHandler() + StartBackgroundTasks()
+```
+
+The desktop app:
+- Starts a local HTTP server on `127.0.0.1:0` (never `0.0.0.0`)
+- Generates a random 32-byte token for authentication
+- Embeds the existing React frontend via Wails AssetServer
+- Reuses all existing backend routes and services unchanged
+- Provides desktop-specific APIs via Wails bindings
+
+### Data Directory
+
+Desktop mode stores all data in the system App Data directory:
+
+| Platform | Default Path |
+|---|---|
+| macOS | `~/Library/Application Support/CloudVault` |
+| Windows | `%APPDATA%\CloudVault` |
+| Linux | `$XDG_DATA_HOME/cloudvault` or `~/.local/share/cloudvault` |
+
+The directory contains:
+```
+CloudVault/
+├── app.db          ← SQLite database
+├── objects/        ← Local object storage
+├── backups/        ← Backup archives
+├── logs/           ← Application logs
+└── cache/          ← Temporary cache
+```
+
+### Desktop Configuration
+
+Desktop-specific config in `config.toml`:
+
+```toml
+[desktop]
+app_name = "Cloud Vault"
+data_dir = ""                              # auto-detect by platform
+close_to_tray = true
+native_notifications = true
+launch_at_login = false
+```
+
+Environment variables:
+
+| Variable | Description |
+|---|---|
+| `DESKTOP_APP_NAME` | Application name shown in tray |
+| `DESKTOP_DATA_DIR` | Override data directory path |
+| `DESKTOP_CLOSE_TO_TRAY` | Close to tray instead of quit (`true`/`false`) |
+| `DESKTOP_NATIVE_NOTIFICATIONS` | Enable native desktop notifications |
+| `DESKTOP_LAUNCH_AT_LOGIN` | Start at login (not yet implemented) |
+
+### System Tray
+
+The tray icon provides quick access to common actions:
+
+| Menu Item | Action |
+|---|---|
+| Show Window | Restore the main window |
+| Open Data Directory | Open data folder in file manager |
+| Scan Import Directory | Preview files in import directory |
+| Runtime Info | Display runtime information |
+| Close to Tray | Toggle close-to-tray behavior |
+| Quit | Exit the application |
+
+When close-to-tray is enabled, closing the window hides it instead of quitting.
+
+### Desktop API Endpoints
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/api/v1/system/runtime` | Runtime info (mode, port, data dir, platform) |
+| POST | `/api/v1/import-jobs/scan-preview` | Preview scan of import directory |
+| GET | `/api/v1/desktop/data-dir` | Data directory info |
+| POST | `/api/v1/desktop/open-data-dir` | Open data directory in file manager |
+
+All endpoints require the token passed via `?token=...` query parameter or `X-Auth-Token` header.
+
+### Wails Bindings
+
+The frontend can call these methods via Wails runtime:
+
+| Method | Description |
+|---|---|
+| `GetRuntimeInfo()` | Get runtime information |
+| `SelectDirectory(title, defaultPath)` | Open native directory picker |
+| `ScanPreview(req)` | Preview scan of directory |
+| `OpenDataDirectory()` | Open data folder in file manager |
+| `ShowNotification(title, message)` | Show desktop notification |
+| `StartImport(jobID, req)` | Start import with progress tracking |
+| `GetConfig()` | Get desktop configuration |
+| `UpdateConfig(config)` | Update desktop configuration |
+| `Quit()` | Quit the application |
+| `MinimizeToTray()` | Hide window to tray |
+| `RestoreFromTray()` | Show window from tray |
+
+### Building the Desktop App
+
+```bash
+# Development mode with hot reload
+make desktop-dev
+
+# Production build
+make desktop-build
+
+# Package for distribution
+make desktop-package
+
+# Clean build artifacts
+make desktop-clean
+```
+
+### Running the Desktop App
+
+```bash
+# Build and run
+go build -o bin/cloud-vault-desktop ./cmd/desktop
+./bin/cloud-vault-desktop
+
+# Or use go run
+go run ./cmd/desktop
+```
+
+### Security
+
+Desktop mode enforces strict security:
+
+1. **Local-only binding** — HTTP server binds to `127.0.0.1` only, never `0.0.0.0`
+2. **Random port** — Port is selected randomly from available ports
+3. **Token authentication** — 32-byte random token required for all API calls
+4. **Timing-safe comparison** — Token validation uses constant-time comparison
+5. **No secrets in logs** — Token and sensitive config never logged
+
+### Server Mode vs Desktop Mode
+
+| Feature | Server Mode (`cmd/server`) | Desktop Mode (`cmd/desktop`) |
+|---|---|---|
+| Entry point | `cmd/server/main.go` | `cmd/desktop/main.go` |
+| Bind address | Configurable (`APP_ADDR`) | Always `127.0.0.1:0` |
+| Authentication | Cookie-based sessions | Token-based (random) |
+| Data directory | Configurable (`DB_PATH`) | System App Data |
+| UI | Browser-based | Wails native window |
+| System tray | No | Yes |
+| TLS | Configurable | Disabled |
+
+### V0.9 Current Limitations
+
+- **Launch at login** — not yet implemented
+- **Auto-update** — not yet implemented
+- **Multi-window** — single window only
+- **Offline sync** — not yet implemented
+- **Native notifications on Linux** — falls back to logging
+
+### Migration from V0.8
+
+Desktop mode uses a separate data directory from server mode. To migrate data:
+
+1. Export from server mode: `cp data/app.db ~/Library/Application\ Support/CloudVault/app.db`
+2. Copy objects: `cp -r data/objects ~/Library/Application\ Support/CloudVault/objects`
+3. Start desktop mode — data is available immediately
+
+### V0.9 Verification
+
+See `docs/testing/desktop-v0.9-checklist.md` for the complete verification checklist covering:
+- Build verification
+- Configuration validation
+- HTTP server security
+- Desktop service APIs
+- System tray functionality
+- Wails bindings
+- Platform-specific behavior
+- Security requirements
+- Performance requirements
+
 ## Current Limitations
 
 - No multi-user collaboration (single admin account only)
@@ -1135,3 +1862,5 @@ The bootstrap admin will be created automatically on startup, and you can login 
 - No multi-tenancy support
 - No two-factor authentication (2FA)
 - No email verification or password reset
+- No incremental or scheduled backups
+- No backup encryption at rest

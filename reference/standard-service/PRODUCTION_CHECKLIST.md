@@ -24,10 +24,11 @@ Each item is a conscious decision, not a default assumption.
   If self-terminating, set `cfg.Core.TLS.Enabled = true` and provide cert/key paths.
 
 - [ ] **CORS policy** is tightened if the API is consumed by browser clients.
-  `cors.Middleware` is wired in `internal/app/app.go` with permissive defaults.
-  Replace `cors.CORSOptions{}` with `cors.StrictDefaultOptions(origins...)` and
-  enumerate the allowed origins explicitly. Do not use wildcard origins for
-  authenticated APIs.
+  Set `APP_CORS_ALLOWED_ORIGINS` to a comma-separated list of allowed origins
+  (e.g. `https://app.example.com,https://admin.example.com`). When set, the app
+  uses `cors.StrictDefaultOptions` to restrict cross-origin access to those domains.
+  When unset the default is `["*"]` (allow all) — safe for local dev only. Do not
+  use wildcard origins for authenticated APIs.
 
 ---
 

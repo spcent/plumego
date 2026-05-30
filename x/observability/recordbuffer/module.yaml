@@ -21,36 +21,20 @@ allowed_imports:
   - stdlib
   - metrics
 
-forbidden_imports:
-  - core/**
-  - router/**
-  - contract/**
-  - middleware/**
-  - security/**
-  - store/**
-  - health/**
-  - log/**
-  - x/ai/**
-  - x/data/**
-  - x/fileapi/**
-  - x/frontend/**
-  - x/gateway/**
-  - x/messaging/**
-  - x/openapi/**
-  - x/resilience/**
-  - x/rest/**
-  - x/rpc/**
-  - x/tenant/**
-  - x/validate/**
-
 test_commands:
   - go test -race -timeout 60s ./x/observability/recordbuffer/...
   - go vet ./x/observability/recordbuffer/...
 
+forbidden_imports:
+  - x/tenant/**
+  - x/ai/**
+  - x/gateway/**
+
 review_checklist:
-  - Keep the buffer bounded and safe under concurrent writes
-  - Define explicit drop or overwrite behavior when full
+  - Keep the queue bounded; do not allow unbounded memory growth
+  - Do not own export backend configuration (owned by x/observability)
+  - Keep the replay interface generic enough to support multiple export backends
 
 agent_hints:
-  - Treat this as a reusable buffering primitive, not an exporter
-  - Document flush and capacity semantics for callers
+  - Record buffer is wired by x/observability export pipeline; do not call it directly from handlers
+  - Buffer capacity and flush interval are configuration concerns; keep them explicit

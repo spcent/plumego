@@ -39,7 +39,7 @@ Non-goals:
 Files:
 - `x/openapi/module.yaml`
 - `specs/extension-beta-evidence.yaml` (when promotion evidence is recorded)
-- `docs/EXTENSION_MATURITY.md` (when promotion status changes)
+- `docs/concepts/extension-maturity.md` (when promotion status changes)
 
 Tests:
 - `go test -race -timeout 60s ./x/openapi/...`
@@ -47,7 +47,7 @@ Tests:
 - `go run ./internal/checks/extension-maturity`
 
 Docs Sync:
-- Update `docs/ROADMAP.md` Phase 14 to note CLI completion and current status.
+- Update `docs/release/roadmap.md` Phase 14 to note CLI completion and current status.
 
 Done Definition:
 - x/openapi/module.yaml summary no longer contains stale milestone-card language.

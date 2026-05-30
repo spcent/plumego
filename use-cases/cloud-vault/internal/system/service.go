@@ -12,15 +12,15 @@ import (
 type Service struct {
 	db    *sql.DB
 	store storage.ObjectStorage
-	aiCfg config.AIConfig
+	cfg   config.Config
 }
 
-func NewService(db *sql.DB, store storage.ObjectStorage, aiCfg config.AIConfig) *Service {
-	return &Service{db: db, store: store, aiCfg: aiCfg}
+func NewService(db *sql.DB, store storage.ObjectStorage, cfg config.Config) *Service {
+	return &Service{db: db, store: store, cfg: cfg}
 }
 
 func (s *Service) Health(ctx context.Context) HealthResult {
-	return checkHealth(ctx, s.db, s.store, s.aiCfg)
+	return checkHealth(ctx, s.db, s.store, s.cfg.AI)
 }
 
 func (s *Service) Stats(ctx context.Context) (StatsResult, error) {
@@ -40,7 +40,7 @@ func (s *Service) Doctor(ctx context.Context, req DoctorRequest) DoctorResult {
 
 	var results []CheckResult
 	for _, name := range checks {
-		results = append(results, runCheck(ctx, name, s.db, s.store, sampleSize))
+		results = append(results, runCheck(ctx, name, s.db, s.store, s.cfg, sampleSize))
 	}
 
 	return DoctorResult{

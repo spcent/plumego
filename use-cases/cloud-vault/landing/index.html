@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Markdown Cloud Vault - Your Private Markdown Knowledge Base</title>
+    <meta name="description" content="A secure, self-hosted Markdown knowledge management system with AI-powered organization, full-text search, and cloud storage integration.">
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #3b82f6;
+            --primary-dark: #2563eb;
+            --secondary: #64748b;
+            --accent: #8b5cf6;
+            --dark: #0f172a;
+            --light: #f8fafc;
+            --gray: #64748b;
+            --border: #e2e8f0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: var(--dark);
+            background: var(--light);
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+
+        /* Header */
+        header {
+            background: white;
+            border-bottom: 1px solid var(--border);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem 0;
+        }
+
+        .logo {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--dark);
+            text-decoration: none;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 2rem;
+            list-style: none;
+        }
+
+        .nav-links a {
+            color: var(--gray);
+            text-decoration: none;
+            font-weight: 500;
+            transition: color 0.2s;
+        }
+
+        .nav-links a:hover {
+            color: var(--primary);
+        }
+
+        .cta-button {
+            background: var(--primary);
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            text-decoration: none;
+            font-weight: 600;
+            transition: background 0.2s;
+            display: inline-block;
+        }
+
+        .cta-button:hover {
+            background: var(--primary-dark);
+        }
+
+        .cta-button-secondary {
+            background: white;
+            color: var(--primary);
+            border: 2px solid var(--primary);
+        }
+
+        .cta-button-secondary:hover {
+            background: var(--primary);
+            color: white;
+        }
+
+        /* Hero Section */
+        .hero {
+            padding: 6rem 0;
+            text-align: center;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .hero h1 {
+            font-size: 3.5rem;
+            font-weight: 800;
+            margin-bottom: 1.5rem;
+            line-height: 1.2;
+        }
+
+        .hero p {
+            font-size: 1.25rem;
+            margin-bottom: 2rem;
+            opacity: 0.95;
+            max-width: 700px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .hero-buttons {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .hero .cta-button {
+            background: white;
+            color: var(--primary);
+            font-size: 1.1rem;
+            padding: 1rem 2rem;
+        }
+
+        .hero .cta-button:hover {
+            background: var(--light);
+        }
+
+        /* Features Section */
+        .features {
+            padding: 5rem 0;
+            background: white;
+        }
+
+        .section-title {
+            text-align: center;
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+        }
+
+        .section-subtitle {
+            text-align: center;
+            font-size: 1.1rem;
+            color: var(--gray);
+            margin-bottom: 4rem;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+        }
+
+        .feature-card {
+            padding: 2rem;
+            border: 1px solid var(--border);
+            border-radius: 1rem;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+
+        .feature-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+
+        .feature-card h3 {
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+            color: var(--dark);
+        }
+
+        .feature-card p {
+            color: var(--gray);
+            line-height: 1.8;
+        }
+
+        /* Use Cases Section */
+        .use-cases {
+            padding: 5rem 0;
+            background: var(--light);
+        }
+
+        .use-cases-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 2rem;
+        }
+
+        .use-case {
+            text-align: center;
+            padding: 2rem;
+        }
+
+        .use-case-icon {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+        }
+
+        .use-case h3 {
+            font-size: 1.25rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .use-case p {
+            color: var(--gray);
+        }
+
+        /* Tech Stack Section */
+        .tech-stack {
+            padding: 5rem 0;
+            background: white;
+        }
+
+        .tech-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 2rem;
+            text-align: center;
+        }
+
+        .tech-item {
+            padding: 2rem;
+            border: 1px solid var(--border);
+            border-radius: 0.5rem;
+        }
+
+        .tech-item h4 {
+            font-size: 1.25rem;
+            margin-bottom: 0.5rem;
+            color: var(--primary);
+        }
+
+        .tech-item p {
+            color: var(--gray);
+            font-size: 0.9rem;
+        }
+
+        /* CTA Section */
+        .cta-section {
+            padding: 5rem 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            text-align: center;
+        }
+
+        .cta-section h2 {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .cta-section p {
+            font-size: 1.25rem;
+            margin-bottom: 2rem;
+            opacity: 0.95;
+        }
+
+        /* Footer */
+        footer {
+            background: var(--dark);
+            color: white;
+            padding: 3rem 0 1rem;
+        }
+
+        .footer-content {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        .footer-section h4 {
+            margin-bottom: 1rem;
+            font-size: 1.1rem;
+        }
+
+        .footer-section ul {
+            list-style: none;
+        }
+
+        .footer-section ul li {
+            margin-bottom: 0.5rem;
+        }
+
+        .footer-section a {
+            color: #94a3b8;
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+
+        .footer-section a:hover {
+            color: white;
+        }
+
+        .footer-bottom {
+            text-align: center;
+            padding-top: 2rem;
+            border-top: 1px solid #334155;
+            color: #94a3b8;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .hero h1 {
+                font-size: 2.5rem;
+            }
+
+            .hero p {
+                font-size: 1.1rem;
+            }
+
+            .nav-links {
+                display: none;
+            }
+
+            .section-title {
+                font-size: 2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header>
+        <nav class="container">
+            <a href="#" class="logo">📚 Markdown Cloud Vault</a>
+            <ul class="nav-links">
+                <li><a href="#features">Features</a></li>
+                <li><a href="#use-cases">Use Cases</a></li>
+                <li><a href="#docs">Docs</a></li>
+                <li><a href="https://github.com/example/cloud-vault">GitHub</a></li>
+            </ul>
+            <a href="#download" class="cta-button">Download</a>
+        </nav>
+    </header>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="container">
+            <h1>Your Private Markdown Knowledge Base</h1>
+            <p>A secure, self-hosted Markdown knowledge management system with AI-powered organization, full-text search, and cloud storage integration. Keep your notes private and organized.</p>
+            <div class="hero-buttons">
+                <a href="#download" class="cta-button">Download Now</a>
+                <a href="https://github.com/example/cloud-vault" class="cta-button cta-button-secondary">View on GitHub</a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section id="features" class="features">
+        <div class="container">
+            <h2 class="section-title">Powerful Features</h2>
+            <p class="section-subtitle">Everything you need to manage, organize, and search your Markdown documents</p>
+
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">🔍</div>
+                    <h3>Full-Text Search</h3>
+                    <p>Lightning-fast search across all your documents using SQLite FTS5. Find any note in milliseconds with advanced query operators.</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">🤖</div>
+                    <h3>AI-Powered Organization</h3>
+                    <p>Automatic summarization, Q&A, tag suggestions, and topic detection powered by OpenAI, Azure, or local LLMs.</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">📥</div>
+                    <h3>Bulk Import</h3>
+                    <p>Import thousands of Markdown files from directories or ZIP archives with automatic duplicate detection and metadata extraction.</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">☁️</div>
+                    <h3>Cloud Storage</h3>
+                    <p>Store locally or sync with Qiniu cloud storage. Your data, your choice. Full encryption support for maximum security.</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">🏷️</div>
+                    <h3>Smart Organization</h3>
+                    <p>Organize with collections, tags, and AI-detected topics. Detect duplicates and manage your review queue efficiently.</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">🔐</div>
+                    <h3>Privacy First</h3>
+                    <p>Self-hosted solution with no telemetry. Your data stays on your device or your cloud. Complete control over your information.</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">💻</div>
+                    <h3>Desktop & Server</h3>
+                    <p>Native desktop apps for Windows, macOS, and Linux. Or deploy as a server for team access with full authentication.</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">🔄</div>
+                    <h3>Backup & Restore</h3>
+                    <p>Automatic scheduled backups with encryption. Restore your entire vault with one click. Never lose your notes.</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">📊</div>
+                    <h3>Diagnostics & Monitoring</h3>
+                    <p>Built-in health checks, performance metrics, and diagnostic tools. Export diagnostic bundles with automatic data redaction.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Use Cases Section -->
+    <section id="use-cases" class="use-cases">
+        <div class="container">
+            <h2 class="section-title">Perfect For</h2>
+            <p class="section-subtitle">Markdown Cloud Vault adapts to your workflow</p>
+
+            <div class="use-cases-grid">
+                <div class="use-case">
+                    <div class="use-case-icon">📝</div>
+                    <h3>Personal Knowledge Base</h3>
+                    <p>Organize your notes, ideas, and research in one place</p>
+                </div>
+
+                <div class="use-case">
+                    <div class="use-case-icon">👨‍💻</div>
+                    <h3>Developer Documentation</h3>
+                    <p>Manage technical docs, code snippets, and project notes</p>
+                </div>
+
+                <div class="use-case">
+                    <div class="use-case-icon">📚</div>
+                    <h3>Research & Writing</h3>
+                    <p>Collect research papers, articles, and writing projects</p>
+                </div>
+
+                <div class="use-case">
+                    <div class="use-case-icon">👥</div>
+                    <h3>Team Knowledge Sharing</h3>
+                    <p>Share documentation and best practices with your team</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Tech Stack Section -->
+    <section class="tech-stack">
+        <div class="container">
+            <h2 class="section-title">Built With Modern Technology</h2>
+            <p class="section-subtitle">Reliable, fast, and maintainable</p>
+
+            <div class="tech-grid">
+                <div class="tech-item">
+                    <h4>Go 1.22+</h4>
+                    <p>High-performance backend</p>
+                </div>
+                <div class="tech-item">
+                    <h4>React 18</h4>
+                    <p>Modern frontend UI</p>
+                </div>
+                <div class="tech-item">
+                    <h4>SQLite FTS5</h4>
+                    <p>Full-text search engine</p>
+                </div>
+                <div class="tech-item">
+                    <h4>Wails</h4>
+                    <p>Native desktop apps</p>
+                </div>
+                <div class="tech-item">
+                    <h4>Tailwind CSS</h4>
+                    <p>Utility-first styling</p>
+                </div>
+                <div class="tech-item">
+                    <h4>Vite</h4>
+                    <p>Fast build tooling</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section id="download" class="cta-section">
+        <div class="container">
+            <h2>Ready to Organize Your Markdown?</h2>
+            <p>Download Markdown Cloud Vault and take control of your knowledge base</p>
+            <div class="hero-buttons">
+                <a href="https://github.com/example/cloud-vault/releases" class="cta-button">Download v1.0.0</a>
+                <a href="../docs/getting-started.md" class="cta-button cta-button-secondary">Read the Docs</a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <h4>Product</h4>
+                    <ul>
+                        <li><a href="#features">Features</a></li>
+                        <li><a href="#download">Download</a></li>
+                        <li><a href="../docs/release-notes.md">Release Notes</a></li>
+                        <li><a href="https://github.com/example/cloud-vault/releases">All Releases</a></li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h4>Documentation</h4>
+                    <ul>
+                        <li><a href="../docs/getting-started.md">Getting Started</a></li>
+                        <li><a href="../docs/installation.md">Installation</a></li>
+                        <li><a href="../docs/configuration.md">Configuration</a></li>
+                        <li><a href="../docs/README.md">All Docs</a></li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h4>Community</h4>
+                    <ul>
+                        <li><a href="https://github.com/example/cloud-vault">GitHub</a></li>
+                        <li><a href="https://github.com/example/cloud-vault/issues">Issues</a></li>
+                        <li><a href="https://github.com/example/cloud-vault/discussions">Discussions</a></li>
+                        <li><a href="https://github.com/example/cloud-vault/blob/main/CONTRIBUTING.md">Contributing</a></li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h4>Legal</h4>
+                    <ul>
+                        <li><a href="../LICENSE">License (MIT)</a></li>
+                        <li><a href="../docs/privacy.md">Privacy Policy</a></li>
+                        <li><a href="../docs/security.md">Security</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2026 Markdown Cloud Vault. Released under MIT License.</p>
+            </div>
+        </div>
+    </footer>
+</body>
+</html>

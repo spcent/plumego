@@ -77,8 +77,8 @@ jobs:
           required_paths=(
             README.md
             README_CN.md
-            docs/CANONICAL_STYLE_GUIDE.md
-            docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md
+            docs/reference/canonical-style-guide.md
+            docs/concepts/agent-first-repo-blueprint.md
             specs/repo.yaml
             specs/task-routing.yaml
             specs/extension-taxonomy.yaml
@@ -101,8 +101,8 @@ jobs:
           canonical_docs=(
             README.md
             README_CN.md
-            docs/CANONICAL_STYLE_GUIDE.md
-            docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md
+            docs/reference/canonical-style-guide.md
+            docs/concepts/agent-first-repo-blueprint.md
             reference/standard-service/README.md
           )
 
@@ -338,8 +338,8 @@ jobs:
           required_paths=(
             README.md
             README_CN.md
-            docs/CANONICAL_STYLE_GUIDE.md
-            docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md
+            docs/reference/canonical-style-guide.md
+            docs/concepts/agent-first-repo-blueprint.md
             specs/repo.yaml
             specs/task-routing.yaml
             specs/extension-taxonomy.yaml
@@ -362,8 +362,8 @@ jobs:
           canonical_docs=(
             README.md
             README_CN.md
-            docs/CANONICAL_STYLE_GUIDE.md
-            docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md
+            docs/reference/canonical-style-guide.md
+            docs/concepts/agent-first-repo-blueprint.md
             reference/standard-service/README.md
           )
 

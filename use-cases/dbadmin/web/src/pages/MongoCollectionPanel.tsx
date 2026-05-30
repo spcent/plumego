@@ -13,9 +13,11 @@ import type {
   MongoPipelineEntry,
   MongoObjectIdInfo,
 } from '../api'
+import { useMongoHistory } from '../hooks/useMongoHistory'
 import ErrorState from '../components/ErrorState'
 import EmptyState from '../components/EmptyState'
 import ConfirmDialog from '../components/ConfirmDialog'
+import WorkbenchHeader from '../components/WorkbenchHeader'
 
 type ViewMode = 'table' | 'json'
 type ActiveTab = 'documents' | 'aggregation' | 'schema' | 'stats'
@@ -56,8 +58,8 @@ export default function MongoCollectionPanel() {
   const [aggResult, setAggResult] = useState<MongoAggregateResponse | null>(null)
   const [aggLoading, setAggLoading] = useState(false)
   const [aggError, setAggError] = useState<string | null>(null)
-  const [aggHistory, setAggHistory] = useState<MongoPipelineEntry[]>([])
   const [showHistory, setShowHistory] = useState(false)
+  const mongoHistory = useMongoHistory()
 
   // Schema state
   const [schema, setSchema] = useState<MongoSchemaResponse | null>(null)
@@ -103,29 +105,25 @@ export default function MongoCollectionPanel() {
     setAggLoading(true)
     setAggError(null)
 
+    const startTime = Date.now()
     try {
       const result = await api.mongoAggregate(connectionId, database, collection, pipeline)
       setAggResult(result)
-      // Refresh history
-      const history = await api.mongoListHistory(connectionId)
-      setAggHistory(history)
+      // Record to localStorage history
+      mongoHistory.addEntry({
+        conn_id: connectionId,
+        database,
+        collection,
+        pipeline,
+        duration_ms: Date.now() - startTime,
+        result_count: result.documents?.length ?? 0,
+      })
     } catch (err) {
       setAggError(err instanceof Error ? err.message : 'Aggregation failed')
     } finally {
       setAggLoading(false)
     }
-  }, [connectionId, database, collection, pipeline, t])
-
-  // Load aggregation history
-  const loadHistory = useCallback(async () => {
-    if (!connectionId) return
-    try {
-      const history = await api.mongoListHistory(connectionId)
-      setAggHistory(history)
-    } catch (err) {
-      showToast(err instanceof Error ? err.message : 'Failed to load history', 'error')
-    }
-  }, [connectionId, showToast])
+  }, [connectionId, database, collection, pipeline, t, mongoHistory])
 
   // Run schema analysis
   const analyzeSchema = useCallback(async () => {
@@ -268,14 +266,12 @@ export default function MongoCollectionPanel() {
   useEffect(() => {
     if (activeTab === 'documents') {
       executeQuery()
-    } else if (activeTab === 'aggregation' && aggHistory.length === 0) {
-      loadHistory()
     } else if (activeTab === 'schema' && !schema && !schemaLoading) {
       analyzeSchema()
     } else if (activeTab === 'stats' && !stats && !statsLoading) {
       loadStats()
     }
-  }, [activeTab, aggHistory.length, schema, schemaLoading, stats, statsLoading, loadHistory, analyzeSchema, loadStats, executeQuery])
+  }, [activeTab, schema, schemaLoading, stats, statsLoading, analyzeSchema, loadStats, executeQuery])
 
   if (!connectionId || !database || !collection) {
     return (
@@ -288,25 +284,13 @@ export default function MongoCollectionPanel() {
 
   return (
     <div className="flex flex-col h-full bg-[var(--bg-primary)]">
-      {/* Header */}
-      <div className="px-6 py-4 border-b border-[var(--border-primary)] bg-[var(--bg-secondary)]">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-semibold text-[var(--text-primary)]">
-              {collection}
-            </h1>
-            <p className="text-sm text-[var(--text-secondary)] mt-1">
-              {database} / {collection}
-            </p>
-          </div>
-          <button
-            onClick={() => setShowObjectIdModal(true)}
-            className="px-4 py-2 text-sm font-medium text-[var(--text-primary)] bg-[var(--bg-tertiary)] rounded hover:bg-[var(--bg-hover)]"
-          >
-            {t('mongodb.p1.objectid.title')}
-          </button>
-        </div>
-      </div>
+      <WorkbenchHeader
+        connectionName={connectionId || undefined}
+        resourcePath={database && collection ? [database, collection] : []}
+        datasourceType="mongodb"
+        readonly={false}
+        onRefresh={() => activeTab === 'documents' && executeQuery()}
+      />
 
       {/* Tabs */}
       <div className="px-6 py-3 border-b border-[var(--border-primary)] bg-[var(--bg-secondary)]">
@@ -405,11 +389,9 @@ export default function MongoCollectionPanel() {
             aggResult={aggResult}
             aggLoading={aggLoading}
             aggError={aggError}
-            aggHistory={aggHistory}
             showHistory={showHistory}
             setShowHistory={setShowHistory}
             runAggregation={runAggregation}
-            loadHistory={loadHistory}
             connectionId={connectionId}
           />
         )}
@@ -493,14 +475,15 @@ export default function MongoCollectionPanel() {
 
       {showHistory && (
         <HistoryModal
-          history={aggHistory}
+          history={mongoHistory.entries}
           connectionId={connectionId}
           onClose={() => setShowHistory(false)}
           onSelect={(entry: MongoPipelineEntry) => {
             setPipeline(entry.pipeline)
             setShowHistory(false)
           }}
-          loadHistory={loadHistory}
+          onDelete={(entryId: string) => mongoHistory.removeEntry(entryId)}
+          onClear={() => mongoHistory.clearHistory()}
         />
       )}
 
@@ -832,11 +815,9 @@ function AggregationTab(props: {
   aggResult: MongoAggregateResponse | null
   aggLoading: boolean
   aggError: string | null
-  aggHistory: MongoPipelineEntry[]
   showHistory: boolean
   setShowHistory: (v: boolean) => void
   runAggregation: () => void
-  loadHistory: () => void
   connectionId: string
 }) {
   const { t } = useI18n()
@@ -1304,31 +1285,22 @@ function HistoryModal(props: {
   connectionId: string
   onClose: () => void
   onSelect: (entry: MongoPipelineEntry) => void
-  loadHistory: () => void
+  onDelete: (entryId: string) => void
+  onClear: () => void
 }) {
   const { t } = useI18n()
   const { showToast } = useToast()
-  const { history, connectionId, onClose, onSelect, loadHistory } = props
+  const { history, onClose, onSelect, onDelete, onClear } = props
 
-  const handleDelete = async (entryId: string) => {
-    try {
-      await api.mongoDeleteHistoryEntry(connectionId, entryId)
-      loadHistory()
-      showToast(t('mongodb.p1.history.deleted'), 'success')
-    } catch (err) {
-      showToast(err instanceof Error ? err.message : t('mongodb.p1.history.error'), 'error')
-    }
+  const handleDelete = (entryId: string) => {
+    onDelete(entryId)
+    showToast(t('mongodb.p1.history.deleted'), 'success')
   }
 
-  const handleClearAll = async () => {
+  const handleClearAll = () => {
     if (!confirm(t('mongodb.p1.history.clear_confirm'))) return
-    try {
-      await api.mongoClearHistory(connectionId)
-      loadHistory()
-      showToast(t('mongodb.p1.history.cleared'), 'success')
-    } catch (err) {
-      showToast(err instanceof Error ? err.message : t('mongodb.p1.history.error'), 'error')
-    }
+    onClear()
+    showToast(t('mongodb.p1.history.cleared'), 'success')
   }
 
   return (
@@ -1502,6 +1474,7 @@ function DocumentViewerModal({
   onSave: (docJson: string) => void
 }) {
   const { t } = useI18n()
+  const { showToast } = useToast()
   const [editing, setEditing] = useState(false)
   const [editJson, setEditJson] = useState(JSON.stringify(document, null, 2))
 
@@ -1510,7 +1483,7 @@ function DocumentViewerModal({
       JSON.parse(editJson)
       onSave(editJson)
     } catch {
-      alert(t('mongodb.document.invalid_json'))
+      showToast(t('mongodb.document.invalid_json'), 'error')
     }
   }
 
@@ -1590,6 +1563,7 @@ function InsertDocumentModal({
   onInsert: (docJson: string) => void
 }) {
   const { t } = useI18n()
+  const { showToast } = useToast()
   const [docJson, setDocJson] = useState('{\n  \n}')
 
   const handleInsert = () => {
@@ -1597,7 +1571,7 @@ function InsertDocumentModal({
       JSON.parse(docJson)
       onInsert(docJson)
     } catch {
-      alert(t('mongodb.document.invalid_json'))
+      showToast(t('mongodb.document.invalid_json'), 'error')
     }
   }
 

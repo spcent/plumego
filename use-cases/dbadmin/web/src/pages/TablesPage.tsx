@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { api, type ResourceNode, type DangerousStatement, ApiError } from '../api'
 import ConfirmDialog from '../components/ConfirmDialog'
+import WorkbenchHeader from '../components/WorkbenchHeader'
 import { useToast } from '../components/Toast'
 import { useI18n } from '../i18n'
 import { useCurrentConn } from './MainLayout'
@@ -85,10 +86,13 @@ export default function TablesPage() {
 
   return (
     <div className="flex flex-col h-full">
+      <WorkbenchHeader
+        connectionName={currentConn?.name}
+        resourcePath={dbName ? [dbName] : []}
+        datasourceType={currentConn?.driver ?? 'mysql'}
+        readonly={isReadonly}
+      />
       <div className="px-6 pt-5 pb-4 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between shrink-0">
-        <h1 className="text-xl font-bold text-gray-800 dark:text-gray-100">
-          Tables — <span className="text-blue-600">{dbName}</span>
-        </h1>
         <div className="flex gap-2">
           <button
             onClick={handleCopySchema}

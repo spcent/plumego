@@ -6,12 +6,12 @@ Verified Cards: `2062`, `2063`, `2064`, `2065`, `2066`, `2067`
 
 ## Scope Check
 
-- In-scope files touched: `x/ai/*/module.yaml` for `provider`, `session`, `streaming`, and `tool`; `x/ai/module.yaml`; `docs/modules/x/ai/README.md`; `docs/EXTENSION_MATURITY.md`; `AGENTS.md`; `README.md`; `docs/README.md`; `docs/AGENT_FIRST.md`; `docs/agent-first-operating-reference.md`; `docs/why-plumego.md`; `specs/dependency-rules.yaml`; `middleware/module.yaml`; `middleware/conformance/README.md`; `docs/modules/middleware/README.md`; `tasks/milestones/ROADMAP.md`; `tasks/milestones/STATUS.md`; `tasks/milestones/superseded/README.md`; `tasks/milestones/ARCHIVE_INDEX.md`; and the archived `2062`-`2067` task cards
+- In-scope files touched: `x/ai/*/module.yaml` for `provider`, `session`, `streaming`, and `tool`; `x/ai/module.yaml`; `docs/modules/x/ai/README.md`; `docs/concepts/extension-maturity.md`; `AGENTS.md`; `README.md`; `docs/README.md`; `docs/concepts/agent-first.md`; `docs/operations/agent-first-operating-reference.md`; `docs/start/why-plumego.md`; `specs/dependency-rules.yaml`; `middleware/module.yaml`; `middleware/conformance/README.md`; `docs/modules/middleware/README.md`; `tasks/milestones/ROADMAP.md`; `tasks/milestones/STATUS.md`; `tasks/milestones/superseded/README.md`; `tasks/milestones/ARCHIVE_INDEX.md`; and the archived `2062`-`2067` task cards
 - Out-of-scope files touched: none
 
 ## Ownership Check
 
-- overlapping card ownership: `docs/modules/x/ai/README.md`, `docs/EXTENSION_MATURITY.md`, and `docs/modules/middleware/README.md` were intentionally shared across adjacent cards and updated sequentially
+- overlapping card ownership: `docs/modules/x/ai/README.md`, `docs/concepts/extension-maturity.md`, and `docs/modules/middleware/README.md` were intentionally shared across adjacent cards and updated sequentially
 - unresolved ownership conflicts: none
 
 ## Symbol Completeness Check

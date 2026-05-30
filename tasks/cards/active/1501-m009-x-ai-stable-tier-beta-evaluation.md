@@ -7,8 +7,8 @@ State: active
 Primary Module: x/ai
 Owned Files:
 - `specs/extension-beta-evidence.yaml`
-- `docs/extension-evidence/x-ai.md`
-- `docs/EXTENSION_MATURITY.md`
+- `docs/evidence/extension/x-ai.md`
+- `docs/concepts/extension-maturity.md`
 - `x/ai/module.yaml`
 
 Goal:
@@ -45,11 +45,11 @@ Non-goals:
 
 Files:
 - `specs/extension-beta-evidence.yaml`
-- `docs/extension-evidence/x-ai.md`
-- `docs/EXTENSION_MATURITY.md`
+- `docs/evidence/extension/x-ai.md`
+- `docs/concepts/extension-maturity.md`
 - `x/ai/module.yaml`
 - `docs/modules/x/ai/README.md`
-- `docs/ROADMAP.md`
+- `docs/release/roadmap.md`
 
 Tests:
 - `go test -race -timeout 60s ./x/ai/provider/...`
@@ -60,9 +60,9 @@ Tests:
 - `go run ./internal/checks/extension-maturity`
 
 Docs Sync:
-- Required per promoted subpackage: update `docs/EXTENSION_MATURITY.md` selected-beta-surfaces
+- Required per promoted subpackage: update `docs/concepts/extension-maturity.md` selected-beta-surfaces
   table, `x/ai/module.yaml` subpackage status, `docs/modules/x/ai/README.md` status table,
-  and `docs/ROADMAP.md` Phase 8 next-work section.
+  and `docs/release/roadmap.md` Phase 8 next-work section.
 
 Done Definition:
 - Each of the four stable-tier subpackages either has beta status in the evidence ledger

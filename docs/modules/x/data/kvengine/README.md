@@ -10,7 +10,7 @@ tuning. It owns everything that belongs above the stable `store/kv` primitive.
 
 ## Status
 
-`experimental` — API not frozen. See [`docs/EXTENSION_MATURITY.md`](../../../../EXTENSION_MATURITY.md).
+`experimental` — API not frozen. See [`docs/concepts/extension-maturity.md`](../../../../concepts/extension-maturity.md).
 
 ## Use this module when
 

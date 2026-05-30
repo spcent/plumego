@@ -36,6 +36,10 @@ func (h ConnectionHandler) List(w http.ResponseWriter, r *http.Request) {
 			Type(contract.TypeInternal).Message("failed to list connections").Build()))
 		return
 	}
+	// Redact all sensitive credentials before returning.
+	for _, c := range conns {
+		c.Redact()
+	}
 	logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusOK, conns, map[string]any{"count": len(conns)}))
 }
 
@@ -53,7 +57,7 @@ func (h ConnectionHandler) Get(w http.ResponseWriter, r *http.Request) {
 			Type(contract.TypeInternal).Message("failed to get connection").Build()))
 		return
 	}
-	c.Password = ""
+	c.Redact()
 	logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusOK, c, nil))
 }
 
@@ -76,7 +80,7 @@ func (h ConnectionHandler) Create(w http.ResponseWriter, r *http.Request) {
 			Type(contract.TypeInternal).Message("failed to save connection").Build()))
 		return
 	}
-	c.Password = ""
+	c.Redact()
 	logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusCreated, c, nil))
 }
 
@@ -107,7 +111,7 @@ func (h ConnectionHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 	// Invalidate cached pool on update.
 	h.Manager.Close(id)
-	c.Password = ""
+	c.Redact()
 	logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusOK, c, nil))
 }
 

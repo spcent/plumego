@@ -37,7 +37,7 @@ func TestAgentQualityControlPlaneViolationsReportsMissingFile(t *testing.T) {
 func TestAgentQualityControlPlaneViolationsReportsMissingReference(t *testing.T) {
 	repoRoot := t.TempDir()
 	writeAgentQualityControlPlane(t, repoRoot, nil)
-	writeFile(t, repoRoot, "AGENTS.md", "docs/AGENT_CODE_QUALITY_RULES.md\n")
+	writeFile(t, repoRoot, "AGENTS.md", "docs/operations/agent-code-quality-rules.md\n")
 
 	violations, err := agentQualityControlPlaneViolations(repoRoot)
 	if err != nil {
@@ -97,17 +97,17 @@ func writeAgentQualityControlPlane(t *testing.T, repoRoot string, omit []string)
 	t.Helper()
 
 	files := map[string]string{
-		"docs/AGENT_CODE_QUALITY_RULES.md":                      "quality rules\n",
+		"docs/operations/agent-code-quality-rules.md":           "quality rules\n",
 		"specs/agent-quality-rules.yaml":                        "version: 1\n",
-		"AGENTS.md":                                             "docs/AGENT_CODE_QUALITY_RULES.md\nspecs/agent-quality-rules.yaml\n",
-		"docs/CODEX_WORKFLOW.md":                                "docs/AGENT_CODE_QUALITY_RULES.md\nspecs/agent-quality-rules.yaml\n",
-		"docs/README.md":                                        "docs/AGENT_CODE_QUALITY_RULES.md\n",
+		"AGENTS.md":                                             "docs/operations/agent-code-quality-rules.md\nspecs/agent-quality-rules.yaml\n",
+		"docs/operations/codex-workflow.md":                     "docs/operations/agent-code-quality-rules.md\nspecs/agent-quality-rules.yaml\n",
+		"docs/README.md":                                        "docs/operations/agent-code-quality-rules.md\n",
 		"specs/checks.yaml":                                     "specs/agent-quality-rules.yaml\n",
-		"specs/change-recipes/fix-bug.yaml":                     "docs/AGENT_CODE_QUALITY_RULES.md\nspecs/agent-quality-rules.yaml\n",
-		"specs/change-recipes/review-only.yaml":                 "docs/AGENT_CODE_QUALITY_RULES.md\n",
-		"specs/change-recipes/stable-root-boundary-review.yaml": "docs/AGENT_CODE_QUALITY_RULES.md\nspecs/agent-quality-rules.yaml\n",
-		"specs/change-recipes/symbol-change.yaml":               "docs/AGENT_CODE_QUALITY_RULES.md\nspecs/agent-quality-rules.yaml\n",
-		"specs/repo.yaml":                                       "docs/AGENT_CODE_QUALITY_RULES.md\nspecs/agent-quality-rules.yaml\n",
+		"specs/change-recipes/fix-bug.yaml":                     "docs/operations/agent-code-quality-rules.md\nspecs/agent-quality-rules.yaml\n",
+		"specs/change-recipes/review-only.yaml":                 "docs/operations/agent-code-quality-rules.md\n",
+		"specs/change-recipes/stable-root-boundary-review.yaml": "docs/operations/agent-code-quality-rules.md\nspecs/agent-quality-rules.yaml\n",
+		"specs/change-recipes/symbol-change.yaml":               "docs/operations/agent-code-quality-rules.md\nspecs/agent-quality-rules.yaml\n",
+		"specs/repo.yaml":                                       "docs/operations/agent-code-quality-rules.md\nspecs/agent-quality-rules.yaml\n",
 	}
 	for path, content := range files {
 		if slices.Contains(omit, path) {

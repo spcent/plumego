@@ -1,7 +1,7 @@
 name: tenant-policy-change
 scope: tenant resolution, tenant policy, quota, rate-limit, or tenant-session behavior
 steps:
-  - Read AGENTS.md, the matching specs/task-routing.yaml entry, x/tenant/module.yaml, and only the relevant docs/architecture/X_TENANT_BLUEPRINT.md section.
+  - Read AGENTS.md, the matching specs/task-routing.yaml entry, x/tenant/module.yaml, and only the relevant docs/concepts/x-tenant-blueprint.md section.
   - Confirm the change belongs in x/tenant rather than stable middleware, stable store, or core.
   - Keep resolution, policy, quota, and session flow explicit and fail closed on errors.
   - Preserve transport-only behavior in tenant middleware and keep stable roots free of tenant internals.

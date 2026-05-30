@@ -217,29 +217,35 @@ export const api = {
     req<void>('DELETE', `/connections/${connId}/mongo/history`),
 
   // ── Elasticsearch API ─────────────────────────────────────────────────────
+  esInfo: (connId: string) =>
+    req<ESClusterInfo>('GET', `/connections/${connId}/es/info`),
+
   esListIndices: (connId: string) =>
     req<{ indices: ESIndexInfo[] }>('GET', `/connections/${connId}/es/indices`),
 
-  esGetIndexInfo: (connId: string, index: string) =>
-    req<ESIndexDetail>('GET', `/connections/${connId}/es/indices/${encodeURIComponent(index)}`),
-
-  esSearch: (connId: string, index: string, query: string) =>
-    req<ESSearchResponse>('POST', `/connections/${connId}/es/indices/${encodeURIComponent(index)}/search`, { query }),
-
   esGetMapping: (connId: string, index: string) =>
-    req<ESMappingResponse>('GET', `/connections/${connId}/es/indices/${encodeURIComponent(index)}/mapping`),
+    req<Record<string, unknown>>('GET', `/connections/${connId}/es/index/mapping?index=${encodeURIComponent(index)}`),
 
   esGetSettings: (connId: string, index: string) =>
-    req<ESSettingsResponse>('GET', `/connections/${connId}/es/indices/${encodeURIComponent(index)}/settings`),
+    req<Record<string, unknown>>('GET', `/connections/${connId}/es/index/settings?index=${encodeURIComponent(index)}`),
 
-  esGetAliases: (connId: string) =>
-    req<ESAliasInfo[]>('GET', `/connections/${connId}/es/aliases`),
-
-  esGetDataStreams: (connId: string) =>
-    req<ESDataStreamInfo[]>('GET', `/connections/${connId}/es/data-streams`),
+  esSearch: (connId: string, index: string, dsl: Record<string, unknown>) =>
+    req<ESSearchResponse>('POST', `/connections/${connId}/es/search`, { index, dsl }),
 
   esGetDocument: (connId: string, index: string, id: string) =>
-    req<ESDocument>('GET', `/connections/${connId}/es/indices/${encodeURIComponent(index)}/documents/${encodeURIComponent(id)}`),
+    req<ESDocument>('GET', `/connections/${connId}/es/document?index=${encodeURIComponent(index)}&id=${encodeURIComponent(id)}`),
+
+  esDeleteDocument: (connId: string, index: string, id: string, confirm: boolean) =>
+    req<void>('DELETE', `/connections/${connId}/es/document`, { index, id, confirm }),
+
+  esListHistory: (connId: string) =>
+    req<ESHistoryEntry[]>('GET', `/connections/${connId}/es/history`),
+
+  esDeleteHistoryEntry: (connId: string, entryId: string) =>
+    req<void>('DELETE', `/connections/${connId}/es/history/${encodeURIComponent(entryId)}`),
+
+  esClearHistory: (connId: string) =>
+    req<void>('DELETE', `/connections/${connId}/es/history`),
 }
 
 export interface Connection {
@@ -569,67 +575,54 @@ export interface MongoPipelineEntry {
 
 // ── Elasticsearch Types ─────────────────────────────────────────────────────
 
+export interface ESClusterInfo {
+  cluster_name: string
+  cluster_uuid: string
+  version: {
+    number: string
+    build_flavor: string
+    lucene_version: string
+  }
+  tagline: string
+}
+
 export interface ESIndexInfo {
   name: string
   health: 'green' | 'yellow' | 'red'
   status: 'open' | 'close'
-  docs_count: number
-  store_size: number
-}
-
-export interface ESIndexDetail {
-  name: string
-  health: string
-  status: string
-  docs_count: number
-  store_size: number
-  aliases: string[]
-  mapping: Record<string, unknown>
-  settings: Record<string, unknown>
+  docs_count: string
+  store_size: string
+  pri: string
+  rep: string
 }
 
 export interface ESSearchResponse {
   took: number
   timed_out: boolean
-  hits: {
-    total: { value: number; relation: string }
-    max_score: number | null
-    hits: Array<{
-      _index: string
-      _id: string
-      _score: number | null
-      _source: Record<string, unknown>
-    }>
-  }
-}
-
-export interface ESMappingResponse {
-  mappings: Record<string, unknown>
-}
-
-export interface ESSettingsResponse {
-  settings: Record<string, unknown>
-}
-
-export interface ESAliasInfo {
-  alias: string
-  index: string
-  filter?: Record<string, unknown>
-  routing?: { index?: string; search?: string }
-  is_write_index?: boolean
-}
-
-export interface ESDataStreamInfo {
-  name: string
-  timestamp_field: string
-  indices: Array<{ index_name: string; index_uuid: string }>
-  generation: number
-  status: string
+  total: { value: number; relation: string }
+  hits: Array<{
+    _index: string
+    _id: string
+    _score: number | null
+    _source: Record<string, unknown>
+  }>
+  aggregations?: Record<string, unknown> | null
 }
 
 export interface ESDocument {
   _index: string
   _id: string
-  _version?: number
+  _version: number
   _source: Record<string, unknown>
+}
+
+export interface ESHistoryEntry {
+  id: string
+  conn_id: string
+  index: string
+  dsl: string
+  duration_ms: number
+  result_count: number
+  error?: string
+  created_at: string
 }

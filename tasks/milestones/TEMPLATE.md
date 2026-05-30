@@ -102,7 +102,7 @@
 7. Commit: `feat(<module>): <short description> [M-XXX]`
 8. Final commit: `milestone(M-XXX): <Title>` with bullet list of completed tasks.
 9. Push to `milestone/M-XXX-<slug>`.
-10. Open PR: title `milestone(M-XXX): <Title>`, body from `docs/github-workflows/milestone-pr-template.md`.
+10. Open PR: title `milestone(M-XXX): <Title>`, body from `docs/assets/github-workflows/milestone-pr-template.md`.
 
 ---
 

@@ -1,11 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import Editor from '@monaco-editor/react'
-import { api, ApiError, type QueryResult, type HistoryEntry } from '../api'
+import { api, ApiError, type QueryResult } from '../api'
 import ConfirmDialog from '../components/ConfirmDialog'
 import { useToast } from '../components/Toast'
 import { useI18n } from '../i18n'
 import { useCurrentConn } from './MainLayout'
+import WorkbenchHeader from '../components/WorkbenchHeader'
+import ErrorState from '../components/ErrorState'
+import { useSqlHistory } from '../hooks/useSqlHistory'
 
 interface ConfirmState {
   reason: string
@@ -34,14 +37,13 @@ export default function QueryPage() {
   const [running, setRunning] = useState(false)
   const [activeTab, setActiveTab] = useState<'result' | 'history'>('result')
   const [confirmState, setConfirmState] = useState<ConfirmState | null>(null)
-  const [serverHistory, setServerHistory] = useState<HistoryEntry[]>([])
-  const [historyLoading, setHistoryLoading] = useState(false)
   const editorRef = useRef<unknown>(null)
   const runRef = useRef<() => void>(() => {})
   const { showToast } = useToast()
   const { t } = useI18n()
   const currentConn = useCurrentConn(connId)
   const isReadonly = currentConn?.readonly ?? false
+  const sqlHistory = useSqlHistory()
 
   useEffect(() => {
     if (!connId) return
@@ -49,26 +51,6 @@ export default function QueryPage() {
       .then(nodes => setDatabases(nodes.filter(n => n.type === 'sql_database').map(n => n.name)))
       .catch(e => showToast(e.message))
   }, [connId])
-
-  const loadHistory = useCallback(async () => {
-    if (!connId) return
-    setHistoryLoading(true)
-    try {
-      const entries = await api.listHistory(connId)
-      setServerHistory(entries ?? [])
-    } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Failed to load history')
-    } finally {
-      setHistoryLoading(false)
-    }
-  }, [connId])
-
-  // Load history when switching to history tab.
-  useEffect(() => {
-    if (activeTab === 'history') {
-      loadHistory()
-    }
-  }, [activeTab, loadHistory])
 
   const handleRun = useCallback(async (confirmDangerous = false) => {
     if (!connId || !sql.trim()) return
@@ -83,21 +65,38 @@ export default function QueryPage() {
     }
 
     setRunning(true)
+    const startTime = Date.now()
     try {
       const r = await api.executeQuery(connId, selectedDb, sql, { confirmDangerous })
       setResult(r)
       setActiveTab('result')
+      // Record to localStorage history
+      sqlHistory.add({
+        sql: sql.trim(),
+        database: selectedDb,
+        connectionName: currentConn?.name ?? '',
+        executionTimeMs: Date.now() - startTime,
+        success: true,
+      })
     } catch (e) {
       if (e instanceof ApiError && e.details?.confirm_required) {
         setConfirmState({ reason: String(e.details.reason ?? 'dangerous operation') })
       } else {
         const msg = e instanceof Error ? e.message : 'Query failed'
         setError(msg)
+        // Record failed query to history
+        sqlHistory.add({
+          sql: sql.trim(),
+          database: selectedDb,
+          connectionName: currentConn?.name ?? '',
+          executionTimeMs: Date.now() - startTime,
+          success: false,
+        })
       }
     } finally {
       setRunning(false)
     }
-  }, [connId, selectedDb, sql])
+  }, [connId, selectedDb, sql, sqlHistory])
 
   // Keep runRef in sync so Monaco keybinding never captures a stale closure.
   useEffect(() => {
@@ -121,24 +120,12 @@ export default function QueryPage() {
     )
   }
 
-  async function handleDeleteHistory(entryId: string) {
-    if (!connId) return
-    try {
-      await api.deleteHistory(connId, entryId)
-      setServerHistory(prev => prev.filter(e => e.id !== entryId))
-    } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Failed to delete entry')
-    }
+  function handleDeleteHistory(entryId: string) {
+    sqlHistory.remove(entryId)
   }
 
-  async function handleClearHistory() {
-    if (!connId) return
-    try {
-      await api.clearHistory(connId)
-      setServerHistory([])
-    } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Failed to clear history')
-    }
+  function handleClearHistory() {
+    sqlHistory.clear()
   }
 
   const tabLabel = result
@@ -148,18 +135,16 @@ export default function QueryPage() {
     : ''
 
   return (
-    <div className="flex flex-col h-full p-4 gap-3">
+    <div className="flex flex-col h-full">
+      <WorkbenchHeader
+        connectionName={currentConn?.name}
+        resourcePath={[t('query.title')]}
+        datasourceType={currentConn?.driver ?? 'mysql'}
+        readonly={isReadonly}
+      />
+      <div className="flex flex-col flex-1 overflow-hidden p-4 gap-3">
       {/* Toolbar */}
       <div className="flex items-center gap-2 flex-wrap">
-        <h1 className="text-lg font-bold mr-1 flex items-center gap-2" style={{ color: 'var(--text-strong)' }}>
-          {t('query.title')}
-          {isReadonly && (
-            <span className="text-xs px-1.5 py-0.5 rounded font-mono font-normal"
-              style={{ background: 'var(--bg-muted)', color: 'var(--warning)', border: '1px solid var(--border-strong)' }}>
-              {t('readonly.badge')}
-            </span>
-          )}
-        </h1>
         <select
           value={selectedDb}
           onChange={e => setSelectedDb(e.target.value)}
@@ -209,10 +194,11 @@ export default function QueryPage() {
 
       {/* Error banner */}
       {error && (
-        <div className="px-3 py-2 rounded text-sm shrink-0"
-          style={{ background: 'var(--bg-muted)', border: '1px solid var(--danger)', color: 'var(--danger)' }}>
-          {error}
-        </div>
+        <ErrorState
+          title="Query Error"
+          message={error}
+          onRetry={() => handleRun(false)}
+        />
       )}
 
       {/* Result / History tabs */}
@@ -244,7 +230,7 @@ export default function QueryPage() {
               marginBottom: -1,
             }}
           >
-            {t('history.tab')} ({serverHistory.length})
+            {t('history.tab')} ({sqlHistory.entries.length})
           </button>
         </div>
 
@@ -271,55 +257,49 @@ export default function QueryPage() {
 
         {activeTab === 'history' && (
           <div>
-            {historyLoading ? (
-              <div className="text-center py-6 text-sm" style={{ color: 'var(--text-subtle)' }}>Loading…</div>
-            ) : (
-              <>
-                {serverHistory.length > 0 && (
-                  <div className="flex justify-end mb-2">
-                    <button
-                      onClick={handleClearHistory}
-                      className="text-xs px-2 py-1"
-                      style={{ color: 'var(--text-subtle)' }}
-                    >{t('history.clear_all')}</button>
-                  </div>
-                )}
-                <div className="space-y-1">
-                  {serverHistory.map(h => (
-                    <div
-                      key={h.id}
-                      className="group relative p-3 rounded"
-                      style={{ border: '1px solid var(--border-subtle)' }}
-                    >
-                      <div onClick={() => setSql(h.sql)} className="cursor-pointer">
-                        <div className="flex items-center justify-between mb-0.5">
-                          <span className="text-xs" style={{ color: 'var(--text-subtle)' }}>
-                            {new Date(h.created_at).toLocaleString()}
-                            {h.database ? ` · ${h.database}` : ''}
-                          </span>
-                          <span className="text-xs" style={{ color: 'var(--text-subtle)' }}>{h.duration_ms}ms</span>
-                        </div>
-                        <pre className="text-xs font-mono truncate" style={{ color: 'var(--text-default)' }}>{h.sql}</pre>
-                        {h.error && (
-                          <div className="text-xs mt-0.5" style={{ color: 'var(--danger)' }}>✗ {h.error}</div>
-                        )}
-                      </div>
-                      <button
-                        onClick={() => handleDeleteHistory(h.id)}
-                        className="absolute top-2 right-2 text-xs px-1 opacity-0 group-hover:opacity-100"
-                        style={{ color: 'var(--text-subtle)' }}
-                        title={t('history.delete')}
-                      >×</button>
-                    </div>
-                  ))}
-                  {serverHistory.length === 0 && (
-                    <div className="text-center py-6 text-sm" style={{ color: 'var(--text-subtle)' }}>
-                      {t('history.empty')}
-                    </div>
-                  )}
-                </div>
-              </>
+            {sqlHistory.entries.length > 0 && (
+              <div className="flex justify-end mb-2">
+                <button
+                  onClick={handleClearHistory}
+                  className="text-xs px-2 py-1"
+                  style={{ color: 'var(--text-subtle)' }}
+                >{t('history.clear_all')}</button>
+              </div>
             )}
+            <div className="space-y-1">
+              {sqlHistory.entries.map(h => (
+                <div
+                  key={h.id}
+                  className="group relative p-3 rounded"
+                  style={{ border: '1px solid var(--border-subtle)' }}
+                >
+                  <div onClick={() => setSql(h.sql)} className="cursor-pointer">
+                    <div className="flex items-center justify-between mb-0.5">
+                      <span className="text-xs" style={{ color: 'var(--text-subtle)' }}>
+                        {new Date(h.executedAt).toLocaleString()}
+                        {h.database ? ` · ${h.database}` : ''}
+                      </span>
+                      <span className="text-xs" style={{ color: 'var(--text-subtle)' }}>{h.executionTimeMs}ms</span>
+                    </div>
+                    <pre className="text-xs font-mono truncate" style={{ color: 'var(--text-default)' }}>{h.sql}</pre>
+                    {!h.success && (
+                      <div className="text-xs mt-0.5" style={{ color: 'var(--danger)' }}>✗ Failed</div>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => handleDeleteHistory(h.id)}
+                    className="absolute top-2 right-2 text-xs px-1 opacity-0 group-hover:opacity-100"
+                    style={{ color: 'var(--text-subtle)' }}
+                    title={t('history.delete')}
+                  >×</button>
+                </div>
+              ))}
+              {sqlHistory.entries.length === 0 && (
+                <div className="text-center py-6 text-sm" style={{ color: 'var(--text-subtle)' }}>
+                  {t('history.empty')}
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>
@@ -334,6 +314,7 @@ export default function QueryPage() {
         onConfirm={() => { setConfirmState(null); handleRun(true) }}
         onCancel={() => setConfirmState(null)}
       />
+    </div>
     </div>
   )
 }

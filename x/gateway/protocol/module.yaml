@@ -22,36 +22,23 @@ allowed_imports:
   - contract
   - x/gateway
 
-forbidden_imports:
-  - core/**
-  - router/**
-  - middleware/**
-  - security/**
-  - store/**
-  - health/**
-  - log/**
-  - metrics/**
-  - x/ai/**
-  - x/data/**
-  - x/fileapi/**
-  - x/frontend/**
-  - x/messaging/**
-  - x/observability/**
-  - x/openapi/**
-  - x/resilience/**
-  - x/rest/**
-  - x/rpc/**
-  - x/tenant/**
-  - x/validate/**
-
 test_commands:
   - go test -race -timeout 60s ./x/gateway/protocol/...
   - go vet ./x/gateway/protocol/...
 
+forbidden_imports:
+  - core/**
+  - store/**
+  - x/tenant/**
+  - x/ai/**
+  - x/messaging/**
+  - x/observability/**
+
 review_checklist:
-  - Keep protocol detection deterministic and side-effect free
-  - Do not embed transport, proxy, or middleware logic here
+  - Keep protocol adapters stateless and composable
+  - Do not mix gRPC server logic with transcoding adapters
+  - Keep authentication out of protocol adapters (owned by middleware/auth)
 
 agent_hints:
-  - Treat this as the protocol vocabulary consumed by x/gateway/protocolmw
-  - Add new protocol kinds here rather than in middleware
+  - Each protocol adapter is a separate type; keep them isolated from each other
+  - GraphQL and gRPC adapters share the gateway interface but must not share internal state

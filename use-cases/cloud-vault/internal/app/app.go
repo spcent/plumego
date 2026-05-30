@@ -17,7 +17,7 @@ import (
 	"github.com/spcent/plumego/middleware/httpmetrics"
 	"github.com/spcent/plumego/middleware/recovery"
 	"github.com/spcent/plumego/middleware/requestid"
-	midsecurity "github.com/spcent/plumego/middleware/security"
+	midsecurity "github.com/spcent/plumego/middleware/securityheaders"
 	"github.com/spcent/plumego/middleware/timeout"
 
 	"cloud-vault/internal/ai"
@@ -26,6 +26,7 @@ import (
 	"cloud-vault/internal/collection"
 	"cloud-vault/internal/config"
 	"cloud-vault/internal/database"
+	"cloud-vault/internal/diagnostics"
 	"cloud-vault/internal/document"
 	"cloud-vault/internal/importer"
 	"cloud-vault/internal/organize"
@@ -33,6 +34,8 @@ import (
 	"cloud-vault/internal/storage"
 	"cloud-vault/internal/system"
 	"cloud-vault/internal/tag"
+	"cloud-vault/internal/update"
+	"cloud-vault/internal/version"
 )
 
 // App holds application-wide dependencies.
@@ -50,6 +53,9 @@ type App struct {
 	System         *system.Handler
 	Auth           *auth.Handler
 	Backup         *backup.Handler
+	Update         *update.Handler
+	Diagnostics    *diagnostics.Handler
+	updateService  *update.Service
 	authService    *auth.Service
 	authMiddleware func(http.Handler) http.Handler
 	indexer        *search.Indexer
@@ -171,7 +177,7 @@ func New(cfg config.Config) (*App, error) {
 	}
 
 	// System handler (V0.6).
-	systemSvc := system.NewService(db.DB, store, cfg.AI)
+	systemSvc := system.NewService(db.DB, store, cfg)
 	systemHandler := system.NewHandler(systemSvc, app.Logger())
 
 	// Auth handler (V0.7).
@@ -212,6 +218,29 @@ func New(cfg config.Config) (*App, error) {
 	backupSvc := backup.NewService(backupRepo, cfg.DB.Path, cfg.Storage.Provider, cfg.Local.Root, "", cfg.App.Version)
 	backupHandler := backup.NewHandler(backupSvc, filepath.Dir(cfg.DB.Path), app.Logger())
 
+	// Update handler (V1.0).
+	versionInfo := update.VersionInfo{
+		Version:   version.Version,
+		Commit:    version.Commit,
+		BuildTime: version.BuildTime,
+		Channel:   version.Channel,
+	}
+	updateChecker := update.NewChecker(versionInfo, "")
+	updateSvcConfig := &update.Config{
+		Enabled:          cfg.Update.Enabled,
+		CheckOnStartup:   cfg.Update.CheckOnStartup,
+		UpdateURL:        "",
+		CheckIntervalMin: cfg.Update.CheckIntervalMin,
+		Channel:          cfg.Update.Channel,
+	}
+	updateSvc := update.NewService(updateChecker, updateSvcConfig, app.Logger())
+	updateHandler := update.NewHandler(updateSvc, app.Logger())
+
+	// Diagnostics handler (V1.0).
+	diagnosticsDir := filepath.Join(filepath.Dir(cfg.DB.Path), "diagnostics")
+	diagnosticsSvc := diagnostics.NewService(cfg, db, store, diagnosticsDir)
+	diagnosticsHandler := diagnostics.NewHandler(diagnosticsSvc, app.Logger())
+
 	return &App{
 		Core:           app,
 		Cfg:            cfg,
@@ -226,6 +255,9 @@ func New(cfg config.Config) (*App, error) {
 		System:         systemHandler,
 		Auth:           authHandler,
 		Backup:         backupHandler,
+		Update:         updateHandler,
+		Diagnostics:    diagnosticsHandler,
+		updateService:  updateSvc,
 		authService:    authService,
 		authMiddleware: authMiddleware,
 		indexer:        indexer,
@@ -256,6 +288,11 @@ func (a *App) Start(ctx context.Context) error {
 	// Start AI task workers.
 	for _, w := range a.aiWorkers {
 		go w.Run(ctx)
+	}
+
+	// Start V1.0 update background checker.
+	if a.updateService != nil {
+		a.updateService.StartBackgroundChecker(ctx)
 	}
 
 	shutdownErr := make(chan error, 1)
@@ -399,4 +436,30 @@ func (rr *groupRouteReg) delete(path string, h http.Handler) {
 		return
 	}
 	rr.err = rr.group.Delete(path, h)
+}
+
+// HTTPHandler returns the HTTP handler for the application.
+// This is used by desktop mode to embed the server.
+func (a *App) HTTPHandler() (http.Handler, error) {
+	if err := a.Core.Prepare(); err != nil {
+		return nil, err
+	}
+	return a.Core, nil
+}
+
+// StartBackgroundTasks starts background workers (indexer, AI workers).
+// This is called separately in desktop mode after the server starts.
+func (a *App) StartBackgroundTasks(ctx context.Context) {
+	// Start search indexer
+	go a.indexer.Run(ctx)
+
+	// Start AI workers
+	for _, worker := range a.aiWorkers {
+		go worker.Run(ctx)
+	}
+
+	// Start V1.0 update background checker
+	if a.updateService != nil {
+		a.updateService.StartBackgroundChecker(ctx)
+	}
 }

@@ -3,7 +3,7 @@
 `extension-api-snapshot` records the exported Go API surface for an extension
 package tree and compares two recorded snapshots.
 
-It is a local evidence tool for `docs/EXTENSION_STABILITY_POLICY.md`. It does
+It is a local evidence tool for `docs/reference/extension-stability-policy.md`. It does
 not fetch tags, decide promotion status, or update module manifests.
 
 Generate a snapshot:

@@ -16,8 +16,8 @@ var (
 	docPaths = []string{
 		"README.md",
 		"README_CN.md",
-		"docs/getting-started.md",
-		"docs/CANONICAL_STYLE_GUIDE.md",
+		"docs/start/getting-started.md",
+		"docs/reference/canonical-style-guide.md",
 		"docs/modules/core/README.md",
 	}
 
@@ -120,10 +120,10 @@ func writePackageMainSnippets(tmp string, root string) (int, error) {
 }
 
 func writeGettingStartedFragments(tmp string, root string) (int, error) {
-	blocks, err := goBlocks(filepath.Join(root, "docs/getting-started.md"))
+	blocks, err := goBlocks(filepath.Join(root, "docs/start/getting-started.md"))
 	if err != nil {
 		if os.IsNotExist(err) {
-			return 0, fmt.Errorf("missing doc: docs/getting-started.md")
+			return 0, fmt.Errorf("missing doc: docs/start/getting-started.md")
 		}
 		return 0, err
 	}

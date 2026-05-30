@@ -18,38 +18,22 @@ non_goals:
 
 allowed_imports:
   - stdlib
-  - contract
   - log
-
-forbidden_imports:
-  - core/**
-  - router/**
-  - middleware/**
-  - security/**
-  - store/**
-  - health/**
-  - metrics/**
-  - x/ai/**
-  - x/data/**
-  - x/fileapi/**
-  - x/frontend/**
-  - x/gateway/**
-  - x/messaging/**
-  - x/openapi/**
-  - x/resilience/**
-  - x/rest/**
-  - x/rpc/**
-  - x/tenant/**
-  - x/validate/**
 
 test_commands:
   - go test -race -timeout 60s ./x/observability/testlog/...
   - go vet ./x/observability/testlog/...
 
+forbidden_imports:
+  - x/tenant/**
+  - x/ai/**
+  - x/gateway/**
+
 review_checklist:
-  - Keep this strictly a test double with no production wiring
-  - Preserve log.StructuredLogger compatibility
+  - Use only in test code; do not import in production packages
+  - Keep captured entries queryable by level and message
+  - Do not add export or transport functionality
 
 agent_hints:
-  - Use only in tests to assert log output
-  - Do not import this from production bootstrap paths
+  - Use testlog.Recorder as the StructuredLogger in tests that need to assert log output
+  - Keep test assertions focused on meaningful fields; avoid over-specifying log format

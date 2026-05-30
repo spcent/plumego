@@ -1,6 +1,7 @@
 package app
 
 import (
+	"io/fs"
 	"net/http"
 
 	midauth "github.com/spcent/plumego/middleware/auth"
@@ -8,6 +9,7 @@ import (
 
 	dbauthn "dbadmin/internal/domain/authn"
 	"dbadmin/internal/handler"
+	"dbadmin/web"
 )
 
 // RegisterRoutes wires all HTTP routes for dbadmin.
@@ -56,10 +58,11 @@ func (a *App) RegisterRoutes() error {
 		Logger:      a.Core.Logger(),
 	}
 	queryH := handler.QueryHandler{
-		Connections: a.ConnectionStore,
-		Manager:     a.DBManager,
-		History:     a.HistoryStore,
-		Logger:      a.Core.Logger(),
+		Connections:         a.ConnectionStore,
+		Manager:             a.DBManager,
+		History:             a.HistoryStore,
+		Logger:              a.Core.Logger(),
+		QueryTimeoutSeconds: a.Cfg.App.QueryTimeoutSeconds,
 	}
 	rowH := handler.RowHandler{
 		Connections: a.ConnectionStore,
@@ -76,6 +79,7 @@ func (a *App) RegisterRoutes() error {
 		Manager:      a.DBManager,
 		RedisManager: a.RedisManager,
 		MongoManager: a.MongoManager,
+		ESManager:    a.ESManager,
 		Logger:       a.Core.Logger(),
 	}
 	resourceH := handler.ResourceHandler{
@@ -83,6 +87,7 @@ func (a *App) RegisterRoutes() error {
 		SQLAdapter:   a.SQLAdapter,
 		RedisAdapter: a.RedisAdapter,
 		MongoAdapter: a.MongoAdapter,
+		ESAdapter:    a.ESAdapter,
 		Logger:       a.Core.Logger(),
 	}
 	redisH := handler.RedisHandler{
@@ -102,6 +107,12 @@ func (a *App) RegisterRoutes() error {
 		MongoManager: a.MongoManager,
 		History:      a.MongoHistoryStore,
 		Logger:       a.Core.Logger(),
+	}
+	esH := handler.ElasticsearchHandler{
+		Connections: a.ConnectionStore,
+		ESManager:   a.ESManager,
+		History:     a.ESHistoryStore,
+		Logger:      a.Core.Logger(),
 	}
 
 	// Protected routes — all require a valid session cookie.
@@ -192,17 +203,41 @@ func (a *App) RegisterRoutes() error {
 	protected.get("/api/connections/:id/mongo/history", guard(http.HandlerFunc(mongoH.ListHistory)))
 	protected.delete("/api/connections/:id/mongo/history/:entryId", guard(http.HandlerFunc(mongoH.DeleteHistoryEntry)))
 	protected.delete("/api/connections/:id/mongo/history", guard(http.HandlerFunc(mongoH.ClearHistory)))
+
+	// Elasticsearch operations — ES-specific route group.
+	protected.get("/api/connections/:id/es/info", guard(http.HandlerFunc(esH.ClusterInfo)))
+	protected.get("/api/connections/:id/es/indices", guard(http.HandlerFunc(esH.ListIndices)))
+	protected.get("/api/connections/:id/es/index/mapping", guard(http.HandlerFunc(esH.GetMapping)))
+	protected.get("/api/connections/:id/es/index/settings", guard(http.HandlerFunc(esH.GetSettings)))
+	protected.post("/api/connections/:id/es/search", guard(http.HandlerFunc(esH.Search)))
+	protected.get("/api/connections/:id/es/document", guard(http.HandlerFunc(esH.GetDocument)))
+	protected.delete("/api/connections/:id/es/document", guard(http.HandlerFunc(esH.DeleteDocument)))
+	protected.get("/api/connections/:id/es/history", guard(http.HandlerFunc(esH.ListHistory)))
+	protected.delete("/api/connections/:id/es/history/:entryId", guard(http.HandlerFunc(esH.DeleteHistoryEntry)))
+	protected.delete("/api/connections/:id/es/history", guard(http.HandlerFunc(esH.ClearHistory)))
 	if protected.err != nil {
 		return protected.err
 	}
 
 	// SPA: must be registered last so API routes take precedence over the catch-all.
-	// In development (no dist/), skip gracefully.
-	return frontend.RegisterFromDir(a.Core, "./web/dist",
+	// Use embedded assets in production, fall back to disk in development.
+	opts := []frontend.Option{
 		frontend.WithFallback(true),
 		frontend.WithCacheControl("public, max-age=31536000, immutable"),
 		frontend.WithIndexCacheControl("no-cache, must-revalidate"),
-	)
+	}
+
+	if web.Available {
+		// Production: serve from embedded filesystem
+		distFS, err := fs.Sub(web.Assets, "dist")
+		if err != nil {
+			return err
+		}
+		return frontend.RegisterFS(a.Core, http.FS(distFS), opts...)
+	}
+
+	// Development: serve from disk, skip if not built
+	return frontend.RegisterFromDir(a.Core, "./web/dist", opts...)
 }
 
 // routeAdder is the minimal interface shared by *core.App and *core.RouteGroup.

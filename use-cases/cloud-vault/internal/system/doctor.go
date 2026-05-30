@@ -1,12 +1,17 @@
 package system
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"database/sql"
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
+	"time"
 
+	"cloud-vault/internal/config"
 	"cloud-vault/internal/storage"
 )
 
@@ -14,7 +19,7 @@ const defaultMaxItems = 100
 const defaultSampleSize = 100
 
 // runCheck dispatches to the correct check function by name.
-func runCheck(ctx context.Context, name string, db *sql.DB, store storage.ObjectStorage, sampleSize int) CheckResult {
+func runCheck(ctx context.Context, name string, db *sql.DB, store storage.ObjectStorage, cfg config.Config, sampleSize int) CheckResult {
 	switch name {
 	case "storage_objects":
 		return checkStorageObjects(ctx, db, store)
@@ -36,6 +41,22 @@ func runCheck(ctx context.Context, name string, db *sql.DB, store storage.Object
 		return checkAIConsistency(ctx, db)
 	case "auth":
 		return checkAuth(ctx, db)
+	case "config_check":
+		return checkConfig(ctx, cfg)
+	case "data_dir_check":
+		return checkDataDir(ctx, cfg)
+	case "storage_writable_check":
+		return checkStorageWritable(ctx, store, cfg)
+	case "auth_security_check":
+		return checkAuthSecurity(ctx, db, cfg)
+	case "cookie_security_check":
+		return checkCookieSecurity(ctx, cfg)
+	case "qiniu_config_check":
+		return checkQiniuConfig(ctx, store, cfg)
+	case "backup_check":
+		return checkBackup(ctx, cfg)
+	case "migration_check":
+		return checkMigration(ctx, db)
 	default:
 		return CheckResult{Name: name, Status: StatusError, Items: []IssueItem{{Issue: "unknown_check"}}}
 	}
@@ -568,6 +589,343 @@ func checkAuth(ctx context.Context, db *sql.DB) CheckResult {
 	if r.Failed > 0 {
 		r.Status = StatusWarning
 	}
+	return r
+}
+
+// checkConfig validates the configuration.
+func checkConfig(ctx context.Context, cfg config.Config) CheckResult {
+	r := CheckResult{Name: "config_check", Status: StatusOK}
+	if err := config.ValidateConfig(cfg); err != nil {
+		r.Status = StatusError
+		r.Items = []IssueItem{{Issue: "config_validation_failed", Detail: err.Error()}}
+	}
+	return r
+}
+
+// checkDataDir verifies the data directory exists and is writable.
+func checkDataDir(ctx context.Context, cfg config.Config) CheckResult {
+	r := CheckResult{Name: "data_dir_check", Status: StatusOK}
+
+	dataDir := cfg.DB.Path
+	if dataDir != "" {
+		dataDir = filepath.Dir(dataDir)
+	}
+
+	if dataDir == "" {
+		r.Status = StatusError
+		r.Items = []IssueItem{{Issue: "database_path_empty"}}
+		return r
+	}
+
+	info, err := os.Stat(dataDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			// Try to create it
+			if err := os.MkdirAll(dataDir, 0755); err != nil {
+				r.Status = StatusError
+				r.Items = []IssueItem{{Issue: "data_dir_missing", Detail: err.Error()}}
+				return r
+			}
+			r.Status = StatusOK
+			r.Items = []IssueItem{{Issue: "data_dir_created", Detail: dataDir}}
+			return r
+		}
+		r.Status = StatusError
+		r.Items = []IssueItem{{Issue: "data_dir_stat_failed", Detail: err.Error()}}
+		return r
+	}
+
+	if !info.IsDir() {
+		r.Status = StatusError
+		r.Items = []IssueItem{{Issue: "data_path_not_directory", Detail: dataDir}}
+		return r
+	}
+
+	// Check writability
+	testFile := filepath.Join(dataDir, ".write_test")
+	if f, err := os.Create(testFile); err != nil {
+		r.Status = StatusError
+		r.Items = []IssueItem{{Issue: "data_dir_not_writable", Detail: err.Error()}}
+	} else {
+		f.Close()
+		os.Remove(testFile)
+	}
+
+	return r
+}
+
+// checkStorageWritable verifies storage can write and read objects.
+func checkStorageWritable(ctx context.Context, store storage.ObjectStorage, cfg config.Config) CheckResult {
+	r := CheckResult{Name: "storage_writable_check", Status: StatusOK}
+
+	testKey := ".doctor_write_test"
+	testData := []byte("test")
+
+	// Write
+	if err := store.Put(ctx, testKey, bytes.NewReader(testData), int64(len(testData)), "text/plain"); err != nil {
+		r.Status = StatusError
+		r.Items = []IssueItem{{Issue: "storage_write_failed", Detail: err.Error()}}
+		return r
+	}
+
+	// Read
+	exists, err := store.Exists(ctx, testKey)
+	if err != nil {
+		r.Status = StatusError
+		r.Items = []IssueItem{{Issue: "storage_exists_failed", Detail: err.Error()}}
+		store.Delete(ctx, testKey)
+		return r
+	}
+	if !exists {
+		r.Status = StatusError
+		r.Items = []IssueItem{{Issue: "storage_object_not_found_after_write"}}
+		return r
+	}
+
+	// Delete
+	if err := store.Delete(ctx, testKey); err != nil {
+		r.Status = StatusWarning
+		r.Items = []IssueItem{{Issue: "storage_delete_failed", Detail: err.Error()}}
+	}
+
+	return r
+}
+
+// checkAuthSecurity verifies authentication security settings.
+func checkAuthSecurity(ctx context.Context, db *sql.DB, cfg config.Config) CheckResult {
+	r := CheckResult{Name: "auth_security_check", Status: StatusOK}
+
+	if !cfg.Auth.Enabled {
+		r.Status = StatusWarning
+		r.Items = []IssueItem{{Issue: "auth_disabled", Detail: "authentication is disabled"}}
+		return r
+	}
+
+	// Check for at least one admin user
+	var adminCount int
+	err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM users WHERE role = 'admin'`).Scan(&adminCount)
+	if err != nil {
+		r.Status = StatusError
+		r.Items = []IssueItem{{Issue: "admin_query_failed", Detail: err.Error()}}
+		return r
+	}
+	if adminCount == 0 {
+		r.Status = StatusError
+		r.Items = []IssueItem{{Issue: "no_admin_users", Detail: "at least one admin user required"}}
+	}
+
+	// Check for disabled users with active sessions
+	rows, err := db.QueryContext(ctx, `
+		SELECT us.id, us.user_id FROM user_sessions us
+		JOIN users u ON u.id = us.user_id
+		WHERE u.disabled = true
+		AND us.revoked_at IS NULL
+		AND us.expires_at > datetime('now')
+		LIMIT ?`, defaultMaxItems)
+	if err == nil {
+		defer rows.Close()
+		for rows.Next() {
+			var sessionID, userID string
+			if err := rows.Scan(&sessionID, &userID); err != nil {
+				continue
+			}
+			r.Failed++
+			if len(r.Items) < defaultMaxItems {
+				r.Items = append(r.Items, IssueItem{
+					EntityID: sessionID,
+					Issue:    "disabled_user_active_session",
+					Detail:   fmt.Sprintf("user_id=%s", userID),
+				})
+			}
+		}
+	}
+
+	// Check for expired sessions pending cleanup
+	var expiredSessions int
+	err = db.QueryRowContext(ctx, `
+		SELECT COUNT(*) FROM user_sessions
+		WHERE expires_at < datetime('now') AND revoked_at IS NULL
+	`).Scan(&expiredSessions)
+	if err == nil && expiredSessions > 0 {
+		r.Items = append(r.Items, IssueItem{
+			Issue:  "expired_sessions_pending_cleanup",
+			Detail: fmt.Sprintf("%d expired sessions", expiredSessions),
+		})
+		if r.Status == StatusOK {
+			r.Status = StatusWarning
+		}
+	}
+
+	if r.Failed > 0 && r.Status != StatusError {
+		r.Status = StatusWarning
+	}
+	return r
+}
+
+// checkCookieSecurity verifies cookie security settings.
+func checkCookieSecurity(ctx context.Context, cfg config.Config) CheckResult {
+	r := CheckResult{Name: "cookie_security_check", Status: StatusOK}
+
+	if !cfg.Auth.Enabled {
+		r.Status = StatusDisabled
+		return r
+	}
+
+	if cfg.Auth.CookieName == "" {
+		r.Status = StatusError
+		r.Items = []IssueItem{{Issue: "cookie_name_empty"}}
+		return r
+	}
+
+	if !cfg.Auth.SecureCookie {
+		r.Status = StatusWarning
+		r.Items = []IssueItem{{Issue: "secure_cookie_disabled", Detail: "set secure_cookie=true for production"}}
+	}
+
+	return r
+}
+
+// checkQiniuConfig verifies Qiniu configuration when provider is qiniu.
+func checkQiniuConfig(ctx context.Context, store storage.ObjectStorage, cfg config.Config) CheckResult {
+	r := CheckResult{Name: "qiniu_config_check", Status: StatusOK}
+
+	if cfg.Storage.Provider != "qiniu" {
+		r.Status = StatusDisabled
+		return r
+	}
+
+	// Check all required fields
+	var missing []string
+	if cfg.Qiniu.AccessKey == "" {
+		missing = append(missing, "access_key")
+	}
+	if cfg.Qiniu.SecretKey == "" {
+		missing = append(missing, "secret_key")
+	}
+	if cfg.Qiniu.Bucket == "" {
+		missing = append(missing, "bucket")
+	}
+	if cfg.Qiniu.Domain == "" {
+		missing = append(missing, "domain")
+	}
+	if cfg.Qiniu.Region == "" {
+		missing = append(missing, "region")
+	}
+
+	if len(missing) > 0 {
+		r.Status = StatusError
+		r.Items = []IssueItem{{Issue: "qiniu_fields_missing", Detail: fmt.Sprintf("missing: %v", missing)}}
+		return r
+	}
+
+	// Try to probe storage (Exists call)
+	_, err := store.Exists(ctx, ".qiniu_probe_test")
+	if err != nil {
+		r.Status = StatusWarning
+		r.Items = []IssueItem{{Issue: "qiniu_probe_failed", Detail: err.Error()}}
+	}
+
+	return r
+}
+
+// checkBackup verifies backup directory and recent backups.
+func checkBackup(ctx context.Context, cfg config.Config) CheckResult {
+	r := CheckResult{Name: "backup_check", Status: StatusOK}
+
+	backupDir := filepath.Join(filepath.Dir(cfg.DB.Path), "backups")
+
+	info, err := os.Stat(backupDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			// Try to create it
+			if err := os.MkdirAll(backupDir, 0755); err != nil {
+				r.Status = StatusError
+				r.Items = []IssueItem{{Issue: "backup_dir_missing", Detail: err.Error()}}
+				return r
+			}
+			r.Items = []IssueItem{{Issue: "backup_dir_created", Detail: backupDir}}
+			return r
+		}
+		r.Status = StatusError
+		r.Items = []IssueItem{{Issue: "backup_dir_stat_failed", Detail: err.Error()}}
+		return r
+	}
+
+	if !info.IsDir() {
+		r.Status = StatusError
+		r.Items = []IssueItem{{Issue: "backup_path_not_directory", Detail: backupDir}}
+		return r
+	}
+
+	// Check writability
+	testFile := filepath.Join(backupDir, ".write_test")
+	if f, err := os.Create(testFile); err != nil {
+		r.Status = StatusError
+		r.Items = []IssueItem{{Issue: "backup_dir_not_writable", Detail: err.Error()}}
+	} else {
+		f.Close()
+		os.Remove(testFile)
+	}
+
+	// Check for recent backups (within 7 days)
+	entries, err := os.ReadDir(backupDir)
+	if err == nil {
+		var latest time.Time
+		for _, entry := range entries {
+			if entry.IsDir() || filepath.Ext(entry.Name()) != ".zip" {
+				continue
+			}
+			info, err := entry.Info()
+			if err != nil {
+				continue
+			}
+			if info.ModTime().After(latest) {
+				latest = info.ModTime()
+			}
+		}
+
+		if latest.IsZero() {
+			r.Items = append(r.Items, IssueItem{Issue: "no_backups_found"})
+			if r.Status == StatusOK {
+				r.Status = StatusWarning
+			}
+		} else if time.Since(latest) > 7*24*time.Hour {
+			r.Items = append(r.Items, IssueItem{
+				Issue:  "backup_stale",
+				Detail: fmt.Sprintf("last backup: %s", latest.Format("2006-01-02")),
+			})
+			if r.Status == StatusOK {
+				r.Status = StatusWarning
+			}
+		}
+	}
+
+	return r
+}
+
+// checkMigration verifies database schema is up to date.
+func checkMigration(ctx context.Context, db *sql.DB) CheckResult {
+	r := CheckResult{Name: "migration_check", Status: StatusOK}
+
+	// Check schema_migrations table exists
+	var version string
+	err := db.QueryRowContext(ctx, `SELECT version FROM schema_migrations ORDER BY version DESC LIMIT 1`).Scan(&version)
+	if err != nil {
+		r.Status = StatusError
+		r.Items = []IssueItem{{Issue: "schema_migrations_missing", Detail: err.Error()}}
+		return r
+	}
+
+	// Expected latest version (V0.8)
+	expectedVersion := "008"
+	if version != expectedVersion {
+		r.Status = StatusWarning
+		r.Items = []IssueItem{{
+			Issue:  "schema_version_drift",
+			Detail: fmt.Sprintf("current=%s expected=%s", version, expectedVersion),
+		}}
+	}
+
 	return r
 }
 

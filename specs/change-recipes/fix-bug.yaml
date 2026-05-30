@@ -1,7 +1,7 @@
 name: fix-bug
 scope: defect repair and regression prevention
 steps:
-  - Read AGENTS.md, the matching specs/task-routing.yaml entry, docs/AGENT_CODE_QUALITY_RULES.md, specs/agent-quality-rules.yaml, and the target module manifest; add docs/CODEX_WORKFLOW.md or specs/repo.yaml only when ownership remains unclear.
+  - Read AGENTS.md, the matching specs/task-routing.yaml entry, docs/operations/agent-code-quality-rules.md, specs/agent-quality-rules.yaml, and the target module manifest; add docs/operations/codex-workflow.md or specs/repo.yaml only when ownership remains unclear.
   - Reproduce or localize the bug at the owning module and identify the root cause before editing.
   - Complete the quality preflight and select the lightest sufficient gate profile.
   - Apply the smallest coherent fix at the root cause rather than patching symptoms.

@@ -1,7 +1,7 @@
 name: http-endpoint-bugfix
 scope: defect repair in HTTP handlers, route wiring, or transport contracts
 steps:
-  - Read AGENTS.md, the matching specs/task-routing.yaml entry, docs/CANONICAL_STYLE_GUIDE.md HTTP sections, and the owning module manifest.
+  - Read AGENTS.md, the matching specs/task-routing.yaml entry, docs/reference/canonical-style-guide.md HTTP sections, and the owning module manifest.
   - Localize whether the defect belongs to route wiring, handler transport logic, contract helpers, or the owning extension family.
   - Fix the root cause while preserving the canonical handler shape and explicit route registration style.
   - Keep JSON decode, request input reads, and error writing on canonical transport paths.

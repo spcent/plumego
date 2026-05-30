@@ -23,6 +23,7 @@ export interface Translations {
     aiTasks: string
     prompts: string
     system: string
+    settings: string
     account: string
     security: string
     logout: string
@@ -113,6 +114,8 @@ export interface Translations {
       health: string
       stats: string
       doctor: string
+      backup: string
+      settings: string
     }
     account: {
       title: string
@@ -136,6 +139,32 @@ export interface Translations {
     enUS: string
     zhCN: string
     zhTW: string
+  }
+  backup: {
+    title: string
+    create: string
+    creating: string
+    download: string
+    delete: string
+    deleting: string
+    noBackups: string
+    confirmDelete: string
+    size: string
+    createdAt: string
+  }
+  settings: {
+    title: string
+    version: string
+    storageProvider: string
+    authEnabled: string
+    searchEnabled: string
+    aiEnabled: string
+    databasePath: string
+    storageRoot: string
+    enabled: string
+    disabled: string
+    local: string
+    qiniu: string
   }
 }
 
@@ -164,6 +193,7 @@ export const enUS: Translations = {
     aiTasks: 'AI Tasks',
     prompts: 'Prompts',
     system: 'System',
+    settings: 'Settings',
     account: 'Account',
     security: 'Security',
     logout: 'Logout',
@@ -254,6 +284,8 @@ export const enUS: Translations = {
       health: 'Health',
       stats: 'Statistics',
       doctor: 'Doctor',
+      backup: 'Backup',
+      settings: 'Settings',
     },
     account: {
       title: 'Account',
@@ -277,6 +309,32 @@ export const enUS: Translations = {
     enUS: 'English (US)',
     zhCN: '简体中文',
     zhTW: '繁體中文',
+  },
+  backup: {
+    title: 'Backup Management',
+    create: 'Create Backup',
+    creating: 'Creating...',
+    download: 'Download',
+    delete: 'Delete',
+    deleting: 'Deleting...',
+    noBackups: 'No backups available',
+    confirmDelete: 'Are you sure you want to delete this backup?',
+    size: 'Size',
+    createdAt: 'Created',
+  },
+  settings: {
+    title: 'System Settings',
+    version: 'Version',
+    storageProvider: 'Storage Provider',
+    authEnabled: 'Authentication',
+    searchEnabled: 'Search',
+    aiEnabled: 'AI Features',
+    databasePath: 'Database Path',
+    storageRoot: 'Storage Root',
+    enabled: 'Enabled',
+    disabled: 'Disabled',
+    local: 'Local Storage',
+    qiniu: 'Qiniu Cloud',
   },
 }
 
@@ -305,6 +363,7 @@ export const zhCN: Translations = {
     aiTasks: 'AI 任务',
     prompts: '提示词',
     system: '系统',
+    settings: '设置',
     account: '账户',
     security: '安全',
     logout: '退出',
@@ -395,6 +454,8 @@ export const zhCN: Translations = {
       health: '健康检查',
       stats: '统计',
       doctor: '诊断',
+      backup: '备份',
+      settings: '设置',
     },
     account: {
       title: '账户',
@@ -418,6 +479,32 @@ export const zhCN: Translations = {
     enUS: 'English (US)',
     zhCN: '简体中文',
     zhTW: '繁體中文',
+  },
+  backup: {
+    title: '备份管理',
+    create: '创建备份',
+    creating: '创建中...',
+    download: '下载',
+    delete: '删除',
+    deleting: '删除中...',
+    noBackups: '暂无备份',
+    confirmDelete: '确定要删除此备份吗？',
+    size: '大小',
+    createdAt: '创建时间',
+  },
+  settings: {
+    title: '系统设置',
+    version: '版本',
+    storageProvider: '存储提供商',
+    authEnabled: '认证',
+    searchEnabled: '搜索',
+    aiEnabled: 'AI 功能',
+    databasePath: '数据库路径',
+    storageRoot: '存储根目录',
+    enabled: '已启用',
+    disabled: '已禁用',
+    local: '本地存储',
+    qiniu: '七牛云',
   },
 }
 
@@ -446,6 +533,7 @@ export const zhTW: Translations = {
     aiTasks: 'AI 任務',
     prompts: '提示詞',
     system: '系統',
+    settings: '設定',
     account: '帳戶',
     security: '安全',
     logout: '登出',
@@ -536,6 +624,8 @@ export const zhTW: Translations = {
       health: '健康檢查',
       stats: '統計',
       doctor: '診斷',
+      backup: '備份',
+      settings: '設定',
     },
     account: {
       title: '帳戶',
@@ -559,5 +649,31 @@ export const zhTW: Translations = {
     enUS: 'English (US)',
     zhCN: '简体中文',
     zhTW: '繁體中文',
+  },
+  backup: {
+    title: '備份管理',
+    create: '建立備份',
+    creating: '建立中...',
+    download: '下載',
+    delete: '刪除',
+    deleting: '刪除中...',
+    noBackups: '暫無備份',
+    confirmDelete: '確定要刪除此備份嗎？',
+    size: '大小',
+    createdAt: '建立時間',
+  },
+  settings: {
+    title: '系統設置',
+    version: '版本',
+    storageProvider: '儲存供應商',
+    authEnabled: '認證',
+    searchEnabled: '搜尋',
+    aiEnabled: 'AI 功能',
+    databasePath: '資料庫路徑',
+    storageRoot: '儲存根目錄',
+    enabled: '已啟用',
+    disabled: '已停用',
+    local: '本地儲存',
+    qiniu: '七牛雲',
   },
 }

@@ -10,7 +10,7 @@ providers along with duplicate-key deduplication policy.
 
 ## Status
 
-`experimental` — API not frozen. See [`docs/EXTENSION_MATURITY.md`](../../../../EXTENSION_MATURITY.md).  
+`experimental` — API not frozen. See [`docs/concepts/extension-maturity.md`](../../../../concepts/extension-maturity.md).  
 `x/data/idempotency` is a beta surface at v1.1.0: API unchanged across v1.0.0 → v1.1.0, owner sign-off recorded.
 
 ## Use this module when

@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
@@ -19,10 +20,11 @@ import (
 
 // QueryHandler handles SQL console execution and query history.
 type QueryHandler struct {
-	Connections *connection.Store
-	Manager     *dbmanager.Manager
-	History     *history.Store
-	Logger      plumelog.StructuredLogger
+	Connections         *connection.Store
+	Manager             *dbmanager.Manager
+	History             *history.Store
+	Logger              plumelog.StructuredLogger
+	QueryTimeoutSeconds int // Maximum query execution time in seconds
 }
 
 type queryRequest struct {
@@ -207,9 +209,17 @@ func (h QueryHandler) Execute(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Apply timeout if configured
+	ctx := r.Context()
+	var cancel context.CancelFunc
+	if h.QueryTimeoutSeconds > 0 {
+		ctx, cancel = context.WithTimeout(ctx, time.Duration(h.QueryTimeoutSeconds)*time.Second)
+		defer cancel()
+	}
+
 	// For MySQL, USE the selected database first.
 	if conn.Driver == connection.DriverMySQL && req.Database != "" {
-		if _, err := db.ExecContext(r.Context(), "USE "+quoteIdent(req.Database, connection.DriverMySQL)); err != nil {
+		if _, err := db.ExecContext(ctx, "USE "+quoteIdent(req.Database, connection.DriverMySQL)); err != nil {
 			logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
 				Type(contract.TypeInternal).Message("failed to select database").Build()))
 			return
@@ -227,13 +237,24 @@ func (h QueryHandler) Execute(w http.ResponseWriter, r *http.Request) {
 			truncated = true
 		}
 
-		rows, err := db.QueryContext(r.Context(), sqlStr)
+		rows, err := db.QueryContext(ctx, sqlStr)
 		if err != nil {
 			durationMs := time.Since(start).Milliseconds()
 			_ = h.recordHistory(connID, req.Database, originalSQL, durationMs, err.Error())
-			h.Logger.Error("query failed", plumelog.Fields{"error": err.Error()})
-			logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
-				Type(contract.TypeInternal).Message(err.Error()).Build()))
+
+			// Check if timeout occurred
+			if ctx.Err() == context.DeadlineExceeded {
+				h.Logger.Error("query timeout", plumelog.Fields{"timeout": h.QueryTimeoutSeconds, "sql": sqlStr})
+				logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+					Type(contract.TypeTimeout).
+					Message("query execution timeout").
+					Detail("timeout_seconds", h.QueryTimeoutSeconds).
+					Build()))
+			} else {
+				h.Logger.Error("query failed", plumelog.Fields{"error": err.Error()})
+				logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+					Type(contract.TypeInternal).Message(err.Error()).Build()))
+			}
 			return
 		}
 		defer rows.Close()
@@ -260,13 +281,24 @@ func (h QueryHandler) Execute(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Non-SELECT: use Exec.
-	res, err := db.ExecContext(r.Context(), sqlStr)
+	res, err := db.ExecContext(ctx, sqlStr)
 	if err != nil {
 		durationMs := time.Since(start).Milliseconds()
 		_ = h.recordHistory(connID, req.Database, originalSQL, durationMs, err.Error())
-		h.Logger.Error("exec failed", plumelog.Fields{"error": err.Error()})
-		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
-			Type(contract.TypeInternal).Message(err.Error()).Build()))
+
+		// Check if timeout occurred
+		if ctx.Err() == context.DeadlineExceeded {
+			h.Logger.Error("exec timeout", plumelog.Fields{"timeout": h.QueryTimeoutSeconds, "sql": sqlStr})
+			logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+				Type(contract.TypeTimeout).
+				Message("query execution timeout").
+				Detail("timeout_seconds", h.QueryTimeoutSeconds).
+				Build()))
+		} else {
+			h.Logger.Error("exec failed", plumelog.Fields{"error": err.Error()})
+			logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+				Type(contract.TypeInternal).Message(err.Error()).Build()))
+		}
 		return
 	}
 

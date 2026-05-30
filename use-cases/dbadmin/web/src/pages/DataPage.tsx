@@ -5,6 +5,7 @@ import CellRenderer from '../components/CellRenderer'
 import CellViewer from '../components/CellViewer'
 import ConfirmDialog from '../components/ConfirmDialog'
 import RowDrawer from '../components/RowDrawer'
+import WorkbenchHeader from '../components/WorkbenchHeader'
 import { useToast } from '../components/Toast'
 import { useI18n } from '../i18n'
 import { useCurrentConn } from './MainLayout'
@@ -228,6 +229,14 @@ export default function DataPage() {
       className="flex flex-col h-full"
       style={{ background: 'var(--bg-surface)' }}
     >
+      <WorkbenchHeader
+        connectionName={currentConn?.name}
+        resourcePath={dbName && tableName ? [dbName, tableName] : []}
+        datasourceType={currentConn?.driver ?? 'mysql'}
+        readonly={isReadonly}
+        onRefresh={load}
+        meta={{ rowCount: data.total }}
+      />
       {/* ── Title / toolbar ──────────────────────────────── */}
       <div
         className="flex items-center justify-between px-4 py-2 shrink-0"
@@ -237,15 +246,6 @@ export default function DataPage() {
           className="text-sm font-semibold flex items-center gap-2 min-w-0"
           style={{ color: 'var(--text-strong)' }}
         >
-          <span className="truncate font-mono">{tableName}</span>
-          <span className="text-xs font-normal shrink-0" style={{ color: 'var(--text-muted)' }}>
-            ({data.total.toLocaleString()} rows)
-          </span>
-          {!hasPK && structure && (
-            <span className="text-[11px] shrink-0" style={{ color: 'var(--warning)' }} title={noPKTitle}>
-              no PK
-            </span>
-          )}
           {loading && (
             <span className="text-[11px] shrink-0 animate-pulse" style={{ color: 'var(--accent)' }}>
               {t('data.loading')}

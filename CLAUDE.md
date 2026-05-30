@@ -45,7 +45,7 @@ make website-sync                       # regenerate website/src/generated/
 ### Start here
 
 - **Canonical shape:** `reference/standard-service` — explicit middleware, routing, stdlib only
-- **Style rules:** `docs/CANONICAL_STYLE_GUIDE.md`
+- **Style rules:** `docs/reference/canonical-style-guide.md`
 - **Boundary rules:** each module's `<module>/module.yaml` + `specs/dependency-rules.yaml`
 - **Task routing:** `specs/task-routing.yaml` maps task types to context packages and start files
 - **Active work:** `tasks/milestones/active/` and `tasks/cards/active/`

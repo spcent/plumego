@@ -171,3 +171,16 @@ summary_enabled = true
 qa_enabled = true
 # Enable AI prompt extraction
 prompt_extract_enabled = true
+
+# =============================================================================
+# Auto-Update Configuration (V1.0+)
+# =============================================================================
+[update]
+# Enable automatic update checking
+enabled = true
+# Check for updates on application startup
+check_on_startup = true
+# Update check interval in minutes (default: 1440 = 24 hours)
+check_interval_minutes = 1440
+# Update channel: "stable", "beta", or "dev"
+channel = "stable"

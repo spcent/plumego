@@ -12,16 +12,16 @@ repo:
 canonical_authority:
   operations:
     - AGENTS.md
-    - docs/CODEX_WORKFLOW.md
-    - docs/AGENT_CONTEXT_BUDGET.md
+    - docs/operations/codex-workflow.md
+    - docs/operations/agent-context-budget.md
   style:
-    - docs/CANONICAL_STYLE_GUIDE.md
+    - docs/reference/canonical-style-guide.md
   quality:
-    - docs/AGENT_CODE_QUALITY_RULES.md
+    - docs/operations/agent-code-quality-rules.md
   architecture:
-    - docs/architecture/AGENT_FIRST_REPO_BLUEPRINT.md
+    - docs/concepts/agent-first-repo-blueprint.md
   maturity:
-    - docs/EXTENSION_MATURITY.md
+    - docs/concepts/extension-maturity.md
     - specs/extension-maturity.yaml
   implementation:
     - reference/standard-service
@@ -161,7 +161,7 @@ agent_workflow:
     - Identify target layer and module
     - Establish goal, in-scope paths, and out-of-scope paths before editing
     - Read canonical style and reference app when shaping app structure
-    - Read docs/AGENT_CONTEXT_BUDGET.md when context package selection is unclear
+    - Read docs/operations/agent-context-budget.md when context package selection is unclear
     - Read specs/task-routing.yaml for discovery defaults and start_with context packages
     - Read specs/package-hotspots.yaml when package choice is ambiguous
     - Read specs/agent-quality-rules.yaml for quality preflight and gate selection

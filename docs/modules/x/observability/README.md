@@ -11,7 +11,7 @@
 - Promoted at `v0.2.0` after release-backed evidence showed no exported
   `x/observability/*` API changes across refs `d2c25c3` and `ec70358`, with
   `observability` owner sign-off recorded in
-  `docs/extension-evidence/x-observability.md`
+  `docs/evidence/extension/x-observability.md`
 
 ## Use this module when
 
@@ -89,12 +89,12 @@ ownership.
 ## Beta readiness
 
 `x/observability` satisfies the current coverage and boundary portions of
-`docs/EXTENSION_STABILITY_POLICY.md`: collector/exporter behavior, tracer
+`docs/reference/extension-stability-policy.md`: collector/exporter behavior, tracer
 lifecycle, configuration, and supporting record-buffer, window, test, feature,
 and DB insight packages have focused tests.
 
 The module is beta. The beta evidence in
-`docs/extension-evidence/x-observability.md` records two release refs, matching
+`docs/evidence/extension/x-observability.md` records two release refs, matching
 API snapshots, no exported API changes, and `observability` owner sign-off.
 Transport observability primitives remain in stable `middleware/*`; exporter
 and adapter wiring stays here.

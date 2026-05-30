@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"cloud-vault/internal/version"
+
 	"github.com/spcent/plumego/contract"
 	plumelog "github.com/spcent/plumego/log"
 )
@@ -61,5 +63,13 @@ func (h *Handler) Doctor(w http.ResponseWriter, r *http.Request) {
 	result := h.svc.Doctor(r.Context(), req)
 	if err := contract.WriteResponse(w, r, http.StatusOK, result, nil); err != nil && h.logger != nil {
 		h.logger.Error("system doctor: write", plumelog.Fields{"err": err.Error()})
+	}
+}
+
+// GET /api/v1/system/version
+func (h *Handler) GetVersion(w http.ResponseWriter, r *http.Request) {
+	info := version.GetBuildInfo()
+	if err := contract.WriteResponse(w, r, http.StatusOK, info, nil); err != nil && h.logger != nil {
+		h.logger.Error("system version: write", plumelog.Fields{"err": err.Error()})
 	}
 }

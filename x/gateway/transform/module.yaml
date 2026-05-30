@@ -22,39 +22,26 @@ allowed_imports:
   - stdlib
   - contract
   - internal/httputil
+  - internal/httpx
   - x/gateway
-
-forbidden_imports:
-  - core/**
-  - router/**
-  - middleware/**
-  - security/**
-  - store/**
-  - health/**
-  - log/**
-  - metrics/**
-  - x/ai/**
-  - x/data/**
-  - x/fileapi/**
-  - x/frontend/**
-  - x/messaging/**
-  - x/observability/**
-  - x/openapi/**
-  - x/resilience/**
-  - x/rest/**
-  - x/rpc/**
-  - x/tenant/**
-  - x/validate/**
 
 test_commands:
   - go test -race -timeout 60s ./x/gateway/transform/...
   - go vet ./x/gateway/transform/...
 
+forbidden_imports:
+  - core/**
+  - store/**
+  - x/tenant/**
+  - x/ai/**
+  - x/messaging/**
+  - x/observability/**
+
 review_checklist:
-  - Keep transforms explicit and order-independent where possible
-  - Route error and response shaping through contract
-  - Avoid coupling transforms to specific upstreams
+  - Keep transforms pure, composable, and side-effect-free
+  - Do not add routing decisions to transform helpers
+  - Keep body rewriting helpers explicit and covered by tests
 
 agent_hints:
-  - Add transform steps here, not inline in proxy wiring
-  - Use contract helpers for any error output
+  - Transforms are value operations; prefer immutable helpers over in-place mutation
+  - Keep path normalization and header transforms in separate focused helpers

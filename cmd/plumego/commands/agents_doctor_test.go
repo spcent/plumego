@@ -328,12 +328,12 @@ func TestCLI_DoctorPassesOnFullRepo(t *testing.T) {
 	}
 
 	// Agent-first docs
-	docsDir := filepath.Join(tmp, "docs", "architecture")
+	docsDir := filepath.Join(tmp, "docs", "concepts")
 	if err := os.MkdirAll(docsDir, 0755); err != nil {
 		t.Fatalf("mkdir docs: %v", err)
 	}
 	docsFiles := []struct{ dir, name string }{
-		{filepath.Join(tmp, "docs"), "agent-first.md"},
+		{docsDir, "agent-first.md"},
 		{docsDir, "core-boundary.md"},
 		{docsDir, "extension-boundary.md"},
 	}
@@ -408,12 +408,12 @@ func TestCLI_DoctorWarnsWhenAgentTasksMissing(t *testing.T) {
 		writeModuleYAML(t, tmp, root, nil)
 	}
 	// Also write the agent-first docs
-	docsDir := filepath.Join(tmp, "docs", "architecture")
+	docsDir := filepath.Join(tmp, "docs", "concepts")
 	if err := os.MkdirAll(docsDir, 0755); err != nil {
 		t.Fatalf("mkdir docs: %v", err)
 	}
 	for _, f := range []struct{ dir, name string }{
-		{filepath.Join(tmp, "docs"), "agent-first.md"},
+		{docsDir, "agent-first.md"},
 		{docsDir, "core-boundary.md"},
 		{docsDir, "extension-boundary.md"},
 	} {

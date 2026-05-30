@@ -1,7 +1,56 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { Link, useNavigate, useParams, useLocation } from 'react-router-dom'
 import { api, type Connection, type ResourceNode, type ResourceNodeType } from '../api'
 import { useI18n } from '../i18n'
+import { useToast } from './Toast'
+
+// ── Context Menu ───────────────────────────────────────────────────────────
+
+interface ContextMenuItem {
+  label: string
+  onClick: () => void
+}
+
+interface ContextMenuState {
+  x: number
+  y: number
+  items: ContextMenuItem[]
+}
+
+function ContextMenu({ state, onClose }: { state: ContextMenuState; onClose: () => void }) {
+  const menuRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        onClose()
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [onClose])
+
+  return (
+    <div
+      ref={menuRef}
+      className="fixed z-50 bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded shadow-lg py-1 min-w-[160px]"
+      style={{ left: state.x, top: state.y }}
+    >
+      {state.items.map((item, i) => (
+        <button
+          key={i}
+          onClick={() => {
+            item.onClick()
+            onClose()
+          }}
+          className="w-full text-left px-3 py-1.5 text-sm hover:bg-[var(--bg-hover)] text-[var(--text-default)]"
+        >
+          {item.label}
+        </button>
+      ))}
+    </div>
+  )
+}
 
 // ── Icon dispatch ──────────────────────────────────────────────────────────
 
@@ -90,7 +139,7 @@ function DriverBadge({ driver }: { driver: string }) {
 }
 
 function TreeItem({
-  depth, icon, label, active, expanded, expandable, onClick, to, extra,
+  depth, icon, label, active, expanded, expandable, onClick, to, extra, onContextMenu,
 }: {
   depth: number
   icon?: React.ReactNode
@@ -101,6 +150,7 @@ function TreeItem({
   onClick?: () => void
   to?: string
   extra?: React.ReactNode
+  onContextMenu?: (e: React.MouseEvent) => void
 }) {
   const paddingLeft = 12 + depth * 16
   const cls = [
@@ -126,8 +176,8 @@ function TreeItem({
       {extra}
     </>
   )
-  if (to) return <Link to={to} className={cls} style={style} title={label}>{inner}</Link>
-  return <button onClick={onClick} className={cls} style={style} title={label}>{inner}</button>
+  if (to) return <Link to={to} className={cls} style={style} title={label} onContextMenu={onContextMenu}>{inner}</Link>
+  return <button onClick={onClick} onContextMenu={onContextMenu} className={cls} style={style} title={label}>{inner}</button>
 }
 
 // ── ResourceExplorer ───────────────────────────────────────────────────────
@@ -142,6 +192,7 @@ export default function ResourceExplorer({ connections, onRefresh: _onRefresh }:
   const location = useLocation()
   const navigate = useNavigate()
   const { t } = useI18n()
+  const { showToast } = useToast()
 
   // Expanded state: connection IDs and node paths
   const [expandedConns, setExpandedConns] = useState<Record<string, boolean>>({})
@@ -150,21 +201,43 @@ export default function ResourceExplorer({ connections, onRefresh: _onRefresh }:
   // Cached resource nodes: key = connId (top-level) or "connId:dbPath" (children)
   const [resourceCache, setResourceCache] = useState<Record<string, ResourceNode[]>>({})
 
+  // Loading and error states
+  const [loadingConns, setLoadingConns] = useState<Set<string>>(new Set())
+  const [connErrors, setConnErrors] = useState<Record<string, string>>({})
+  const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
+
   const isQueryPage = location.pathname.includes('/query')
 
   // Fetch top-level nodes (databases) for a connection
-  const fetchTopLevel = useCallback(async (connId: string) => {
-    if (resourceCache[connId] !== undefined) return
+  const fetchTopLevel = useCallback(async (connId: string, forceRefresh = false) => {
+    if (!forceRefresh && resourceCache[connId] !== undefined) return
+
+    setLoadingConns(prev => new Set(prev).add(connId))
+    setConnErrors(prev => {
+      const next = { ...prev }
+      delete next[connId]
+      return next
+    })
+
     try {
       const nodes = await api.resources(connId)
       setResourceCache(c => ({ ...c, [connId]: nodes }))
-    } catch {}
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      setConnErrors(prev => ({ ...prev, [connId]: msg }))
+    } finally {
+      setLoadingConns(prev => {
+        const next = new Set(prev)
+        next.delete(connId)
+        return next
+      })
+    }
   }, [resourceCache])
 
   // Fetch child nodes (tables/views) under a database node
-  const fetchChildren = useCallback(async (connId: string, node: ResourceNode) => {
+  const fetchChildren = useCallback(async (connId: string, node: ResourceNode, forceRefresh = false) => {
     const key = `${connId}:${node.path}`
-    if (resourceCache[key] !== undefined) return
+    if (!forceRefresh && resourceCache[key] !== undefined) return
     try {
       const nodes = await api.resources(connId, node.id)
       setResourceCache(c => ({ ...c, [key]: nodes }))
@@ -184,6 +257,35 @@ export default function ResourceExplorer({ connections, onRefresh: _onRefresh }:
     if (next) fetchChildren(connId, node)
   }, [expandedNodes, fetchChildren])
 
+  const handleRefreshConn = useCallback((connId: string) => {
+    setResourceCache(c => {
+      const next = { ...c }
+      delete next[connId]
+      Object.keys(next).forEach(k => {
+        if (k.startsWith(`${connId}:`)) delete next[k]
+      })
+      return next
+    })
+    fetchTopLevel(connId, true)
+    showToast(t('resource.refresh'), 'success')
+  }, [fetchTopLevel, showToast, t])
+
+  const handleRefreshNode = useCallback((connId: string, node: ResourceNode) => {
+    const key = `${connId}:${node.path}`
+    setResourceCache(c => {
+      const next = { ...c }
+      delete next[key]
+      return next
+    })
+    fetchChildren(connId, node, true)
+    showToast(t('resource.refresh'), 'success')
+  }, [fetchChildren, showToast, t])
+
+  const handleContextMenu = useCallback((e: React.MouseEvent, items: ContextMenuItem[]) => {
+    e.preventDefault()
+    setContextMenu({ x: e.clientX, y: e.clientY, items })
+  }, [])
+
   // Dispatch a click on a non-expandable node (future: redis_key, etc.)
   const handleNodeClick = useCallback((connId: string, node: ResourceNode) => {
     const url = nodeUrl(connId, node)
@@ -192,7 +294,7 @@ export default function ResourceExplorer({ connections, onRefresh: _onRefresh }:
   }, [navigate])
 
   return (
-    <nav className="flex-1 overflow-y-auto py-1 overflow-x-hidden">
+    <nav className="flex-1 overflow-y-auto py-1 overflow-x-hidden" onClick={() => setContextMenu(null)}>
       {connections.length === 0 && (
         <div className="px-4 py-3 text-[12px]" style={{ color: 'var(--sb-muted)' }}>
           {t('connections.empty')}
@@ -203,6 +305,8 @@ export default function ResourceExplorer({ connections, onRefresh: _onRefresh }:
         const connExpanded = expandedConns[conn.id]
         const connActive = params.connId === conn.id && isQueryPage
         const topNodes: ResourceNode[] = resourceCache[conn.id] ?? []
+        const isLoading = loadingConns.has(conn.id)
+        const error = connErrors[conn.id]
 
         return (
           <div key={conn.id}>
@@ -214,15 +318,27 @@ export default function ResourceExplorer({ connections, onRefresh: _onRefresh }:
               label={conn.name}
               icon={<DriverBadge driver={conn.driver} />}
               onClick={() => toggleConn(conn.id)}
+              onContextMenu={(e) => {
+                handleContextMenu(e, [
+                  { label: t('resource.refresh'), onClick: () => handleRefreshConn(conn.id) },
+                ])
+              }}
               extra={
-                conn.readonly ? (
-                  <span
-                    className="shrink-0 text-[10px] font-mono px-1 py-px rounded leading-none"
-                    style={{ background: '#92400e44', color: '#fbbf24' }}
-                  >
-                    RO
-                  </span>
-                ) : undefined
+                <>
+                  {isLoading && (
+                    <span className="shrink-0 text-[10px] animate-spin" style={{ color: 'var(--sb-muted)' }}>
+                      ⟳
+                    </span>
+                  )}
+                  {conn.readonly && (
+                    <span
+                      className="shrink-0 text-[10px] font-mono px-1 py-px rounded leading-none"
+                      style={{ background: '#92400e44', color: '#fbbf24' }}
+                    >
+                      RO
+                    </span>
+                  )}
+                </>
               }
             />
 
@@ -239,6 +355,26 @@ export default function ResourceExplorer({ connections, onRefresh: _onRefresh }:
                   />
                 )}
 
+                {/* Error state */}
+                {error && (
+                  <div className="px-4 py-2 text-[12px]" style={{ color: 'var(--danger)' }}>
+                    {t('resource.error')}: {error}
+                    <button
+                      className="ml-2 underline"
+                      onClick={() => fetchTopLevel(conn.id, true)}
+                    >
+                      {t('resource.retry')}
+                    </button>
+                  </div>
+                )}
+
+                {/* Empty state */}
+                {!isLoading && !error && topNodes.length === 0 && (
+                  <div className="px-4 py-2 text-[12px]" style={{ color: 'var(--sb-muted)' }}>
+                    {t('resource.empty')}
+                  </div>
+                )}
+
                 {/* Resource tree nodes */}
                 {topNodes.map(node => (
                   <ResourceNodeRow
@@ -252,6 +388,9 @@ export default function ResourceExplorer({ connections, onRefresh: _onRefresh }:
                     resourceCache={resourceCache}
                     onToggle={toggleNode}
                     onLeafClick={handleNodeClick}
+                    onContextMenu={handleContextMenu}
+                    onRefresh={handleRefreshNode}
+                    driver={conn.driver}
                   />
                 ))}
               </>
@@ -259,6 +398,14 @@ export default function ResourceExplorer({ connections, onRefresh: _onRefresh }:
           </div>
         )
       })}
+
+      {/* Context menu */}
+      {contextMenu && (
+        <ContextMenu
+          state={contextMenu}
+          onClose={() => setContextMenu(null)}
+        />
+      )}
     </nav>
   )
 }
@@ -267,7 +414,7 @@ export default function ResourceExplorer({ connections, onRefresh: _onRefresh }:
 
 function ResourceNodeRow({
   connId, node, depth, params, isQueryPage,
-  expandedNodes, resourceCache, onToggle, onLeafClick,
+  expandedNodes, resourceCache, onToggle, onLeafClick, onContextMenu, onRefresh, driver,
 }: {
   connId: string
   node: ResourceNode
@@ -278,7 +425,12 @@ function ResourceNodeRow({
   resourceCache: Record<string, ResourceNode[]>
   onToggle: (connId: string, node: ResourceNode) => void
   onLeafClick: (connId: string, node: ResourceNode) => void
+  onContextMenu: (e: React.MouseEvent, items: ContextMenuItem[]) => void
+  onRefresh: (connId: string, node: ResourceNode) => void
+  driver: string
 }) {
+  const { t } = useI18n()
+  const navigate = useNavigate()
   const nodeKey = `${connId}:${node.path}`
   const expanded = expandedNodes[nodeKey] ?? false
   const children: ResourceNode[] = resourceCache[nodeKey] ?? []
@@ -287,6 +439,55 @@ function ResourceNodeRow({
   const expandable = node.type === 'sql_database' || node.type === 'mongo_database'
 
   const to = expandable ? undefined : (nodeUrl(connId, node) ?? undefined)
+
+  // Build context menu items based on node type
+  const handleContextMenu = (e: React.MouseEvent) => {
+    const items: ContextMenuItem[] = []
+
+    if (node.type === 'sql_database') {
+      items.push({
+        label: t('resource.open_console'),
+        onClick: () => navigate(`/conn/${connId}/db/${encodeURIComponent(node.path)}/query`),
+      })
+    } else if (node.type === 'sql_table' || node.type === 'sql_view') {
+      const slash = node.path.indexOf('/')
+      if (slash >= 0) {
+        const db = node.path.slice(0, slash)
+        const table = node.path.slice(slash + 1)
+        items.push({
+          label: t('resource.view_data'),
+          onClick: () => navigate(`/conn/${connId}/db/${encodeURIComponent(db)}/tables/${encodeURIComponent(table)}/data`),
+        })
+        items.push({
+          label: t('resource.view_structure'),
+          onClick: () => navigate(`/conn/${connId}/db/${encodeURIComponent(db)}/tables/${encodeURIComponent(table)}/structure`),
+        })
+      }
+    } else if (node.type === 'mongo_collection') {
+      const slash = node.path.indexOf('/')
+      if (slash >= 0) {
+        const db = node.path.slice(0, slash)
+        const coll = node.path.slice(slash + 1)
+        items.push({
+          label: t('resource.open'),
+          onClick: () => navigate(`/conn/${connId}/mongo/${encodeURIComponent(db)}/${encodeURIComponent(coll)}/documents`),
+        })
+      }
+    } else if (node.type === 'es_index') {
+      items.push({
+        label: t('resource.open'),
+        onClick: () => navigate(`/conn/${connId}/es/${encodeURIComponent(node.path)}`),
+      })
+    }
+
+    if (items.length > 0) {
+      items.push({
+        label: t('resource.refresh'),
+        onClick: () => onRefresh(connId, node),
+      })
+      onContextMenu(e, items)
+    }
+  }
 
   return (
     <>
@@ -299,6 +500,7 @@ function ResourceNodeRow({
         expanded={expanded}
         to={to}
         onClick={expandable ? () => onToggle(connId, node) : () => onLeafClick(connId, node)}
+        onContextMenu={handleContextMenu}
       />
 
       {expandable && expanded && (
@@ -344,6 +546,9 @@ function ResourceNodeRow({
               resourceCache={resourceCache}
               onToggle={onToggle}
               onLeafClick={onLeafClick}
+              onContextMenu={onContextMenu}
+              onRefresh={onRefresh}
+              driver={driver}
             />
           ))}
         </>

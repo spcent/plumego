@@ -11,9 +11,8 @@ import (
 	"cloud-vault/internal/app"
 	"cloud-vault/internal/backup"
 	"cloud-vault/internal/config"
+	"cloud-vault/internal/version"
 )
-
-var version = "dev"
 
 func main() {
 	// Check for CLI subcommands
@@ -24,6 +23,9 @@ func main() {
 				log.Printf("restore failed: %v", err)
 				os.Exit(1)
 			}
+			return
+		case "--version", "-v", "version":
+			printVersion()
 			return
 		case "help", "-h", "--help":
 			printUsage()
@@ -45,7 +47,14 @@ Usage:
   cloud-vault restore --file <zip>     Restore from backup
   cloud-vault help                     Show this help
 
-`, version)
+`, version.Version)
+}
+
+func printVersion() {
+	fmt.Printf("Cloud Vault %s\n", version.Version)
+	fmt.Printf("Commit: %s\n", version.Commit)
+	fmt.Printf("Build Time: %s\n", version.BuildTime)
+	fmt.Printf("Channel: %s\n", version.Channel)
 }
 
 func runRestore() error {
@@ -83,7 +92,7 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	cfg.App.Version = version
+	cfg.App.Version = version.Version
 
 	a, err := app.New(cfg)
 	if err != nil {

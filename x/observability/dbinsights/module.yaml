@@ -24,35 +24,20 @@ allowed_imports:
   - metrics
   - store
 
-forbidden_imports:
-  - core/**
-  - router/**
-  - contract/**
-  - middleware/**
-  - security/**
-  - health/**
-  - x/ai/**
-  - x/data/**
-  - x/fileapi/**
-  - x/frontend/**
-  - x/gateway/**
-  - x/messaging/**
-  - x/openapi/**
-  - x/resilience/**
-  - x/rest/**
-  - x/rpc/**
-  - x/tenant/**
-  - x/validate/**
-  - x/websocket/**
-
 test_commands:
   - go test -race -timeout 60s ./x/observability/dbinsights/...
   - go vet ./x/observability/dbinsights/...
 
+forbidden_imports:
+  - x/tenant/**
+  - x/ai/**
+  - x/gateway/**
+
 review_checklist:
-  - Keep DB instrumentation read-only and allocation-light on hot paths
-  - Do not own metric backend or exporter wiring
+  - Keep DB instrumentation at the query boundary; do not own DB driver or connection management
+  - Keep metric emission stateless; do not buffer or export records here
+  - Do not import store/db drivers directly
 
 agent_hints:
-  - Emit through the shared collector, not a package-local backend
-  - Keep query attribution stable across versions
+  - Instrument DB calls by wrapping existing store/db interfaces; do not add new driver dependencies
+  - Record slow queries and pool saturation via metrics.AggregateCollector; do not own the export path
