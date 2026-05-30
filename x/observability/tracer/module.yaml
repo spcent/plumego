@@ -20,13 +20,13 @@ non_goals:
 
 allowed_imports:
   - stdlib
+  - contract
   - log
   - x/observability
 
 forbidden_imports:
   - core/**
   - router/**
-  - contract/**
   - middleware/**
   - security/**
   - store/**

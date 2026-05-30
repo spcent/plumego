@@ -18,12 +18,12 @@ non_goals:
 
 allowed_imports:
   - stdlib
+  - contract
   - log
 
 forbidden_imports:
   - core/**
   - router/**
-  - contract/**
   - middleware/**
   - security/**
   - store/**
