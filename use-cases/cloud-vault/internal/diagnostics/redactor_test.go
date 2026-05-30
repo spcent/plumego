@@ -86,8 +86,8 @@ func TestRedactLogLine(t *testing.T) {
 		},
 		{
 			name:     "Multiple sensitive fields",
-			input:    "api_key=key123 and secret=secret456",
-			expected: "api_key=<redacted> and secret=<redacted>",
+			input:    "api_key=key123 and secret_key=secret456",
+			expected: "api_key=<redacted> and secret_key=<redacted>",
 		},
 	}
 

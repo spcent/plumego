@@ -80,6 +80,31 @@ export const ALL_CHECKS = [
   'migration_check',
 ]
 
+// V1.0: Version and update interfaces
+export interface VersionInfo {
+  version: string
+  commit: string
+  build_time: string
+  channel: string
+}
+
+export interface UpdateStatus {
+  current_version: string
+  latest_version: string
+  update_available: boolean
+  download_url: string
+  release_notes_url: string
+  checked_at: string
+}
+
+export interface DiagnosticBundle {
+  id: string
+  filename: string
+  size: number
+  created_at: string
+  download_url: string
+}
+
 export interface Backup {
   id: string
   filename: string
@@ -116,4 +141,29 @@ export async function deleteBackup(name: string): Promise<void> {
 
 export function getBackupDownloadUrl(name: string): string {
   return `/api/v1/system/backups/${encodeURIComponent(name)}/download`
+}
+
+// V1.0: Version, update, and diagnostics API methods
+export async function getVersion(): Promise<VersionInfo> {
+  return client.get('/api/v1/system/version')
+}
+
+export async function getUpdateStatus(): Promise<UpdateStatus> {
+  return client.get('/api/v1/system/update/status')
+}
+
+export async function checkForUpdates(): Promise<UpdateStatus> {
+  return client.post('/api/v1/system/update/check', {})
+}
+
+export async function generateDiagnostics(): Promise<DiagnosticBundle> {
+  return client.post('/api/v1/system/diagnostics/generate', {})
+}
+
+export async function listDiagnostics(): Promise<{ bundles: DiagnosticBundle[] }> {
+  return client.get('/api/v1/system/diagnostics')
+}
+
+export function getDiagnosticDownloadUrl(filename: string): string {
+  return `/api/v1/system/diagnostics/download/${encodeURIComponent(filename)}`
 }

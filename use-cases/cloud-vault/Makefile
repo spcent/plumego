@@ -1,4 +1,4 @@
-.PHONY: dev web-dev web-build server-build desktop-dev desktop-build desktop-package desktop-clean build run clean tidy test test-go test-web test-e2e doctor bench release restore backup
+.PHONY: dev web-dev web-build server-build server-build-v1 desktop-dev desktop-build desktop-package desktop-clean build run clean tidy test test-go test-web test-e2e doctor bench release release-v1 release-v1-test restore backup
 
 # Run the frontend Vite dev server (proxies API to :8080)
 dev:
@@ -15,6 +15,10 @@ web-build:
 # Build the Go server binary
 server-build:
 	go build -o bin/markdown-vault ./cmd/server
+
+# Build the Go server binary with V1.0 version injection
+server-build-v1:
+	go build -ldflags "-X main.version=1.0.0 -X main.commit=$(shell git rev-parse --short HEAD) -X main.buildTime=$(shell date -u +%Y-%m-%dT%H:%M:%SZ)" -o bin/markdown-vault ./cmd/server
 
 # Run the desktop app in dev mode (hot reload)
 desktop-dev:
@@ -78,6 +82,14 @@ bench:
 # Build release distribution (default version: dev)
 release:
 	./scripts/release.sh $(or $(VERSION),dev)
+
+# Build V1.0 release distribution with checksums and latest.json (default version: 1.0.0)
+release-v1:
+	./scripts/release-v1.sh $(or $(VERSION),1.0.0)
+
+# Smoke test for V1.0 release build (default version: 1.0.0)
+release-v1-test:
+	./scripts/release_test.sh $(or $(VERSION),1.0.0)
 
 # Smoke test for release build (default version: dev)
 release-test:

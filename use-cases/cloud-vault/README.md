@@ -1,6 +1,229 @@
 # Markdown Cloud Vault
 
-A single-binary Go + React application for managing Markdown documents with object storage versioning.
+A local-first Markdown knowledge vault for your AI-generated notes.
+
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Version](https://img.shields.io/badge/version-1.0.0-green.svg)](docs/release-notes.md)
+
+[Download Desktop App](https://example.com/download) | [Deploy Server](docs/server-deploy.md) | [Documentation](docs/)
+
+---
+
+## Features
+
+- **Local-first storage** — Your Markdown stays on your machine (or your own cloud storage)
+- **Bulk import** — Import hundreds of Markdown files with scan preview, duplicate detection, and retry
+- **Full-text search** — SQLite FTS5 powers instant search across titles, content, and metadata
+- **Smart organization** — Collections, tags, review queue, and AI-powered topic grouping
+- **Optional AI** — Summarize, question, and extract insights (configure your own AI provider)
+- **Backup & restore** — Built-in backup with one-click restore
+- **Desktop & server** — Native desktop app (macOS/Windows/Linux) or self-hosted server
+
+## Quick Start
+
+### Desktop App
+
+1. Download the installer for your platform:
+   - [macOS (Apple Silicon)](https://example.com/downloads/Cloud-Vault-v1.0.0-macOS-arm64.dmg)
+   - [macOS (Intel)](https://example.com/downloads/Cloud-Vault-v1.0.0-macOS-amd64.dmg)
+   - [Windows](https://example.com/downloads/Cloud-Vault-v1.0.0-windows-amd64.exe)
+   - [Linux](https://example.com/downloads/Cloud-Vault-v1.0.0-linux-amd64.AppImage)
+
+2. Install and launch the application
+3. On first run, create an admin account
+4. Import your Markdown files: System → Import → Select Directory
+5. Start searching and organizing!
+
+See [Desktop Guide](docs/desktop.md) for detailed instructions.
+
+### Server Deployment
+
+1. Download the server binary:
+   ```bash
+   curl -L -o cloud-vault https://example.com/downloads/cloud-vault-v1.0.0-linux-amd64
+   chmod +x cloud-vault
+   ```
+
+2. Create config file:
+   ```bash
+   cp config.example.toml config.toml
+   # Edit config.toml as needed
+   ```
+
+3. Run the server:
+   ```bash
+   ./cloud-vault
+   ```
+
+4. Open http://localhost:8080 and create an admin account
+
+See [Server Deployment Guide](docs/server-deploy.md) for Docker, systemd, and HTTPS setup.
+
+## Configuration
+
+Configuration is loaded from `config.toml`, `.env` file, or environment variables (in that order, env vars take precedence).
+
+Key options:
+- `server.addr` — HTTP listen address (default: `:8080`)
+- `database.path` — SQLite database path (default: `./data/app.db`)
+- `storage.provider` — `local` or `qiniu` (default: `local`)
+- `auth.enabled` — Enable authentication (default: `false`)
+- `ai.enabled` — Enable AI features (default: `false`)
+
+See [Configuration Guide](docs/configuration.md) for all options.
+
+## Importing Markdown
+
+1. Navigate to System → Import
+2. Select a directory containing Markdown files
+3. Review scan preview (file count, size, duplicates)
+4. Click "Start Import"
+5. Monitor progress and retry failures
+
+See [Import Guide](docs/import.md) for advanced options.
+
+## Search & Organize
+
+- **Search** — Use the search bar to find documents by title, content, or metadata
+- **Collections** — Group related documents into collections
+- **Tags** — Add tags for flexible categorization
+- **Review queue** — Process unprocessed imports
+- **AI topics** — Get AI-powered topic suggestions (if enabled)
+
+See [Search Guide](docs/search.md) and [Organize Guide](docs/organize.md).
+
+## AI Features (Optional)
+
+AI features are disabled by default. To enable:
+
+1. Configure an OpenAI-compatible provider in `config.toml`:
+   ```toml
+   [ai]
+   enabled = true
+   provider = "openai_compatible"
+   base_url = "https://api.openai.com/v1"
+   api_key = "your-api-key"
+   model = "gpt-4"
+   ```
+
+2. Use AI features:
+   - Summarize documents
+   - Ask questions about selected documents
+   - Extract prompts from conversations
+   - Generate new documents from AI output
+
+**Privacy**: Only documents you explicitly select are sent to the AI provider.
+
+See [AI Guide](docs/ai.md) for details.
+
+## Backup & Restore
+
+### Create backup
+```bash
+curl -X POST http://localhost:8080/api/v1/system/backup \
+  -H 'Content-Type: application/json' \
+  -b cookie.txt
+```
+
+Or use the web UI: System → Backup → Create Backup
+
+### Restore from backup
+```bash
+./cloud-vault restore --file backups/backup-20260530-120000.zip --data-dir ./data
+```
+
+See [Backup & Restore Guide](docs/backup-restore.md).
+
+## Error Reporting & Diagnostics
+
+If you encounter issues, export a diagnostic bundle:
+
+1. Navigate to Settings → Diagnostics
+2. Click "Export Diagnostic Bundle"
+3. Download the generated zip file
+4. Share with support (if applicable)
+
+**Privacy**: Diagnostic bundles include redacted config, logs, and system info. They **do not** include Markdown content, database files, API keys, session tokens, or passwords.
+
+See [Diagnostics Guide](docs/diagnostics.md).
+
+## Privacy & Security
+
+- **LocalStorage mode** — All data stays on your machine
+- **QiniuStorage mode** — Data uploaded to your own Qiniu bucket (you control access)
+- **AI features** — Optional, only send documents you explicitly select
+- **Session cookies** — HttpOnly flag, secure flag recommended for production
+- **Diagnostic bundles** — Exclude Markdown content and secrets
+
+See [Privacy Policy](docs/privacy.md) and [Security Guide](docs/security.md).
+
+## Development
+
+### Prerequisites
+- Go 1.26+
+- Node.js 20+ and pnpm
+- (Optional) Wails CLI for desktop builds: `go install github.com/wailsapp/wails/v2/cmd/wails@latest`
+
+### Build from source
+
+```bash
+# Clone repository
+git clone https://github.com/example/cloud-vault.git
+cd cloud-vault
+
+# Build server
+make build
+
+# Run server
+./bin/markdown-vault
+
+# Build desktop app (requires Wails CLI)
+make desktop-build
+```
+
+### Run tests
+
+```bash
+# Go tests
+make test
+
+# Frontend tests
+cd web && pnpm test
+
+# E2E tests (requires Playwright)
+make test-e2e
+```
+
+See [Development Guide](docs/development.md).
+
+## License
+
+[MIT](LICENSE)
+
+## Current Limitations
+
+- V1.0 does not support multi-user real-time collaboration
+- V1.0 does not support cloud sync accounts
+- Auto-update check only notifies, does not silently install
+- AI features require user-configured model provider
+- Approximate duplicate and topic detection are suggestions, may not be fully accurate
+- QiniuStorage requires user to manage bucket permissions and backup strategy
+- macOS/Windows installers may show security warnings if not signed (see [Installation Guide](docs/installation.md))
+
+## Links
+
+- [Documentation](docs/)
+- [Release Notes](docs/release-notes.md)
+- [Changelog](CHANGELOG.md)
+- [Privacy Policy](docs/privacy.md)
+- [Security](docs/security.md)
+- [Landing Page Draft](landing/index.html)
+
+---
+
+# Developer Documentation
+
+The sections below contain detailed developer documentation for all versions.
 
 ## Technology Stack
 
