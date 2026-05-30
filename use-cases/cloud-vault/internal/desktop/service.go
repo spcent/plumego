@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"time"
 
 	"github.com/spcent/plumego/log"
@@ -96,6 +97,18 @@ func (s *Service) ScanPreview(ctx context.Context, req *ScanPreviewRequest) (*Sc
 	absPath, err := filepath.Abs(req.SourceDir)
 	if err != nil {
 		return nil, fmt.Errorf("get absolute path: %w", err)
+	}
+
+	safeRoot, err := filepath.Abs(s.config.DataDir)
+	if err != nil {
+		return nil, fmt.Errorf("get safe root path: %w", err)
+	}
+	safeRootWithSep := safeRoot
+	if !strings.HasSuffix(safeRootWithSep, string(os.PathSeparator)) {
+		safeRootWithSep += string(os.PathSeparator)
+	}
+	if absPath != safeRoot && !strings.HasPrefix(absPath, safeRootWithSep) {
+		return nil, fmt.Errorf("source_dir is outside allowed directory")
 	}
 
 	info, err := os.Stat(absPath)
