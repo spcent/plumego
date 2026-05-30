@@ -410,6 +410,7 @@ func (h MongoDBHandler) QueryDocuments(w http.ResponseWriter, r *http.Request) {
 		opts.SetSort(sort)
 	}
 
+	start := time.Now()
 	cursor, err := client.Database(req.Database).Collection(req.Collection).Find(ctx, filter, opts)
 	if err != nil {
 		h.Logger.Error("query documents failed", plumelog.Fields{
@@ -423,14 +424,24 @@ func (h MongoDBHandler) QueryDocuments(w http.ResponseWriter, r *http.Request) {
 	}
 	defer cursor.Close(ctx)
 
+	limits := DefaultPreviewLimits()
 	documents := make([]any, 0)
+	anyTruncated := false
 	for cursor.Next(ctx) {
 		var doc bson.M
 		if err := cursor.Decode(&doc); err != nil {
 			continue
 		}
-		documents = append(documents, bsonToJSON(doc))
+		jsonDoc := bsonToJSON(doc)
+		truncated, wasTruncated := limits.TruncateJSONValue(jsonDoc)
+		documents = append(documents, truncated)
+		if wasTruncated {
+			anyTruncated = true
+		}
 	}
+
+	durationMs := time.Since(start).Milliseconds()
+	h.logSlowQuery(connID, req.Database, req.Collection, "Find", req.Filter, durationMs)
 
 	total, err := client.Database(req.Database).Collection(req.Collection).CountDocuments(ctx, filter)
 	if err != nil {
@@ -447,6 +458,7 @@ func (h MongoDBHandler) QueryDocuments(w http.ResponseWriter, r *http.Request) {
 		"total":     total,
 		"limit":     req.Limit,
 		"skip":      req.Skip,
+		"truncated": anyTruncated,
 	}, nil))
 }
 
@@ -912,13 +924,20 @@ func (h MongoDBHandler) Aggregate(w http.ResponseWriter, r *http.Request) {
 	}
 	defer cursor.Close(ctx)
 
+	limits := DefaultPreviewLimits()
 	var documents []any
+	anyTruncated := false
 	for cursor.Next(ctx) {
 		var doc bson.M
 		if err := cursor.Decode(&doc); err != nil {
 			continue
 		}
-		documents = append(documents, bsonToJSON(doc))
+		jsonDoc := bsonToJSON(doc)
+		truncated, wasTruncated := limits.TruncateJSONValue(jsonDoc)
+		documents = append(documents, truncated)
+		if wasTruncated {
+			anyTruncated = true
+		}
 		if len(documents) >= req.Limit {
 			break
 		}
@@ -926,11 +945,13 @@ func (h MongoDBHandler) Aggregate(w http.ResponseWriter, r *http.Request) {
 
 	duration := time.Since(startTime).Milliseconds()
 	h.savePipelineHistory(connID, req.Database, req.Collection, req.Pipeline, duration, len(documents), "")
+	h.logSlowQuery(connID, req.Database, req.Collection, "Aggregate", req.Pipeline, duration)
 
 	logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusOK, map[string]any{
 		"documents":   documents,
 		"count":       len(documents),
 		"duration_ms": duration,
+		"truncated":   anyTruncated,
 	}, nil))
 }
 
@@ -958,6 +979,29 @@ func (h MongoDBHandler) savePipelineHistory(connID, database, collection, pipeli
 // generateID generates a unique ID for history entries.
 func generateID() string {
 	return fmt.Sprintf("%d", time.Now().UnixNano())
+}
+
+// logSlowQuery logs queries that exceed the slow query threshold.
+func (h MongoDBHandler) logSlowQuery(connID, database, collection, operation, query string, durationMs int64) {
+	if durationMs > SlowQueryThresholdMs {
+		h.Logger.Warn("slow MongoDB query detected", plumelog.Fields{
+			"connection_id": connID,
+			"database":      database,
+			"collection":    collection,
+			"operation":     operation,
+			"duration_ms":   durationMs,
+			"threshold_ms":  SlowQueryThresholdMs,
+			"query":         truncateQueryForLog(query, 200),
+		})
+	}
+}
+
+// truncateQueryForLog truncates query for logging to prevent excessively long log entries.
+func truncateQueryForLog(query string, maxLen int) string {
+	if len(query) <= maxLen {
+		return query
+	}
+	return query[:maxLen] + "... (truncated)"
 }
 
 // ExplainQuery shows the query execution plan for a find operation.

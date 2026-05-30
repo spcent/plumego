@@ -332,6 +332,7 @@ func (h ElasticsearchHandler) Search(w http.ResponseWriter, r *http.Request) {
 		client.Search.WithBody(bytes.NewReader(enforcedDSL)),
 	)
 	duration := time.Since(start).Milliseconds()
+	h.logSlowQuery(connID, req.Index, string(enforcedDSL), duration)
 
 	// Record history
 	entry := &eshistory.Entry{
@@ -367,7 +368,7 @@ func (h ElasticsearchHandler) Search(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Parse result to extract hits count
+	// Parse result to extract hits count and apply truncation
 	var result map[string]any
 	if err := json.Unmarshal(body, &result); err != nil {
 		entry.Error = err.Error()
@@ -382,13 +383,30 @@ func (h ElasticsearchHandler) Search(w http.ResponseWriter, r *http.Request) {
 				entry.ResultCount = int(value)
 			}
 		}
+
+		// Apply truncation to hits
+		if hitsArray, ok := hits["hits"].([]any); ok {
+			limits := DefaultPreviewLimits()
+			anyTruncated := false
+			for _, hit := range hitsArray {
+				if hitMap, ok := hit.(map[string]any); ok {
+					if source, ok := hitMap["_source"].(map[string]any); ok {
+						_, wasTruncated := limits.TruncateJSONValue(source)
+						if wasTruncated {
+							anyTruncated = true
+						}
+					}
+				}
+			}
+			result["_truncated"] = anyTruncated
+		}
 	}
 
 	h.History.Add(entry)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	w.Write(body)
+	json.NewEncoder(w).Encode(result)
 }
 
 // GetDocument retrieves a document by ID.
@@ -436,6 +454,13 @@ func (h ElasticsearchHandler) GetDocument(w http.ResponseWriter, r *http.Request
 	if err := json.NewDecoder(res.Body).Decode(&doc); err != nil {
 		h.internalErr(w, r, "decode document", err)
 		return
+	}
+
+	// Apply truncation to document _source
+	limits := DefaultPreviewLimits()
+	if source, ok := doc["_source"].(map[string]any); ok {
+		_, wasTruncated := limits.TruncateJSONValue(source)
+		doc["_truncated"] = wasTruncated
 	}
 
 	logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusOK, doc, nil))
@@ -541,4 +566,17 @@ func (h ElasticsearchHandler) ClearHistory(w http.ResponseWriter, r *http.Reques
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// logSlowQuery logs queries that exceed the slow query threshold.
+func (h ElasticsearchHandler) logSlowQuery(connID, index, dsl string, durationMs int64) {
+	if durationMs > SlowQueryThresholdMs {
+		h.Logger.Warn("slow Elasticsearch query detected", plumelog.Fields{
+			"connection_id": connID,
+			"index":         index,
+			"duration_ms":   durationMs,
+			"threshold_ms":  SlowQueryThresholdMs,
+			"dsl":           truncateQueryForLog(dsl, 200),
+		})
+	}
 }

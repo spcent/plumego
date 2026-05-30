@@ -2,7 +2,6 @@ package handler
 
 import (
 	"database/sql"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -10,7 +9,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	"unicode/utf8"
 
 	"github.com/spcent/plumego/contract"
 	plumelog "github.com/spcent/plumego/log"
@@ -193,7 +191,7 @@ func (h RowHandler) List(w http.ResponseWriter, r *http.Request) {
 	defer rows.Close()
 
 	cols, _ := rows.Columns()
-	result, err := scanRows(rows, cols)
+	result, _, err := scanRows(rows, cols)
 	if err != nil {
 		h.Logger.Error("scan rows", plumelog.Fields{"error": err.Error()})
 		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
@@ -418,8 +416,12 @@ func (h RowHandler) writeErr(w http.ResponseWriter, r *http.Request, err error) 
 }
 
 // scanRows converts sql.Rows into a slice of maps.
-func scanRows(rows *sql.Rows, cols []string) ([]map[string]any, error) {
+// Large text and BLOB values are automatically truncated using DefaultPreviewLimits.
+// The returned boolean indicates whether any value was truncated.
+func scanRows(rows *sql.Rows, cols []string) ([]map[string]any, bool, error) {
+	limits := DefaultPreviewLimits()
 	result := make([]map[string]any, 0)
+	anyTruncated := false
 	for rows.Next() {
 		vals := make([]any, len(cols))
 		ptrs := make([]any, len(cols))
@@ -427,26 +429,19 @@ func scanRows(rows *sql.Rows, cols []string) ([]map[string]any, error) {
 			ptrs[i] = &vals[i]
 		}
 		if err := rows.Scan(ptrs...); err != nil {
-			return nil, err
+			return nil, false, err
 		}
 		row := make(map[string]any, len(cols))
 		for i, col := range cols {
-			v := vals[i]
-			if b, ok := v.([]byte); ok {
-				if utf8.Valid(b) {
-					row[col] = string(b)
-				} else {
-					const blobPreviewLen = 64
-					preview := hex.EncodeToString(b[:min(blobPreviewLen, len(b))])
-					row[col] = fmt.Sprintf("<BLOB %d bytes|%s>", len(b), preview)
-				}
-			} else {
-				row[col] = v
-			}
+			row[col] = vals[i]
+		}
+		row, truncated := limits.ApplyPreviewToRow(row)
+		if truncated {
+			anyTruncated = true
 		}
 		result = append(result, row)
 	}
-	return result, rows.Err()
+	return result, anyTruncated, rows.Err()
 }
 
 // sortedColumnsValues returns columns and values from a map in sorted key order.

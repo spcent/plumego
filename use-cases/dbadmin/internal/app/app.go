@@ -31,6 +31,7 @@ import (
 	"dbadmin/internal/domain/mongohistory"
 	"dbadmin/internal/domain/session"
 	"dbadmin/internal/esmanager"
+	"dbadmin/internal/handler"
 	"dbadmin/internal/mongomanager"
 	"dbadmin/internal/redismanager"
 )
@@ -53,6 +54,7 @@ type App struct {
 	MongoAdapter      *datasource.MongoAdapter
 	ESAdapter         *datasource.ESAdapter
 	UploadDir         string
+	QueryRegistry     *handler.QueryRegistry
 }
 
 // New constructs the App with all middleware and shared dependencies wired.
@@ -155,6 +157,7 @@ func New(cfg config.Config) (*App, error) {
 		MongoAdapter:      datasource.NewMongoAdapter(mongoMgr),
 		ESAdapter:         datasource.NewESAdapter(esMgr),
 		UploadDir:         uploadDir,
+		QueryRegistry:     handler.NewQueryRegistry(),
 	}, nil
 }
 

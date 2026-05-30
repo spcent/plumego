@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"time"
 
 	// Register drivers via blank imports so they're available to database/sql.
 	_ "github.com/go-sql-driver/mysql"
@@ -36,7 +37,15 @@ func (m *Manager) Open(c *connection.Connection) (*sql.DB, error) {
 	defer m.mu.Unlock()
 
 	if db, ok := m.pools[c.ID]; ok {
-		return db, nil
+		// Validate connection is still alive with a short timeout
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+		if err := db.PingContext(ctx); err == nil {
+			return db, nil
+		}
+		// Connection is stale, close and remove it
+		db.Close()
+		delete(m.pools, c.ID)
 	}
 
 	dsn, err := buildDSN(c)
@@ -54,12 +63,42 @@ func (m *Manager) Open(c *connection.Connection) (*sql.DB, error) {
 		// Use redactDSN so the password is never included in error messages.
 		return nil, fmt.Errorf("open %s connection (%s): %w", c.Driver, redactDSN(dsn), err)
 	}
+
+	// Configure connection pool for production stability
+	db.SetMaxOpenConns(25)                  // Max 25 concurrent connections
+	db.SetMaxIdleConns(5)                   // Keep 5 idle connections ready
+	db.SetConnMaxLifetime(5 * time.Minute)  // Recycle connections after 5 min
+	db.SetConnMaxIdleTime(10 * time.Minute) // Close idle connections after 10 min
+
 	if err := db.PingContext(context.Background()); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("ping %s: %w", c.Driver, err)
 	}
 	m.pools[c.ID] = db
 	return db, nil
+}
+
+// Stats returns the pool statistics for a connection ID.
+// Returns (stats, true) if the connection exists, (empty stats, false) otherwise.
+func (m *Manager) Stats(connID string) (sql.DBStats, bool) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	if db, ok := m.pools[connID]; ok {
+		return db.Stats(), true
+	}
+	return sql.DBStats{}, false
+}
+
+// AllStats returns pool statistics for all active SQL connections.
+func (m *Manager) AllStats() map[string]sql.DBStats {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	stats := make(map[string]sql.DBStats, len(m.pools))
+	for connID, db := range m.pools {
+		stats[connID] = db.Stats()
+	}
+	return stats
 }
 
 // Get returns the live pool for connID, or nil if not open.

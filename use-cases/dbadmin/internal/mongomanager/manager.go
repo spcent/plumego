@@ -28,19 +28,21 @@ func NewManager() *Manager {
 
 // Open returns a cached client for the connection, creating one if necessary.
 func (m *Manager) Open(conn *connection.Connection) (*mongo.Client, error) {
-	m.mu.RLock()
-	if client, ok := m.clients[conn.ID]; ok {
-		m.mu.RUnlock()
-		return client, nil
-	}
-	m.mu.RUnlock()
-
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	// Double-check after acquiring write lock
 	if client, ok := m.clients[conn.ID]; ok {
-		return client, nil
+		// Validate connection is still alive with a short timeout
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+		if err := client.Ping(ctx, nil); err == nil {
+			return client, nil
+		}
+		// Connection is stale, close and remove it
+		ctx2, cancel2 := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel2()
+		client.Disconnect(ctx2)
+		delete(m.clients, conn.ID)
 	}
 
 	client, err := m.createClient(conn)
@@ -61,6 +63,20 @@ func (m *Manager) Test(ctx context.Context, conn *connection.Connection) error {
 	defer client.Disconnect(ctx)
 
 	return client.Ping(ctx, nil)
+}
+
+// Get returns the cached client for the given connID, or nil if not open.
+func (m *Manager) Get(connID string) *mongo.Client {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.clients[connID]
+}
+
+// Count returns the number of active MongoDB connections.
+func (m *Manager) Count() int {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return len(m.clients)
 }
 
 // Close closes and removes the client for the given connection ID.

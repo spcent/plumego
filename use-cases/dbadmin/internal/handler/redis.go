@@ -292,6 +292,9 @@ type keyDetail struct {
 	SetVal    []string          `json:"set,omitempty"`
 	ZSetVal   []zsetMember      `json:"zset,omitempty"`
 	StreamVal *streamInfo       `json:"stream,omitempty"`
+	// truncation flags
+	StringTruncated bool `json:"stringTruncated,omitempty"`
+	ValueTruncated  bool `json:"valueTruncated,omitempty"`
 }
 
 type zsetMember struct {
@@ -357,6 +360,7 @@ func (h RedisHandler) GetKey(w http.ResponseWriter, r *http.Request) {
 	}
 
 	detail := keyDetail{Key: key, Type: keyType, TTL: ttlSec}
+	limits := DefaultPreviewLimits()
 
 	switch keyType {
 	case "string":
@@ -365,7 +369,11 @@ func (h RedisHandler) GetKey(w http.ResponseWriter, r *http.Request) {
 			h.internalErr(w, r, err)
 			return
 		}
-		detail.StringVal = &val
+		// Truncate large strings
+		result := limits.PreviewValue(val)
+		truncated := result.Value.(string)
+		detail.StringVal = &truncated
+		detail.StringTruncated = result.Truncated
 
 	case "hash":
 		vals, err := cl.HGetAll(ctx, key).Result()
@@ -373,7 +381,16 @@ func (h RedisHandler) GetKey(w http.ResponseWriter, r *http.Request) {
 			h.internalErr(w, r, err)
 			return
 		}
-		detail.HashVal = vals
+		// Truncate large hash values
+		truncatedVals := make(map[string]string)
+		for k, v := range vals {
+			result := limits.PreviewValue(v)
+			truncatedVals[k] = result.Value.(string)
+			if result.Truncated {
+				detail.ValueTruncated = true
+			}
+		}
+		detail.HashVal = truncatedVals
 
 	case "list":
 		vals, err := cl.LRange(ctx, key, 0, 999).Result()
@@ -381,7 +398,16 @@ func (h RedisHandler) GetKey(w http.ResponseWriter, r *http.Request) {
 			h.internalErr(w, r, err)
 			return
 		}
-		detail.ListVal = vals
+		// Truncate large list values
+		truncatedVals := make([]string, len(vals))
+		for i, v := range vals {
+			result := limits.PreviewValue(v)
+			truncatedVals[i] = result.Value.(string)
+			if result.Truncated {
+				detail.ValueTruncated = true
+			}
+		}
+		detail.ListVal = truncatedVals
 
 	case "set":
 		vals, err := cl.SMembers(ctx, key).Result()
@@ -389,7 +415,16 @@ func (h RedisHandler) GetKey(w http.ResponseWriter, r *http.Request) {
 			h.internalErr(w, r, err)
 			return
 		}
-		detail.SetVal = vals
+		// Truncate large set values
+		truncatedVals := make([]string, len(vals))
+		for i, v := range vals {
+			result := limits.PreviewValue(v)
+			truncatedVals[i] = result.Value.(string)
+			if result.Truncated {
+				detail.ValueTruncated = true
+			}
+		}
+		detail.SetVal = truncatedVals
 
 	case "zset":
 		members, err := cl.ZRangeWithScores(ctx, key, 0, 999).Result()
@@ -399,7 +434,12 @@ func (h RedisHandler) GetKey(w http.ResponseWriter, r *http.Request) {
 		}
 		zm := make([]zsetMember, len(members))
 		for i, m := range members {
-			zm[i] = zsetMember{Member: fmt.Sprintf("%v", m.Member), Score: m.Score}
+			memberStr := fmt.Sprintf("%v", m.Member)
+			result := limits.PreviewValue(memberStr)
+			zm[i] = zsetMember{Member: result.Value.(string), Score: m.Score}
+			if result.Truncated {
+				detail.ValueTruncated = true
+			}
 		}
 		detail.ZSetVal = zm
 
@@ -412,7 +452,12 @@ func (h RedisHandler) GetKey(w http.ResponseWriter, r *http.Request) {
 		for i, m := range messages {
 			vals := make(map[string]string)
 			for k, v := range m.Values {
-				vals[k] = fmt.Sprintf("%v", v)
+				valStr := fmt.Sprintf("%v", v)
+				result := limits.PreviewValue(valStr)
+				vals[k] = result.Value.(string)
+				if result.Truncated {
+					detail.ValueTruncated = true
+				}
 			}
 			msgs[i] = streamMessage{ID: m.ID, Values: vals}
 		}

@@ -79,7 +79,7 @@ func TestIntegration_ListRows(t *testing.T) {
 	}
 	defer rows.Close()
 	cols, _ := rows.Columns()
-	result, err := scanRows(rows, cols)
+	result, _, err := scanRows(rows, cols)
 	if err != nil {
 		t.Fatalf("scan: %v", err)
 	}
@@ -187,7 +187,7 @@ func TestIntegration_SortedResults(t *testing.T) {
 	defer rows.Close()
 
 	cols, _ := rows.Columns()
-	result, err := scanRows(rows, cols)
+	result, _, err := scanRows(rows, cols)
 	if err != nil {
 		t.Fatalf("scan: %v", err)
 	}

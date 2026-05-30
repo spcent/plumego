@@ -15,9 +15,29 @@ import (
 // RegisterRoutes wires all HTTP routes for dbadmin.
 // Routes are explicit — one method, one path, one handler per line.
 func (a *App) RegisterRoutes() error {
+	// Build health checkers for all connections
+	checkers, err := handler.BuildHealthCheckers(
+		a.ConnectionStore,
+		a.DBManager,
+		a.RedisManager,
+		a.MongoManager,
+		a.ESManager,
+	)
+	if err != nil {
+		return err
+	}
+
 	healthH := handler.HealthHandler{
 		ServiceName: a.Cfg.App.ServiceName,
 		Logger:      a.Core.Logger(),
+		Checkers:    checkers,
+	}
+	poolStatsH := handler.PoolStatsHandler{
+		DBManager:    a.DBManager,
+		RedisManager: a.RedisManager,
+		MongoManager: a.MongoManager,
+		ESManager:    a.ESManager,
+		Logger:       a.Core.Logger(),
 	}
 	authH := handler.AuthHandler{
 		AdminUser:     a.Cfg.App.AdminUser,
@@ -37,6 +57,8 @@ func (a *App) RegisterRoutes() error {
 	root := newRouteReg(a.Core)
 	root.get("/healthz", http.HandlerFunc(healthH.Live))
 	root.get("/readyz", http.HandlerFunc(healthH.Ready))
+	root.get("/pool-stats", http.HandlerFunc(poolStatsH.GetAllStats))
+	root.get("/pool-stats/sql", http.HandlerFunc(poolStatsH.GetSQLPoolStats))
 	root.post("/api/auth/login", http.HandlerFunc(authH.Login))
 	if root.err != nil {
 		return root.err
@@ -63,6 +85,7 @@ func (a *App) RegisterRoutes() error {
 		History:             a.HistoryStore,
 		Logger:              a.Core.Logger(),
 		QueryTimeoutSeconds: a.Cfg.App.QueryTimeoutSeconds,
+		Registry:            a.QueryRegistry,
 	}
 	rowH := handler.RowHandler{
 		Connections: a.ConnectionStore,
@@ -166,6 +189,10 @@ func (a *App) RegisterRoutes() error {
 	protected.get("/api/conn/:id/history", guard(http.HandlerFunc(queryH.ListHistory)))
 	protected.delete("/api/conn/:id/history", guard(http.HandlerFunc(queryH.ClearHistory)))
 	protected.delete("/api/conn/:id/history/:entryId", guard(http.HandlerFunc(queryH.DeleteHistory)))
+
+	// Query cancellation — cancel active queries and list running queries.
+	protected.post("/api/queries/cancel", guard(http.HandlerFunc(queryH.Cancel)))
+	protected.get("/api/queries/active", guard(http.HandlerFunc(queryH.ListActive)))
 
 	// Redis operations — Redis-specific route group.
 	protected.get("/api/conn/:id/redis/databases", guard(http.HandlerFunc(redisH.ListDBs)))

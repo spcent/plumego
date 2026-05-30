@@ -18,6 +18,10 @@ import (
 	"dbadmin/internal/domain/history"
 )
 
+// SlowQueryThresholdMs defines the threshold for slow query logging.
+// Queries taking longer than this will be logged at WARN level.
+const SlowQueryThresholdMs = 1000
+
 // QueryHandler handles SQL console execution and query history.
 type QueryHandler struct {
 	Connections         *connection.Store
@@ -25,6 +29,7 @@ type QueryHandler struct {
 	History             *history.Store
 	Logger              plumelog.StructuredLogger
 	QueryTimeoutSeconds int // Maximum query execution time in seconds
+	Registry            *QueryRegistry
 }
 
 type queryRequest struct {
@@ -36,6 +41,7 @@ type queryRequest struct {
 
 type selectResult struct {
 	Type            string           `json:"type"` // "result_set"
+	QueryID         string           `json:"queryId,omitempty"`
 	Columns         []string         `json:"columns"`
 	Rows            []map[string]any `json:"rows"`
 	ExecutionTimeMs int64            `json:"executionTimeMs"`
@@ -44,6 +50,7 @@ type selectResult struct {
 
 type execResult struct {
 	Type            string `json:"type"` // "exec_result"
+	QueryID         string `json:"queryId,omitempty"`
 	RowsAffected    int64  `json:"rowsAffected"`
 	LastInsertId    int64  `json:"lastInsertId"`
 	ExecutionTimeMs int64  `json:"executionTimeMs"`
@@ -209,12 +216,25 @@ func (h QueryHandler) Execute(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Apply timeout if configured
-	ctx := r.Context()
-	var cancel context.CancelFunc
+	// Apply timeout if configured, wrapped in a cancellable context so the query
+	// can also be cancelled manually via the Cancel endpoint.
+	ctx, cancel := context.WithCancel(r.Context())
+	defer cancel()
+
 	if h.QueryTimeoutSeconds > 0 {
-		ctx, cancel = context.WithTimeout(ctx, time.Duration(h.QueryTimeoutSeconds)*time.Second)
-		defer cancel()
+		var timeoutCancel context.CancelFunc
+		ctx, timeoutCancel = context.WithTimeout(ctx, time.Duration(h.QueryTimeoutSeconds)*time.Second)
+		defer timeoutCancel()
+	}
+
+	start := time.Now()
+	originalSQL := req.SQL // preserve original for history
+
+	// Register query for cancellation if registry is available.
+	queryID, _ := generateHistoryID()
+	if h.Registry != nil {
+		h.Registry.Register(queryID, connID, req.Database, originalSQL, cancel)
+		defer h.Registry.Unregister(queryID)
 	}
 
 	// For MySQL, USE the selected database first.
@@ -225,9 +245,6 @@ func (h QueryHandler) Execute(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-
-	start := time.Now()
-	originalSQL := req.SQL // preserve original for history
 
 	if cls.IsSelect {
 		// Append LIMIT 1000 if no explicit LIMIT to prevent unbounded result sets.
@@ -241,16 +258,26 @@ func (h QueryHandler) Execute(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			durationMs := time.Since(start).Milliseconds()
 			_ = h.recordHistory(connID, req.Database, originalSQL, durationMs, err.Error())
+			h.logSlowQuery(connID, req.Database, originalSQL, durationMs)
 
-			// Check if timeout occurred
-			if ctx.Err() == context.DeadlineExceeded {
+			// Check cancellation or timeout
+			switch ctx.Err() {
+			case context.Canceled:
+				h.Logger.Info("query cancelled", plumelog.Fields{"queryId": queryID})
+				logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+					Type(contract.TypeTimeout).
+					Message("query was cancelled").
+					Detail("query_id", queryID).
+					Build()))
+			case context.DeadlineExceeded:
 				h.Logger.Error("query timeout", plumelog.Fields{"timeout": h.QueryTimeoutSeconds, "sql": sqlStr})
 				logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
 					Type(contract.TypeTimeout).
 					Message("query execution timeout").
 					Detail("timeout_seconds", h.QueryTimeoutSeconds).
+					Detail("query_id", queryID).
 					Build()))
-			} else {
+			default:
 				h.Logger.Error("query failed", plumelog.Fields{"error": err.Error()})
 				logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
 					Type(contract.TypeInternal).Message(err.Error()).Build()))
@@ -260,7 +287,10 @@ func (h QueryHandler) Execute(w http.ResponseWriter, r *http.Request) {
 		defer rows.Close()
 
 		cols, _ := rows.Columns()
-		resultRows, err := scanRows(rows, cols)
+		resultRows, contentTruncated, err := scanRows(rows, cols)
+		if contentTruncated {
+			truncated = true
+		}
 		if err != nil {
 			h.Logger.Error("scan rows failed", plumelog.Fields{"error": err.Error()})
 			logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
@@ -270,8 +300,10 @@ func (h QueryHandler) Execute(w http.ResponseWriter, r *http.Request) {
 
 		durationMs := time.Since(start).Milliseconds()
 		_ = h.recordHistory(connID, req.Database, originalSQL, durationMs, "")
+		h.logSlowQuery(connID, req.Database, originalSQL, durationMs)
 		logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusOK, selectResult{
 			Type:            "result_set",
+			QueryID:         queryID,
 			Columns:         cols,
 			Rows:            resultRows,
 			ExecutionTimeMs: durationMs,
@@ -285,16 +317,26 @@ func (h QueryHandler) Execute(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		durationMs := time.Since(start).Milliseconds()
 		_ = h.recordHistory(connID, req.Database, originalSQL, durationMs, err.Error())
+		h.logSlowQuery(connID, req.Database, originalSQL, durationMs)
 
-		// Check if timeout occurred
-		if ctx.Err() == context.DeadlineExceeded {
+		// Check cancellation or timeout
+		switch ctx.Err() {
+		case context.Canceled:
+			h.Logger.Info("exec cancelled", plumelog.Fields{"queryId": queryID})
+			logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+				Type(contract.TypeTimeout).
+				Message("query was cancelled").
+				Detail("query_id", queryID).
+				Build()))
+		case context.DeadlineExceeded:
 			h.Logger.Error("exec timeout", plumelog.Fields{"timeout": h.QueryTimeoutSeconds, "sql": sqlStr})
 			logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
 				Type(contract.TypeTimeout).
 				Message("query execution timeout").
 				Detail("timeout_seconds", h.QueryTimeoutSeconds).
+				Detail("query_id", queryID).
 				Build()))
-		} else {
+		default:
 			h.Logger.Error("exec failed", plumelog.Fields{"error": err.Error()})
 			logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
 				Type(contract.TypeInternal).Message(err.Error()).Build()))
@@ -306,12 +348,73 @@ func (h QueryHandler) Execute(w http.ResponseWriter, r *http.Request) {
 	lastInsertId, _ := res.LastInsertId()
 	durationMs := time.Since(start).Milliseconds()
 	_ = h.recordHistory(connID, req.Database, originalSQL, durationMs, "")
+	h.logSlowQuery(connID, req.Database, originalSQL, durationMs)
 	logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusOK, execResult{
 		Type:            "exec_result",
+		QueryID:         queryID,
 		RowsAffected:    rowsAffected,
 		LastInsertId:    lastInsertId,
 		ExecutionTimeMs: durationMs,
 	}, nil))
+}
+
+// Cancel cancels an active query by its ID.
+// POST /api/queries/cancel - Body: {"queryId": "abc123"}
+func (h QueryHandler) Cancel(w http.ResponseWriter, r *http.Request) {
+	if h.Registry == nil {
+		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+			Type(contract.TypeInternal).Message("query registry not available").Build()))
+		return
+	}
+
+	var req struct {
+		QueryID string `json:"queryId"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+			Type(contract.TypeBadRequest).Message("invalid request body").Build()))
+		return
+	}
+
+	if req.QueryID == "" {
+		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+			Type(contract.TypeBadRequest).Message("queryId is required").Build()))
+		return
+	}
+
+	if h.Registry.Cancel(req.QueryID) {
+		logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusOK, map[string]any{
+			"status":  "cancelled",
+			"queryId": req.QueryID,
+		}, nil))
+	} else {
+		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+			Type(contract.TypeNotFound).Message("query not found or already completed").Build()))
+	}
+}
+
+// ListActive returns all currently running queries.
+// GET /api/queries/active
+func (h QueryHandler) ListActive(w http.ResponseWriter, r *http.Request) {
+	if h.Registry == nil {
+		logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusOK, []any{}, nil))
+		return
+	}
+
+	queries := h.Registry.ListActive()
+	result := make([]map[string]any, 0, len(queries))
+	for _, q := range queries {
+		result = append(result, map[string]any{
+			"queryId":   q.QueryID,
+			"connId":    q.ConnID,
+			"database":  q.Database,
+			"sql":       q.SQL,
+			"startTime": q.StartTime,
+			"duration":  time.Since(q.StartTime).String(),
+		})
+	}
+
+	logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusOK, result, map[string]any{"count": len(result)}))
 }
 
 // ListHistory returns query history for a connection.
@@ -363,6 +466,27 @@ func (h QueryHandler) recordHistory(connID, dbName, sql string, durationMS int64
 		Error:     errStr,
 		CreatedAt: time.Now().UTC(),
 	})
+}
+
+// logSlowQuery logs queries that exceed the slow query threshold.
+func (h QueryHandler) logSlowQuery(connID, dbName, sql string, durationMs int64) {
+	if durationMs > SlowQueryThresholdMs {
+		h.Logger.Warn("slow query detected", plumelog.Fields{
+			"connection_id": connID,
+			"database":      dbName,
+			"duration_ms":   durationMs,
+			"threshold_ms":  SlowQueryThresholdMs,
+			"sql":           truncateSQLForLog(sql, 200),
+		})
+	}
+}
+
+// truncateSQLForLog truncates SQL for logging to prevent excessively long log entries.
+func truncateSQLForLog(sql string, maxLen int) string {
+	if len(sql) <= maxLen {
+		return sql
+	}
+	return sql[:maxLen] + "... (truncated)"
 }
 
 func generateHistoryID() (string, error) {

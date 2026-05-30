@@ -29,19 +29,23 @@ func NewManager() *Manager {
 
 // Open returns a cached client for the connection, creating one if necessary.
 func (m *Manager) Open(conn *connection.Connection) (*elasticsearch.Client, error) {
-	m.mu.RLock()
-	if cl, ok := m.clients[conn.ID]; ok {
-		m.mu.RUnlock()
-		return cl, nil
-	}
-	m.mu.RUnlock()
-
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	// Double-check after acquiring write lock
 	if cl, ok := m.clients[conn.ID]; ok {
-		return cl, nil
+		// Validate connection is still alive with a short timeout
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+		res, err := cl.Ping(cl.Ping.WithContext(ctx))
+		if err == nil && !res.IsError() {
+			res.Body.Close()
+			return cl, nil
+		}
+		if res != nil && res.Body != nil {
+			res.Body.Close()
+		}
+		// Connection is stale, remove it
+		delete(m.clients, conn.ID)
 	}
 
 	cl, err := m.createClient(conn)
@@ -71,6 +75,20 @@ func (m *Manager) Test(ctx context.Context, conn *connection.Connection) error {
 	}
 
 	return nil
+}
+
+// Get returns the cached client for the given connID, or nil if not open.
+func (m *Manager) Get(connID string) *elasticsearch.Client {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.clients[connID]
+}
+
+// Count returns the number of active Elasticsearch connections.
+func (m *Manager) Count() int {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return len(m.clients)
 }
 
 // Close closes and removes the client for the given connection ID.

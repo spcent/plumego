@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"time"
 
 	"dbadmin/internal/domain/connection"
 
@@ -38,18 +39,19 @@ func NewManager() *Manager {
 func (m *Manager) Open(c *connection.Connection, dbIndex int) (*redis.Client, error) {
 	key := poolKey{connID: c.ID, dbIndex: dbIndex}
 
-	m.mu.RLock()
-	if cl, ok := m.clients[key]; ok {
-		m.mu.RUnlock()
-		return cl, nil
-	}
-	m.mu.RUnlock()
-
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	// Double-check after acquiring write lock.
+
 	if cl, ok := m.clients[key]; ok {
-		return cl, nil
+		// Validate connection is still alive with a short timeout
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+		if err := cl.Ping(ctx).Err(); err == nil {
+			return cl, nil
+		}
+		// Connection is stale, close and remove it
+		cl.Close()
+		delete(m.clients, key)
 	}
 
 	cl, err := m.build(c, dbIndex)
@@ -104,6 +106,13 @@ func (m *Manager) Get(connID string, dbIndex int) (*redis.Client, error) {
 		return cl, nil
 	}
 	return nil, ErrNoClient
+}
+
+// Count returns the number of active Redis connections.
+func (m *Manager) Count() int {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return len(m.clients)
 }
 
 // build constructs a new *redis.Client for the given connection config.
