@@ -9,7 +9,7 @@ import (
 
 // generateEndpoint generates the canonical plumego handler shape:
 // a func that injects a service interface and returns http.HandlerFunc.
-// Unlike generateHandler (struct-based), this follows CANONICAL_STYLE_GUIDE.md.
+// Unlike generateHandler (struct-based), this follows docs/reference/canonical-style-guide.md.
 func generateEndpoint(dir string, opts GenerateOptions) (*GenerateResult, error) {
 	result := &GenerateResult{
 		Type:    "endpoint",
