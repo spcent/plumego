@@ -1,6 +1,7 @@
 package app
 
 import (
+	"io/fs"
 	"net/http"
 
 	midauth "github.com/spcent/plumego/middleware/auth"
@@ -8,6 +9,7 @@ import (
 
 	dbauthn "dbadmin/internal/domain/authn"
 	"dbadmin/internal/handler"
+	"dbadmin/web"
 )
 
 // RegisterRoutes wires all HTTP routes for dbadmin.
@@ -217,12 +219,24 @@ func (a *App) RegisterRoutes() error {
 	}
 
 	// SPA: must be registered last so API routes take precedence over the catch-all.
-	// In development (no dist/), skip gracefully.
-	return frontend.RegisterFromDir(a.Core, "./web/dist",
+	// Use embedded assets in production, fall back to disk in development.
+	opts := []frontend.Option{
 		frontend.WithFallback(true),
 		frontend.WithCacheControl("public, max-age=31536000, immutable"),
 		frontend.WithIndexCacheControl("no-cache, must-revalidate"),
-	)
+	}
+
+	if web.Available {
+		// Production: serve from embedded filesystem
+		distFS, err := fs.Sub(web.Assets, "dist")
+		if err != nil {
+			return err
+		}
+		return frontend.RegisterFS(a.Core, http.FS(distFS), opts...)
+	}
+
+	// Development: serve from disk, skip if not built
+	return frontend.RegisterFromDir(a.Core, "./web/dist", opts...)
 }
 
 // routeAdder is the minimal interface shared by *core.App and *core.RouteGroup.
