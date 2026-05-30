@@ -22,6 +22,36 @@ allowed_imports:
   - contract
   - x/gateway
 
+forbidden_imports:
+  - core/**
+  - router/**
+  - middleware/**
+  - security/**
+  - store/**
+  - health/**
+  - log/**
+  - metrics/**
+  - x/ai/**
+  - x/data/**
+  - x/fileapi/**
+  - x/frontend/**
+  - x/messaging/**
+  - x/observability/**
+  - x/openapi/**
+  - x/resilience/**
+  - x/rest/**
+  - x/rpc/**
+  - x/tenant/**
+  - x/validate/**
+
 test_commands:
   - go test -race -timeout 60s ./x/gateway/protocol/...
   - go vet ./x/gateway/protocol/...
+
+review_checklist:
+  - Keep protocol detection deterministic and side-effect free
+  - Do not embed transport, proxy, or middleware logic here
+
+agent_hints:
+  - Treat this as the protocol vocabulary consumed by x/gateway/protocolmw
+  - Add new protocol kinds here rather than in middleware

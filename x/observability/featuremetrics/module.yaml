@@ -20,6 +20,37 @@ allowed_imports:
   - stdlib
   - metrics
 
+forbidden_imports:
+  - core/**
+  - router/**
+  - contract/**
+  - middleware/**
+  - security/**
+  - store/**
+  - health/**
+  - log/**
+  - x/ai/**
+  - x/data/**
+  - x/fileapi/**
+  - x/frontend/**
+  - x/gateway/**
+  - x/messaging/**
+  - x/openapi/**
+  - x/resilience/**
+  - x/rest/**
+  - x/rpc/**
+  - x/tenant/**
+  - x/validate/**
+
 test_commands:
   - go test -race -timeout 60s ./x/observability/featuremetrics/...
   - go vet ./x/observability/featuremetrics/...
+
+review_checklist:
+  - Keep metric and tag names stable across releases
+  - Emit via the stable collector, not a local backend
+  - Do not embed business logic in metric capture
+
+agent_hints:
+  - Define feature metric keys centrally to avoid drift
+  - Use a no-op collector in tests

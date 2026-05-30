@@ -9,9 +9,9 @@ import (
 
 	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/middleware"
+	"github.com/spcent/plumego/middleware/abuseguard"
 	"github.com/spcent/plumego/middleware/bodylimit"
 	"github.com/spcent/plumego/middleware/httpmetrics"
-	"github.com/spcent/plumego/middleware/abuseguard"
 	"github.com/spcent/plumego/middleware/requestid"
 	mwtracing "github.com/spcent/plumego/middleware/tracing"
 	"github.com/spcent/plumego/security/authn"

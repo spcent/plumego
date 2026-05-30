@@ -24,6 +24,37 @@ allowed_imports:
   - internal/httputil
   - x/gateway
 
+forbidden_imports:
+  - core/**
+  - router/**
+  - middleware/**
+  - security/**
+  - store/**
+  - health/**
+  - log/**
+  - metrics/**
+  - x/ai/**
+  - x/data/**
+  - x/fileapi/**
+  - x/frontend/**
+  - x/messaging/**
+  - x/observability/**
+  - x/openapi/**
+  - x/resilience/**
+  - x/rest/**
+  - x/rpc/**
+  - x/tenant/**
+  - x/validate/**
+
 test_commands:
   - go test -race -timeout 60s ./x/gateway/transform/...
   - go vet ./x/gateway/transform/...
+
+review_checklist:
+  - Keep transforms explicit and order-independent where possible
+  - Route error and response shaping through contract
+  - Avoid coupling transforms to specific upstreams
+
+agent_hints:
+  - Add transform steps here, not inline in proxy wiring
+  - Use contract helpers for any error output

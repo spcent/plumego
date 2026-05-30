@@ -24,6 +24,37 @@ allowed_imports:
   - internal/httputil
   - x/gateway
 
+forbidden_imports:
+  - core/**
+  - router/**
+  - middleware/**
+  - security/**
+  - store/**
+  - health/**
+  - log/**
+  - metrics/**
+  - x/ai/**
+  - x/data/**
+  - x/fileapi/**
+  - x/frontend/**
+  - x/messaging/**
+  - x/observability/**
+  - x/openapi/**
+  - x/resilience/**
+  - x/rest/**
+  - x/rpc/**
+  - x/tenant/**
+  - x/validate/**
+
 test_commands:
   - go test -race -timeout 60s ./x/gateway/cache/...
   - go vet ./x/gateway/cache/...
+
+review_checklist:
+  - Keep cache key derivation collision-free and scheme/host/path aware
+  - Honor TTL and never serve responses past their intended expiry
+  - Keep caching opt-in and separate from upstream proxy logic
+
+agent_hints:
+  - Wire caching as an explicit gateway stage, not implicit global behavior
+  - Keep cache storage swappable behind the package interface

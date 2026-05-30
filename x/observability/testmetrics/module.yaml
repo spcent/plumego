@@ -20,6 +20,36 @@ allowed_imports:
   - stdlib
   - metrics
 
+forbidden_imports:
+  - core/**
+  - router/**
+  - contract/**
+  - middleware/**
+  - security/**
+  - store/**
+  - health/**
+  - log/**
+  - x/ai/**
+  - x/data/**
+  - x/fileapi/**
+  - x/frontend/**
+  - x/gateway/**
+  - x/messaging/**
+  - x/openapi/**
+  - x/resilience/**
+  - x/rest/**
+  - x/rpc/**
+  - x/tenant/**
+  - x/validate/**
+
 test_commands:
   - go test -race -timeout 60s ./x/observability/testmetrics/...
   - go vet ./x/observability/testmetrics/...
+
+review_checklist:
+  - Keep this strictly a test double with no production wiring
+  - Preserve metrics collector compatibility
+
+agent_hints:
+  - Use in tests to assert emitted metrics
+  - Do not wire this into production collectors

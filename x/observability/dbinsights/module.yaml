@@ -24,6 +24,35 @@ allowed_imports:
   - metrics
   - store
 
+forbidden_imports:
+  - core/**
+  - router/**
+  - contract/**
+  - middleware/**
+  - security/**
+  - health/**
+  - x/ai/**
+  - x/data/**
+  - x/fileapi/**
+  - x/frontend/**
+  - x/gateway/**
+  - x/messaging/**
+  - x/openapi/**
+  - x/resilience/**
+  - x/rest/**
+  - x/rpc/**
+  - x/tenant/**
+  - x/validate/**
+  - x/websocket/**
+
 test_commands:
   - go test -race -timeout 60s ./x/observability/dbinsights/...
   - go vet ./x/observability/dbinsights/...
+
+review_checklist:
+  - Keep DB instrumentation read-only and allocation-light on hot paths
+  - Do not own metric backend or exporter wiring
+
+agent_hints:
+  - Emit through the shared collector, not a package-local backend
+  - Keep query attribution stable across versions

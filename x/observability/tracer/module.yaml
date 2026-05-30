@@ -23,6 +23,39 @@ allowed_imports:
   - log
   - x/observability
 
+forbidden_imports:
+  - core/**
+  - router/**
+  - contract/**
+  - middleware/**
+  - security/**
+  - store/**
+  - health/**
+  - metrics/**
+  - x/ai/**
+  - x/data/**
+  - x/fileapi/**
+  - x/frontend/**
+  - x/gateway/**
+  - x/messaging/**
+  - x/openapi/**
+  - x/resilience/**
+  - x/rest/**
+  - x/rpc/**
+  - x/tenant/**
+  - x/validate/**
+
 test_commands:
   - go test -race -timeout 60s ./x/observability/tracer/...
   - go vet ./x/observability/tracer/...
+
+review_checklist:
+  - Keep trace context propagation aligned with contract.TraceContext
+  - Keep sampling decisions deterministic and configurable
+  - Do not leak span internals across the public surface
+  - Fail safe when no tracer is configured
+
+agent_hints:
+  - Read and write trace context via contract.TraceContext, not ad hoc keys
+  - Keep exporter and backend wiring in application code
+  - Start spans explicitly; avoid implicit global tracers
