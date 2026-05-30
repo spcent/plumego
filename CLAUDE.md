@@ -22,7 +22,7 @@ Zero runtime dependencies in stable roots. Extensions under `x/*` may use extern
 | Reference apps | `reference/standard-service` … `reference/with-websocket` (16 total) | Each has its own `go.mod` |
 | Use-case apps | `use-cases/workerfleet` | MongoDB; own `go.mod` |
 | CLI tool | `cmd/plumego` | Agent-assist, codegen, validation, scaffold |
-| Validation | `internal/checks/` (14 programs) | Run via `make gates` |
+| Validation | `internal/checks/` (11 programs) | Run via `make gates` |
 | Docs website | `website/` | Astro; regenerate with `make website-sync` |
 
 ### Key commands
