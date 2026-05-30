@@ -30,4 +30,3 @@ func TestGenerateToken_uniqueness(t *testing.T) {
 		tokens[token] = true
 	}
 }
-

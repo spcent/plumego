@@ -89,11 +89,11 @@ func TestConnection_Redact(t *testing.T) {
 
 	t.Run("redacts Elasticsearch credentials", func(t *testing.T) {
 		c := &Connection{
-			ID:        "test-id",
-			Name:      "Test ES Connection",
-			Driver:    DriverElasticsearch,
-			ESNodes:   []string{"http://localhost:9200"},
-			ESAPIKey:  "secret-api-key",
+			ID:         "test-id",
+			Name:       "Test ES Connection",
+			Driver:     DriverElasticsearch,
+			ESNodes:    []string{"http://localhost:9200"},
+			ESAPIKey:   "secret-api-key",
 			ESPassword: "es-password",
 		}
 

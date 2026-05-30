@@ -270,9 +270,9 @@ func TestParseJSONFilter_invalid(t *testing.T) {
 
 func TestGetSortedKeys(t *testing.T) {
 	doc := bson.M{
-		"zebra":  1,
-		"apple":  2,
-		"mango":  3,
+		"zebra": 1,
+		"apple": 2,
+		"mango": 3,
 	}
 	keys := getSortedKeys(doc)
 	if len(keys) != 3 {
