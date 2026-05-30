@@ -24,7 +24,7 @@ func discardLogger() plumelog.StructuredLogger {
 // mustCreateItem calls store.Create with context.Background() and fails the test on error.
 // Handler tests inject item.MemoryStore directly for test isolation; in production
 // the handler receives an item.ItemService wired through routes.go. Both satisfy the
-// handler's ItemRepository interface so handler logic is unaffected by the difference.
+// handler's ItemService interface so handler logic is unaffected by the difference.
 func mustCreateItem(t *testing.T, store *item.MemoryStore, name, description string) item.Item {
 	t.Helper()
 	it, err := store.Create(context.Background(), name, description)
@@ -376,7 +376,7 @@ func TestAPIHandlerResponses(t *testing.T) {
 }
 
 func TestItemHandlerCreate(t *testing.T) {
-	h := ItemHandler{Repo: item.NewMemoryStore(), Logger: discardLogger()}
+	h := ItemHandler{Service: item.NewMemoryStore(), Logger: discardLogger()}
 
 	t.Run("valid body returns 201 with item", func(t *testing.T) {
 		body := bytes.NewBufferString(`{"name":"widget","description":"a widget"}`)
@@ -471,11 +471,29 @@ func TestItemHandlerCreate(t *testing.T) {
 			t.Fatalf("error code = %q, want %q", code, codeItemCreateInvalidJSON)
 		}
 	})
+
+	t.Run("unknown field returns 400 with unknown_field code and field detail", func(t *testing.T) {
+		// Strict decoding rejects a typo like "desc" instead of dropping it and
+		// reporting a misleading "description required" error.
+		body := bytes.NewBufferString(`{"name":"widget","desc":"a widget"}`)
+		rec := httptest.NewRecorder()
+		h.Create(rec, httptest.NewRequest(http.MethodPost, "/api/v1/items", body))
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
+		}
+		ef := decodeErrorPayload(t, rec)
+		if ef.Code != codeItemCreateUnknownField {
+			t.Fatalf("error code = %q, want %q", ef.Code, codeItemCreateUnknownField)
+		}
+		if ef.Details["field"] != "desc" {
+			t.Fatalf("error detail field = %v, want %q", ef.Details["field"], "desc")
+		}
+	})
 }
 
 func TestItemHandlerList(t *testing.T) {
 	t.Run("empty store returns empty data with zero total in meta", func(t *testing.T) {
-		h := ItemHandler{Repo: item.NewMemoryStore(), Logger: discardLogger()}
+		h := ItemHandler{Service: item.NewMemoryStore(), Logger: discardLogger()}
 		rec := httptest.NewRecorder()
 		h.List(rec, httptest.NewRequest(http.MethodGet, "/api/v1/items", nil))
 		if rec.Code != http.StatusOK {
@@ -496,7 +514,7 @@ func TestItemHandlerList(t *testing.T) {
 		store := item.NewMemoryStore()
 		mustCreateItem(t, store, "alpha", "alpha item")
 		mustCreateItem(t, store, "beta", "beta item")
-		h := ItemHandler{Repo: store, Logger: discardLogger()}
+		h := ItemHandler{Service: store, Logger: discardLogger()}
 
 		rec := httptest.NewRecorder()
 		h.List(rec, httptest.NewRequest(http.MethodGet, "/api/v1/items", nil))
@@ -524,7 +542,7 @@ func TestItemHandlerList(t *testing.T) {
 		for _, name := range []string{"a", "b", "c", "d", "e"} {
 			mustCreateItem(t, store, name, name+" item")
 		}
-		h := ItemHandler{Repo: store, Logger: discardLogger()}
+		h := ItemHandler{Service: store, Logger: discardLogger()}
 
 		rec := httptest.NewRecorder()
 		h.List(rec, httptest.NewRequest(http.MethodGet, "/api/v1/items?limit=3", nil))
@@ -550,7 +568,7 @@ func TestItemHandlerList(t *testing.T) {
 		mustCreateItem(t, store, "a", "a item")
 		mustCreateItem(t, store, "b", "b item")
 		mustCreateItem(t, store, "c", "c item")
-		h := ItemHandler{Repo: store, Logger: discardLogger()}
+		h := ItemHandler{Service: store, Logger: discardLogger()}
 
 		rec := httptest.NewRecorder()
 		h.List(rec, httptest.NewRequest(http.MethodGet, "/api/v1/items?offset=10", nil))
@@ -575,7 +593,7 @@ func TestItemHandlerList(t *testing.T) {
 		for _, name := range []string{"a", "b", "c", "d", "e"} {
 			mustCreateItem(t, store, name, name+" item")
 		}
-		h := ItemHandler{Repo: store, Logger: discardLogger()}
+		h := ItemHandler{Service: store, Logger: discardLogger()}
 
 		rec := httptest.NewRecorder()
 		h.List(rec, httptest.NewRequest(http.MethodGet, "/api/v1/items?offset=3", nil))
@@ -597,7 +615,7 @@ func TestItemHandlerList(t *testing.T) {
 	})
 
 	t.Run("invalid limit returns 400 TypeBadRequest", func(t *testing.T) {
-		h := ItemHandler{Repo: item.NewMemoryStore(), Logger: discardLogger()}
+		h := ItemHandler{Service: item.NewMemoryStore(), Logger: discardLogger()}
 		rec := httptest.NewRecorder()
 		h.List(rec, httptest.NewRequest(http.MethodGet, "/api/v1/items?limit=abc", nil))
 		if rec.Code != http.StatusBadRequest {
@@ -609,7 +627,7 @@ func TestItemHandlerList(t *testing.T) {
 	})
 
 	t.Run("invalid offset returns 400 TypeBadRequest", func(t *testing.T) {
-		h := ItemHandler{Repo: item.NewMemoryStore(), Logger: discardLogger()}
+		h := ItemHandler{Service: item.NewMemoryStore(), Logger: discardLogger()}
 		rec := httptest.NewRecorder()
 		h.List(rec, httptest.NewRequest(http.MethodGet, "/api/v1/items?offset=xyz", nil))
 		if rec.Code != http.StatusBadRequest {
@@ -621,7 +639,7 @@ func TestItemHandlerList(t *testing.T) {
 	})
 
 	t.Run("negative limit returns 400 TypeBadRequest", func(t *testing.T) {
-		h := ItemHandler{Repo: item.NewMemoryStore(), Logger: discardLogger()}
+		h := ItemHandler{Service: item.NewMemoryStore(), Logger: discardLogger()}
 		rec := httptest.NewRecorder()
 		h.List(rec, httptest.NewRequest(http.MethodGet, "/api/v1/items?limit=-1", nil))
 		if rec.Code != http.StatusBadRequest {
@@ -631,7 +649,7 @@ func TestItemHandlerList(t *testing.T) {
 
 	t.Run("zero limit returns 400 TypeBadRequest", func(t *testing.T) {
 		// limit=0 violates minVal=1; must be rejected as an invalid param.
-		h := ItemHandler{Repo: item.NewMemoryStore(), Logger: discardLogger()}
+		h := ItemHandler{Service: item.NewMemoryStore(), Logger: discardLogger()}
 		rec := httptest.NewRecorder()
 		h.List(rec, httptest.NewRequest(http.MethodGet, "/api/v1/items?limit=0", nil))
 		if rec.Code != http.StatusBadRequest {
@@ -642,31 +660,25 @@ func TestItemHandlerList(t *testing.T) {
 		}
 	})
 
-	t.Run("limit above max is silently clamped and reflected in meta", func(t *testing.T) {
-		// parseQueryInt silently clamps limit to maxLimit (100) without returning
-		// an error. Meta always reflects the effective limit so clients know the
-		// actual page size they received.
-		store := item.NewMemoryStore()
-		for i := 0; i < 5; i++ {
-			mustCreateItem(t, store, "item", "an item")
-		}
-		h := ItemHandler{Repo: store, Logger: discardLogger()}
-
+	t.Run("limit above max returns 400 TypeBadRequest", func(t *testing.T) {
+		// parseQueryInt rejects a limit above maxLimit (100) instead of silently
+		// clamping, so clients get an explicit error rather than a surprising page size.
+		h := ItemHandler{Service: item.NewMemoryStore(), Logger: discardLogger()}
 		rec := httptest.NewRecorder()
 		h.List(rec, httptest.NewRequest(http.MethodGet, "/api/v1/items?limit=200", nil))
-		if rec.Code != http.StatusOK {
-			t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
 		}
-		env := decodeEnvelope(t, rec)
-		// Effective limit is clamped to 100; total and offset are unaffected.
-		assertMeta(t, env.Meta, 5, 100, 0)
+		if code := decodeErrorPayload(t, rec).Code; code != codeItemListInvalidParam {
+			t.Fatalf("error code = %q, want %q", code, codeItemListInvalidParam)
+		}
 	})
 }
 
 func TestItemHandlerGetByID(t *testing.T) {
 	store := item.NewMemoryStore()
 	created := mustCreateItem(t, store, "gadget", "a gadget")
-	h := ItemHandler{Repo: store, Logger: discardLogger()}
+	h := ItemHandler{Service: store, Logger: discardLogger()}
 
 	t.Run("existing id returns 200 with item", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/api/v1/items/"+created.ID, nil)
@@ -702,7 +714,7 @@ func TestItemHandlerUpdate(t *testing.T) {
 	t.Run("existing id returns 200 with fully updated item", func(t *testing.T) {
 		store := item.NewMemoryStore()
 		created := mustCreateItem(t, store, "original", "an original item")
-		h := ItemHandler{Repo: store, Logger: discardLogger()}
+		h := ItemHandler{Service: store, Logger: discardLogger()}
 
 		body := bytes.NewBufferString(`{"name":"renamed","description":"updated description"}`)
 		req := httptest.NewRequest(http.MethodPut, "/api/v1/items/"+created.ID, body)
@@ -725,7 +737,7 @@ func TestItemHandlerUpdate(t *testing.T) {
 	t.Run("description is replaced by put", func(t *testing.T) {
 		store := item.NewMemoryStore()
 		created := mustCreateItem(t, store, "widget", "old description")
-		h := ItemHandler{Repo: store, Logger: discardLogger()}
+		h := ItemHandler{Service: store, Logger: discardLogger()}
 
 		body := bytes.NewBufferString(`{"name":"widget","description":"new description"}`)
 		req := httptest.NewRequest(http.MethodPut, "/api/v1/items/"+created.ID, body)
@@ -744,7 +756,7 @@ func TestItemHandlerUpdate(t *testing.T) {
 	})
 
 	t.Run("missing id returns 404 TypeNotFound", func(t *testing.T) {
-		h := ItemHandler{Repo: item.NewMemoryStore(), Logger: discardLogger()}
+		h := ItemHandler{Service: item.NewMemoryStore(), Logger: discardLogger()}
 		body := bytes.NewBufferString(`{"name":"anything","description":"anything"}`)
 		req := httptest.NewRequest(http.MethodPut, "/api/v1/items/no-such-item", body)
 		ctx := contract.WithRequestContext(req.Context(), contract.RequestContext{
@@ -760,7 +772,7 @@ func TestItemHandlerUpdate(t *testing.T) {
 	t.Run("both name and description missing returns 400 with both field details", func(t *testing.T) {
 		store := item.NewMemoryStore()
 		created := mustCreateItem(t, store, "original", "an original item")
-		h := ItemHandler{Repo: store, Logger: discardLogger()}
+		h := ItemHandler{Service: store, Logger: discardLogger()}
 
 		body := bytes.NewBufferString(`{}`)
 		req := httptest.NewRequest(http.MethodPut, "/api/v1/items/"+created.ID, body)
@@ -787,7 +799,7 @@ func TestItemHandlerUpdate(t *testing.T) {
 	t.Run("missing name only returns 400 with name detail", func(t *testing.T) {
 		store := item.NewMemoryStore()
 		created := mustCreateItem(t, store, "original", "an original item")
-		h := ItemHandler{Repo: store, Logger: discardLogger()}
+		h := ItemHandler{Service: store, Logger: discardLogger()}
 
 		body := bytes.NewBufferString(`{"name":"","description":"some desc"}`)
 		req := httptest.NewRequest(http.MethodPut, "/api/v1/items/"+created.ID, body)
@@ -814,7 +826,7 @@ func TestItemHandlerUpdate(t *testing.T) {
 	t.Run("empty body returns 400 TypeRequired with body_required code", func(t *testing.T) {
 		store := item.NewMemoryStore()
 		created := mustCreateItem(t, store, "original", "an original item")
-		h := ItemHandler{Repo: store, Logger: discardLogger()}
+		h := ItemHandler{Service: store, Logger: discardLogger()}
 
 		req := httptest.NewRequest(http.MethodPut, "/api/v1/items/"+created.ID, http.NoBody)
 		ctx := contract.WithRequestContext(req.Context(), contract.RequestContext{
@@ -833,7 +845,7 @@ func TestItemHandlerUpdate(t *testing.T) {
 	t.Run("invalid JSON returns 400 TypeBadRequest", func(t *testing.T) {
 		store := item.NewMemoryStore()
 		created := mustCreateItem(t, store, "original", "an original item")
-		h := ItemHandler{Repo: store, Logger: discardLogger()}
+		h := ItemHandler{Service: store, Logger: discardLogger()}
 
 		body := bytes.NewBufferString(`not-json`)
 		req := httptest.NewRequest(http.MethodPut, "/api/v1/items/"+created.ID, body)
@@ -847,10 +859,34 @@ func TestItemHandlerUpdate(t *testing.T) {
 		}
 	})
 
+	t.Run("unknown field returns 400 with unknown_field code and field detail", func(t *testing.T) {
+		store := item.NewMemoryStore()
+		created := mustCreateItem(t, store, "original", "an original item")
+		h := ItemHandler{Service: store, Logger: discardLogger()}
+
+		body := bytes.NewBufferString(`{"name":"x","description":"y","extra":true}`)
+		req := httptest.NewRequest(http.MethodPut, "/api/v1/items/"+created.ID, body)
+		ctx := contract.WithRequestContext(req.Context(), contract.RequestContext{
+			Params: map[string]string{"id": created.ID},
+		})
+		rec := httptest.NewRecorder()
+		h.Update(rec, req.WithContext(ctx))
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
+		}
+		ef := decodeErrorPayload(t, rec)
+		if ef.Code != codeItemUpdateUnknownField {
+			t.Fatalf("error code = %q, want %q", ef.Code, codeItemUpdateUnknownField)
+		}
+		if ef.Details["field"] != "extra" {
+			t.Fatalf("error detail field = %v, want %q", ef.Details["field"], "extra")
+		}
+	})
+
 	t.Run("put is idempotent", func(t *testing.T) {
 		store := item.NewMemoryStore()
 		created := mustCreateItem(t, store, "original", "an original item")
-		h := ItemHandler{Repo: store, Logger: discardLogger()}
+		h := ItemHandler{Service: store, Logger: discardLogger()}
 
 		for i := 0; i < 3; i++ {
 			body := bytes.NewBufferString(`{"name":"stable","description":"stable desc"}`)
@@ -873,7 +909,7 @@ func TestItemHandlerUpdate(t *testing.T) {
 
 func TestItemHandlerDelete(t *testing.T) {
 	t.Run("missing id returns 404 TypeNotFound", func(t *testing.T) {
-		h := ItemHandler{Repo: item.NewMemoryStore(), Logger: discardLogger()}
+		h := ItemHandler{Service: item.NewMemoryStore(), Logger: discardLogger()}
 		req := httptest.NewRequest(http.MethodDelete, "/api/v1/items/no-such-item", nil)
 		ctx := contract.WithRequestContext(req.Context(), contract.RequestContext{
 			Params: map[string]string{"id": "no-such-item"},
@@ -888,7 +924,7 @@ func TestItemHandlerDelete(t *testing.T) {
 	t.Run("existing id returns 204 no content", func(t *testing.T) {
 		store := item.NewMemoryStore()
 		created := mustCreateItem(t, store, "gadget", "a gadget")
-		h := ItemHandler{Repo: store, Logger: discardLogger()}
+		h := ItemHandler{Service: store, Logger: discardLogger()}
 
 		req := httptest.NewRequest(http.MethodDelete, "/api/v1/items/"+created.ID, nil)
 		ctx := contract.WithRequestContext(req.Context(), contract.RequestContext{
@@ -907,7 +943,7 @@ func TestItemHandlerDelete(t *testing.T) {
 	t.Run("second delete of same id returns 404", func(t *testing.T) {
 		store := item.NewMemoryStore()
 		created := mustCreateItem(t, store, "gadget", "a gadget")
-		h := ItemHandler{Repo: store, Logger: discardLogger()}
+		h := ItemHandler{Service: store, Logger: discardLogger()}
 
 		// First delete succeeds.
 		req := httptest.NewRequest(http.MethodDelete, "/api/v1/items/"+created.ID, nil)
@@ -933,7 +969,7 @@ func TestItemHandlerPatch(t *testing.T) {
 	t.Run("patch name only returns 200 with name updated and description unchanged", func(t *testing.T) {
 		store := item.NewMemoryStore()
 		created := mustCreateItem(t, store, "original", "original desc")
-		h := ItemHandler{Repo: store, Logger: discardLogger()}
+		h := ItemHandler{Service: store, Logger: discardLogger()}
 
 		body := bytes.NewBufferString(`{"name":"renamed"}`)
 		req := httptest.NewRequest(http.MethodPatch, "/api/v1/items/"+created.ID, body)
@@ -957,7 +993,7 @@ func TestItemHandlerPatch(t *testing.T) {
 	t.Run("patch description only returns 200 with description updated and name unchanged", func(t *testing.T) {
 		store := item.NewMemoryStore()
 		created := mustCreateItem(t, store, "original", "original desc")
-		h := ItemHandler{Repo: store, Logger: discardLogger()}
+		h := ItemHandler{Service: store, Logger: discardLogger()}
 
 		body := bytes.NewBufferString(`{"description":"new desc"}`)
 		req := httptest.NewRequest(http.MethodPatch, "/api/v1/items/"+created.ID, body)
@@ -978,7 +1014,7 @@ func TestItemHandlerPatch(t *testing.T) {
 	t.Run("patch both fields returns 200 with both updated", func(t *testing.T) {
 		store := item.NewMemoryStore()
 		created := mustCreateItem(t, store, "original", "original desc")
-		h := ItemHandler{Repo: store, Logger: discardLogger()}
+		h := ItemHandler{Service: store, Logger: discardLogger()}
 
 		body := bytes.NewBufferString(`{"name":"renamed","description":"new desc"}`)
 		req := httptest.NewRequest(http.MethodPatch, "/api/v1/items/"+created.ID, body)
@@ -999,7 +1035,7 @@ func TestItemHandlerPatch(t *testing.T) {
 	t.Run("patch with no fields returns 400 TypeRequired", func(t *testing.T) {
 		store := item.NewMemoryStore()
 		created := mustCreateItem(t, store, "original", "original desc")
-		h := ItemHandler{Repo: store, Logger: discardLogger()}
+		h := ItemHandler{Service: store, Logger: discardLogger()}
 
 		body := bytes.NewBufferString(`{}`)
 		req := httptest.NewRequest(http.MethodPatch, "/api/v1/items/"+created.ID, body)
@@ -1017,7 +1053,7 @@ func TestItemHandlerPatch(t *testing.T) {
 	})
 
 	t.Run("patch missing id returns 404 TypeNotFound", func(t *testing.T) {
-		h := ItemHandler{Repo: item.NewMemoryStore(), Logger: discardLogger()}
+		h := ItemHandler{Service: item.NewMemoryStore(), Logger: discardLogger()}
 		body := bytes.NewBufferString(`{"name":"renamed"}`)
 		req := httptest.NewRequest(http.MethodPatch, "/api/v1/items/no-such-item", body)
 		ctx := contract.WithRequestContext(req.Context(), contract.RequestContext{
@@ -1033,7 +1069,7 @@ func TestItemHandlerPatch(t *testing.T) {
 	t.Run("empty body returns 400 TypeRequired with body_required code", func(t *testing.T) {
 		store := item.NewMemoryStore()
 		created := mustCreateItem(t, store, "original", "original desc")
-		h := ItemHandler{Repo: store, Logger: discardLogger()}
+		h := ItemHandler{Service: store, Logger: discardLogger()}
 
 		req := httptest.NewRequest(http.MethodPatch, "/api/v1/items/"+created.ID, http.NoBody)
 		ctx := contract.WithRequestContext(req.Context(), contract.RequestContext{
@@ -1052,7 +1088,7 @@ func TestItemHandlerPatch(t *testing.T) {
 	t.Run("invalid JSON returns 400 TypeBadRequest", func(t *testing.T) {
 		store := item.NewMemoryStore()
 		created := mustCreateItem(t, store, "original", "original desc")
-		h := ItemHandler{Repo: store, Logger: discardLogger()}
+		h := ItemHandler{Service: store, Logger: discardLogger()}
 
 		body := bytes.NewBufferString(`not-json`)
 		req := httptest.NewRequest(http.MethodPatch, "/api/v1/items/"+created.ID, body)
@@ -1077,7 +1113,7 @@ func TestItemHandlerPatch(t *testing.T) {
 		// This is a property of the merge semantics, not an HTTP guarantee.
 		store := item.NewMemoryStore()
 		created := mustCreateItem(t, store, "original", "original desc")
-		h := ItemHandler{Repo: store, Logger: discardLogger()}
+		h := ItemHandler{Service: store, Logger: discardLogger()}
 
 		for i := 0; i < 2; i++ {
 			body := bytes.NewBufferString(`{"name":"stable"}`)
