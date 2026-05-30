@@ -26,6 +26,7 @@ import (
 	"cloud-vault/internal/collection"
 	"cloud-vault/internal/config"
 	"cloud-vault/internal/database"
+	"cloud-vault/internal/diagnostics"
 	"cloud-vault/internal/document"
 	"cloud-vault/internal/importer"
 	"cloud-vault/internal/organize"
@@ -53,6 +54,7 @@ type App struct {
 	Auth           *auth.Handler
 	Backup         *backup.Handler
 	Update         *update.Handler
+	Diagnostics    *diagnostics.Handler
 	updateService  *update.Service
 	authService    *auth.Service
 	authMiddleware func(http.Handler) http.Handler
@@ -234,6 +236,11 @@ func New(cfg config.Config) (*App, error) {
 	updateSvc := update.NewService(updateChecker, updateSvcConfig, app.Logger())
 	updateHandler := update.NewHandler(updateSvc, app.Logger())
 
+	// Diagnostics handler (V1.0).
+	diagnosticsDir := filepath.Join(filepath.Dir(cfg.DB.Path), "diagnostics")
+	diagnosticsSvc := diagnostics.NewService(cfg, db, store, diagnosticsDir)
+	diagnosticsHandler := diagnostics.NewHandler(diagnosticsSvc, app.Logger())
+
 	return &App{
 		Core:           app,
 		Cfg:            cfg,
@@ -249,6 +256,7 @@ func New(cfg config.Config) (*App, error) {
 		Auth:           authHandler,
 		Backup:         backupHandler,
 		Update:         updateHandler,
+		Diagnostics:    diagnosticsHandler,
 		updateService:  updateSvc,
 		authService:    authService,
 		authMiddleware: authMiddleware,

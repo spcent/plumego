@@ -40,7 +40,7 @@ func (h *Handler) GenerateBundle(w http.ResponseWriter, r *http.Request) {
 // DownloadBundle handles GET /api/v1/diagnostics/download/{filename}
 // It streams the diagnostic bundle zip file to the client.
 func (h *Handler) DownloadBundle(w http.ResponseWriter, r *http.Request) {
-	filename := r.PathValue("filename")
+	filename := r.PathValue("name")
 	if filename == "" {
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeInvalidRequest).

@@ -137,6 +137,11 @@ func (a *App) RegisterRoutes() error {
 	v1.post("/system/update/check", a.requireAuth(http.HandlerFunc(a.Update.CheckNow)))
 	v1.post("/system/update/config", a.requireAuth(http.HandlerFunc(a.Update.SetEnabled)))
 
+	// V1.0: Diagnostics export (protected).
+	v1.post("/system/diagnostics/export", a.requireAuth(http.HandlerFunc(a.Diagnostics.GenerateBundle)))
+	v1.get("/system/diagnostics", a.requireAuth(http.HandlerFunc(a.Diagnostics.ListBundles)))
+	v1.get("/system/diagnostics/:name/download", a.requireAuth(http.HandlerFunc(a.Diagnostics.DownloadBundle)))
+
 	// V0.8: Backup and restore endpoints (protected).
 	v1.post("/system/backup", a.requireAuth(http.HandlerFunc(a.Backup.CreateBackup)))
 	v1.get("/system/backups", a.requireAuth(http.HandlerFunc(a.Backup.ListBackups)))

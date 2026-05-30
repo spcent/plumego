@@ -18,7 +18,7 @@ server-build:
 
 # Build the Go server binary with V1.0 version injection
 server-build-v1:
-	go build -ldflags "-X main.version=1.0.0 -X main.commit=$(shell git rev-parse --short HEAD) -X main.buildTime=$(shell date -u +%Y-%m-%dT%H:%M:%SZ)" -o bin/markdown-vault ./cmd/server
+	go build -ldflags "-X cloud-vault/internal/version.Version=1.0.0 -X cloud-vault/internal/version.Commit=$(shell git rev-parse --short HEAD) -X cloud-vault/internal/version.BuildTime=$(shell date -u +%Y-%m-%dT%H:%M:%SZ) -X cloud-vault/internal/version.Channel=stable" -o bin/markdown-vault ./cmd/server
 
 # Run the desktop app in dev mode (hot reload)
 desktop-dev:
