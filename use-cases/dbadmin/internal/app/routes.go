@@ -58,10 +58,11 @@ func (a *App) RegisterRoutes() error {
 		Logger:      a.Core.Logger(),
 	}
 	queryH := handler.QueryHandler{
-		Connections: a.ConnectionStore,
-		Manager:     a.DBManager,
-		History:     a.HistoryStore,
-		Logger:      a.Core.Logger(),
+		Connections:         a.ConnectionStore,
+		Manager:             a.DBManager,
+		History:             a.HistoryStore,
+		Logger:              a.Core.Logger(),
+		QueryTimeoutSeconds: a.Cfg.App.QueryTimeoutSeconds,
 	}
 	rowH := handler.RowHandler{
 		Connections: a.ConnectionStore,

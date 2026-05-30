@@ -32,6 +32,10 @@ type AppConfig struct {
 	// EncryptionKey is a 32-byte hex-encoded AES-GCM key for encrypting connection passwords.
 	EncryptionKey string
 	Version       string
+	// QueryTimeoutSeconds is the maximum execution time for SQL queries (default: 30).
+	QueryTimeoutSeconds int
+	// QueryCancelEnabled enables query cancellation support (default: true).
+	QueryCancelEnabled bool
 }
 
 // Defaults returns safe configuration values for local development.
@@ -41,14 +45,16 @@ func Defaults() Config {
 	return Config{
 		Core: coreCfg,
 		App: AppConfig{
-			EnvFile:        ".env",
-			ServiceName:    "dbadmin",
-			MaxBodyBytes:   512 << 20, // 512 MiB (accommodates large SQLite uploads)
-			MaxUploadBytes: 512 << 20, // 512 MiB per SQLite file
-			DataDir:        "./data",
-			AdminUser:      "admin",
-			AdminPassword:  "admin",
-			Version:        "dev",
+			EnvFile:             ".env",
+			ServiceName:         "dbadmin",
+			MaxBodyBytes:        512 << 20, // 512 MiB (accommodates large SQLite uploads)
+			MaxUploadBytes:      512 << 20, // 512 MiB per SQLite file
+			DataDir:             "./data",
+			AdminUser:           "admin",
+			AdminPassword:       "admin",
+			Version:             "dev",
+			QueryTimeoutSeconds: 30,
+			QueryCancelEnabled:  true,
 		},
 	}
 }
@@ -111,6 +117,13 @@ func applyEnv(cfg *Config, lookupEnv func(string) (string, bool)) {
 			}
 		}
 	}
+	intf := func(key string, dest *int) {
+		if val, ok := lookupEnv(key); ok {
+			if n, err := strconv.Atoi(strings.TrimSpace(val)); err == nil {
+				*dest = n
+			}
+		}
+	}
 	boolf := func(key string, dest *bool) {
 		if val, ok := lookupEnv(key); ok {
 			if b, err := strconv.ParseBool(strings.TrimSpace(val)); err == nil {
@@ -130,6 +143,8 @@ func applyEnv(cfg *Config, lookupEnv func(string) (string, bool)) {
 	str("DBADMIN_USER", &cfg.App.AdminUser)
 	str("DBADMIN_PASSWORD", &cfg.App.AdminPassword)
 	str("DBADMIN_ENCRYPTION_KEY", &cfg.App.EncryptionKey)
+	intf("DBADMIN_QUERY_TIMEOUT_SECONDS", &cfg.App.QueryTimeoutSeconds)
+	boolf("DBADMIN_QUERY_CANCEL_ENABLED", &cfg.App.QueryCancelEnabled)
 }
 
 func applyEnvMap(cfg *Config, values map[string]string) {
