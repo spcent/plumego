@@ -76,6 +76,7 @@ func (a *App) RegisterRoutes() error {
 		Manager:      a.DBManager,
 		RedisManager: a.RedisManager,
 		MongoManager: a.MongoManager,
+		ESManager:    a.ESManager,
 		Logger:       a.Core.Logger(),
 	}
 	resourceH := handler.ResourceHandler{
@@ -83,6 +84,7 @@ func (a *App) RegisterRoutes() error {
 		SQLAdapter:   a.SQLAdapter,
 		RedisAdapter: a.RedisAdapter,
 		MongoAdapter: a.MongoAdapter,
+		ESAdapter:    a.ESAdapter,
 		Logger:       a.Core.Logger(),
 	}
 	redisH := handler.RedisHandler{
@@ -102,6 +104,12 @@ func (a *App) RegisterRoutes() error {
 		MongoManager: a.MongoManager,
 		History:      a.MongoHistoryStore,
 		Logger:       a.Core.Logger(),
+	}
+	esH := handler.ElasticsearchHandler{
+		Connections: a.ConnectionStore,
+		ESManager:   a.ESManager,
+		History:     a.ESHistoryStore,
+		Logger:      a.Core.Logger(),
 	}
 
 	// Protected routes — all require a valid session cookie.
@@ -192,6 +200,18 @@ func (a *App) RegisterRoutes() error {
 	protected.get("/api/connections/:id/mongo/history", guard(http.HandlerFunc(mongoH.ListHistory)))
 	protected.delete("/api/connections/:id/mongo/history/:entryId", guard(http.HandlerFunc(mongoH.DeleteHistoryEntry)))
 	protected.delete("/api/connections/:id/mongo/history", guard(http.HandlerFunc(mongoH.ClearHistory)))
+
+	// Elasticsearch operations — ES-specific route group.
+	protected.get("/api/connections/:id/es/info", guard(http.HandlerFunc(esH.ClusterInfo)))
+	protected.get("/api/connections/:id/es/indices", guard(http.HandlerFunc(esH.ListIndices)))
+	protected.get("/api/connections/:id/es/index/mapping", guard(http.HandlerFunc(esH.GetMapping)))
+	protected.get("/api/connections/:id/es/index/settings", guard(http.HandlerFunc(esH.GetSettings)))
+	protected.post("/api/connections/:id/es/search", guard(http.HandlerFunc(esH.Search)))
+	protected.get("/api/connections/:id/es/document", guard(http.HandlerFunc(esH.GetDocument)))
+	protected.delete("/api/connections/:id/es/document", guard(http.HandlerFunc(esH.DeleteDocument)))
+	protected.get("/api/connections/:id/es/history", guard(http.HandlerFunc(esH.ListHistory)))
+	protected.delete("/api/connections/:id/es/history/:entryId", guard(http.HandlerFunc(esH.DeleteHistoryEntry)))
+	protected.delete("/api/connections/:id/es/history", guard(http.HandlerFunc(esH.ClearHistory)))
 	if protected.err != nil {
 		return protected.err
 	}

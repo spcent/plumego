@@ -18,7 +18,7 @@ import (
 	"github.com/spcent/plumego/middleware/httpmetrics"
 	"github.com/spcent/plumego/middleware/recovery"
 	"github.com/spcent/plumego/middleware/requestid"
-	midsecurity "github.com/spcent/plumego/middleware/security"
+	midsecurity "github.com/spcent/plumego/middleware/securityheaders"
 	"github.com/spcent/plumego/middleware/timeout"
 	kvstore "github.com/spcent/plumego/store/kv"
 
@@ -26,6 +26,7 @@ import (
 	"dbadmin/internal/datasource"
 	"dbadmin/internal/dbmanager"
 	"dbadmin/internal/domain/connection"
+	"dbadmin/internal/domain/eshistory"
 	"dbadmin/internal/domain/history"
 	"dbadmin/internal/domain/mongohistory"
 	"dbadmin/internal/domain/session"
@@ -42,6 +43,7 @@ type App struct {
 	ConnectionStore   *connection.Store
 	HistoryStore      *history.Store
 	MongoHistoryStore *mongohistory.Store
+	ESHistoryStore    *eshistory.Store
 	DBManager         *dbmanager.Manager
 	RedisManager      *redismanager.Manager
 	MongoManager      *mongomanager.Manager
@@ -90,6 +92,13 @@ func New(cfg config.Config) (*App, error) {
 		return nil, fmt.Errorf("create mongo history KV store: %w", err)
 	}
 
+	esHistKV, err := kvstore.NewKVStore(kvstore.Options{
+		DataDir: cfg.App.DataDir + "/es-history",
+	})
+	if err != nil {
+		return nil, fmt.Errorf("create ES history KV store: %w", err)
+	}
+
 	securityMw, err := midsecurity.Middleware(midsecurity.Config{})
 	if err != nil {
 		return nil, fmt.Errorf("configure security headers middleware: %w", err)
@@ -136,6 +145,7 @@ func New(cfg config.Config) (*App, error) {
 		ConnectionStore:   connStore,
 		HistoryStore:      history.NewStore(histKV),
 		MongoHistoryStore: mongohistory.NewStore(mongoHistKV),
+		ESHistoryStore:    eshistory.NewStore(esHistKV),
 		DBManager:         mgr,
 		RedisManager:      redisMgr,
 		MongoManager:      mongoMgr,

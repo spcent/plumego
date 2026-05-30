@@ -4,8 +4,17 @@ import { useI18n } from '../i18n'
 import { useCurrentConn } from './MainLayout'
 import { api, type RedisKeyEntry, type RedisKeyDetail } from '../api'
 import { useToast } from '../components/Toast'
+import WorkbenchHeader from '../components/WorkbenchHeader'
+import ConfirmDialog from '../components/ConfirmDialog'
+import { useRedisHistory } from '../hooks/useRedisHistory'
 
-type ViewMode = 'inspector' | 'command'
+interface ConfirmState {
+  title: string
+  message: string
+  onConfirm: () => void
+}
+
+type ViewMode = 'inspector' | 'command' | 'history'
 
 // Pattern favorites stored in localStorage
 interface PatternFavorite {
@@ -57,6 +66,12 @@ export default function RedisKeyPanel() {
   const [showFavorites, setShowFavorites] = useState(false)
   const [newFavoriteName, setNewFavoriteName] = useState('')
 
+  // Command history
+  const redisHistory = useRedisHistory()
+
+  // Confirm dialog state
+  const [confirmState, setConfirmState] = useState<ConfirmState | null>(null)
+
   const isReadonly = conn?.readonly ?? false
 
   // Load keys
@@ -100,17 +115,23 @@ export default function RedisKeyPanel() {
   }, [connId, dbIndex, toast])
 
   // Delete key
-  const handleDelete = useCallback(async (key: string) => {
+  const handleDelete = useCallback((key: string) => {
     if (!connId || isReadonly) return
-    if (!window.confirm(t('redis.key.delete_confirm', { key }))) return
-    try {
-      await api.redisDeleteKey(connId, dbIndex, key)
-      setKeys(prev => prev.filter(k => k.key !== key))
-      if (selectedKey?.key === key) setSelectedKey(null)
-      toast.showToast('Key deleted', 'success')
-    } catch (err: any) {
-      toast.showToast(err.message || 'Failed to delete key', 'error')
-    }
+    setConfirmState({
+      title: t('redis.key.delete'),
+      message: t('redis.key.delete_confirm', { key }),
+      onConfirm: async () => {
+        try {
+          await api.redisDeleteKey(connId, dbIndex, key)
+          setKeys(prev => prev.filter(k => k.key !== key))
+          if (selectedKey?.key === key) setSelectedKey(null)
+          toast.showToast('Key deleted', 'success')
+        } catch (err: any) {
+          toast.showToast(err.message || 'Failed to delete key', 'error')
+        }
+        setConfirmState(null)
+      },
+    })
   }, [connId, dbIndex, isReadonly, selectedKey, t, toast])
 
   // Set TTL
@@ -129,19 +150,32 @@ export default function RedisKeyPanel() {
   const handleCommand = useCallback(async () => {
     if (!connId || !commandInput.trim()) return
     setCommandRunning(true)
+    const startTime = Date.now()
     try {
       const resp = await api.redisCommand(connId, dbIndex, commandInput.trim())
       setCommandResult(resp)
+      // Record successful command
+      redisHistory.addEntry({
+        command: commandInput.trim(),
+        duration_ms: Date.now() - startTime,
+        success: true,
+      })
       // Refresh key list after write commands
       if (!isReadonly && /^(SET|DEL|EXPIRE|PERSIST|HSET|LPUSH|SADD|ZADD)/i.test(commandInput)) {
         await loadKeys(true)
       }
     } catch (err: any) {
       setCommandResult({ error: err.message })
+      // Record failed command
+      redisHistory.addEntry({
+        command: commandInput.trim(),
+        duration_ms: Date.now() - startTime,
+        success: false,
+      })
     } finally {
       setCommandRunning(false)
     }
-  }, [connId, dbIndex, commandInput, isReadonly, loadKeys])
+  }, [connId, dbIndex, commandInput, isReadonly, loadKeys, redisHistory])
 
   // Batch delete handlers
   const handleBatchPreview = useCallback(async () => {
@@ -155,23 +189,28 @@ export default function RedisKeyPanel() {
     }
   }, [connId, dbIndex, pattern, toast])
 
-  const handleBatchDelete = useCallback(async () => {
+  const handleBatchDelete = useCallback(() => {
     if (!connId || isReadonly || previewKeys.length === 0) return
     const count = previewKeys.length
-    if (!window.confirm(t('redis.batch.confirm_delete', { n: count }))) return
-
-    try {
-      const keysToDelete = previewKeys.map(k => k.key)
-      await api.redisBatchDelete(connId, dbIndex, keysToDelete, true)
-      toast.showToast(t('redis.batch.deleted', { n: count }), 'success')
-      setSelectedKeys(new Set())
-      setBatchMode(false)
-      setShowBatchPreview(false)
-      setPreviewKeys([])
-      await loadKeys(true)
-    } catch (err: any) {
-      toast.showToast(err.message || 'Failed to delete keys', 'error')
-    }
+    setConfirmState({
+      title: t('danger.batch_delete'),
+      message: t('redis.batch.confirm_delete', { n: count }),
+      onConfirm: async () => {
+        try {
+          const keysToDelete = previewKeys.map(k => k.key)
+          await api.redisBatchDelete(connId, dbIndex, keysToDelete, true)
+          toast.showToast(t('redis.batch.deleted', { n: count }), 'success')
+          setSelectedKeys(new Set())
+          setBatchMode(false)
+          setShowBatchPreview(false)
+          setPreviewKeys([])
+          await loadKeys(true)
+        } catch (err: any) {
+          toast.showToast(err.message || 'Failed to delete keys', 'error')
+        }
+        setConfirmState(null)
+      },
+    })
   }, [connId, dbIndex, previewKeys, isReadonly, loadKeys, t, toast])
 
   const toggleKeySelection = (key: string) => {
@@ -237,25 +276,13 @@ export default function RedisKeyPanel() {
 
   return (
     <div className="h-full flex flex-col">
-      {/* Header */}
-      <div className="px-4 py-3 border-b flex items-center gap-3" style={{ borderColor: 'var(--border-subtle)' }}>
-        <span className="text-lg font-mono" style={{ color: '#f87171' }}>⚡</span>
-        <h2 className="text-base font-semibold" style={{ color: 'var(--text-strong)' }}>
-          {t('redis.browser.db', { n: dbIndex })}
-        </h2>
-        {conn && (
-          <span className="text-xs font-mono px-2 py-0.5 rounded"
-            style={{ background: 'var(--bg-muted)', color: 'var(--text-muted)' }}>
-            {conn.name}
-          </span>
-        )}
-        {isReadonly && (
-          <span className="text-xs px-2 py-0.5 rounded"
-            style={{ background: 'var(--warning)18', color: 'var(--warning)', border: '1px solid var(--warning)44' }}>
-            {t('redis.readonly')}
-          </span>
-        )}
-      </div>
+      <WorkbenchHeader
+        connectionName={conn?.name}
+        resourcePath={[t('redis.browser.db', { n: dbIndex })]}
+        datasourceType="redis"
+        readonly={isReadonly}
+        onRefresh={() => loadKeys(true)}
+      />
 
       {/* Main content */}
       <div className="flex-1 flex overflow-hidden">
@@ -526,6 +553,16 @@ export default function RedisKeyPanel() {
             >
               {t('redis.command.title')}
             </button>
+            <button
+              onClick={() => setViewMode('history')}
+              className="px-4 py-2 text-sm font-medium border-b-2"
+              style={{
+                color: viewMode === 'history' ? 'var(--accent)' : 'var(--text-muted)',
+                borderColor: viewMode === 'history' ? 'var(--accent)' : 'transparent',
+              }}
+            >
+              {t('redis.history.title')}
+            </button>
           </div>
 
           {/* Content */}
@@ -545,7 +582,7 @@ export default function RedisKeyPanel() {
                   {t('redis.key.not_found')}
                 </div>
               )
-            ) : (
+            ) : viewMode === 'command' ? (
               <CommandConsole
                 input={commandInput}
                 onInputChange={setCommandInput}
@@ -555,6 +592,54 @@ export default function RedisKeyPanel() {
                 isReadonly={isReadonly}
                 t={t}
               />
+            ) : (
+              <div className="space-y-2">
+                {redisHistory.entries.length > 0 && (
+                  <div className="flex justify-end mb-2">
+                    <button
+                      onClick={() => redisHistory.clearHistory()}
+                      className="text-xs px-2 py-1"
+                      style={{ color: 'var(--text-subtle)' }}
+                    >{t('redis.history.clear_all')}</button>
+                  </div>
+                )}
+                {redisHistory.entries.length === 0 && (
+                  <div className="text-center py-6 text-sm" style={{ color: 'var(--text-muted)' }}>
+                    {t('redis.history.empty')}
+                  </div>
+                )}
+                {redisHistory.entries.map(h => (
+                  <div
+                    key={h.id}
+                    className="group relative p-3 rounded border cursor-pointer hover:bg-opacity-50"
+                    style={{ borderColor: 'var(--border-subtle)' }}
+                    onClick={() => {
+                      setCommandInput(h.command)
+                      setViewMode('command')
+                    }}
+                  >
+                    <div className="flex items-center justify-between mb-0.5">
+                      <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                        {new Date(h.created_at).toLocaleString()}
+                      </span>
+                      <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{h.duration_ms}ms</span>
+                    </div>
+                    <pre className="text-xs font-mono truncate" style={{ color: 'var(--text-default)' }}>{h.command}</pre>
+                    {!h.success && (
+                      <div className="text-xs mt-0.5" style={{ color: 'var(--danger)' }}>✗ Failed</div>
+                    )}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        redisHistory.removeEntry(h.id)
+                      }}
+                      className="absolute top-2 right-2 text-xs px-1 opacity-0 group-hover:opacity-100"
+                      style={{ color: 'var(--text-muted)' }}
+                      title={t('redis.history.delete')}
+                    >×</button>
+                  </div>
+                ))}
+              </div>
             )}
           </div>
         </div>
@@ -632,6 +717,15 @@ export default function RedisKeyPanel() {
           </div>
         </div>
       )}
+
+      {/* Confirm dialog */}
+      <ConfirmDialog
+        open={confirmState !== null}
+        title={confirmState?.title || ''}
+        message={confirmState?.message || ''}
+        onConfirm={() => confirmState?.onConfirm()}
+        onCancel={() => setConfirmState(null)}
+      />
     </div>
   )
 }

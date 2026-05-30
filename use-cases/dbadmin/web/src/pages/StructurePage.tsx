@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { api, type TableStructure } from '../api'
+import WorkbenchHeader from '../components/WorkbenchHeader'
 import { useToast } from '../components/Toast'
 import { useI18n } from '../i18n'
+import { useCurrentConn } from './MainLayout'
 import { toMarkdownSchema, toJSONSchemaDesc } from '../utils/copyFormats'
 
 type TabKey = 'columns' | 'indexes' | 'fks' | 'ddl'
@@ -38,6 +40,7 @@ export default function StructurePage() {
   const [tab, setTab] = useState<TabKey>(initialTab)
   const { showToast } = useToast()
   const { t } = useI18n()
+  const currentConn = useCurrentConn(connId)
 
   useEffect(() => {
     if (!connId || !dbName || !tableName) return
@@ -80,6 +83,11 @@ export default function StructurePage() {
 
   return (
     <div className="flex flex-col h-full">
+      <WorkbenchHeader
+        connectionName={currentConn?.name}
+        resourcePath={dbName && tableName ? [dbName, tableName] : []}
+        datasourceType={currentConn?.driver ?? 'mysql'}
+      />
       {/* Header + tabs */}
       <div
         className="px-6 pt-5 pb-0 shrink-0"
