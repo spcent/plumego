@@ -2,9 +2,9 @@
 // repository, and service. The three files implement the canonical three-layer
 // structure described in docs/reference/canonical-style-guide.md §3:
 //
-//   item.go    — domain model (the Item type)
-//   store.go   — persistence layer (Repository interface and MemoryStore)
-//   service.go — business logic layer (Service interface and ItemService)
+//	item.go    — domain model (the Item type)
+//	store.go   — persistence layer (Repository interface and MemoryStore)
+//	service.go — business logic layer (Service interface and ItemService)
 package item
 
 import "time"
