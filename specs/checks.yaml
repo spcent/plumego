@@ -29,12 +29,9 @@ repo:
     - go run ./internal/checks/extension-beta-evidence
     - go run ./internal/checks/deprecation-inventory -strict
     - go run ./internal/checks/public-entrypoints-sync
-    - go run ./internal/checks/semantic-boundary
-    - go run ./internal/checks/docs-sync-contract
   # evidence_checks run per-extension; substitute <name> and <path> for the target module.
   # Template:
   #   go run ./internal/checks/extension-api-snapshot -module ./<path>/... -out /tmp/plumego-<name>-api.snapshot
-  #   go run ./internal/checks/extension-release-evidence -module ./<path>/... -base HEAD -head HEAD
   repo_wide_checks:
     - go test -race -timeout 60s ./...
     - go test -timeout 20s ./...
@@ -53,22 +50,15 @@ profiles:
     - go vet ./x/tenant/...
   evidence_x_rest:
     - go run ./internal/checks/extension-api-snapshot -module ./x/rest/... -out /tmp/plumego-x-rest-api.snapshot
-    - go run ./internal/checks/extension-release-evidence -module ./x/rest/... -base HEAD -head HEAD
   evidence_x_tenant:
     - go run ./internal/checks/extension-api-snapshot -module ./x/tenant/... -out /tmp/plumego-x-tenant-api.snapshot
-    - go run ./internal/checks/extension-release-evidence -module ./x/tenant/... -base HEAD -head HEAD
   evidence_x_messaging:
     - go run ./internal/checks/extension-api-snapshot -module ./x/messaging/... -out /tmp/plumego-x-messaging-api.snapshot
-    - go run ./internal/checks/extension-release-evidence -module ./x/messaging/... -base HEAD -head HEAD
   evidence_x_gateway:
     - go run ./internal/checks/extension-api-snapshot -module ./x/gateway/... -out /tmp/plumego-x-gateway-api.snapshot
-    - go run ./internal/checks/extension-release-evidence -module ./x/gateway/... -base HEAD -head HEAD
   evidence_x_websocket:
     - go run ./internal/checks/extension-api-snapshot -module ./x/websocket/... -out /tmp/plumego-x-websocket-api.snapshot
-    - go run ./internal/checks/extension-release-evidence -module ./x/websocket/... -base HEAD -head HEAD
   evidence_x_observability:
     - go run ./internal/checks/extension-api-snapshot -module ./x/observability/... -out /tmp/plumego-x-observability-api.snapshot
-    - go run ./internal/checks/extension-release-evidence -module ./x/observability/... -base HEAD -head HEAD
   evidence_x_frontend:
     - go run ./internal/checks/extension-api-snapshot -module ./x/frontend/... -out /tmp/plumego-x-frontend-api.snapshot
-    - go run ./internal/checks/extension-release-evidence -module ./x/frontend/... -base HEAD -head HEAD

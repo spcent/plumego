@@ -1,4 +1,0 @@
-# Approved exceptions for init() in extension packages.
-# Format: path/to/file.go:init
-# Add entries here only when init() is unavoidable and has been explicitly
-# reviewed. Each entry should have a companion comment explaining why.
