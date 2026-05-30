@@ -45,12 +45,24 @@ func New(cfg config.Config) (*App, error) {
 		return nil, fmt.Errorf("configure access log middleware: %w", err)
 	}
 	timeoutMw := timeout.Middleware(timeout.Config{Timeout: 30 * time.Second})
+	// Build CORS options from config. When CORSAllowedOrigins is set, use strict
+	// defaults that restrict cross-origin access to the enumerated origins. When
+	// empty (the default), CORSOptions{} allows all origins ("*") — safe for local
+	// development; always set APP_CORS_ALLOWED_ORIGINS in production.
+	var corsOpts cors.CORSOptions
+	if len(cfg.App.CORSAllowedOrigins) > 0 {
+		strictOpts, err := cors.StrictDefaultOptions(cfg.App.CORSAllowedOrigins...)
+		if err != nil {
+			return nil, fmt.Errorf("configure CORS middleware: %w", err)
+		}
+		corsOpts = strictOpts
+	}
+
 	// Middleware order — outermost to innermost (first registered runs first on inbound requests):
 	//   requestid  → stamps correlation ID before any logging or error handling
 	//   security   → security headers (X-Frame-Options, X-Content-Type-Options, …) on all responses
-	//   cors       → CORS preflight and headers; CORSOptions{} defaults AllowedOrigins to ["*"]
-	//               (allow all origins) — replace with cors.StrictDefaultOptions(origins…) in
-	//               production to restrict cross-origin access to known domains
+	//   cors       → CORS preflight and headers; set APP_CORS_ALLOWED_ORIGINS to restrict
+	//               cross-origin access to known domains in production (see env.example)
 	//   recovery   → converts panics to 500 responses; inside cors/security so headers still apply
 	//   accesslog  → logs every request/response; after recovery so panics appear as 500
 	//   bodylimit  → rejects oversized bodies with 413; after accesslog so the 413 is logged
@@ -65,7 +77,7 @@ func New(cfg config.Config) (*App, error) {
 	if err := app.Use(
 		requestid.Middleware(),
 		securityMw,
-		cors.Middleware(cors.CORSOptions{}),
+		cors.Middleware(corsOpts),
 		recoveryMw,
 		accesslogMw,
 		bodylimit.Middleware(bodylimit.Config{

@@ -47,14 +47,12 @@ func TestRegisterRoutesCanonicalShape(t *testing.T) {
 }
 
 // TestHelloEndpointListMatchesRegisteredRoutes is a drift-detection test.
-// It validates that the explicit endpoint list in handler.APIHandler.Hello
-// contains exactly the same Method+Path pairs as the routes registered in
-// RegisterRoutes. When you add a route in routes.go you must also add it to
-// the Endpoints slice in handler/api.go Hello — this test will fail if you forget.
+// It validates that the explicit endpoint list in handler.APIHandler.Hello:
+//  1. Contains exactly the same Method+Path pairs as the routes registered in RegisterRoutes.
+//  2. Has a non-empty Name and non-empty Description for every entry.
 //
-// Coverage note: this test enforces Method+Path parity only. The Name and
-// Description fields in the endpoint list are documentation-oriented and are
-// not verified here; update them manually when route semantics change.
+// When you add a route in routes.go you must also add it to the Endpoints slice in
+// handler/api.go Hello — this test will fail if you forget.
 func TestHelloEndpointListMatchesRegisteredRoutes(t *testing.T) {
 	a, err := New(config.Defaults())
 	if err != nil {
@@ -80,8 +78,10 @@ func TestHelloEndpointListMatchesRegisteredRoutes(t *testing.T) {
 	var env struct {
 		Data struct {
 			Endpoints []struct {
-				Method string `json:"method"`
-				Path   string `json:"path"`
+				Name        string `json:"name"`
+				Method      string `json:"method"`
+				Path        string `json:"path"`
+				Description string `json:"description"`
 			} `json:"endpoints"`
 		} `json:"data"`
 	}
@@ -114,6 +114,18 @@ func TestHelloEndpointListMatchesRegisteredRoutes(t *testing.T) {
 		key := methodPath{ep.Method, ep.Path}
 		if !registeredSet[key] {
 			t.Errorf("GET /api/hello lists %s %s which is not a registered route", ep.Method, ep.Path)
+		}
+	}
+
+	// Every entry must have a non-empty Name and Description so the endpoint list
+	// is useful for service discovery and documentation. Update them in handler/api.go
+	// when route semantics change.
+	for i, ep := range env.Data.Endpoints {
+		if ep.Name == "" {
+			t.Errorf("endpoint[%d] (%s %s): Name is empty — add a stable machine-readable name in handler/api.go Hello", i, ep.Method, ep.Path)
+		}
+		if ep.Description == "" {
+			t.Errorf("endpoint[%d] (%s %s): Description is empty — add a human-readable description in handler/api.go Hello", i, ep.Method, ep.Path)
 		}
 	}
 }

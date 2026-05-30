@@ -25,7 +25,7 @@ Open this page after [x/* Family](/docs/x-family) when the change is about share
 
 - the resilience work is specific to AI provider calls — that belongs in `x/ai/resilience`
 - the change is about per-tenant rate limits with `Retry-After` budget headers — that belongs in `x/tenant/ratelimit`
-- the work is a transport-only timeout or rate limit middleware for inbound HTTP — start from `middleware/ratelimit` or `middleware/timeout`
+- the work is a transport-only timeout or rate limit middleware for inbound HTTP — start from `x/resilience/ratelimit` or `middleware/timeout`
 - the change requires stable security, store, or core knowledge
 
 ## First files to read in the current repository
@@ -39,7 +39,7 @@ Open this page after [x/* Family](/docs/x-family) when the change is about share
 | Keep it in `x/resilience` when the work is about | Move out when the work becomes |
 | --- | --- |
 | `circuitbreaker`: shared breaker state, threshold configuration, half-open probing | feature-specific breaker tuning baked into a single extension's provider calls |
-| `ratelimit`: reusable rate limit adapters that wrap outbound calls | inbound HTTP rate limiting at the transport layer — that belongs in `middleware/ratelimit` |
+| `ratelimit`: reusable rate limit adapters that wrap outbound calls | inbound HTTP rate limiting at the transport layer — that belongs in `x/resilience/ratelimit` |
 | shared retry wrappers consumed by multiple extension families | per-call retry logic inside a specific provider adapter (`x/ai`, `x/gateway`) |
 | generic timeout wrappers not tied to a single extension | per-tenant quota enforcement with budget headers — use `x/tenant/ratelimit` |
 

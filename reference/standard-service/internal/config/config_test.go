@@ -226,6 +226,65 @@ func TestWriteKeyClearableByEmptyEnv(t *testing.T) {
 	}
 }
 
+func TestLoadEnvCORSAllowedOrigins(t *testing.T) {
+	t.Run("comma-separated origins are split and trimmed", func(t *testing.T) {
+		cfg, err := load(
+			[]string{"standard-service"},
+			mapLookup(map[string]string{
+				"APP_CORS_ALLOWED_ORIGINS": "https://app.example.com, https://admin.example.com",
+			}),
+		)
+		if err != nil {
+			t.Fatalf("load config: %v", err)
+		}
+		if len(cfg.App.CORSAllowedOrigins) != 2 {
+			t.Fatalf("CORSAllowedOrigins = %v, want 2 entries", cfg.App.CORSAllowedOrigins)
+		}
+		if cfg.App.CORSAllowedOrigins[0] != "https://app.example.com" {
+			t.Fatalf("CORSAllowedOrigins[0] = %q, want %q", cfg.App.CORSAllowedOrigins[0], "https://app.example.com")
+		}
+		if cfg.App.CORSAllowedOrigins[1] != "https://admin.example.com" {
+			t.Fatalf("CORSAllowedOrigins[1] = %q, want %q", cfg.App.CORSAllowedOrigins[1], "https://admin.example.com")
+		}
+	})
+
+	t.Run("empty value leaves CORSAllowedOrigins nil (allow all default)", func(t *testing.T) {
+		cfg, err := load(
+			[]string{"standard-service"},
+			mapLookup(map[string]string{"APP_CORS_ALLOWED_ORIGINS": ""}),
+		)
+		if err != nil {
+			t.Fatalf("load config: %v", err)
+		}
+		if cfg.App.CORSAllowedOrigins != nil {
+			t.Fatalf("CORSAllowedOrigins = %v, want nil when env is empty", cfg.App.CORSAllowedOrigins)
+		}
+	})
+
+	t.Run("absent variable leaves CORSAllowedOrigins nil (allow all default)", func(t *testing.T) {
+		cfg, err := load([]string{"standard-service"}, mapLookup(nil))
+		if err != nil {
+			t.Fatalf("load config: %v", err)
+		}
+		if cfg.App.CORSAllowedOrigins != nil {
+			t.Fatalf("CORSAllowedOrigins = %v, want nil when var is absent", cfg.App.CORSAllowedOrigins)
+		}
+	})
+
+	t.Run("single origin without comma", func(t *testing.T) {
+		cfg, err := load(
+			[]string{"standard-service"},
+			mapLookup(map[string]string{"APP_CORS_ALLOWED_ORIGINS": "https://app.example.com"}),
+		)
+		if err != nil {
+			t.Fatalf("load config: %v", err)
+		}
+		if len(cfg.App.CORSAllowedOrigins) != 1 || cfg.App.CORSAllowedOrigins[0] != "https://app.example.com" {
+			t.Fatalf("CORSAllowedOrigins = %v, want [https://app.example.com]", cfg.App.CORSAllowedOrigins)
+		}
+	})
+}
+
 func mapLookup(values map[string]string) func(string) (string, bool) {
 	return func(key string) (string, bool) {
 		value, ok := values[key]

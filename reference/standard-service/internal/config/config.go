@@ -22,11 +22,12 @@ type Config struct {
 // AppConfig holds app-local, non-kernel configuration.
 // Add application-specific fields here; keep framework/kernel config in Config.Core.
 type AppConfig struct {
-	EnvFile      string
-	ServiceName  string // APP_SERVICE_NAME; used as the service identity in health and API responses.
-	MaxBodyBytes int64  // APP_MAX_BODY_BYTES; maximum request body size. 0 disables the limit.
-	WriteKey     string // APP_WRITE_KEY; when non-empty, POST/PUT/DELETE /api/v1/items require X-Write-Key header. Empty disables the guard.
-	Version      string // Build version injected via -ldflags "-X main.version=…" in main.go; defaults to "dev".
+	EnvFile            string
+	ServiceName        string   // APP_SERVICE_NAME; used as the service identity in health and API responses.
+	MaxBodyBytes       int64    // APP_MAX_BODY_BYTES; maximum request body size. 0 disables the limit.
+	WriteKey           string   // APP_WRITE_KEY; when non-empty, POST/PUT/DELETE /api/v1/items require X-Write-Key header. Empty disables the guard.
+	Version            string   // Build version injected via -ldflags "-X main.version=…" in main.go; defaults to "dev".
+	CORSAllowedOrigins []string // APP_CORS_ALLOWED_ORIGINS; comma-separated list of allowed origins. Empty defaults to ["*"] (allow all). Always restrict in production.
 }
 
 // Defaults returns safe configuration values for local development.
@@ -136,6 +137,23 @@ func applyEnv(cfg *Config, lookupEnv func(string) (string, bool)) {
 	boolf("APP_TLS_ENABLED", &cfg.Core.TLS.Enabled)
 	str("APP_TLS_CERT_FILE", &cfg.Core.TLS.CertFile)
 	str("APP_TLS_KEY_FILE", &cfg.Core.TLS.KeyFile)
+	// APP_CORS_ALLOWED_ORIGINS: comma-separated list of allowed origins.
+	// Example: "https://app.example.com,https://admin.example.com"
+	// Empty or absent keeps the default permissive ["*"] behaviour.
+	if val, ok := lookupEnv("APP_CORS_ALLOWED_ORIGINS"); ok {
+		if v := strings.TrimSpace(val); v != "" {
+			parts := strings.Split(v, ",")
+			origins := make([]string, 0, len(parts))
+			for _, p := range parts {
+				if s := strings.TrimSpace(p); s != "" {
+					origins = append(origins, s)
+				}
+			}
+			if len(origins) > 0 {
+				cfg.App.CORSAllowedOrigins = origins
+			}
+		}
+	}
 }
 
 // applyEnvMap applies a pre-parsed key-value map (e.g., from a .env file) to cfg.

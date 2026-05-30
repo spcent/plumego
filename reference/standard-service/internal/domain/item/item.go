@@ -38,14 +38,14 @@ func NewMemoryStore() *MemoryStore {
 }
 
 // Create stores an item with the provided name and description and returns the new item.
-// Returns Item{} immediately when ctx is already cancelled so handlers can detect
-// deadline expiry without acquiring the store lock. In a real backend Create would
-// return (Item, error) and propagate ctx to the database call; the in-memory
-// signature omits the error return for simplicity, so callers distinguish
-// cancellation by checking ctx.Err() after the call when needed.
-func (s *MemoryStore) Create(ctx context.Context, name, description string) Item {
-	if ctx.Err() != nil {
-		return Item{}
+// Returns (Item{}, ctx.Err()) immediately when ctx is already cancelled so handlers
+// can detect deadline expiry without acquiring the store lock. Real storage backends
+// propagate ctx to the database call and return any storage error; the context error
+// path here mirrors that contract so callers are never surprised when the interface
+// implementation changes.
+func (s *MemoryStore) Create(ctx context.Context, name, description string) (Item, error) {
+	if err := ctx.Err(); err != nil {
+		return Item{}, err
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -58,7 +58,7 @@ func (s *MemoryStore) Create(ctx context.Context, name, description string) Item
 	}
 	s.items[item.ID] = item
 	s.ids = append(s.ids, item.ID)
-	return item
+	return item, nil
 }
 
 // Get returns an item by id.
@@ -75,58 +75,74 @@ func (s *MemoryStore) Get(ctx context.Context, id string) (Item, bool) {
 	return item, ok
 }
 
-// List returns all stored items in creation order.
-// Returns nil immediately when ctx is already cancelled so callers can detect
-// deadline expiry without acquiring the store lock.
-func (s *MemoryStore) List(ctx context.Context) []Item {
-	if ctx.Err() != nil {
-		return nil
+// List returns a paginated slice of items in creation order, the total item count,
+// and any error. offset is the zero-based index of the first item to return; limit
+// caps the number of items returned. An offset beyond the total returns an empty
+// slice; total is always the full count regardless of offset/limit. This signature
+// lets real storage backends issue a single LIMIT/OFFSET query rather than loading
+// every row into memory.
+// Returns (nil, 0, ctx.Err()) immediately when ctx is already cancelled.
+func (s *MemoryStore) List(ctx context.Context, offset, limit int) ([]Item, int, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, 0, err
 	}
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	result := make([]Item, 0, len(s.ids))
+	all := make([]Item, 0, len(s.ids))
 	for _, id := range s.ids {
-		result = append(result, s.items[id])
+		all = append(all, s.items[id])
 	}
-	return result
+	total := len(all)
+
+	start := offset
+	if start > len(all) {
+		start = len(all)
+	}
+	page := all[start:]
+	if len(page) > limit {
+		page = page[:limit]
+	}
+	return page, total, nil
 }
 
 // Update replaces the name and description of an existing item and returns the updated item.
 // CreatedAt and ID are immutable; all other fields are replaced by this operation.
-// Returns (Item{}, false) immediately when ctx is already cancelled.
-// It reports false when no item with that id exists.
-func (s *MemoryStore) Update(ctx context.Context, id, name, description string) (Item, bool) {
-	if ctx.Err() != nil {
-		return Item{}, false
+// Returns (Item{}, false, ctx.Err()) immediately when ctx is already cancelled.
+// Returns (Item{}, false, nil) when no item with that id exists; the boolean false
+// distinguishes "not found" from a storage error so callers can return 404 vs 500.
+func (s *MemoryStore) Update(ctx context.Context, id, name, description string) (Item, bool, error) {
+	if err := ctx.Err(); err != nil {
+		return Item{}, false, err
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	item, ok := s.items[id]
 	if !ok {
-		return Item{}, false
+		return Item{}, false, nil
 	}
 	item.Name = name
 	item.Description = description
 	s.items[item.ID] = item
-	return item, true
+	return item, true, nil
 }
 
 // Patch applies a partial update to an existing item and returns the result.
 // Only non-empty fields are replaced; empty string values leave the corresponding
 // field unchanged. ID and CreatedAt are always immutable.
-// It reports false when no item with that id exists or ctx is already cancelled.
-func (s *MemoryStore) Patch(ctx context.Context, id, name, description string) (Item, bool) {
-	if ctx.Err() != nil {
-		return Item{}, false
+// Returns (Item{}, false, ctx.Err()) immediately when ctx is already cancelled.
+// Returns (Item{}, false, nil) when no item with that id exists.
+func (s *MemoryStore) Patch(ctx context.Context, id, name, description string) (Item, bool, error) {
+	if err := ctx.Err(); err != nil {
+		return Item{}, false, err
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	item, ok := s.items[id]
 	if !ok {
-		return Item{}, false
+		return Item{}, false, nil
 	}
 	if name != "" {
 		item.Name = name
@@ -135,20 +151,22 @@ func (s *MemoryStore) Patch(ctx context.Context, id, name, description string) (
 		item.Description = description
 	}
 	s.items[item.ID] = item
-	return item, true
+	return item, true, nil
 }
 
 // Delete removes an item by id and reports whether it existed.
-// Returns false immediately when ctx is already cancelled.
-func (s *MemoryStore) Delete(ctx context.Context, id string) bool {
-	if ctx.Err() != nil {
-		return false
+// Returns (false, ctx.Err()) immediately when ctx is already cancelled.
+// Returns (false, nil) when no item with that id exists; the boolean false
+// distinguishes "not found" from a storage error so callers can return 404 vs 500.
+func (s *MemoryStore) Delete(ctx context.Context, id string) (bool, error) {
+	if err := ctx.Err(); err != nil {
+		return false, err
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	if _, ok := s.items[id]; !ok {
-		return false
+		return false, nil
 	}
 	delete(s.items, id)
 	// Linear scan to remove the id while preserving insertion order; acceptable at
@@ -159,5 +177,5 @@ func (s *MemoryStore) Delete(ctx context.Context, id string) bool {
 			break
 		}
 	}
-	return true
+	return true, nil
 }

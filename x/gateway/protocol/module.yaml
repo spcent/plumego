@@ -25,3 +25,20 @@ allowed_imports:
 test_commands:
   - go test -race -timeout 60s ./x/gateway/protocol/...
   - go vet ./x/gateway/protocol/...
+
+forbidden_imports:
+  - core/**
+  - store/**
+  - x/tenant/**
+  - x/ai/**
+  - x/messaging/**
+  - x/observability/**
+
+review_checklist:
+  - Keep protocol adapters stateless and composable
+  - Do not mix gRPC server logic with transcoding adapters
+  - Keep authentication out of protocol adapters (owned by middleware/auth)
+
+agent_hints:
+  - Each protocol adapter is a separate type; keep them isolated from each other
+  - GraphQL and gRPC adapters share the gateway interface but must not share internal state

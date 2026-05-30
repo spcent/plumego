@@ -27,3 +27,20 @@ allowed_imports:
 test_commands:
   - go test -race -timeout 60s ./x/gateway/cache/...
   - go vet ./x/gateway/cache/...
+
+forbidden_imports:
+  - core/**
+  - store/**
+  - x/tenant/**
+  - x/ai/**
+  - x/messaging/**
+  - x/observability/**
+
+review_checklist:
+  - Keep cache key strategies explicit and pluggable
+  - Do not introduce hidden global cache state
+  - Keep distributed cache adapters out of this package (owned by x/data)
+
+agent_hints:
+  - Cache key strategies are composable interfaces; prefer composition over inheritance
+  - In-memory store is the canonical implementation; wire storage alternatives via the Store interface
