@@ -1,67 +1,330 @@
 # dbadmin
 
-Web-based MySQL and SQLite management tool built on [plumego](../../README.md),
-comparable to PHP Adminer.
+A local-first, security-focused database management workbench for developers. Manage MySQL, SQLite, Redis, MongoDB, and Elasticsearch from a single modern web interface.
+
+## Overview
+
+dbadmin is a self-hosted database workbench designed for local development and internal tools. Unlike cloud-based solutions, dbadmin runs entirely on your machine, keeping your data and credentials private. It provides a unified interface for multiple database types with built-in security features to prevent accidental data loss.
+
+**Who is this for?**
+- Developers who need to inspect and modify data across multiple databases
+- Teams building internal tools that need database access
+- Anyone who wants a lightweight, local alternative to heavy database clients
+
+## Supported Data Sources
+
+| Database | Features | Status |
+|----------|----------|--------|
+| **MySQL** | Browse tables, execute queries, view/edit rows, DDL operations, import/export | ✅ Stable |
+| **SQLite** | All MySQL features + file upload/download, schema inspection | ✅ Stable |
+| **Redis** | Browse keys by type, execute commands, TTL management, batch operations | ✅ Stable |
+| **MongoDB** | Browse collections, query with filters, aggregation pipelines, explain plans | ✅ Stable |
+| **Elasticsearch** | Browse indices, DSL queries, document CRUD, cluster health, mappings | ✅ Stable |
 
 ## Features
 
-- **Connection management** — save and test MySQL / SQLite connections with
-  optional AES-GCM encrypted password storage
-- **Database / table browsing** — left-sidebar tree of connections → databases → tables
-- **Table structure** — columns, indexes, foreign keys, DDL source
-- **Data viewer** — paginated table data with column filter, sort
-- **Row CRUD** — insert, edit, delete rows with parameterized queries
-- **SQL Console** — Monaco-powered editor, Ctrl+Enter to run, query history
-- **DDL operations** — create table, alter table (add/drop columns, rename), drop table
-- **Export** — CSV or SQL INSERT dump per table
-- **Import** — upload a `.sql` file to execute against any connection
-- **Auth** — session-cookie login, configurable credentials, HttpOnly cookies
+### Core Capabilities
+- **Connection Management**: Save, test, and organize connections with credential encryption
+- **Resource Browsing**: Tree view of databases, tables, collections, indices, and keys
+- **Query Execution**: Syntax-highlighted editors with query history and result formatting
+- **Data Manipulation**: View, edit, insert, delete with confirmation dialogs for dangerous operations
+- **Import/Export**: CSV, JSON, SQL dump formats for data migration
+- **Schema Inspection**: View table structure, indexes, foreign keys, mappings
 
-## Quick start
+### Security & Safety
+- **Read-only Mode**: Block all write operations per connection
+- **Dangerous Operation Detection**: Intercept DROP, DELETE, FLUSH, and other destructive commands
+- **Confirmation Dialogs**: Require explicit confirmation before executing dangerous operations
+- **Credential Redaction**: Passwords and API keys redacted in all logs and API responses
+- **Session Management**: Secure cookie-based authentication with automatic timeout
+- **Input Validation**: SQL injection prevention and command injection protection
+
+### User Experience
+- **Modern UI**: Responsive design with Tailwind CSS
+- **Dark Mode**: Automatic theme switching based on system preferences
+- **Internationalization**: English and Chinese (简体中文) support
+- **Query History**: Searchable history with execution time and result counts
+- **Keyboard Shortcuts**: Efficient navigation and execution (Ctrl/Cmd+Enter)
+
+## Quick Start
+
+### Prerequisites
+- Go 1.21 or later
+- Node.js 18 or later
+- npm or yarn
+
+### Installation
 
 ```bash
-# 1. Build the frontend
-cd web && npm install && npm run build && cd ..
+# Clone the repository
+git clone https://github.com/spcent/plumego.git
+cd plumego/use-cases/dbadmin
 
-# 2. Copy and edit config
-cp env.example .env
+# Backend setup
+go mod download
 
-# 3. Run
-go run ./...
-# → http://localhost:8080
+# Frontend setup
+cd web
+npm install
+npm run build
+cd ..
+
+# Start the server
+go run main.go
+```
+
+Visit `http://localhost:8080`
+
+**Default credentials:** `admin` / `admin`
+
+⚠️ **Security Notice**: Change the default password in production. See [Configuration](#configuration) for details.
+
+## Development
+
+### Running in Development Mode
+
+Start both backend and frontend with hot reload:
+
+```bash
+# Terminal 1: Backend
+go run main.go
+
+# Terminal 2: Frontend (with hot reload)
+cd web
+npm run dev
+```
+
+The frontend dev server runs on `http://localhost:5173` and proxies API requests to the backend.
+
+### Building for Production
+
+Build a single binary with embedded frontend:
+
+```bash
+cd web
+npm run build
+cd ..
+
+go build -o dbadmin main.go
+```
+
+Run the binary:
+```bash
+./dbadmin
+```
+
+The binary includes all frontend assets and can be deployed without Node.js.
+
+### Using Docker
+
+```bash
+# Build image
+docker build -t dbadmin .
+
+# Run container
+docker run -p 8080:8080 -v ./data:/app/data dbadmin
+```
+
+For development with hot reload, use Docker Compose:
+
+```bash
+docker-compose up
 ```
 
 ## Configuration
 
+### Environment Variables
+
 | Variable | Default | Description |
-|---|---|---|
-| `APP_ADDR` | `:8080` | Listen address |
-| `DBADMIN_DATA_DIR` | `./data` | KV store directory |
-| `DBADMIN_USER` | `admin` | Login username |
-| `DBADMIN_PASSWORD` | `admin` | Login password |
-| `DBADMIN_ENCRYPTION_KEY` | (none) | 64-char hex AES-GCM key for passwords |
+|----------|---------|-------------|
+| `APP_ADDR` | `:8080` | Server listen address |
+| `DBADMIN_DATA_DIR` | `./data` | Directory for sessions, history, and uploads |
+| `DBADMIN_USER` | `admin` | Admin username |
+| `DBADMIN_PASSWORD` | `admin` | Admin password |
+| `DBADMIN_SESSION_TTL` | `24h` | Session timeout duration |
+| `DBADMIN_ENCRYPTION_KEY` | (auto) | 32-byte hex key for credential encryption |
+
+### Configuration File
+
+Create a `.env` file in the project root:
+
+```bash
+APP_ADDR=:8080
+DBADMIN_DATA_DIR=./data
+DBADMIN_USER=admin
+DBADMIN_PASSWORD=your-secure-password
+DBADMIN_SESSION_TTL=24h
+DBADMIN_ENCRYPTION_KEY=your-32-byte-hex-key
+```
+
+Generate a secure encryption key:
+```bash
+openssl rand -hex 32
+```
+
+### Command-line Flags
+
+```bash
+./dbadmin --addr=:9090 --data-dir=/var/dbadmin
+```
 
 ## Architecture
 
 ```
 use-cases/dbadmin/
-├── main.go
+├── cmd/server/          # Application entry point
 ├── internal/
-│   ├── config/           # env / flag loading
-│   ├── app/              # core.App + middleware + routes
-│   ├── handler/          # HTTP handlers (auth, connections, inspect, rows, query, ddl, export, import)
-│   ├── dbmanager/        # connection pool + Inspector interface + mysql / sqlite implementations
-│   └── domain/
-│       ├── authn/        # session-cookie authenticator
-│       ├── connection/   # saved connection CRUD (KV-backed, AES-GCM passwords)
-│       ├── history/      # SQL query history (KV-backed)
-│       └── session/      # session store (KV-backed, TTL)
-└── web/                  # React 19 + Vite SPA (served via x/frontend)
+│   ├── app/            # HTTP routes and middleware
+│   ├── config/         # Configuration management
+│   ├── domain/         # Business logic
+│   │   ├── connection/ # Connection CRUD and encryption
+│   │   ├── session/    # Session management
+│   │   ├── history/    # Query history (SQL)
+│   │   ├── mongohistory/ # Query history (MongoDB)
+│   │   └── eshistory/  # Query history (Elasticsearch)
+│   ├── handler/        # HTTP handlers
+│   │   ├── sql.go      # MySQL/SQLite operations
+│   │   ├── redis.go    # Redis operations
+│   │   ├── mongodb.go  # MongoDB operations
+│   │   └── elasticsearch.go # Elasticsearch operations
+│   ├── dbmanager/      # SQL connection pooling
+│   ├── redismanager/   # Redis connection management
+│   ├── mongomanager/   # MongoDB connection management
+│   ├── esmanager/      # Elasticsearch connection management
+│   └── security/       # Security utilities
+├── web/                # React frontend
+│   ├── src/
+│   │   ├── components/ # Reusable UI components
+│   │   ├── pages/      # Page components
+│   │   ├── services/   # API client
+│   │   └── hooks/      # Custom React hooks
+│   └── public/         # Static assets
+└── docs/               # Documentation
 ```
 
-## Boundary rules
+## Testing
 
-This is a use-case app with its own `go.mod`.  It may import:
-- All stable plumego roots (`core`, `contract`, `middleware/*`, `security`, `store`, `health`, `log`, `metrics`)
-- Extensions: `x/frontend` only (for SPA serving)
-- External drivers: `github.com/go-sql-driver/mysql`, `modernc.org/sqlite`
+### Backend Tests
+
+Run all backend tests:
+```bash
+go test ./...
+```
+
+Run with coverage:
+```bash
+go test -cover ./...
+```
+
+Run specific test category:
+```bash
+go test ./internal/handler -run TestSQLQuote
+go test ./internal/handler -run TestRedisCommand
+go test ./internal/handler -run TestMongoFilter
+go test ./internal/handler -run TestESValidation
+```
+
+### Frontend Tests
+
+Run all frontend tests:
+```bash
+cd web
+npm test
+```
+
+Run with coverage:
+```bash
+npm run test:coverage
+```
+
+Run in watch mode:
+```bash
+npm run test:watch
+```
+
+### Manual Testing
+
+See [docs/manual-test.md](docs/manual-test.md) for comprehensive manual testing procedures covering:
+- Connection management
+- Data source operations
+- Security features
+- UI/UX validation
+- Performance testing
+
+## Security Considerations
+
+### Local Development
+dbadmin is designed for local development and internal use. By default, it binds to `localhost:8080` and should not be exposed to the public internet.
+
+### Production Deployment
+If deploying to production:
+1. **Change default credentials** - Set strong `DBADMIN_USER` and `DBADMIN_PASSWORD`
+2. **Use HTTPS** - Configure TLS certificates or use a reverse proxy with SSL
+3. **Set encryption key** - Generate a secure `DBADMIN_ENCRYPTION_KEY` for credential encryption
+4. **Restrict network access** - Use firewall rules or VPN to limit access
+5. **Enable read-only mode** - For connections that don't need write access
+6. **Regular backups** - Backup the `data` directory containing sessions and history
+
+### Security Features
+- **Credential Encryption**: Connection passwords encrypted at rest using AES-256-GCM
+- **Credential Redaction**: Passwords and API keys never logged or exposed in API responses
+- **Dangerous Operation Detection**: Destructive commands require explicit confirmation
+- **Read-only Mode**: Block all write operations per connection
+- **Session Timeout**: Automatic logout after configurable inactivity period
+- **Input Validation**: SQL injection and command injection prevention
+- **Secure Cookies**: HttpOnly, Secure, SameSite attributes on session cookies
+
+## Troubleshooting
+
+### Frontend not loading
+- Ensure you've run `npm run build` in the `web` directory
+- Check that the backend is running on the expected port
+- Verify no firewall is blocking the connection
+
+### Connection test fails
+- Verify database credentials are correct
+- Check that the database server is running and accessible
+- For remote databases, ensure firewall allows connections from your IP
+- For MongoDB/Redis, verify authentication method matches your server config
+
+### Query execution errors
+- Check database user has appropriate permissions
+- For read-only connections, write operations will be blocked
+- Verify SQL/DSL syntax is correct for your database version
+- Check dbadmin logs for detailed error messages
+
+### Performance issues
+- For large datasets, use pagination (default 50 rows per page)
+- Add indexes to frequently queried columns
+- Use filters to reduce result set size
+- For Elasticsearch, use `size` parameter to limit results
+
+### Data directory errors
+- Ensure `DBADMIN_DATA_DIR` path exists and is writable
+- Check disk space is available
+- Verify file permissions allow read/write access
+
+## Contributing
+
+Contributions are welcome! Please:
+
+1. Fork the repository
+2. Create a feature branch
+3. Add tests for new functionality
+4. Ensure all tests pass
+5. Submit a pull request
+
+See [docs/manual-test.md](docs/manual-test.md) for testing guidelines.
+
+## License
+
+MIT
+
+## Acknowledgments
+
+Built with:
+- [Go](https://golang.org/) - Backend runtime
+- [React](https://react.dev/) - Frontend framework
+- [Tailwind CSS](https://tailwindcss.com/) - Styling
+- [Monaco Editor](https://microsoft.github.io/monaco-editor/) - Code editor
+- plumego framework - HTTP server and utilities
