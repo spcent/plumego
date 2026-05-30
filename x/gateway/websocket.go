@@ -20,7 +20,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/spcent/plumego/internal/httpx"
+	"github.com/spcent/plumego/internal/httputil"
 )
 
 // handleWebSocketProxy handles WebSocket proxying
@@ -145,7 +145,7 @@ func (p *Proxy) sendBackendUpgrade(conn net.Conn, backendURL *url.URL, r *http.R
 	// Apply request modifications if configured
 	if p.config.AddForwardedHeaders {
 		// Add X-Forwarded headers
-		clientIP := httpx.ClientIP(r)
+		clientIP := httputil.ClientIP(r)
 		sb.WriteString("X-Forwarded-For: ")
 		sb.WriteString(clientIP)
 		sb.WriteString("\r\n")

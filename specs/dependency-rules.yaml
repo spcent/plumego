@@ -196,8 +196,10 @@ modules:
       - contract
     declared_callers:
       - middleware
+      - x/gateway
       - x/gateway/cache
       - x/gateway/transform
+      - x/messaging/webhook
     deny:
       - core/**
       - router/**
@@ -224,28 +226,6 @@ modules:
     deny:
       - core/**
       - router/**
-      - security/**
-      - store/**
-      - health/**
-      - log/**
-      - metrics/**
-      - x/**
-      - reference/**
-      - cmd/**
-
-  internal/httpx:
-    path: internal/httpx
-    layer: internal
-    allow:
-      - stdlib
-    declared_callers:
-      - x/gateway
-      - x/messaging/webhook
-    deny:
-      - core/**
-      - router/**
-      - contract/**
-      - middleware/**
       - security/**
       - store/**
       - health/**
@@ -680,7 +660,6 @@ modules:
       - middleware
       - security
       - x/resilience
-      - internal/httpx
       - internal/httputil
     deny:
       - core/**

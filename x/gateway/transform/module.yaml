@@ -22,7 +22,6 @@ allowed_imports:
   - stdlib
   - contract
   - internal/httputil
-  - internal/httpx
   - x/gateway
 
 test_commands:

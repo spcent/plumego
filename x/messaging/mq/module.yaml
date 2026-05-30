@@ -43,6 +43,7 @@ allowed_imports:
   - metrics
   - store
   - x/data/idempotency
+  - x/data/kvengine
   - x/messaging/pubsub
 
 forbidden_imports:

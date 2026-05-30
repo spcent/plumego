@@ -49,7 +49,6 @@ allowed_imports:
   - router
   - security
   - x/resilience
-  - internal/httpx
   - internal/httputil
 
 forbidden_imports:

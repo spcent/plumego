@@ -230,14 +230,31 @@ func ClientIP(r *http.Request) string {
 		return ""
 	}
 
-	if ip := strings.TrimSpace(strings.Split(r.Header.Get(HeaderForwardedFor), ",")[0]); ip != "" {
-		return ip
+	// Prefer the first syntactically valid IP from X-Forwarded-For, then
+	// X-Real-IP. Validating with net.ParseIP avoids returning spoofed or
+	// malformed header values verbatim.
+	for _, part := range strings.Split(r.Header.Get(HeaderForwardedFor), ",") {
+		if ip := validIP(part); ip != "" {
+			return ip
+		}
 	}
-	if ip := strings.TrimSpace(r.Header.Get(HeaderRealIP)); ip != "" {
+	if ip := validIP(r.Header.Get(HeaderRealIP)); ip != "" {
 		return ip
 	}
 
 	return DirectClientIP(r)
+}
+
+// validIP trims value and returns it only when it parses as an IP address.
+func validIP(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return ""
+	}
+	if net.ParseIP(value) != nil {
+		return value
+	}
+	return ""
 }
 
 // DirectClientIP extracts the peer IP from RemoteAddr only.

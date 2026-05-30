@@ -10,7 +10,7 @@ import (
 
 	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/health"
-	"github.com/spcent/plumego/internal/httpx"
+	"github.com/spcent/plumego/internal/httputil"
 	"github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/router"
 	"github.com/spcent/plumego/x/messaging/pubsub"
@@ -171,7 +171,7 @@ func (c *Inbound) webhookInGitHub(w http.ResponseWriter, r *http.Request) {
 			"request_id":  contract.RequestIDFromContext(r.Context()),
 			"delivery_id": delivery,
 			"event_type":  event,
-			"client_ip":   httpx.ClientIP(r),
+			"client_ip":   httputil.ClientIP(r),
 		},
 	}
 
@@ -269,7 +269,7 @@ func (c *Inbound) webhookInStripe(w http.ResponseWriter, r *http.Request) {
 			"request_id":  contract.RequestIDFromContext(r.Context()),
 			"delivery_id": evtID,
 			"event_type":  evtType,
-			"client_ip":   httpx.ClientIP(r),
+			"client_ip":   httputil.ClientIP(r),
 		},
 	}
 
