@@ -79,21 +79,15 @@ func validateName(name string) error {
 	return nil
 }
 
-// parseID tries to parse an ID string as ObjectId, then as JSON scalar, then as string.
-// JSON objects/arrays are rejected to prevent operator injection in MongoDB filters.
+// parseID accepts only ObjectID hex strings or plain string IDs.
+// This prevents user-controlled JSON values from being interpreted as other BSON scalar types.
 func parseID(idStr string) (any, error) {
+	if idStr == "" {
+		return nil, fmt.Errorf("_id is required")
+	}
 	if len(idStr) == 24 {
 		if oid, err := primitive.ObjectIDFromHex(idStr); err == nil {
 			return oid, nil
-		}
-	}
-	var id any
-	if err := json.Unmarshal([]byte(idStr), &id); err == nil {
-		switch id.(type) {
-		case map[string]any, []any:
-			return nil, fmt.Errorf("invalid _id type")
-		default:
-			return id, nil
 		}
 	}
 	return idStr, nil
