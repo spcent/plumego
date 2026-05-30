@@ -59,9 +59,9 @@ func (w *Watchdog) executeEndpoint(ctx context.Context, ep *endpoint.Endpoint, e
 		"duration": result.Duration.Round(time.Millisecond).String(),
 	}
 	if !result.Success {
-		// On failure include the response body so operators can diagnose
-		// without bumping the global log level.
-		fields["body"] = result.Body
+		// Avoid logging raw response payloads to prevent clear-text leakage of
+		// sensitive data. Keep only non-sensitive diagnostics.
+		fields["body_len"] = len(result.Body)
 	}
 	w.log.Info("endpoint monitored", fields)
 	inEndpointMaintenanceWindow := false
