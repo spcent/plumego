@@ -3,7 +3,6 @@ path: x/ai/streaming
 layer: extension
 status: experimental
 suggested_gate_profile: single_module_behavior
-stability_tier: beta
 owner: ai-gateway
 risk: medium
 summary: Stable-tier AI streaming coordination, SSE progress updates, and workflow handlers within the experimental x/ai family.

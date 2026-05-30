@@ -32,12 +32,12 @@ non_goals:
 subordinate_families:
   - x/ai/semanticcache
 
-# Stability tiers for subpackages.
+# Stability tiers for subpackages. This block is the single source of truth for
+# subpackage maturity; individual subpackage module.yaml files do not repeat it.
 # stable       — API is covered by semantic versioning; breaking changes require a major version bump.
-# beta         — API is production-ready; incompatible changes require a deprecation cycle.
 # experimental — API may change in future releases without a deprecation period.
 stability_tiers:
-  beta:
+  stable:
     - provider      # Family tier index; package metadata lives in x/ai/provider/module.yaml
     - session       # Family tier index; package metadata lives in x/ai/session/module.yaml
     - streaming     # Family tier index; package metadata lives in x/ai/streaming/module.yaml
