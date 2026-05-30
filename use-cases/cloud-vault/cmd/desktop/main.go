@@ -178,11 +178,11 @@ func run() error {
 		Mac: &mac.Options{
 			TitleBar: &mac.TitleBar{
 				TitlebarAppearsTransparent: true,
-				HideTitle:                 false,
-				HideTitleBar:              false,
-				FullSizeContent:           true,
-				UseToolbar:                true,
-				HideToolbarSeparator:      true,
+				HideTitle:                  false,
+				HideTitleBar:               false,
+				FullSizeContent:            true,
+				UseToolbar:                 true,
+				HideToolbarSeparator:       true,
 			},
 			WebviewIsTransparent: true,
 			WindowIsTranslucent:  false,

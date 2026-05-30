@@ -163,9 +163,9 @@ func (w *WailsBindings) StartImport(jobID string, req *ScanPreviewRequest) error
 
 	// Emit initial progress event
 	w.emitProgress(jobID, &ImportProgress{
-		JobID:      jobID,
-		Status:     "running",
-		StartTime:  time.Now().Format(time.RFC3339),
+		JobID:     jobID,
+		Status:    "running",
+		StartTime: time.Now().Format(time.RFC3339),
 	})
 
 	return nil

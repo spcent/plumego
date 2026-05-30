@@ -33,6 +33,8 @@ import (
 	"cloud-vault/internal/storage"
 	"cloud-vault/internal/system"
 	"cloud-vault/internal/tag"
+	"cloud-vault/internal/update"
+	"cloud-vault/internal/version"
 )
 
 // App holds application-wide dependencies.
@@ -50,6 +52,8 @@ type App struct {
 	System         *system.Handler
 	Auth           *auth.Handler
 	Backup         *backup.Handler
+	Update         *update.Handler
+	updateService  *update.Service
 	authService    *auth.Service
 	authMiddleware func(http.Handler) http.Handler
 	indexer        *search.Indexer
@@ -212,6 +216,24 @@ func New(cfg config.Config) (*App, error) {
 	backupSvc := backup.NewService(backupRepo, cfg.DB.Path, cfg.Storage.Provider, cfg.Local.Root, "", cfg.App.Version)
 	backupHandler := backup.NewHandler(backupSvc, filepath.Dir(cfg.DB.Path), app.Logger())
 
+	// Update handler (V1.0).
+	versionInfo := update.VersionInfo{
+		Version:   version.Version,
+		Commit:    version.Commit,
+		BuildTime: version.BuildTime,
+		Channel:   version.Channel,
+	}
+	updateChecker := update.NewChecker(versionInfo, "")
+	updateSvcConfig := &update.Config{
+		Enabled:          cfg.Update.Enabled,
+		CheckOnStartup:   cfg.Update.CheckOnStartup,
+		UpdateURL:        "",
+		CheckIntervalMin: cfg.Update.CheckIntervalMin,
+		Channel:          cfg.Update.Channel,
+	}
+	updateSvc := update.NewService(updateChecker, updateSvcConfig, app.Logger())
+	updateHandler := update.NewHandler(updateSvc, app.Logger())
+
 	return &App{
 		Core:           app,
 		Cfg:            cfg,
@@ -226,6 +248,8 @@ func New(cfg config.Config) (*App, error) {
 		System:         systemHandler,
 		Auth:           authHandler,
 		Backup:         backupHandler,
+		Update:         updateHandler,
+		updateService:  updateSvc,
 		authService:    authService,
 		authMiddleware: authMiddleware,
 		indexer:        indexer,
@@ -256,6 +280,11 @@ func (a *App) Start(ctx context.Context) error {
 	// Start AI task workers.
 	for _, w := range a.aiWorkers {
 		go w.Run(ctx)
+	}
+
+	// Start V1.0 update background checker.
+	if a.updateService != nil {
+		a.updateService.StartBackgroundChecker(ctx)
 	}
 
 	shutdownErr := make(chan error, 1)
@@ -419,5 +448,10 @@ func (a *App) StartBackgroundTasks(ctx context.Context) {
 	// Start AI workers
 	for _, worker := range a.aiWorkers {
 		go worker.Run(ctx)
+	}
+
+	// Start V1.0 update background checker
+	if a.updateService != nil {
+		a.updateService.StartBackgroundChecker(ctx)
 	}
 }

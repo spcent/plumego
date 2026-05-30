@@ -26,12 +26,12 @@ func TestSecurityRegression_UnauthenticatedAccess(t *testing.T) {
 
 	cfg := config.Config{
 		Auth: config.AuthConfig{
-			Enabled:               true,
-			CookieName:            "session",
-			SessionTTLHours:       24,
-			PasswordMinLength:     10,
-			MaxLoginFailures:      5,
-			LockoutMinutes:        30,
+			Enabled:                   true,
+			CookieName:                "session",
+			SessionTTLHours:           24,
+			PasswordMinLength:         10,
+			MaxLoginFailures:          5,
+			LockoutMinutes:            30,
 			LoginFailureWindowMinutes: 15,
 		},
 	}

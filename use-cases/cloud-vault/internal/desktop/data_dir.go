@@ -35,11 +35,11 @@ func OpenDataDirectory(dataDir string) error {
 
 // GetDataDirInfo returns information about the data directory.
 type DataDirInfo struct {
-	Path        string `json:"path"`
-	Exists      bool   `json:"exists"`
-	Size        int64  `json:"size"`
-	FileCount   int    `json:"file_count"`
-	IsWritable  bool   `json:"is_writable"`
+	Path       string `json:"path"`
+	Exists     bool   `json:"exists"`
+	Size       int64  `json:"size"`
+	FileCount  int    `json:"file_count"`
+	IsWritable bool   `json:"is_writable"`
 }
 
 // GetDataDirInfo retrieves information about the data directory.

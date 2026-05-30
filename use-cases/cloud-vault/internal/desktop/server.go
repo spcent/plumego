@@ -14,11 +14,11 @@ import (
 
 // LocalServer wraps the HTTP server for desktop mode with security constraints.
 type LocalServer struct {
-	server    *http.Server
-	port      int
-	token     string
-	logger    log.StructuredLogger
-	dataDir   string
+	server  *http.Server
+	port    int
+	token   string
+	logger  log.StructuredLogger
+	dataDir string
 }
 
 // NewLocalServer creates a new local HTTP server bound to 127.0.0.1.

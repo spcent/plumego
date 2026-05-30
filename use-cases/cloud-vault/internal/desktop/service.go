@@ -68,23 +68,23 @@ func (s *Service) GetRuntimeInfo(ctx context.Context) (*RuntimeInfo, error) {
 
 // ScanPreviewRequest contains parameters for scan preview.
 type ScanPreviewRequest struct {
-	SourceDir       string `json:"source_dir"`
-	Recursive       bool   `json:"recursive"`
-	MaxFileSizeMB   int    `json:"max_file_size_mb"`
-	IgnoreHidden    bool   `json:"ignore_hidden"`
-	IgnoreEmpty     bool   `json:"ignore_empty"`
+	SourceDir     string `json:"source_dir"`
+	Recursive     bool   `json:"recursive"`
+	MaxFileSizeMB int    `json:"max_file_size_mb"`
+	IgnoreHidden  bool   `json:"ignore_hidden"`
+	IgnoreEmpty   bool   `json:"ignore_empty"`
 }
 
 // ScanPreviewResponse contains scan preview results.
 type ScanPreviewResponse struct {
-	TotalFiles     int64    `json:"total_files"`
-	TotalSize      int64    `json:"total_size"`
-	MarkdownFiles  int64    `json:"markdown_files"`
-	EmptyFiles     int64    `json:"empty_files"`
-	LargeFiles     int64    `json:"large_files"`
-	SkippedFiles   int64    `json:"skipped_files"`
-	SampleFiles    []string `json:"sample_files"`
-	Errors         []string `json:"errors"`
+	TotalFiles    int64    `json:"total_files"`
+	TotalSize     int64    `json:"total_size"`
+	MarkdownFiles int64    `json:"markdown_files"`
+	EmptyFiles    int64    `json:"empty_files"`
+	LargeFiles    int64    `json:"large_files"`
+	SkippedFiles  int64    `json:"skipped_files"`
+	SampleFiles   []string `json:"sample_files"`
+	Errors        []string `json:"errors"`
 }
 
 // ScanPreview performs a preview scan of a directory.
