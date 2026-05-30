@@ -40,14 +40,15 @@ const (
 const noLimit = math.MaxInt
 
 // ItemRepository is the minimal persistence contract that ItemHandler depends on.
-// All methods accept a context so callers can propagate request deadlines and
-// cancellation to real storage backends. Pass a concrete implementation from
-// routes.go; pass a stub in tests.
+// Declaring this interface in the handler package means the handler owns its
+// dependency contract and is not coupled to domain implementation details.
+//
+// In production routes.go wires item.ItemService, which implements this interface
+// via structural typing. In handler tests item.MemoryStore also satisfies it
+// directly, allowing test setup to bypass the service layer without code changes.
 //
 // The error return on mutating methods distinguishes storage failures (non-nil error)
 // from "not found" (bool false, nil error) so handlers can return 500 vs 404.
-// Real backends propagate ctx to the underlying driver; the in-memory implementation
-// checks ctx.Err() before acquiring its lock so the contract holds for both.
 type ItemRepository interface {
 	Create(ctx context.Context, name, description string) (item.Item, error)
 	Get(ctx context.Context, id string) (item.Item, bool)
@@ -67,11 +68,10 @@ type ItemHandler struct {
 	Logger plumelog.StructuredLogger
 }
 
-// createItemReq, updateItemReq, and patchItemReq carry the same fields today but
-// are kept as distinct types because their validation semantics differ: Create and
-// Update require both fields; Patch requires at least one. Keeping them separate
-// also leaves room to diverge — for example, Patch could add pointer fields for
-// explicit-null semantics without changing the Create or Update contracts.
+// createItemReq, updateItemReq, and patchItemReq carry the same fields but are
+// distinct types: Create and Update require both fields non-empty; Patch requires
+// at least one. Separate types make the per-operation validation contract explicit
+// at the type level and allow the request shapes to diverge independently.
 type createItemReq struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`

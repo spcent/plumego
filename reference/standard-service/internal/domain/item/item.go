@@ -1,13 +1,13 @@
-// Package item contains the reference application's item domain model and store.
+// Package item contains the reference application's item domain model,
+// repository, and service. The three files implement the canonical three-layer
+// structure described in docs/reference/canonical-style-guide.md §3:
+//
+//   item.go    — domain model (the Item type)
+//   store.go   — persistence layer (Repository interface and MemoryStore)
+//   service.go — business logic layer (Service interface and ItemService)
 package item
 
-import (
-	"context"
-	"fmt"
-	"math/rand/v2"
-	"sync"
-	"time"
-)
+import "time"
 
 // Item is the canonical item resource in this reference application.
 type Item struct {
@@ -15,167 +15,4 @@ type Item struct {
 	Name        string    `json:"name"`
 	Description string    `json:"description"`
 	CreatedAt   time.Time `json:"created_at"`
-}
-
-// MemoryStore is a thread-safe in-memory item repository.
-// items is the lookup table; ids tracks insertion order so List is stable.
-type MemoryStore struct {
-	mu    sync.RWMutex
-	items map[string]Item
-	ids   []string
-}
-
-// generateID returns a random 16-character hex string suitable for use as an
-// opaque resource identifier. Using random IDs rather than sequential integers
-// avoids leaking the store's internal state through the API.
-func generateID() string {
-	return fmt.Sprintf("%016x", rand.Uint64())
-}
-
-// NewMemoryStore returns a ready-to-use in-memory store.
-func NewMemoryStore() *MemoryStore {
-	return &MemoryStore{items: make(map[string]Item)}
-}
-
-// Create stores an item with the provided name and description and returns the new item.
-// Returns (Item{}, ctx.Err()) immediately when ctx is already cancelled so handlers
-// can detect deadline expiry without acquiring the store lock. Real storage backends
-// propagate ctx to the database call and return any storage error; the context error
-// path here mirrors that contract so callers are never surprised when the interface
-// implementation changes.
-func (s *MemoryStore) Create(ctx context.Context, name, description string) (Item, error) {
-	if err := ctx.Err(); err != nil {
-		return Item{}, err
-	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	item := Item{
-		ID:          generateID(),
-		Name:        name,
-		Description: description,
-		CreatedAt:   time.Now().UTC(),
-	}
-	s.items[item.ID] = item
-	s.ids = append(s.ids, item.ID)
-	return item, nil
-}
-
-// Get returns an item by id.
-// Returns (Item{}, false) immediately when ctx is already cancelled so handlers
-// can short-circuit cleanly without acquiring the store lock.
-func (s *MemoryStore) Get(ctx context.Context, id string) (Item, bool) {
-	if ctx.Err() != nil {
-		return Item{}, false
-	}
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	item, ok := s.items[id]
-	return item, ok
-}
-
-// List returns a paginated slice of items in creation order, the total item count,
-// and any error. offset is the zero-based index of the first item to return; limit
-// caps the number of items returned. An offset beyond the total returns an empty
-// slice; total is always the full count regardless of offset/limit. This signature
-// lets real storage backends issue a single LIMIT/OFFSET query rather than loading
-// every row into memory.
-// Returns (nil, 0, ctx.Err()) immediately when ctx is already cancelled.
-func (s *MemoryStore) List(ctx context.Context, offset, limit int) ([]Item, int, error) {
-	if err := ctx.Err(); err != nil {
-		return nil, 0, err
-	}
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	all := make([]Item, 0, len(s.ids))
-	for _, id := range s.ids {
-		all = append(all, s.items[id])
-	}
-	total := len(all)
-
-	start := offset
-	if start > len(all) {
-		start = len(all)
-	}
-	page := all[start:]
-	if len(page) > limit {
-		page = page[:limit]
-	}
-	return page, total, nil
-}
-
-// Update replaces the name and description of an existing item and returns the updated item.
-// CreatedAt and ID are immutable; all other fields are replaced by this operation.
-// Returns (Item{}, false, ctx.Err()) immediately when ctx is already cancelled.
-// Returns (Item{}, false, nil) when no item with that id exists; the boolean false
-// distinguishes "not found" from a storage error so callers can return 404 vs 500.
-func (s *MemoryStore) Update(ctx context.Context, id, name, description string) (Item, bool, error) {
-	if err := ctx.Err(); err != nil {
-		return Item{}, false, err
-	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	item, ok := s.items[id]
-	if !ok {
-		return Item{}, false, nil
-	}
-	item.Name = name
-	item.Description = description
-	s.items[item.ID] = item
-	return item, true, nil
-}
-
-// Patch applies a partial update to an existing item and returns the result.
-// Only non-empty fields are replaced; empty string values leave the corresponding
-// field unchanged. ID and CreatedAt are always immutable.
-// Returns (Item{}, false, ctx.Err()) immediately when ctx is already cancelled.
-// Returns (Item{}, false, nil) when no item with that id exists.
-func (s *MemoryStore) Patch(ctx context.Context, id, name, description string) (Item, bool, error) {
-	if err := ctx.Err(); err != nil {
-		return Item{}, false, err
-	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	item, ok := s.items[id]
-	if !ok {
-		return Item{}, false, nil
-	}
-	if name != "" {
-		item.Name = name
-	}
-	if description != "" {
-		item.Description = description
-	}
-	s.items[item.ID] = item
-	return item, true, nil
-}
-
-// Delete removes an item by id and reports whether it existed.
-// Returns (false, ctx.Err()) immediately when ctx is already cancelled.
-// Returns (false, nil) when no item with that id exists; the boolean false
-// distinguishes "not found" from a storage error so callers can return 404 vs 500.
-func (s *MemoryStore) Delete(ctx context.Context, id string) (bool, error) {
-	if err := ctx.Err(); err != nil {
-		return false, err
-	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	if _, ok := s.items[id]; !ok {
-		return false, nil
-	}
-	delete(s.items, id)
-	// Linear scan to remove the id while preserving insertion order; acceptable at
-	// the small scale of a reference implementation.
-	for i, v := range s.ids {
-		if v == id {
-			s.ids = append(s.ids[:i], s.ids[i+1:]...)
-			break
-		}
-	}
-	return true, nil
 }

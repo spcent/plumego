@@ -22,7 +22,9 @@ func discardLogger() plumelog.StructuredLogger {
 }
 
 // mustCreateItem calls store.Create with context.Background() and fails the test on error.
-// Use it in handler tests to set up domain state without cluttering each subtest.
+// Handler tests inject item.MemoryStore directly for test isolation; in production
+// the handler receives an item.ItemService wired through routes.go. Both satisfy the
+// handler's ItemRepository interface so handler logic is unaffected by the difference.
 func mustCreateItem(t *testing.T, store *item.MemoryStore, name, description string) item.Item {
 	t.Helper()
 	it, err := store.Create(context.Background(), name, description)

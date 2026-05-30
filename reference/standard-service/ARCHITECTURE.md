@@ -13,13 +13,21 @@ internal/
   config/   config.go
   app/      app.go, routes.go
   domain/
-    item/   item.go
+    item/   item.go       ← domain model (Item)
+            store.go      ← persistence layer (Repository interface + MemoryStore)
+            service.go    ← business logic layer (Service interface + ItemService)
   handler/  api.go, guard.go, health.go, items.go, handler_test.go
 ```
 
 This is the canonical Plumego application shape. Every scaffold and getting-
 started guide produces this structure. Deviating from it without an explicit
 reason creates drift that reviewers and agents have to recover from.
+
+The three files under `domain/item/` demonstrate the canonical three-layer
+domain structure described in `docs/reference/canonical-style-guide.md §3`:
+model → repository → service. Even when the service layer is thin delegation
+(as it is here), keeping the files separate makes the ownership boundaries
+obvious and provides the correct landing zone when business logic is added.
 
 ---
 
@@ -101,9 +109,12 @@ do not own persistence concerns (database queries, cache lookups).
 
 Tests live next to the handlers they test (`handler_test.go`).
 
-`internal/domain/item` owns the sample item model and in-memory repository. This
-keeps the transport package focused on HTTP adaptation while still showing where
-real business and persistence code belongs in an application.
+`internal/domain/item` owns the sample item model, repository, and service.
+The three-file split (item.go / store.go / service.go) mirrors the structure
+that style guide §3 prescribes: handlers adapt transport; services own business
+logic; repositories own persistence. This keeps the transport package focused on
+HTTP adaptation while still showing where real business and persistence code
+belongs in an application.
 
 `guard.go` implements `RequireWriteKey`, a per-route middleware that gates
 mutating endpoints behind a static bearer key. It lives here because per-route
@@ -123,14 +134,14 @@ receive concrete implementations from `routes.go`. This keeps handlers
 independently testable: tests pass a stub; production passes the real store.
 
 ```go
-// handler declares the interface it needs
+// handler/items.go declares the narrow interface it needs
 type ItemRepository interface {
-    Create(ctx context.Context, name, description string) item.Item
+    Create(ctx context.Context, name, description string) (item.Item, error)
     Get(ctx context.Context, id string) (item.Item, bool)
-    List(ctx context.Context) []item.Item
-    Update(ctx context.Context, id, name, description string) (item.Item, bool)
-    Patch(ctx context.Context, id, name, description string) (item.Item, bool)
-    Delete(ctx context.Context, id string) bool
+    List(ctx context.Context, offset, limit int) ([]item.Item, int, error)
+    Update(ctx context.Context, id, name, description string) (item.Item, bool, error)
+    Patch(ctx context.Context, id, name, description string) (item.Item, bool, error)
+    Delete(ctx context.Context, id string) (bool, error)
 }
 
 type ItemHandler struct {
@@ -138,8 +149,13 @@ type ItemHandler struct {
     Logger plumelog.StructuredLogger // must not be nil; pass a.Core.Logger() from routes.go
 }
 
-// routes.go wires the concrete implementation
-items := handler.ItemHandler{Repo: item.NewMemoryStore(), Logger: a.Core.Logger()}
+// routes.go wires the service layer as the concrete implementation.
+// item.ItemService and item.MemoryStore both satisfy ItemRepository via
+// structural typing — handler tests can inject either without changing handler code.
+items := handler.ItemHandler{
+    Repo:   item.NewItemService(item.NewMemoryStore()),
+    Logger: a.Core.Logger(),
+}
 ```
 
 Handlers that depend on lifecycle dependencies (logger, config strings) rather than domain

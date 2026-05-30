@@ -66,7 +66,7 @@ If a requested capability belongs to an extension, create or use a
 - `internal/app/routes.go`: route table and handler dependency wiring.
 - `internal/handler`: HTTP adaptation, request parsing, response writing, and
   handler-local DTOs.
-- `internal/domain/item`: sample domain model and in-memory repository.
+- `internal/domain/item`: sample domain model (`item.go`), repository interface and in-memory implementation (`store.go`), and service interface and implementation (`service.go`). The three-file split demonstrates the canonical model → repository → service layering described in the root style guide §3.
 
 Dependency direction is one way:
 
