@@ -42,6 +42,7 @@ func Middleware(svc *Service, cookieName string, requireAuth bool) func(http.Han
 						Path:     "/",
 						Expires:  time.Unix(0, 0),
 						HttpOnly: true,
+						Secure:   true,
 					})
 					http.Error(w, "Unauthorized", http.StatusUnauthorized)
 					return
