@@ -29,6 +29,10 @@ forbidden_imports:
   - x/ai/**
   - x/gateway/**
 
+doc_paths:
+  - docs/modules/x/observability/README.md
+  - docs/modules/x/observability/featuremetrics
+
 review_checklist:
   - Do not add feature flag evaluation or storage here
   - Keep metric helpers thin wrappers over metrics.AggregateCollector

@@ -32,8 +32,9 @@ non_goals:
 subordinate_families:
   - x/ai/semanticcache
 
-# Stability tiers for subpackages.
-# stable   — API is covered by semantic versioning; breaking changes require a major version bump.
+# Stability tiers for subpackages. This block is the single source of truth for
+# subpackage maturity; individual subpackage module.yaml files do not repeat it.
+# stable       — API is covered by semantic versioning; breaking changes require a major version bump.
 # experimental — API may change in future releases without a deprecation period.
 stability_tiers:
   stable:
@@ -92,6 +93,7 @@ test_commands:
 
 doc_paths:
   - docs/modules/x/ai/README.md
+  - docs/concepts/caching-layers.md
 
 change_risks:
   - provider compatibility regression

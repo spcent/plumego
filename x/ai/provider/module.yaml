@@ -3,7 +3,6 @@ path: x/ai/provider
 layer: extension
 status: experimental
 suggested_gate_profile: single_module_behavior
-stability_tier: beta
 owner: ai-gateway
 risk: medium
 summary: Stable-tier provider contracts, routing, and provider adapters within the experimental x/ai family.

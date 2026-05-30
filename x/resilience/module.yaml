@@ -49,6 +49,7 @@ test_commands:
 doc_paths:
   - docs/modules/x/resilience/README.md
   - docs/concepts/x-ai-resilience-boundary.md
+  - docs/concepts/ratelimit-layers.md
 
 change_risks:
   - breaker threshold regression
@@ -69,7 +70,7 @@ review_checklist:
   - Keep feature-specific resilience orchestration, including AI provider fallback, in owning extensions
 
 agent_hints:
-  - "Rate-limit decision guide: HTTP abuse-guard middleware → middleware/abuseguard (wraps security/abuse); internal token-bucket primitive for extension packages → x/resilience/ratelimit (not an HTTP middleware)"
+  - "Rate-limit layer guide: docs/concepts/ratelimit-layers.md — HTTP abuse guard → middleware/abuseguard; extension token bucket → x/resilience/ratelimit; per-tenant policy → x/tenant/core"
   - Put reusable circuit breaking and rate limiting here instead of in stable security or feature-specific packages; keep feature-specific orchestration (e.g. AI fallback) in the owning extension
   - Keep adapters explicit rather than wrapping failures behind hidden middleware magic
 
