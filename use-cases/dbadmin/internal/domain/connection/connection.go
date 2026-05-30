@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 	"time"
 
 	kvstore "github.com/spcent/plumego/store/kv"
@@ -74,6 +75,46 @@ type Connection struct {
 	OriginalFilename string    `json:"original_filename,omitempty"` // user's original upload filename
 	CreatedAt        time.Time `json:"created_at"`
 	UpdatedAt        time.Time `json:"updated_at"`
+}
+
+// Redact clears all sensitive fields so the connection is safe to return in API
+// responses. Password, ESPassword, ESAPIKey are zeroed; MongoURI is rewritten
+// to strip any embedded credentials (mongodb://user:pass@host → mongodb://user@host).
+func (c *Connection) Redact() {
+	c.Password = ""
+	c.ESPassword = ""
+	c.ESAPIKey = ""
+	c.MongoURI = SanitizeMongoURI(c.MongoURI)
+}
+
+// SanitizeMongoURI strips the password from a MongoDB connection string.
+// Returns the original string unchanged if it cannot be parsed.
+// mongodb://user:pass@host:27017 → mongodb://user@host:27017
+// mongodb+srv://user:secret@cluster.example.com → mongodb+srv://user@cluster.example.com
+func SanitizeMongoURI(uri string) string {
+	if uri == "" {
+		return ""
+	}
+	// Find the scheme separator.
+	schemeEnd := strings.Index(uri, "://")
+	if schemeEnd < 0 {
+		return uri
+	}
+	rest := uri[schemeEnd+3:]
+	// Split userinfo from host at the last '@' before the path/query.
+	atIdx := strings.LastIndex(rest, "@")
+	if atIdx < 0 {
+		return uri // no userinfo
+	}
+	userinfo := rest[:atIdx]
+	hostPart := rest[atIdx+1:]
+	// Strip password from userinfo (user:pass → user).
+	colonIdx := strings.Index(userinfo, ":")
+	if colonIdx < 0 {
+		return uri // no password in userinfo
+	}
+	user := userinfo[:colonIdx]
+	return uri[:schemeEnd+3] + user + "@" + hostPart
 }
 
 // Store persists connections in a KV store, encrypting passwords with AES-GCM.
