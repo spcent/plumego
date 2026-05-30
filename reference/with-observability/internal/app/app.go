@@ -69,11 +69,23 @@ func New(cfg config.Config) (*App, error) {
 		return nil, fmt.Errorf("configure access log middleware: %w", err)
 	}
 	timeoutMw := timeout.Middleware(timeout.Config{Timeout: 30 * time.Second})
+	// Build CORS options from config. When CORSAllowedOrigins is set, use strict
+	// defaults that restrict cross-origin access to the enumerated origins. When
+	// empty (the default), CORSOptions{} allows all origins ("*") — safe for local
+	// development; always set APP_CORS_ALLOWED_ORIGINS in production.
+	var corsOpts cors.CORSOptions
+	if len(cfg.App.CORSAllowedOrigins) > 0 {
+		strictOpts, err := cors.StrictDefaultOptions(cfg.App.CORSAllowedOrigins...)
+		if err != nil {
+			return nil, fmt.Errorf("configure CORS middleware: %w", err)
+		}
+		corsOpts = strictOpts
+	}
 
 	if err := coreApp.Use(
 		requestid.Middleware(),
 		securityMw,
-		cors.Middleware(cors.CORSOptions{}),
+		cors.Middleware(corsOpts),
 		recoveryMw,
 		accesslogMw,
 		bodylimit.Middleware(bodylimit.Config{

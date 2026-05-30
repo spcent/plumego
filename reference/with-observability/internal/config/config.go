@@ -20,12 +20,13 @@ type Config struct {
 
 // AppConfig holds app-local, non-kernel configuration.
 type AppConfig struct {
-	EnvFile          string
-	ServiceName      string // APP_SERVICE_NAME; service identity in health and API responses.
-	MaxBodyBytes     int64  // APP_MAX_BODY_BYTES; maximum request body size (0 disables).
-	Version          string // Build version injected via -ldflags "-X main.version=…".
-	MetricsNamespace string // APP_METRICS_NAMESPACE; Prometheus metric name prefix.
-	MetricsMaxSeries int    // APP_METRICS_MAX_SERIES; maximum distinct label combinations retained.
+	EnvFile            string
+	ServiceName        string   // APP_SERVICE_NAME; service identity in health and API responses.
+	MaxBodyBytes       int64    // APP_MAX_BODY_BYTES; maximum request body size (0 disables).
+	Version            string   // Build version injected via -ldflags "-X main.version=…".
+	MetricsNamespace   string   // APP_METRICS_NAMESPACE; Prometheus metric name prefix.
+	MetricsMaxSeries   int      // APP_METRICS_MAX_SERIES; maximum distinct label combinations retained.
+	CORSAllowedOrigins []string // APP_CORS_ALLOWED_ORIGINS; comma-separated. Empty = ["*"]. Always restrict in production.
 }
 
 // Defaults returns safe configuration values for local development.
@@ -134,6 +135,20 @@ func applyEnv(cfg *Config, lookupEnv func(string) (string, bool)) {
 	boolf("APP_TLS_ENABLED", &cfg.Core.TLS.Enabled)
 	str("APP_TLS_CERT_FILE", &cfg.Core.TLS.CertFile)
 	str("APP_TLS_KEY_FILE", &cfg.Core.TLS.KeyFile)
+	if val, ok := lookupEnv("APP_CORS_ALLOWED_ORIGINS"); ok {
+		if v := strings.TrimSpace(val); v != "" {
+			parts := strings.Split(v, ",")
+			origins := make([]string, 0, len(parts))
+			for _, p := range parts {
+				if s := strings.TrimSpace(p); s != "" {
+					origins = append(origins, s)
+				}
+			}
+			if len(origins) > 0 {
+				cfg.App.CORSAllowedOrigins = origins
+			}
+		}
+	}
 }
 
 func applyEnvMap(cfg *Config, values map[string]string) {
