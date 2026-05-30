@@ -9,9 +9,9 @@ import (
 
 // Snapshot captures goroutine state at a point in time.
 type Snapshot struct {
-	Count      int
-	Stacks     []string
-	Timestamp  time.Time
+	Count     int
+	Stacks    []string
+	Timestamp time.Time
 }
 
 // TakeSnapshot captures current goroutine stacks.
@@ -60,8 +60,8 @@ func normalizeStack(stack string) string {
 
 // LeakDetector monitors for goroutine leaks over time.
 type LeakDetector struct {
-	baseline   Snapshot
-	threshold  int
+	baseline      Snapshot
+	threshold     int
 	checkInterval time.Duration
 }
 

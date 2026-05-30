@@ -24,16 +24,16 @@ type PoolStatsHandler struct {
 
 // SQLPoolStats represents connection pool statistics for SQL databases.
 type SQLPoolStats struct {
-	ConnectionID string `json:"connection_id"`
-	Driver       string `json:"driver"`
-	MaxOpen      int    `json:"max_open"`
-	Open         int    `json:"open"`
-	InUse        int    `json:"in_use"`
-	Idle         int    `json:"idle"`
-	WaitCount    int64  `json:"wait_count"`
-	WaitDuration string `json:"wait_duration"`
-	MaxIdleClosed     int64 `json:"max_idle_closed"`
-	MaxLifetimeClosed int64 `json:"max_lifetime_closed"`
+	ConnectionID      string `json:"connection_id"`
+	Driver            string `json:"driver"`
+	MaxOpen           int    `json:"max_open"`
+	Open              int    `json:"open"`
+	InUse             int    `json:"in_use"`
+	Idle              int    `json:"idle"`
+	WaitCount         int64  `json:"wait_count"`
+	WaitDuration      string `json:"wait_duration"`
+	MaxIdleClosed     int64  `json:"max_idle_closed"`
+	MaxLifetimeClosed int64  `json:"max_lifetime_closed"`
 }
 
 // GetSQLPoolStats returns pool statistics for a specific SQL connection.
@@ -76,11 +76,11 @@ func (h PoolStatsHandler) GetSQLPoolStats(w http.ResponseWriter, r *http.Request
 
 // AllPoolStats returns statistics for all active connections.
 type AllPoolStats struct {
-	SQLConnections      []SQLPoolStats          `json:"sql_connections,omitempty"`
-	RedisConnections    int                     `json:"redis_connections"`
-	MongoDBConnections  int                     `json:"mongodb_connections"`
-	ESConnections       int                     `json:"es_connections"`
-	Timestamp           string                  `json:"timestamp"`
+	SQLConnections     []SQLPoolStats `json:"sql_connections,omitempty"`
+	RedisConnections   int            `json:"redis_connections"`
+	MongoDBConnections int            `json:"mongodb_connections"`
+	ESConnections      int            `json:"es_connections"`
+	Timestamp          string         `json:"timestamp"`
 }
 
 // GetAllStats returns pool statistics for all connection types.
