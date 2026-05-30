@@ -20,7 +20,7 @@ Zero runtime dependencies in stable roots. Extensions under `x/*` may use extern
 | Extensions (beta) | `x/frontend` `x/gateway` `x/messaging` `x/observability` `x/rest` `x/tenant` `x/websocket` | Production-ready with caveats |
 | Extensions (experimental) | `x/ai` `x/data` `x/fileapi` `x/openapi` `x/resilience` `x/rpc` `x/validate` | APIs may change |
 | Reference apps | `reference/standard-service` … `reference/with-websocket` (16 total) | Each has its own `go.mod` |
-| Use-case apps | `use-cases/workerfleet` | MongoDB; own `go.mod` |
+| Use-case apps | `use-cases/workerfleet` `use-cases/cloud-vault` `use-cases/dbadmin` `use-cases/guardus` | Each has its own `go.mod` |
 | CLI tool | `cmd/plumego` | Agent-assist, codegen, validation, scaffold |
 | Validation | `internal/checks/` (14 programs) | Run via `make gates` |
 | Docs website | `website/` | Astro; regenerate with `make website-sync` |

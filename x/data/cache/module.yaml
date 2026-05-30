@@ -4,7 +4,7 @@ layer: extension
 status: experimental
 suggested_gate_profile: single_module_behavior
 stability_tier: experimental
-owner: platform
+owner: persistence
 risk: medium
 summary: Subordinate extension-layer cache adapters and topology-heavy cache implementations within the x/data family.
 
@@ -48,6 +48,7 @@ test_commands:
 doc_paths:
   - docs/modules/x/data/cache/README.md
   - docs/evidence/extension/x-cache.md
+  - docs/concepts/caching-layers.md
 
 change_risks:
   - distributed cache correctness regression

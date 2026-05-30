@@ -60,6 +60,7 @@ test_commands:
 
 doc_paths:
   - docs/modules/store/README.md
+  - docs/concepts/caching-layers.md
 
 change_risks:
   - persistence correctness regression

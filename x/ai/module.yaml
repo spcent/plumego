@@ -33,10 +33,11 @@ subordinate_families:
   - x/ai/semanticcache
 
 # Stability tiers for subpackages.
-# stable   — API is covered by semantic versioning; breaking changes require a major version bump.
+# stable       — API is covered by semantic versioning; breaking changes require a major version bump.
+# beta         — API is production-ready; incompatible changes require a deprecation cycle.
 # experimental — API may change in future releases without a deprecation period.
 stability_tiers:
-  stable:
+  beta:
     - provider      # Family tier index; package metadata lives in x/ai/provider/module.yaml
     - session       # Family tier index; package metadata lives in x/ai/session/module.yaml
     - streaming     # Family tier index; package metadata lives in x/ai/streaming/module.yaml
@@ -92,6 +93,7 @@ test_commands:
 
 doc_paths:
   - docs/modules/x/ai/README.md
+  - docs/concepts/caching-layers.md
 
 change_risks:
   - provider compatibility regression

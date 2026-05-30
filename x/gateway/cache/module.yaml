@@ -36,6 +36,10 @@ forbidden_imports:
   - x/messaging/**
   - x/observability/**
 
+doc_paths:
+  - docs/modules/x/gateway/README.md
+  - docs/modules/x/gateway/cache
+
 review_checklist:
   - Keep cache key strategies explicit and pluggable
   - Do not introduce hidden global cache state
