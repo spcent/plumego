@@ -15,11 +15,12 @@ const TopicsPage = lazy(() => import('./pages/TopicsPage'))
 const AITasksPage = lazy(() => import('./pages/AITasksPage'))
 const PromptsPage = lazy(() => import('./pages/PromptsPage'))
 const SystemPage = lazy(() => import('./pages/SystemPage'))
+const SettingsPage = lazy(() => import('./pages/SettingsPage'))
 const AccountPage = lazy(() => import('./pages/AccountPage'))
 const SecurityPage = lazy(() => import('./pages/SecurityPage'))
 const SetupPage = lazy(() => import('./pages/SetupPage'))
 
-type Page = 'vault' | 'search' | 'import' | 'index' | 'duplicates' | 'collections' | 'review' | 'topics' | 'ai' | 'prompts' | 'system' | 'account' | 'security'
+type Page = 'vault' | 'search' | 'import' | 'index' | 'duplicates' | 'collections' | 'review' | 'topics' | 'ai' | 'prompts' | 'system' | 'settings' | 'account' | 'security'
 
 interface OpenDoc {
   id: string
@@ -99,6 +100,9 @@ function AppContent() {
         <TabButton active={page === 'system'} onClick={() => setPage('system')}>
           ⊕ {t.nav.system}
         </TabButton>
+        <TabButton active={page === 'settings'} onClick={() => setPage('settings')}>
+          ⚙ {t.settings.title}
+        </TabButton>
         <span className="text-muted-foreground mx-1 text-xs">|</span>
         <TabButton active={page === 'account'} onClick={() => setPage('account')}>
           {t.nav.account}
@@ -134,6 +138,7 @@ function AppContent() {
           {page === 'ai' && <AITasksPage />}
           {page === 'prompts' && <PromptsPage />}
           {page === 'system' && <SystemPage />}
+          {page === 'settings' && <SettingsPage />}
           {page === 'account' && <AccountPage />}
           {page === 'security' && <SecurityPage />}
         </Suspense>

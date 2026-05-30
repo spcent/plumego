@@ -48,6 +48,10 @@ func TestMigrate_CreatesAllTables(t *testing.T) {
 		"document_ai_summaries",
 		"prompts",
 		"document_chunks",
+		"users",
+		"user_sessions",
+		"login_attempts",
+		"security_events",
 	}
 
 	for _, table := range expectedTables {
@@ -91,8 +95,8 @@ func TestMigrate_Idempotent(t *testing.T) {
 	if err := db.QueryRow("SELECT COUNT(*) FROM schema_migrations").Scan(&count); err != nil {
 		t.Fatalf("count migrations: %v", err)
 	}
-	if count != 5 {
-		t.Errorf("expected 5 migrations, got %d", count)
+	if count != 6 {
+		t.Errorf("expected 6 migrations, got %d", count)
 	}
 }
 
@@ -130,11 +134,11 @@ func TestMigrate_SchemaMigrationsTable(t *testing.T) {
 		}
 	}
 
-	if len(versions) != 5 {
-		t.Errorf("expected 5 versions, got %d", len(versions))
+	if len(versions) != 6 {
+		t.Errorf("expected 6 versions, got %d", len(versions))
 	}
 
-	// Verify versions are 1-5
+	// Verify versions are 1-6
 	for i, v := range versions {
 		if v != i+1 {
 			t.Errorf("version %d at index %d", v, i)

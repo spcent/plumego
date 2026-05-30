@@ -70,4 +70,50 @@ export const ALL_CHECKS = [
   'sources',
   'imports',
   'ai',
+  'config_check',
+  'data_dir_check',
+  'storage_writable_check',
+  'auth_security_check',
+  'cookie_security_check',
+  'qiniu_config_check',
+  'backup_check',
+  'migration_check',
 ]
+
+export interface Backup {
+  id: string
+  filename: string
+  size: number
+  created_at: string
+  storage_path: string
+}
+
+export interface SystemSettings {
+  version: string
+  storage_provider: string
+  auth_enabled: boolean
+  search_enabled: boolean
+  ai_enabled: boolean
+  database_path: string
+  storage_root?: string
+}
+
+export async function getSettings(): Promise<SystemSettings> {
+  return client.get('/api/v1/system/settings')
+}
+
+export async function createBackup(): Promise<{ backup: Backup }> {
+  return client.post('/api/v1/system/backup', {})
+}
+
+export async function listBackups(): Promise<{ backups: Backup[] }> {
+  return client.get('/api/v1/system/backups')
+}
+
+export async function deleteBackup(name: string): Promise<void> {
+  return client.delete(`/api/v1/system/backups/${encodeURIComponent(name)}`)
+}
+
+export function getBackupDownloadUrl(name: string): string {
+  return `/api/v1/system/backups/${encodeURIComponent(name)}/download`
+}

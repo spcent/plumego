@@ -23,6 +23,7 @@ type Config struct {
 	Organize OrganizeConfig
 	AI       AIConfig
 	Auth     AuthConfig
+	Desktop  DesktopConfig
 }
 
 // AppConfig holds app-local configuration.
@@ -31,6 +32,17 @@ type AppConfig struct {
 	Version         string
 	MaxUploadSizeMB int64
 	VersionPolicy   string
+}
+
+// DesktopConfig holds desktop application configuration.
+type DesktopConfig struct {
+	AppName              string
+	DataDir              string
+	CloseToTray          bool
+	CloseToTraySet       bool // tracks if CloseToTray was explicitly set
+	NativeNotifications  bool
+	NativeNotificationsSet bool
+	LaunchAtLogin        bool
 }
 
 // DBConfig holds database configuration.
@@ -136,6 +148,7 @@ type tomlConfig struct {
 	Organize tomlOrganize `toml:"organize"`
 	AI       tomlAI       `toml:"ai"`
 	Auth     tomlAuth     `toml:"auth"`
+	Desktop  tomlDesktop  `toml:"desktop"`
 }
 
 type tomlServer struct {
@@ -231,6 +244,23 @@ type tomlAuth struct {
 	} `toml:"bootstrap_admin"`
 }
 
+type tomlDesktop struct {
+	Enabled            bool   `toml:"enabled"`
+	AppName            string `toml:"app_name"`
+	DataDir            string `toml:"data_dir"`
+	StartHidden        bool   `toml:"start_hidden"`
+	CloseToTray        bool   `toml:"close_to_tray"`
+	ShowTrayIcon       bool   `toml:"show_tray_icon"`
+	LaunchAtLogin      bool   `toml:"launch_at_login"`
+	TrustedLocalMode   bool   `toml:"trusted_local_mode"`
+	NativeNotifications bool   `toml:"native_notifications"`
+	Import             struct {
+		DefaultRecursive        bool `toml:"default_recursive"`
+		DefaultAutoTagFromPath bool `toml:"default_auto_tag_from_path"`
+		ShowScanPreview        bool `toml:"show_scan_preview"`
+	} `toml:"import"`
+}
+
 // Defaults returns safe configuration values for local development.
 func Defaults() Config {
 	coreCfg := core.DefaultConfig()
@@ -303,6 +333,11 @@ func Defaults() Config {
 			LockoutMinutes:            15,
 			PasswordMinLength:         12,
 			BootstrapAdminEnabled:     false,
+		},
+		Desktop: DesktopConfig{
+			AppName:              "Markdown Cloud Vault",
+			CloseToTray:          true,
+			NativeNotifications:  true,
 		},
 	}
 }
@@ -524,6 +559,19 @@ func applyTOML(cfg *Config, tc *tomlConfig) {
 	if tc.Auth.BootstrapAdmin.Password != "" {
 		cfg.Auth.BootstrapAdminPassword = tc.Auth.BootstrapAdmin.Password
 	}
+
+	// Desktop
+	if tc.Desktop.AppName != "" {
+		cfg.Desktop.AppName = tc.Desktop.AppName
+	}
+	if tc.Desktop.DataDir != "" {
+		cfg.Desktop.DataDir = tc.Desktop.DataDir
+	}
+	cfg.Desktop.CloseToTray = tc.Desktop.CloseToTray
+	cfg.Desktop.CloseToTraySet = true
+	cfg.Desktop.NativeNotifications = tc.Desktop.NativeNotifications
+	cfg.Desktop.NativeNotificationsSet = true
+	cfg.Desktop.LaunchAtLogin = tc.Desktop.LaunchAtLogin
 }
 
 // Validate returns an error if cfg is unusable.
@@ -639,6 +687,13 @@ func applyEnvOverrides(cfg *Config, lookupEnv func(string) (string, bool)) {
 	str("AUTH_BOOTSTRAP_ADMIN_USERNAME", &cfg.Auth.BootstrapAdminUsername)
 	str("AUTH_BOOTSTRAP_ADMIN_EMAIL", &cfg.Auth.BootstrapAdminEmail)
 	str("AUTH_BOOTSTRAP_ADMIN_PASSWORD", &cfg.Auth.BootstrapAdminPassword)
+
+	// Desktop environment variables
+	str("DESKTOP_APP_NAME", &cfg.Desktop.AppName)
+	str("DESKTOP_DATA_DIR", &cfg.Desktop.DataDir)
+	boolf("DESKTOP_CLOSE_TO_TRAY", &cfg.Desktop.CloseToTray)
+	boolf("DESKTOP_NATIVE_NOTIFICATIONS", &cfg.Desktop.NativeNotifications)
+	boolf("DESKTOP_LAUNCH_AT_LOGIN", &cfg.Desktop.LaunchAtLogin)
 }
 
 func applyFlags(cfg *Config, args []string) error {

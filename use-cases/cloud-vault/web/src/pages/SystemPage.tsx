@@ -9,6 +9,7 @@ import {
   type DoctorResult,
   type CheckResult,
 } from '../api/system'
+import BackupPanel from '../components/BackupPanel'
 
 const STATUS_COLORS: Record<string, string> = {
   ok: 'bg-green-100 text-green-700 border-green-300',
@@ -190,6 +191,11 @@ export default function SystemPage() {
                   <StatBox label="Prompts" value={stats.prompts} />
                 </div>
               )}
+            </section>
+
+            {/* Backup Section */}
+            <section>
+              <BackupPanel />
             </section>
 
             {/* Doctor Section */}

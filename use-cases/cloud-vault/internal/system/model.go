@@ -71,4 +71,13 @@ var AllChecks = []string{
 	"sources",
 	"imports",
 	"ai",
+	"auth",
+	"config_check",
+	"data_dir_check",
+	"storage_writable_check",
+	"auth_security_check",
+	"cookie_security_check",
+	"qiniu_config_check",
+	"backup_check",
+	"migration_check",
 }
