@@ -3,6 +3,9 @@ package importer
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -10,6 +13,38 @@ import (
 )
 
 const maxScanFiles = 10000
+const importerSafeRootEnv = "IMPORTER_SAFE_ROOT"
+
+func safeImportRoot() string {
+	if v := strings.TrimSpace(os.Getenv(importerSafeRootEnv)); v != "" {
+		return v
+	}
+	return "/data/imports"
+}
+
+func resolveAndValidateSourcePath(input string) (string, error) {
+	cleanInput := strings.TrimSpace(input)
+	if cleanInput == "" {
+		return "", fmt.Errorf("source_path must not be empty")
+	}
+
+	baseAbs, err := filepath.Abs(filepath.Clean(safeImportRoot()))
+	if err != nil {
+		return "", fmt.Errorf("resolve safe root: %w", err)
+	}
+
+	resolvedAbs, err := filepath.Abs(filepath.Join(baseAbs, cleanInput))
+	if err != nil {
+		return "", fmt.Errorf("resolve source_path: %w", err)
+	}
+
+	basePrefix := baseAbs + string(os.PathSeparator)
+	if resolvedAbs != baseAbs && !strings.HasPrefix(resolvedAbs, basePrefix) {
+		return "", fmt.Errorf("source_path must be within %q", baseAbs)
+	}
+
+	return resolvedAbs, nil
+}
 
 // Config holds importer configuration.
 type Config struct {
@@ -36,14 +71,15 @@ func NewService(repo *Repository, docSvc *document.Service, cfg Config) *Service
 
 // CreateJob scans the source directory and registers a new import job.
 func (s *Service) CreateJob(ctx context.Context, req CreateJobRequest) (*JobResponse, error) {
-	if req.SourcePath == "" {
-		return nil, fmt.Errorf("source_path must not be empty")
+	sourcePath, err := resolveAndValidateSourcePath(req.SourcePath)
+	if err != nil {
+		return nil, err
 	}
 	if req.Name == "" {
 		req.Name = req.SourcePath
 	}
 
-	files, err := ScanDirectory(req.SourcePath, maxScanFiles)
+	files, err := ScanDirectory(sourcePath, maxScanFiles)
 	if err != nil {
 		return nil, fmt.Errorf("scan directory: %w", err)
 	}
@@ -52,7 +88,7 @@ func (s *Service) CreateJob(ctx context.Context, req CreateJobRequest) (*JobResp
 	job := &ImportJob{
 		ID:         newID(),
 		Name:       req.Name,
-		SourcePath: req.SourcePath,
+		SourcePath: sourcePath,
 		Status:     JobStatusPending,
 		TotalCount: len(files),
 		CreatedAt:  now,
