@@ -1,6 +1,6 @@
 # plumego extension api snapshot v1
 module	github.com/spcent/plumego
-pattern	./router
+pattern	./router/...
 symbol	github.com/spcent/plumego/router	const	MethodAny	const MethodAny = "ANY"
 symbol	github.com/spcent/plumego/router	func	NewRouter	func NewRouterfunc(opts ...RouterOption) *Router
 symbol	github.com/spcent/plumego/router	func	Param	func Paramfunc(r *http.Request, name string) string
@@ -24,5 +24,5 @@ symbol	github.com/spcent/plumego/router	type	NamedRoute	type NamedRoute struct {
 symbol	github.com/spcent/plumego/router	type	RouteInfo	type RouteInfo struct { Method string `json:"method"` Path string `json:"path"` Meta RouteMeta `json:"meta,omitempty"` }
 symbol	github.com/spcent/plumego/router	type	RouteMeta	type RouteMeta struct { Name string `json:"name,omitempty"` }
 symbol	github.com/spcent/plumego/router	type	RouteOption	type RouteOption func(*RouteMeta)
-symbol	github.com/spcent/plumego/router	type	Router	type Router struct { prefix string parent *Router state *routerState }
+symbol	github.com/spcent/plumego/router	type	Router	type Router struct { }
 symbol	github.com/spcent/plumego/router	type	RouterOption	type RouterOption func(*Router)
