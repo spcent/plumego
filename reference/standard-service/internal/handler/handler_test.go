@@ -1105,6 +1105,30 @@ func TestItemHandlerPatch(t *testing.T) {
 		}
 	})
 
+	t.Run("unknown field returns 400 with unknown_field code and field detail", func(t *testing.T) {
+		store := item.NewMemoryStore()
+		created := mustCreateItem(t, store, "original", "original desc")
+		h := ItemHandler{Service: store, Logger: discardLogger()}
+
+		body := bytes.NewBufferString(`{"desc":"new desc"}`)
+		req := httptest.NewRequest(http.MethodPatch, "/api/v1/items/"+created.ID, body)
+		ctx := contract.WithRequestContext(req.Context(), contract.RequestContext{
+			Params: map[string]string{"id": created.ID},
+		})
+		rec := httptest.NewRecorder()
+		h.Patch(rec, req.WithContext(ctx))
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
+		}
+		ef := decodeErrorPayload(t, rec)
+		if ef.Code != codeItemPatchUnknownField {
+			t.Fatalf("error code = %q, want %q", ef.Code, codeItemPatchUnknownField)
+		}
+		if ef.Details["field"] != "desc" {
+			t.Fatalf("error detail field = %v, want %q", ef.Details["field"], "desc")
+		}
+	})
+
 	t.Run("repeated patch with same values produces stable state", func(t *testing.T) {
 		// PATCH is not defined as idempotent by RFC 5789 — whether repeated
 		// calls produce identical state depends on the server's merge strategy.

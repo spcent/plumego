@@ -33,6 +33,7 @@ const (
 	codeItemListInvalidParam     = "item.list.invalid_param"
 	codeItemPatchInvalidJSON     = "item.patch.invalid_json"
 	codeItemPatchBodyRequired    = "item.patch.body_required"
+	codeItemPatchUnknownField    = "item.patch.unknown_field"
 	codeItemPatchNoFields        = "item.patch.no_fields"
 	codeItemPatchFailed          = "item.patch.failed"
 	codeItemDeleteFailed         = "item.delete.failed"
@@ -398,17 +399,30 @@ func (h ItemHandler) Update(w http.ResponseWriter, r *http.Request) {
 //	PATCH /api/v1/items/<id> {"name":"renamed","description":"new desc"} → 200 (both changed)
 //	PATCH /api/v1/items/<id>                                             → 400 TypeRequired (empty body)
 //	PATCH /api/v1/items/<id> {}                                          → 400 TypeRequired (no fields)
+//	PATCH /api/v1/items/<id> {"desc":"new desc"}                         → 400 TypeBadRequest unknown field "desc"
 //	PATCH /api/v1/items/missing {"name":"x"}                             → 404 TypeNotFound
+//
+// Decoding is strict (decodeJSONStrict), matching Create and Update: unknown
+// fields are rejected rather than silently ignored.
 func (h ItemHandler) Patch(w http.ResponseWriter, r *http.Request) {
 	id := router.Param(r, "id")
 
 	var req patchItemReq
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := decodeJSONStrict(r, &req); err != nil {
 		if errors.Is(err, io.EOF) {
 			logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
 				Type(contract.TypeRequired).
 				Code(codeItemPatchBodyRequired).
 				Message("request body is required").
+				Build()))
+			return
+		}
+		if field := unknownFieldName(err); field != "" {
+			logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+				Type(contract.TypeBadRequest).
+				Code(codeItemPatchUnknownField).
+				Detail("field", field).
+				Message("request body contains an unknown field").
 				Build()))
 			return
 		}
