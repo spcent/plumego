@@ -200,22 +200,28 @@ for a stateless service.
 ### Route layout — groups and collection + member pairs
 
 Routes that share a common path prefix are registered through a `RouteGroup` so
-the prefix is declared once and never repeated:
+the prefix is declared once and never repeated. The group is wrapped in the
+`routeReg` accumulator (see below) so each line stays one method + one path +
+one handler — this is exactly what `routes.go` does:
 
 ```go
-v1 := a.Core.Group("/api/v1")
-v1.Get("/greet",        http.HandlerFunc(api.Greet))
-v1.Get("/items",        http.HandlerFunc(items.List))
-v1.Post("/items",       writeGuard(http.HandlerFunc(items.Create)))
-v1.Get("/items/:id",    http.HandlerFunc(items.GetByID))
-v1.Put("/items/:id",    writeGuard(http.HandlerFunc(items.Update)))
-v1.Patch("/items/:id",  writeGuard(http.HandlerFunc(items.Patch)))
-v1.Delete("/items/:id", writeGuard(http.HandlerFunc(items.Delete)))
+v1 := newRouteReg(a.Core.Group("/api/v1"))
+v1.get("/greet",        http.HandlerFunc(api.Greet))
+v1.get("/items",        http.HandlerFunc(items.List))
+v1.post("/items",       writeGuard(http.HandlerFunc(items.Create)))
+v1.get("/items/:id",    http.HandlerFunc(items.GetByID))
+v1.put("/items/:id",    writeGuard(http.HandlerFunc(items.Update)))
+v1.patch("/items/:id",  writeGuard(http.HandlerFunc(items.Patch)))
+v1.delete("/items/:id", writeGuard(http.HandlerFunc(items.Delete)))
+return v1.err
 ```
 
-`RouteGroup` is a `core.App` concept: it enforces the same lifecycle and
-nil-handler rules as the top-level `Get/Post/Delete` methods. Groups can be
-nested (`api := app.Group("/api"); v1 := api.Group("/v1")`).
+`a.Core.Group("/api/v1")` returns a `*core.RouteGroup`, a `core.App` concept
+that enforces the same lifecycle and nil-handler rules as the top-level
+`Get/Post/Delete` methods. Groups can be nested
+(`api := app.Group("/api"); v1 := api.Group("/v1")`). The lowercase
+`v1.get/post/...` methods are the `routeReg` wrapper around the group's native
+`Get/Post/...`; the accumulator pattern is documented in the root style guide §5.
 
 REST resources follow a consistent two-path pattern:
 
@@ -246,9 +252,11 @@ fields are transmitted.
 
 ### Error accumulation in route registration (`routeReg`)
 
-`routes.go` uses a small local helper (`routeReg`) to avoid per-call error
-checks when registering routes. It wraps `routeAdder` and records only the
-first error:
+`routes.go` uses a small helper (`routeReg`) to avoid per-call error checks when
+registering routes. It wraps `routeAdder` and records only the first error. This
+is a sanctioned canonical pattern documented in the root style guide §5
+("Error-accumulating registration") — copy it rather than inventing a per-app
+variant:
 
 ```go
 v1 := newRouteReg(a.Core.Group("/api/v1"))

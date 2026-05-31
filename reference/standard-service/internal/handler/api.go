@@ -66,10 +66,14 @@ func (h APIHandler) Root(w http.ResponseWriter, r *http.Request) {
 
 // Hello responds with service metadata and the canonical endpoint list.
 //
-// The list is explicit rather than auto-generated so that each entry carries a
-// meaningful name and description. app_test.go TestHelloEndpointListMatchesRegisteredRoutes
-// validates that this list stays in sync with routes.go.
-// When you add a route in routes.go, add a matching entry here.
+// The list is hand-authored rather than derived from a.Core.Routes() by design:
+// router.RouteInfo exposes only Method, Path, and Meta.Name — it carries no
+// human-readable Description, which is editorial metadata the router cannot
+// supply. Auto-generating the list would therefore drop the descriptions that
+// make this a useful service-discovery endpoint. The tradeoff is that adding a
+// route in routes.go requires adding a matching entry here; app_test.go
+// TestHelloEndpointListMatchesRegisteredRoutes fails loudly if the two drift,
+// so the duplication cannot go stale silently.
 //
 // Ordered by method (DELETE < GET < POST < PUT) then path — matching
 // the sort order returned by a.Core.Routes().

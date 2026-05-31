@@ -9,4 +9,4 @@ steps:
   - Run target module tests and wider gates when the transport contract or route behavior changed.
 stop_conditions:
   - Do not hide dependencies in request context or middleware.
-  - Do not invent one-off response envelopes, handler signatures, or route-registration idioms.
+  - Do not invent one-off response envelopes, handler signatures, or route-registration idioms; use the canonical accumulator wrapper (style guide §5) instead of a per-task variant.
