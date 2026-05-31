@@ -105,6 +105,12 @@ func (h WidgetHandler) Create(w http.ResponseWriter, r *http.Request) {
 }
 ```
 
+For a handler that owns a fixed request shape, prefer the strict decode path used
+by the `items.go` write handlers (Create/Update/Patch) — `decodeJSONStrict(r, &req)`
+rejects unknown fields so a client typo is reported instead of silently dropped.
+Keep the lenient `json.NewDecoder(r.Body).Decode(...)` form only when the endpoint
+must tolerate forward-compatible extra fields.
+
 ### Add a readiness check
 
 A `health.ComponentChecker` represents one dependency (database, cache, downstream service).

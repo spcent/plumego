@@ -135,7 +135,7 @@ independently testable: tests pass a stub; production passes the real store.
 
 ```go
 // handler/items.go declares the narrow interface it needs
-type ItemRepository interface {
+type ItemService interface {
     Create(ctx context.Context, name, description string) (item.Item, error)
     Get(ctx context.Context, id string) (item.Item, bool)
     List(ctx context.Context, offset, limit int) ([]item.Item, int, error)
@@ -145,16 +145,16 @@ type ItemRepository interface {
 }
 
 type ItemHandler struct {
-    Repo   ItemRepository
-    Logger plumelog.StructuredLogger // must not be nil; pass a.Core.Logger() from routes.go
+    Service ItemService
+    Logger  plumelog.StructuredLogger // must not be nil; pass a.Core.Logger() from routes.go
 }
 
 // routes.go wires the service layer as the concrete implementation.
-// item.ItemService and item.MemoryStore both satisfy ItemRepository via
+// item.ItemService and item.MemoryStore both satisfy handler.ItemService via
 // structural typing — handler tests can inject either without changing handler code.
 items := handler.ItemHandler{
-    Repo:   item.NewItemService(item.NewMemoryStore()),
-    Logger: a.Core.Logger(),
+    Service: item.NewItemService(item.NewMemoryStore()),
+    Logger:  a.Core.Logger(),
 }
 ```
 

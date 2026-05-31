@@ -224,6 +224,21 @@
       "path": "reference/standard-service/internal/handler/items.go",
       "symbol": "codeItemDeleteFailed",
       "type": "TypeInternal"
+    },
+    {
+      "path": "reference/standard-service/internal/handler/items.go",
+      "symbol": "codeItemCreateUnknownField",
+      "type": "TypeBadRequest"
+    },
+    {
+      "path": "reference/standard-service/internal/handler/items.go",
+      "symbol": "codeItemUpdateUnknownField",
+      "type": "TypeBadRequest"
+    },
+    {
+      "path": "reference/standard-service/internal/handler/items.go",
+      "symbol": "codeItemPatchUnknownField",
+      "type": "TypeBadRequest"
     }
   ]
 }

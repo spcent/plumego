@@ -20,14 +20,15 @@ func (a *App) RegisterRoutes() error {
 		Logger:      a.Core.Logger(),
 	}
 	// ItemHandler demonstrates the three-layer architecture: handler → service → repository.
-	// handler/items.go declares ItemRepository; routes.go wires item.ItemService as the
-	// concrete implementation. ItemService wraps item.NewMemoryStore() here; replace
-	// NewMemoryStore() with a database-backed item.Repository for production.
-	// Both item.ItemService and item.MemoryStore satisfy ItemRepository via structural
-	// typing, so handler tests can inject either without changing handler code.
+	// handler/items.go declares the ItemService interface; routes.go wires
+	// item.ItemService as the concrete implementation. ItemService wraps
+	// item.NewMemoryStore() here; replace NewMemoryStore() with a database-backed
+	// item.Repository for production. Both item.ItemService and item.MemoryStore
+	// satisfy handler.ItemService via structural typing, so handler tests can inject
+	// either without changing handler code.
 	items := handler.ItemHandler{
-		Repo:   item.NewItemService(item.NewMemoryStore()),
-		Logger: a.Core.Logger(),
+		Service: item.NewItemService(item.NewMemoryStore()),
+		Logger:  a.Core.Logger(),
 	}
 
 	// RequireWriteKey is a per-route middleware that gates mutating operations.

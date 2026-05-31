@@ -4,7 +4,7 @@ import "context"
 
 // Service is the business logic contract for items.
 // Routes.go wires ItemService as the concrete implementation; handlers declare
-// a narrow interface (ItemRepository in internal/handler) that both ItemService
+// a narrow interface (ItemService in internal/handler) that both this ItemService
 // and MemoryStore satisfy, so implementations are interchangeable at the wiring
 // site without touching handler code.
 //

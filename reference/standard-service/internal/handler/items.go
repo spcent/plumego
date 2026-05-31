@@ -4,10 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"math"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/spcent/plumego/contract"
 	plumelog "github.com/spcent/plumego/log"
@@ -25,31 +27,35 @@ const (
 	codeItemNotFound             = "item.not_found"
 	codeItemUpdateInvalidJSON    = "item.update.invalid_json"
 	codeItemUpdateBodyRequired   = "item.update.body_required"
+	codeItemCreateUnknownField   = "item.create.unknown_field"
+	codeItemUpdateUnknownField   = "item.update.unknown_field"
 	codeItemListFailed           = "item.list.failed"
 	codeItemListInvalidParam     = "item.list.invalid_param"
 	codeItemPatchInvalidJSON     = "item.patch.invalid_json"
 	codeItemPatchBodyRequired    = "item.patch.body_required"
+	codeItemPatchUnknownField    = "item.patch.unknown_field"
 	codeItemPatchNoFields        = "item.patch.no_fields"
 	codeItemPatchFailed          = "item.patch.failed"
 	codeItemDeleteFailed         = "item.delete.failed"
 )
 
 // noLimit is passed as maxVal to parseQueryInt when no upper bound is needed.
-// Using math.MaxInt means the clamp condition (n > maxVal) will never trigger
-// for any realistic query parameter value.
+// Using math.MaxInt means the upper-bound rejection (n > maxVal) will never
+// trigger for any realistic query parameter value.
 const noLimit = math.MaxInt
 
-// ItemRepository is the minimal persistence contract that ItemHandler depends on.
+// ItemService is the minimal business contract that ItemHandler depends on.
 // Declaring this interface in the handler package means the handler owns its
 // dependency contract and is not coupled to domain implementation details.
 //
 // In production routes.go wires item.ItemService, which implements this interface
 // via structural typing. In handler tests item.MemoryStore also satisfies it
-// directly, allowing test setup to bypass the service layer without code changes.
+// directly, allowing test setup to inject storage straight into the handler
+// without constructing the service layer.
 //
 // The error return on mutating methods distinguishes storage failures (non-nil error)
 // from "not found" (bool false, nil error) so handlers can return 500 vs 404.
-type ItemRepository interface {
+type ItemService interface {
 	Create(ctx context.Context, name, description string) (item.Item, error)
 	Get(ctx context.Context, id string) (item.Item, bool)
 	List(ctx context.Context, offset, limit int) ([]item.Item, int, error)
@@ -64,8 +70,8 @@ type ItemRepository interface {
 // Logger must not be nil; pass a.Core.Logger() from routes.go.
 // Use plumelog.NewLogger(plumelog.LoggerConfig{Format: plumelog.LoggerFormatDiscard}) in tests.
 type ItemHandler struct {
-	Repo   ItemRepository
-	Logger plumelog.StructuredLogger
+	Service ItemService
+	Logger  plumelog.StructuredLogger
 }
 
 // createItemReq, updateItemReq, and patchItemReq carry the same fields but are
@@ -104,28 +110,79 @@ func requireItemFields(eb *contract.ErrorBuilder, name, description string) (*co
 	return eb, valid
 }
 
+// decodeJSONStrict decodes exactly one JSON object from r.Body into dst and
+// rejects any field that does not map to a struct field (DisallowUnknownFields).
+// It returns the decoder error unchanged so callers can distinguish io.EOF
+// (empty body), an unknown-field error (see unknownFieldName), and malformed
+// JSON, mapping each to the appropriate transport response.
+//
+// This is the canonical decode path for write handlers that own a fixed request
+// shape. Use the lenient json.NewDecoder(r.Body).Decode(...) form only when the
+// endpoint must tolerate forward-compatible extra fields.
+func decodeJSONStrict(r *http.Request, dst any) error {
+	dec := json.NewDecoder(r.Body)
+	dec.DisallowUnknownFields()
+	return dec.Decode(dst)
+}
+
+// unknownFieldName returns the offending field name when err is the error
+// encoding/json reports for an unknown field under DisallowUnknownFields
+// (`json: unknown field "x"`), or "" for any other error. The standard library
+// does not expose a typed error for this case, so the documented message prefix
+// is matched directly.
+func unknownFieldName(err error) string {
+	const prefix = `json: unknown field "`
+	if err == nil {
+		return ""
+	}
+	msg := err.Error()
+	if !strings.HasPrefix(msg, prefix) {
+		return ""
+	}
+	rest := msg[len(prefix):]
+	if i := strings.IndexByte(rest, '"'); i >= 0 {
+		return rest[:i]
+	}
+	return ""
+}
+
 // Create handles POST /api/v1/items.
-// It demonstrates two canonical error patterns:
-//   - body/JSON errors are caught first and returned immediately
-//   - field validation collects ALL missing required fields before writing an
+// It demonstrates the canonical write-decode error patterns:
+//   - decode errors are caught first and returned immediately, with empty body,
+//     unknown field, and malformed JSON each mapped to a distinct error code
+//   - field validation then collects ALL missing required fields before writing an
 //     error response, so clients receive a single actionable reply that names
 //     every field they need to fix rather than discovering failures one at a time
+//
+// Decoding is strict (decodeJSONStrict): a client typo such as {"naem":"x"} is
+// rejected with a clear unknown-field error instead of being silently dropped and
+// later surfacing as a confusing "field required" response.
 //
 // Examples:
 //
 //	POST /api/v1/items {"name":"widget","description":"a widget"}  → 201 item
 //	POST /api/v1/items                                             → 400 TypeRequired  (empty body)
 //	POST /api/v1/items (bad JSON)                                  → 400 TypeBadRequest
+//	POST /api/v1/items {"name":"x","desc":"y"}                     → 400 TypeBadRequest unknown field "desc"
 //	POST /api/v1/items {}                                          → 400 TypeRequired  details: name + description
 //	POST /api/v1/items {"name":"widget"}                           → 400 TypeRequired  detail: description
 func (h ItemHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var req createItemReq
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := decodeJSONStrict(r, &req); err != nil {
 		if errors.Is(err, io.EOF) {
 			logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
 				Type(contract.TypeRequired).
 				Code(codeItemCreateBodyRequired).
 				Message("request body is required").
+				Build()))
+			return
+		}
+		if field := unknownFieldName(err); field != "" {
+			logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+				Type(contract.TypeBadRequest).
+				Code(codeItemCreateUnknownField).
+				Detail("field", field).
+				Message("request body contains an unknown field").
 				Build()))
 			return
 		}
@@ -146,7 +203,7 @@ func (h ItemHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	created, err := h.Repo.Create(r.Context(), req.Name, req.Description)
+	created, err := h.Service.Create(r.Context(), req.Name, req.Description)
 	if err != nil {
 		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeInternal).
@@ -168,10 +225,11 @@ func (h ItemHandler) Create(w http.ResponseWriter, r *http.Request) {
 // single LIMIT/OFFSET query rather than loading every row into memory.
 //
 //	GET /api/v1/items                    → 200 data:[…] meta:{total:N,limit:20,offset:0}
-//	GET /api/v1/items?limit=5            → first 5 items; limit capped at 100
+//	GET /api/v1/items?limit=5            → first 5 items (limit must be 1–100)
 //	GET /api/v1/items?limit=5&offset=10  → items 11-15
 //	GET /api/v1/items?offset=999         → empty data; meta:{total:N,limit:20,offset:999}
 //	GET /api/v1/items?limit=abc          → 400 TypeBadRequest item.list.invalid_param
+//	GET /api/v1/items?limit=200          → 400 TypeBadRequest item.list.invalid_param (exceeds max 100)
 func (h ItemHandler) List(w http.ResponseWriter, r *http.Request) {
 	const defaultLimit = 20
 	const maxLimit = 100
@@ -182,7 +240,7 @@ func (h ItemHandler) List(w http.ResponseWriter, r *http.Request) {
 			Type(contract.TypeBadRequest).
 			Code(codeItemListInvalidParam).
 			Detail("field", "limit").
-			Message("limit must be a positive integer").
+			Message(fmt.Sprintf("limit must be an integer between 1 and %d", maxLimit)).
 			Build()))
 		return
 	}
@@ -201,7 +259,7 @@ func (h ItemHandler) List(w http.ResponseWriter, r *http.Request) {
 	// Delegate pagination to the repository. The meta offset field carries the
 	// requested offset (not a clamped value) so clients always know exactly where
 	// their page was requested relative to the full list.
-	page, total, err := h.Repo.List(r.Context(), offset, limit)
+	page, total, err := h.Service.List(r.Context(), offset, limit)
 	if err != nil {
 		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeInternal).
@@ -220,21 +278,19 @@ func (h ItemHandler) List(w http.ResponseWriter, r *http.Request) {
 
 // parseQueryInt parses an integer query parameter.
 // Returns (defaultVal, true) when the parameter is absent.
-// Returns (0, false) when the parameter is present but not a valid integer or is below minVal;
-// the caller should write a 400 error in that case.
-// When n > maxVal, the value is silently clamped to maxVal.
-// Pass noLimit (math.MaxInt) for maxVal to allow any value above minVal without capping.
+// Returns (0, false) when the parameter is present but not a valid integer, is
+// below minVal, or is above maxVal; the caller should write a 400 error in that
+// case so an out-of-range value is reported explicitly rather than being clamped
+// to a different page size than the client asked for.
+// Pass noLimit (math.MaxInt) for maxVal to allow any value at or above minVal.
 func parseQueryInt(r *http.Request, key string, defaultVal, minVal, maxVal int) (int, bool) {
 	raw := r.URL.Query().Get(key)
 	if raw == "" {
 		return defaultVal, true
 	}
 	n, err := strconv.Atoi(raw)
-	if err != nil || n < minVal {
+	if err != nil || n < minVal || n > maxVal {
 		return 0, false
-	}
-	if n > maxVal {
-		return maxVal, true
 	}
 	return n, true
 }
@@ -246,7 +302,7 @@ func parseQueryInt(r *http.Request, key string, defaultVal, minVal, maxVal int) 
 //	GET /api/v1/items/missing → 404 TypeNotFound
 func (h ItemHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 	id := router.Param(r, "id")
-	found, ok := h.Repo.Get(r.Context(), id)
+	found, ok := h.Service.Get(r.Context(), id)
 	if !ok {
 		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeNotFound).
@@ -269,16 +325,29 @@ func (h ItemHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 //	PUT /api/v1/items/<id>                                         → 400 TypeRequired (empty body)
 //	PUT /api/v1/items/<id> {}                                      → 400 TypeRequired (name + description)
 //	PUT /api/v1/items/missing {"name":"x","description":"y"}       → 404 TypeNotFound
+//	PUT /api/v1/items/<id> {"name":"x","desc":"y"}                 → 400 TypeBadRequest unknown field "desc"
+//
+// Decoding is strict (decodeJSONStrict), matching Create: unknown fields are
+// rejected rather than silently ignored.
 func (h ItemHandler) Update(w http.ResponseWriter, r *http.Request) {
 	id := router.Param(r, "id")
 
 	var req updateItemReq
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := decodeJSONStrict(r, &req); err != nil {
 		if errors.Is(err, io.EOF) {
 			logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
 				Type(contract.TypeRequired).
 				Code(codeItemUpdateBodyRequired).
 				Message("request body is required").
+				Build()))
+			return
+		}
+		if field := unknownFieldName(err); field != "" {
+			logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+				Type(contract.TypeBadRequest).
+				Code(codeItemUpdateUnknownField).
+				Detail("field", field).
+				Message("request body contains an unknown field").
 				Build()))
 			return
 		}
@@ -299,7 +368,7 @@ func (h ItemHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	updated, ok, err := h.Repo.Update(r.Context(), id, req.Name, req.Description)
+	updated, ok, err := h.Service.Update(r.Context(), id, req.Name, req.Description)
 	if err != nil {
 		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeInternal).
@@ -330,17 +399,30 @@ func (h ItemHandler) Update(w http.ResponseWriter, r *http.Request) {
 //	PATCH /api/v1/items/<id> {"name":"renamed","description":"new desc"} → 200 (both changed)
 //	PATCH /api/v1/items/<id>                                             → 400 TypeRequired (empty body)
 //	PATCH /api/v1/items/<id> {}                                          → 400 TypeRequired (no fields)
+//	PATCH /api/v1/items/<id> {"desc":"new desc"}                         → 400 TypeBadRequest unknown field "desc"
 //	PATCH /api/v1/items/missing {"name":"x"}                             → 404 TypeNotFound
+//
+// Decoding is strict (decodeJSONStrict), matching Create and Update: unknown
+// fields are rejected rather than silently ignored.
 func (h ItemHandler) Patch(w http.ResponseWriter, r *http.Request) {
 	id := router.Param(r, "id")
 
 	var req patchItemReq
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := decodeJSONStrict(r, &req); err != nil {
 		if errors.Is(err, io.EOF) {
 			logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
 				Type(contract.TypeRequired).
 				Code(codeItemPatchBodyRequired).
 				Message("request body is required").
+				Build()))
+			return
+		}
+		if field := unknownFieldName(err); field != "" {
+			logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+				Type(contract.TypeBadRequest).
+				Code(codeItemPatchUnknownField).
+				Detail("field", field).
+				Message("request body contains an unknown field").
 				Build()))
 			return
 		}
@@ -361,7 +443,7 @@ func (h ItemHandler) Patch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	updated, ok, err := h.Repo.Patch(r.Context(), id, req.Name, req.Description)
+	updated, ok, err := h.Service.Patch(r.Context(), id, req.Name, req.Description)
 	if err != nil {
 		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeInternal).
@@ -389,7 +471,7 @@ func (h ItemHandler) Patch(w http.ResponseWriter, r *http.Request) {
 //	DELETE /api/v1/items/missing → 404 TypeNotFound
 func (h ItemHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	id := router.Param(r, "id")
-	ok, err := h.Repo.Delete(r.Context(), id)
+	ok, err := h.Service.Delete(r.Context(), id)
 	if err != nil {
 		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeInternal).
