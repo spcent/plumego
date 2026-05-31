@@ -176,6 +176,7 @@ func getCanonicalItemHandlerContent(module string) string {
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 
 	"github.com/spcent/plumego/contract"
 	"github.com/spcent/plumego/router"
@@ -198,9 +199,19 @@ type createItemReq struct {
 }
 
 // Create handles POST /api/v1/items.
+// Decoding is strict (decodeJSONStrict): unknown fields are rejected so a client
+// typo is reported instead of being silently dropped.
 func (h ItemHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var req createItemReq
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := decodeJSONStrict(r, &req); err != nil {
+		if field := unknownFieldName(err); field != "" {
+			_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+				Type(contract.TypeBadRequest).
+				Detail("field", field).
+				Message("request body contains an unknown field").
+				Build())
+			return
+		}
 		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeBadRequest).
 			Message("request body must be valid JSON").
@@ -232,6 +243,35 @@ func (h ItemHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	_ = contract.WriteResponse(w, r, http.StatusOK, item, nil)
+}
+
+// decodeJSONStrict decodes the request body into dst and rejects unknown fields
+// so a client typo is reported instead of being silently dropped. Use the lenient
+// json.NewDecoder(r.Body).Decode(...) form only when the endpoint must tolerate
+// forward-compatible extra fields.
+func decodeJSONStrict(r *http.Request, dst any) error {
+	dec := json.NewDecoder(r.Body)
+	dec.DisallowUnknownFields()
+	return dec.Decode(dst)
+}
+
+// unknownFieldName returns the offending field name when err is the error
+// encoding/json reports for an unknown field (json: unknown field "x"), or ""
+// for any other error. The standard library has no typed error for this case.
+func unknownFieldName(err error) string {
+	const prefix = `+"`json: unknown field \"`"+`
+	if err == nil {
+		return ""
+	}
+	msg := err.Error()
+	if !strings.HasPrefix(msg, prefix) {
+		return ""
+	}
+	rest := msg[len(prefix):]
+	if i := strings.IndexByte(rest, '"'); i >= 0 {
+		return rest[:i]
+	}
+	return ""
 }
 `, module)
 }
