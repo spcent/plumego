@@ -133,3 +133,4 @@ records two release refs, matching API snapshots, no exported API changes, and
 - If the task is "proxy/edge transport", start in `x/gateway`
 - If the task is "bootstrap a service", start in `reference/standard-service`
 - If the task is "domain validation or business rules", keep that logic outside `x/rest`
+- If the task is "wire CRUD + request validation + OpenAPI docs together", see `docs/concepts/rest-api-composition.md`
