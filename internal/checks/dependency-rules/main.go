@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 
 	"github.com/spcent/plumego/internal/checks/checkutil"
 )
@@ -14,12 +13,7 @@ func main() {
 		failf("resolve working directory: %v", err)
 	}
 
-	baseline, err := checkutil.ReadBaseline(filepath.Join(repoRoot, "specs", "check-baseline", "dependency-rules.txt"))
-	if err != nil {
-		failf("read dependency baseline: %v", err)
-	}
-
-	violations, err := checkutil.FindDisallowedImports(repoRoot, baseline)
+	violations, err := checkutil.FindDisallowedImports(repoRoot)
 	if err != nil {
 		failf("run dependency rules check: %v", err)
 	}

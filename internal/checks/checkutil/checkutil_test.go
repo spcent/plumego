@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-func TestFindDisallowedImportsHonorsBaselineAndSkipsTests(t *testing.T) {
+func TestFindDisallowedImportsReportsAllAndSkipsTests(t *testing.T) {
 	repo := t.TempDir()
 	writeRepoSpec(t, repo)
 	writeDependencyRulesSpec(t, repo)
@@ -16,23 +16,21 @@ func TestFindDisallowedImportsHonorsBaselineAndSkipsTests(t *testing.T) {
 
 import (
 	"net/http"
-	"github.com/spcent/plumego/internal/httpx"
 	"github.com/spcent/plumego/x/tenant/resolve"
 )
 
 func Use(_ http.ResponseWriter) {
-	_, _ = httpx.ClientIP(nil)
 	_ = resolve.Options{}
 }
 `)
+	// The same disallowed import appears only in a _test.go file and must be
+	// skipped, so it does not produce a second violation.
 	writeFile(t, filepath.Join(repo, "core", "core_test.go"), `package core
 
 import "github.com/spcent/plumego/x/tenant/resolve"
 `)
 
-	violations, err := FindDisallowedImports(repo, map[string]struct{}{
-		"core/core.go|github.com/spcent/plumego/internal/httpx": {},
-	})
+	violations, err := FindDisallowedImports(repo)
 	if err != nil {
 		t.Fatalf("FindDisallowedImports: %v", err)
 	}
@@ -65,7 +63,7 @@ func Use() {
 }
 `)
 
-	violations, err := FindDisallowedImports(repo, nil)
+	violations, err := FindDisallowedImports(repo)
 	if err != nil {
 		t.Fatalf("FindDisallowedImports: %v", err)
 	}
@@ -301,7 +299,7 @@ func TestReadBaselineAcceptsLongLines(t *testing.T) {
 	}
 }
 
-func TestFindMissingModuleManifestsHonorsBaseline(t *testing.T) {
+func TestFindMissingModuleManifestsReportsXModulesWithoutManifest(t *testing.T) {
 	repo := t.TempDir()
 	writeFile(t, filepath.Join(repo, "core", "module.yaml"), validManifest("core", "stable"))
 	writeFile(t, filepath.Join(repo, "router", "module.yaml"), validManifest("router", "stable"))
@@ -314,14 +312,11 @@ func TestFindMissingModuleManifestsHonorsBaseline(t *testing.T) {
 	writeFile(t, filepath.Join(repo, "metrics", "module.yaml"), validManifest("metrics", "stable"))
 	writeFile(t, filepath.Join(repo, "x", "ai", "module.yaml"), validManifest("x/ai", "extension"))
 	writeFile(t, filepath.Join(repo, "x", "observability", "module.yaml"), validManifest("x/observability", "extension"))
-	if err := os.MkdirAll(filepath.Join(repo, "x", "observability", "ops"), 0o755); err != nil {
-		t.Fatalf("mkdir x/observability/ops: %v", err)
-	}
 	if err := os.MkdirAll(filepath.Join(repo, "x", "scheduler"), 0o755); err != nil {
 		t.Fatalf("mkdir x/scheduler: %v", err)
 	}
 
-	missing, err := FindMissingModuleManifests(repo, map[string]struct{}{"x/observability/ops": {}})
+	missing, err := FindMissingModuleManifests(repo)
 	if err != nil {
 		t.Fatalf("FindMissingModuleManifests: %v", err)
 	}
@@ -400,17 +395,15 @@ func TestValidateModuleManifestsRequiresDeclaredDocPathsToExist(t *testing.T) {
 	}
 }
 
-func TestFindUnexpectedTopLevelDirsHonorsBaseline(t *testing.T) {
+func TestFindUnexpectedTopLevelDirs(t *testing.T) {
 	repo := t.TempDir()
-	for _, dir := range []string{"core", "docs", "x", "legacy"} {
+	for _, dir := range []string{"core", "docs", "x"} {
 		if err := os.MkdirAll(filepath.Join(repo, dir), 0o755); err != nil {
 			t.Fatalf("mkdir %s: %v", dir, err)
 		}
 	}
 
-	unexpected, err := FindUnexpectedTopLevelDirs(repo, AllowedTopLevelDirs(), map[string]struct{}{
-		"legacy": {},
-	})
+	unexpected, err := FindUnexpectedTopLevelDirs(repo, AllowedTopLevelDirs())
 	if err != nil {
 		t.Fatalf("FindUnexpectedTopLevelDirs: %v", err)
 	}
@@ -421,9 +414,7 @@ func TestFindUnexpectedTopLevelDirsHonorsBaseline(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(repo, "rogue"), 0o755); err != nil {
 		t.Fatalf("mkdir rogue: %v", err)
 	}
-	unexpected, err = FindUnexpectedTopLevelDirs(repo, AllowedTopLevelDirs(), map[string]struct{}{
-		"legacy": {},
-	})
+	unexpected, err = FindUnexpectedTopLevelDirs(repo, AllowedTopLevelDirs())
 	if err != nil {
 		t.Fatalf("FindUnexpectedTopLevelDirs second pass: %v", err)
 	}

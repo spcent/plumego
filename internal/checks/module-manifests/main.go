@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 
 	"github.com/spcent/plumego/internal/checks/checkutil"
 )
@@ -14,12 +13,7 @@ func main() {
 		failf("resolve working directory: %v", err)
 	}
 
-	baseline, err := checkutil.ReadBaseline(filepath.Join(repoRoot, "specs", "check-baseline", "missing-module-manifests.txt"))
-	if err != nil {
-		failf("read module manifest baseline: %v", err)
-	}
-
-	missing, err := checkutil.FindMissingModuleManifests(repoRoot, baseline)
+	missing, err := checkutil.FindMissingModuleManifests(repoRoot)
 	if err != nil {
 		failf("find missing module manifests: %v", err)
 	}

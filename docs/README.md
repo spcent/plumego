@@ -70,13 +70,21 @@ Related execution surfaces live outside `docs/`:
 - `../reference/production-service/README.md` — production-oriented explicit wiring beyond the minimal canonical path
 - `../reference/with-rest/README.md` — explicit `x/rest` mounting pattern
 - `../reference/with-tenant/README.md` — explicit `x/tenant` mounting pattern
-- `../reference/with-gateway/README.md` — explicit `x/gateway` mounting pattern
+- `../reference/with-tenant-admin/README.md` — explicit tenant administration console mounting pattern
+- `../reference/with-gateway/README.md` — explicit `x/gateway` reverse-proxy mounting pattern
 - `../reference/with-websocket/README.md` — explicit `x/websocket` mounting pattern
 - `../reference/with-ai/README.md` — explicit stable-tier `x/ai` mounting pattern
 - `../reference/with-ops/README.md` — explicit observability and protected admin surface mounting pattern
+- `../reference/with-observability/README.md` — explicit observability stack (tracing, metrics export) mounting pattern
 - `../reference/with-messaging/README.md` — explicit app-facing messaging mounting pattern
+- `../reference/with-events/README.md` — explicit event-driven pubsub architecture mounting pattern
 - `../reference/with-webhook/README.md` — explicit webhook ingress and outbound delivery mounting pattern
-- `../use-cases/workerfleet/README.md` — worker-fleet monitoring use-case, not part of the canonical web-service path
+- `../reference/with-frontend/README.md` — explicit embedded static-asset mounting pattern
+- `../reference/with-rpc/README.md` — explicit `x/rpc` gRPC transport mounting pattern
+- `../reference/benchmark/README.md` — benchmarking harness comparing Plumego against other routers
+
+For use-cases (end-to-end applications, not part of the canonical web-service
+path), see `../use-cases/` — e.g. `../use-cases/workerfleet/README.md`.
 
 ## Authority Order
 

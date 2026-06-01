@@ -255,7 +255,7 @@ func walkGoImports(repoRoot, dir string, includeTests bool, visit func(relPath, 
 	})
 }
 
-func FindDisallowedImports(repoRoot string, baseline map[string]struct{}) ([]string, error) {
+func FindDisallowedImports(repoRoot string) ([]string, error) {
 	rules, err := ReadDependencyRules(repoRoot)
 	if err != nil {
 		return nil, err
@@ -312,9 +312,6 @@ func FindDisallowedImports(repoRoot string, baseline map[string]struct{}) ([]str
 			}
 
 			key := relPath + "|" + importPath
-			if _, ok := baseline[key]; ok {
-				return
-			}
 			violations = append(violations, key)
 		})
 		if err != nil {
@@ -332,9 +329,6 @@ func FindDisallowedImports(repoRoot string, baseline map[string]struct{}) ([]str
 		}
 
 		key := "FORBIDDEN_PATH|" + forbiddenPath
-		if _, ok := baseline[key]; ok {
-			continue
-		}
 		violations = append(violations, key)
 	}
 
@@ -513,7 +507,7 @@ func matchesAnyRepoPattern(relPath string, patterns []string) bool {
 	return false
 }
 
-func FindMissingModuleManifests(repoRoot string, baseline map[string]struct{}) ([]string, error) {
+func FindMissingModuleManifests(repoRoot string) ([]string, error) {
 	var missing []string
 
 	for _, root := range StableRoots {
@@ -544,9 +538,6 @@ func FindMissingModuleManifests(repoRoot string, baseline map[string]struct{}) (
 			return nil, err
 		}
 
-		if _, ok := baseline[relModule]; ok {
-			continue
-		}
 		missing = append(missing, relModule)
 	}
 
@@ -690,7 +681,7 @@ func parseModuleName(data string) string {
 	return ""
 }
 
-func FindUnexpectedTopLevelDirs(repoRoot string, allowed, baseline map[string]struct{}) ([]string, error) {
+func FindUnexpectedTopLevelDirs(repoRoot string, allowed map[string]struct{}) ([]string, error) {
 	entries, err := os.ReadDir(repoRoot)
 	if err != nil {
 		return nil, err
@@ -703,9 +694,6 @@ func FindUnexpectedTopLevelDirs(repoRoot string, allowed, baseline map[string]st
 			continue
 		}
 		if _, ok := allowed[name]; ok {
-			continue
-		}
-		if _, ok := baseline[name]; ok {
 			continue
 		}
 		unexpected = append(unexpected, name)
