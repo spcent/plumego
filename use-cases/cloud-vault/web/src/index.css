@@ -4,36 +4,38 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --border: 214.3 31.8% 91.4%;
-    --accent: 210 40% 96.1%;
+    --background: 210 20% 98%;
+    --surface: 0 0% 100%;
+    --foreground: 220 24% 9%;
+    --muted: 210 18% 93%;
+    --muted-foreground: 216 10% 42%;
+    --border: 214 16% 86%;
+    --accent: 210 20% 94%;
     --accent-foreground: 222.2 47.4% 11.2%;
-    --primary: 221.2 83.2% 53.3%;
+    --primary: 206 72% 42%;
     --primary-foreground: 210 40% 98%;
-    --destructive: 0 84.2% 60.2%;
+    --destructive: 0 72% 48%;
     --destructive-foreground: 210 40% 98%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 221.2 83.2% 53.3%;
+    --input: 214 16% 82%;
+    --ring: 206 72% 42%;
     --radius: 0.5rem;
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --border: 217.2 32.6% 17.5%;
-    --accent: 217.2 32.6% 17.5%;
+    --background: 220 22% 9%;
+    --surface: 220 18% 12%;
+    --foreground: 210 24% 96%;
+    --muted: 220 15% 18%;
+    --muted-foreground: 216 12% 66%;
+    --border: 220 14% 24%;
+    --accent: 220 15% 18%;
     --accent-foreground: 210 40% 98%;
-    --primary: 217.2 91.2% 59.8%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-    --destructive: 0 62.8% 30.6%;
+    --primary: 202 68% 56%;
+    --primary-foreground: 220 22% 9%;
+    --destructive: 0 64% 52%;
     --destructive-foreground: 210 40% 98%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 224.3 76.3% 48%;
+    --input: 220 14% 27%;
+    --ring: 202 68% 56%;
     --radius: 0.5rem;
   }
 
@@ -43,8 +45,81 @@
 
   body {
     @apply bg-background text-foreground;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-family: ui-sans-serif, 'Avenir Next', 'SF Pro Text', 'Segoe UI', Roboto, sans-serif;
+    letter-spacing: 0;
   }
+
+  select {
+    color-scheme: light dark;
+  }
+
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  textarea,
+  select {
+    @apply border-input bg-surface text-foreground placeholder:text-muted-foreground;
+  }
+
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):focus,
+  textarea:focus,
+  select:focus {
+    @apply border-primary/60 outline-none ring-2 ring-primary/10;
+  }
+
+  .dark option {
+    background-color: hsl(var(--surface));
+    color: hsl(var(--foreground));
+  }
+}
+
+.dark .bg-gray-100,
+.dark .bg-blue-50,
+.dark .bg-blue-100,
+.dark .bg-green-50,
+.dark .bg-green-100,
+.dark .bg-yellow-100,
+.dark .bg-red-50,
+.dark .bg-red-100 {
+  background-color: hsl(var(--muted));
+}
+
+.dark .border-gray-300,
+.dark .border-blue-200,
+.dark .border-green-300,
+.dark .border-yellow-300,
+.dark .border-red-200,
+.dark .border-red-300 {
+  border-color: hsl(var(--border));
+}
+
+.dark .text-gray-400,
+.dark .text-gray-500,
+.dark .text-gray-600 {
+  color: hsl(var(--muted-foreground));
+}
+
+.dark .text-blue-500,
+.dark .text-blue-600,
+.dark .text-blue-700 {
+  color: hsl(var(--primary));
+}
+
+.dark .text-green-600,
+.dark .text-green-700,
+.dark .text-green-800 {
+  color: rgb(110 231 183);
+}
+
+.dark .text-yellow-500,
+.dark .text-yellow-600,
+.dark .text-yellow-700 {
+  color: rgb(252 211 77);
+}
+
+.dark .text-red-500,
+.dark .text-red-600,
+.dark .text-red-700,
+.dark .text-red-800 {
+  color: rgb(252 165 165);
 }
 
 /* CodeMirror overrides */
@@ -75,6 +150,7 @@
 .prose ol { @apply list-decimal pl-5 my-2; }
 .prose li { @apply my-0.5; }
 .prose a  { @apply text-blue-600 hover:underline; }
+.prose mark, mark { @apply rounded bg-amber-200/80 px-0.5 text-foreground; }
 .prose code { @apply bg-muted px-1 rounded text-sm font-mono; }
 .prose pre  { @apply bg-muted rounded p-3 overflow-x-auto my-3; }
 .prose pre code { @apply bg-transparent p-0; }

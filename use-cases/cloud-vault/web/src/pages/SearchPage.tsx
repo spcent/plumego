@@ -1,73 +1,106 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { searchAPI, type HistoryItem, type SearchParams, type SearchResultItem } from '../api/search'
 import { type Tag, tagsAPI } from '../api/tags'
+import { Badge, Button, EmptyState, IconButton, SelectInput, SkeletonRows, TextInput, cn } from '../components/ui'
+import { Icon } from '../components/icons'
 
 interface SearchPageProps {
   onOpenDocument: (id: string, query: string) => void
 }
 
-function HighlightBadge({ html }: { html: string }) {
+interface FilterChip {
+  key: string
+  label: string
+  clear: () => void
+}
+
+function sanitizeSnippet(html: string) {
+  return html
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/&#39;/g, "'")
+    .replace(/&lt;mark&gt;/g, '<mark>')
+    .replace(/&lt;\/mark&gt;/g, '</mark>')
+}
+
+function HighlightSnippet({ html }: { html: string }) {
   return (
     <span
-      className="text-xs text-foreground/80 leading-relaxed"
-      dangerouslySetInnerHTML={{ __html: html }}
+      className="text-xs leading-5 text-foreground/80"
+      dangerouslySetInnerHTML={{ __html: sanitizeSnippet(html) }}
     />
   )
 }
 
-function ResultCard({ item, query, onOpen }: {
+function formatDate(iso: string) {
+  return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+}
+
+function ResultRow({ item, query, active, onOpen }: {
   item: SearchResultItem
   query: string
+  active: boolean
   onOpen: (id: string, query: string) => void
 }) {
   return (
-    <div
-      className="px-4 py-3 border-b border-border hover:bg-accent/50 cursor-pointer transition-colors"
+    <button
+      type="button"
+      className={cn(
+        'group w-full border-b border-border px-5 py-4 text-left transition-colors hover:bg-accent/70',
+        active && 'bg-primary/10 hover:bg-primary/10',
+      )}
       onClick={() => onOpen(item.id, query)}
     >
-      <div className="flex items-start justify-between gap-2 mb-1">
-        <div className="flex-1 min-w-0">
-          <span className="text-sm font-medium text-foreground">{item.title}</span>
-          {item.is_favorite && <span className="ml-1.5 text-amber-400 text-xs">★</span>}
+      <div className="flex items-start gap-3">
+        <div className={cn(
+          'mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border bg-surface text-muted-foreground',
+          active && 'border-primary/25 bg-primary/10 text-primary',
+        )}>
+          <Icon name={item.source_type === 'imported' ? 'import' : 'file'} className="h-4 w-4" />
         </div>
-        <div className="flex items-center gap-1.5 shrink-0">
-          {item.source_type === 'imported' && (
-            <span className="text-[10px] text-blue-500 border border-blue-200 rounded px-1">imported</span>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start gap-2">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-1.5">
+                <span className="truncate text-sm font-semibold text-foreground">{item.title || 'Untitled'}</span>
+                {item.is_favorite && <Icon name="star" className="h-3.5 w-3.5 shrink-0 text-amber-500" />}
+              </div>
+              {item.original_path && (
+                <div className="mt-0.5 truncate font-mono text-[11px] text-muted-foreground" title={item.original_path}>
+                  {item.original_path}
+                </div>
+              )}
+            </div>
+            <div className="flex shrink-0 items-center gap-1.5">
+              {item.source_type === 'imported' && <Badge tone="accent">Imported</Badge>}
+              <span className="text-xs text-muted-foreground">{formatDate(item.updated_at)}</span>
+            </div>
+          </div>
+
+          {item.highlights && item.highlights.length > 0 ? (
+            <div className="mt-3 space-y-1.5">
+              {item.highlights.map((highlight, idx) => (
+                <div key={idx} className="rounded-md border border-amber-500/20 bg-amber-500/10 px-3 py-2">
+                  <HighlightSnippet html={highlight} />
+                </div>
+              ))}
+            </div>
+          ) : item.summary ? (
+            <div className="mt-2 line-clamp-2 text-xs leading-5 text-muted-foreground">{item.summary}</div>
+          ) : null}
+
+          {item.tags && item.tags.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              {item.tags.map(tag => (
+                <Badge key={tag}>{tag}</Badge>
+              ))}
+            </div>
           )}
-          <span className="text-xs text-muted-foreground">
-            {new Date(item.updated_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
-          </span>
         </div>
       </div>
-
-      {item.original_path && (
-        <div className="text-[11px] font-mono text-muted-foreground truncate mb-1" title={item.original_path}>
-          {item.original_path}
-        </div>
-      )}
-
-      {item.highlights && item.highlights.length > 0 ? (
-        <div className="space-y-0.5 mb-1.5">
-          {item.highlights.map((h, i) => (
-            <div key={i} className="bg-yellow-50 border border-yellow-100 rounded px-2 py-1">
-              <HighlightBadge html={h} />
-            </div>
-          ))}
-        </div>
-      ) : item.summary ? (
-        <div className="text-xs text-muted-foreground line-clamp-2 mb-1.5">{item.summary}</div>
-      ) : null}
-
-      {item.tags && item.tags.length > 0 && (
-        <div className="flex flex-wrap gap-1">
-          {item.tags.map(tag => (
-            <span key={tag} className="px-1.5 py-0.5 text-[10px] rounded-full border border-border bg-accent">
-              {tag}
-            </span>
-          ))}
-        </div>
-      )}
-    </div>
+    </button>
   )
 }
 
@@ -78,9 +111,9 @@ export default function SearchPage({ onOpenDocument }: SearchPageProps) {
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(false)
   const [offset, setOffset] = useState(0)
+  const [selectedIndex, setSelectedIndex] = useState(0)
   const limit = 20
 
-  // Filters
   const [showFilters, setShowFilters] = useState(false)
   const [tagFilter, setTagFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
@@ -90,15 +123,36 @@ export default function SearchPage({ onOpenDocument }: SearchPageProps) {
   const [toFilter, setToFilter] = useState('')
   const [allTags, setAllTags] = useState<Tag[]>([])
 
-  // History
   const [history, setHistory] = useState<HistoryItem[]>([])
-
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     tagsAPI.list().then(r => setAllTags(r.items)).catch(() => {})
     loadHistory()
   }, [])
+
+  useEffect(() => {
+    setSelectedIndex(0)
+  }, [results])
+
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if (results.length === 0) return
+      if (event.key === 'ArrowDown') {
+        event.preventDefault()
+        setSelectedIndex(index => Math.min(results.length - 1, index + 1))
+      } else if (event.key === 'ArrowUp') {
+        event.preventDefault()
+        setSelectedIndex(index => Math.max(0, index - 1))
+      } else if (event.key === 'Enter' && document.activeElement !== inputRef.current) {
+        event.preventDefault()
+        const item = results[selectedIndex]
+        if (item) onOpenDocument(item.id, q)
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [onOpenDocument, q, results, selectedIndex])
 
   async function loadHistory() {
     try {
@@ -133,7 +187,7 @@ export default function SearchPage({ onOpenDocument }: SearchPageProps) {
     }
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  function handleSubmit(e: FormEvent) {
     e.preventDefault()
     const trimmed = inputVal.trim()
     setQ(trimmed)
@@ -152,194 +206,200 @@ export default function SearchPage({ onOpenDocument }: SearchPageProps) {
     setHistory([])
   }
 
+  function clearFilters() {
+    setTagFilter('')
+    setStatusFilter('')
+    setSourceFilter('')
+    setFavFilter(null)
+    setFromFilter('')
+    setToFilter('')
+  }
+
+  const tagNameById = useMemo(() => new Map(allTags.map(tag => [tag.id, tag.name])), [allTags])
+  const activeFilters: FilterChip[] = [
+    tagFilter ? { key: 'tag', label: tagNameById.get(tagFilter) ?? 'Tag', clear: () => setTagFilter('') } : null,
+    statusFilter ? { key: 'status', label: statusFilter === 'active' ? 'Active' : statusFilter === 'archived' ? 'Archived' : 'All statuses', clear: () => setStatusFilter('') } : null,
+    sourceFilter ? { key: 'source', label: sourceFilter === 'manual' ? 'Manual' : 'Imported', clear: () => setSourceFilter('') } : null,
+    favFilter ? { key: 'favorite', label: 'Favorites', clear: () => setFavFilter(null) } : null,
+    fromFilter ? { key: 'from', label: `From ${fromFilter}`, clear: () => setFromFilter('') } : null,
+    toFilter ? { key: 'to', label: `To ${toFilter}`, clear: () => setToFilter('') } : null,
+  ].filter(Boolean) as FilterChip[]
+
   const totalPages = Math.ceil(total / limit)
   const currentPage = Math.floor(offset / limit)
   const hasSearched = q !== '' || loading
 
   return (
-    <div className="h-full flex flex-col overflow-hidden bg-background">
-      {/* Search header */}
-      <header className="shrink-0 px-4 pt-4 pb-3 border-b border-border">
-        <form onSubmit={handleSubmit} className="flex gap-2 max-w-2xl">
-          <input
-            ref={inputRef}
-            type="text"
-            value={inputVal}
-            onChange={e => setInputVal(e.target.value)}
-            placeholder="Search documents… (press Enter)"
-            className="flex-1 px-3 py-2 text-sm border border-border rounded-md bg-background focus:outline-none focus:ring-1 focus:ring-primary/50"
-            autoFocus
-          />
-          <button
-            type="submit"
-            className="px-4 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-md hover:opacity-90"
-          >
+    <div className="flex h-full flex-col overflow-hidden bg-background">
+      <header className="shrink-0 border-b border-border bg-surface px-4 py-4">
+        <form onSubmit={handleSubmit} className="mx-auto flex max-w-4xl gap-2">
+          <div className="relative min-w-0 flex-1">
+            <Icon name="search" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <TextInput
+              ref={inputRef}
+              type="text"
+              value={inputVal}
+              onChange={e => setInputVal(e.target.value)}
+              placeholder="Search documents"
+              className="h-10 pl-9"
+              autoFocus
+            />
+          </div>
+          <Button type="submit" variant="primary" icon="search" className="h-10">
             Search
-          </button>
-          <button
-            type="button"
+          </Button>
+          <IconButton
+            icon="filter"
+            label="Filters"
+            active={showFilters || activeFilters.length > 0}
             onClick={() => setShowFilters(v => !v)}
-            className={`px-3 py-2 text-sm rounded-md border transition-colors ${
-              showFilters
-                ? 'bg-primary/10 border-primary text-primary'
-                : 'border-border text-muted-foreground hover:bg-accent'
-            }`}
-          >
-            Filters
-          </button>
+            className="h-10 w-10"
+          />
         </form>
 
-        {/* Filter panel */}
-        {showFilters && (
-          <div className="mt-3 flex flex-wrap gap-3 text-xs max-w-2xl">
-            {/* Tag */}
-            <select
-              value={tagFilter}
-              onChange={e => setTagFilter(e.target.value)}
-              className="px-2 py-1 border border-border rounded bg-background text-xs"
-            >
-              <option value="">All tags</option>
-              {allTags.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-            </select>
-            {/* Status */}
-            <select
-              value={statusFilter}
-              onChange={e => setStatusFilter(e.target.value)}
-              className="px-2 py-1 border border-border rounded bg-background text-xs"
-            >
-              <option value="">Any status</option>
-              <option value="active">Active</option>
-              <option value="archived">Archived</option>
-              <option value="all">All</option>
-            </select>
-            {/* Source */}
-            <select
-              value={sourceFilter}
-              onChange={e => setSourceFilter(e.target.value)}
-              className="px-2 py-1 border border-border rounded bg-background text-xs"
-            >
-              <option value="">Any source</option>
-              <option value="manual">Manual</option>
-              <option value="imported">Imported</option>
-            </select>
-            {/* Favorites */}
-            <label className="flex items-center gap-1 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={favFilter === true}
-                onChange={e => setFavFilter(e.target.checked ? true : null)}
-                className="accent-primary"
-              />
-              Favorites only
-            </label>
-            {/* Date range */}
-            <input
-              type="date"
-              value={fromFilter}
-              onChange={e => setFromFilter(e.target.value)}
-              className="px-2 py-1 border border-border rounded bg-background text-xs"
-              title="From date"
-            />
-            <input
-              type="date"
-              value={toFilter}
-              onChange={e => setToFilter(e.target.value)}
-              className="px-2 py-1 border border-border rounded bg-background text-xs"
-              title="To date"
-            />
-            {(tagFilter || statusFilter || sourceFilter || favFilter || fromFilter || toFilter) && (
-              <button
-                type="button"
-                onClick={() => { setTagFilter(''); setStatusFilter(''); setSourceFilter(''); setFavFilter(null); setFromFilter(''); setToFilter('') }}
-                className="text-muted-foreground underline"
-              >
-                Clear filters
-              </button>
+        {(showFilters || activeFilters.length > 0) && (
+          <div className="mx-auto mt-3 max-w-4xl">
+            {activeFilters.length > 0 && (
+              <div className="mb-3 flex flex-wrap gap-1.5">
+                {activeFilters.map(filter => (
+                  <button
+                    key={filter.key}
+                    type="button"
+                    onClick={filter.clear}
+                    className="inline-flex items-center gap-1 rounded-full border border-primary/20 bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary transition-colors hover:bg-primary/15"
+                  >
+                    {filter.label}
+                    <Icon name="close" className="h-3 w-3" />
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  onClick={clearFilters}
+                  className="rounded-full px-2 py-0.5 text-[11px] font-medium text-muted-foreground hover:text-foreground"
+                >
+                  Clear filters
+                </button>
+              </div>
+            )}
+
+            {showFilters && (
+              <div className="grid gap-2 rounded-lg border border-border bg-background/70 p-3 text-xs sm:grid-cols-2 lg:grid-cols-6">
+                <SelectInput value={tagFilter} onChange={e => setTagFilter(e.target.value)} className="h-8 text-xs lg:col-span-2">
+                  <option value="">All tags</option>
+                  {allTags.map(tag => <option key={tag.id} value={tag.id}>{tag.name}</option>)}
+                </SelectInput>
+                <SelectInput value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="h-8 text-xs">
+                  <option value="">Any status</option>
+                  <option value="active">Active</option>
+                  <option value="archived">Archived</option>
+                  <option value="all">All</option>
+                </SelectInput>
+                <SelectInput value={sourceFilter} onChange={e => setSourceFilter(e.target.value)} className="h-8 text-xs">
+                  <option value="">Any source</option>
+                  <option value="manual">Manual</option>
+                  <option value="imported">Imported</option>
+                </SelectInput>
+                <TextInput type="date" value={fromFilter} onChange={e => setFromFilter(e.target.value)} className="h-8 text-xs" title="From date" />
+                <TextInput type="date" value={toFilter} onChange={e => setToFilter(e.target.value)} className="h-8 text-xs" title="To date" />
+                <label className="flex h-8 items-center gap-2 rounded-md border border-border bg-surface px-2 text-muted-foreground lg:col-span-2">
+                  <input
+                    type="checkbox"
+                    checked={favFilter === true}
+                    onChange={e => setFavFilter(e.target.checked ? true : null)}
+                    className="accent-primary"
+                  />
+                  Favorites only
+                </label>
+              </div>
             )}
           </div>
         )}
       </header>
 
-      <div className="flex-1 overflow-y-auto">
-        {/* Results */}
-        {hasSearched && (
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        {hasSearched ? (
           <>
-            {loading && (
-              <div className="p-6 text-sm text-muted-foreground text-center">Searching…</div>
-            )}
+            {loading && <SkeletonRows count={6} />}
             {!loading && results.length === 0 && (
-              <div className="p-6 text-sm text-muted-foreground text-center">No results found.</div>
+              <EmptyState
+                icon="search"
+                title="No results found"
+                description="Try fewer filters, a shorter phrase, or search by filename and tag."
+                action={activeFilters.length > 0 ? <Button size="sm" onClick={clearFilters}>Clear filters</Button> : undefined}
+              />
             )}
             {!loading && results.length > 0 && (
               <>
-                <div className="px-4 py-2 text-xs text-muted-foreground border-b border-border">
-                  {total} result{total !== 1 ? 's' : ''}
+                <div className="sticky top-0 z-10 border-b border-border bg-background/95 px-5 py-2 text-xs text-muted-foreground">
+                  {total.toLocaleString()} result{total !== 1 ? 's' : ''} for <span className="font-medium text-foreground">{q || 'all documents'}</span>
                 </div>
-                {results.map(item => (
-                  <ResultCard key={item.id} item={item} query={q} onOpen={onOpenDocument} />
+                {results.map((item, idx) => (
+                  <ResultRow
+                    key={item.id}
+                    item={item}
+                    query={q}
+                    active={idx === selectedIndex}
+                    onOpen={onOpenDocument}
+                  />
                 ))}
-                {/* Pagination */}
                 {totalPages > 1 && (
-                  <div className="px-4 py-3 flex items-center gap-2 text-sm border-t border-border">
-                    <button
+                  <div className="flex items-center gap-2 border-t border-border px-5 py-4 text-sm">
+                    <Button
+                      icon="chevronLeft"
                       onClick={() => doSearch(q, Math.max(0, offset - limit))}
                       disabled={currentPage === 0}
-                      className="px-3 py-1 border border-border rounded disabled:opacity-40 hover:bg-accent"
                     >
-                      ← Prev
-                    </button>
-                    <span className="text-muted-foreground text-xs">
-                      Page {currentPage + 1} / {totalPages}
+                      Previous
+                    </Button>
+                    <span className="text-xs text-muted-foreground">
+                      Page {currentPage + 1} of {totalPages}
                     </span>
-                    <button
+                    <Button
+                      icon="chevronRight"
                       onClick={() => doSearch(q, offset + limit)}
                       disabled={currentPage >= totalPages - 1}
-                      className="px-3 py-1 border border-border rounded disabled:opacity-40 hover:bg-accent"
                     >
-                      Next →
-                    </button>
+                      Next
+                    </Button>
                   </div>
                 )}
               </>
             )}
           </>
-        )}
-
-        {/* History (shown when no search has been performed) */}
-        {!hasSearched && history.length > 0 && (
-          <div className="px-4 py-3">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-medium text-foreground">Recent searches</span>
-              <button
-                onClick={handleClearHistory}
-                className="text-xs text-muted-foreground hover:text-foreground underline"
-              >
-                Clear
-              </button>
-            </div>
-            <div className="space-y-1">
-              {history.slice(0, 10).map(item => (
-                <button
-                  key={item.id}
-                  onClick={() => handleHistoryClick(item)}
-                  className="w-full text-left px-3 py-1.5 rounded hover:bg-accent text-sm flex items-center justify-between gap-2 group"
-                >
-                  <span className="truncate text-foreground">{item.query}</span>
-                  <span className="text-xs text-muted-foreground shrink-0">
-                    {item.result_count} results
-                  </span>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {!hasSearched && history.length === 0 && (
-          <div className="flex-1 flex items-center justify-center h-48">
-            <div className="text-sm text-muted-foreground text-center">
-              <div className="text-2xl mb-2">🔍</div>
-              Enter a query above to search your documents.
-            </div>
+        ) : (
+          <div className="mx-auto max-w-3xl px-5 py-8">
+            {history.length > 0 ? (
+              <section className="rounded-lg border border-border bg-surface">
+                <div className="flex items-center justify-between border-b border-border px-4 py-3">
+                  <div>
+                    <div className="text-sm font-semibold text-foreground">Recent searches</div>
+                    <div className="text-xs text-muted-foreground">Reuse a query or clear local history.</div>
+                  </div>
+                  <Button size="sm" variant="ghost" onClick={handleClearHistory}>
+                    Clear
+                  </Button>
+                </div>
+                <div className="divide-y divide-border">
+                  {history.slice(0, 10).map(item => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => handleHistoryClick(item)}
+                      className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-accent"
+                    >
+                      <span className="min-w-0 truncate text-sm font-medium text-foreground">{item.query}</span>
+                      <span className="shrink-0 text-xs text-muted-foreground">{item.result_count} results</span>
+                    </button>
+                  ))}
+                </div>
+              </section>
+            ) : (
+              <EmptyState
+                icon="search"
+                title="Search your vault"
+                description="Find documents by content, tags, source path, date range, and favorite state."
+              />
+            )}
           </div>
         )}
       </div>

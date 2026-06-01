@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react'
+import type { ReactNode } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { useI18n } from '../i18n/I18nContext'
 import { useTheme } from '../contexts/ThemeContext'
+import { Button, SelectInput, TextInput, cn } from '../components/ui'
 
 export default function AccountPage() {
   const { user, refreshUser } = useAuth()
@@ -44,78 +46,90 @@ export default function AccountPage() {
   }
 
   return (
-    <div className="p-6 max-w-2xl mx-auto">
-      <h1 className="text-2xl font-bold mb-6">{t.nav.account}</h1>
-
-      <div className="space-y-4">
-        <div>
-          <label className="block text-sm font-medium mb-1">
-            {t.auth.displayName}
-          </label>
-          <input
-            type="text"
-            value={displayName}
-            onChange={(e) => setDisplayName(e.target.value)}
-            className="w-full px-3 py-2 border rounded"
-          />
+    <div className="h-full overflow-y-auto bg-background">
+      <div className="mx-auto max-w-3xl px-5 py-8 md:px-8">
+        <div className="mb-8">
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">{t.nav.account}</h1>
+          <p className="mt-1 text-sm text-muted-foreground">{t.pages.account.preferences}</p>
         </div>
 
-        <div>
-          <label className="block text-sm font-medium mb-1">
-            {t.auth.email}
-          </label>
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="w-full px-3 py-2 border rounded"
-          />
-        </div>
+        <div className="rounded-lg border border-border bg-surface p-5 shadow-sm shadow-slate-950/5 dark:shadow-none">
+          <div className="space-y-5">
+            <Field label={t.auth.displayName}>
+              <TextInput
+                type="text"
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+              />
+            </Field>
 
-        <div>
-          <label className="block text-sm font-medium mb-1">
-            {t.auth.locale}
-          </label>
-          <select
-            value={locale}
-            onChange={(e) => setLocale(e.target.value as 'en-US' | 'zh-CN' | 'zh-TW')}
-            className="w-full px-3 py-2 border rounded"
-          >
-            <option value="en-US">{t.locales.enUS}</option>
-            <option value="zh-CN">{t.locales.zhCN}</option>
-            <option value="zh-TW">{t.locales.zhTW}</option>
-          </select>
-        </div>
+            <Field label={t.auth.email}>
+              <TextInput
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+            </Field>
 
-        <div>
-          <label className="block text-sm font-medium mb-1">
-            {t.auth.theme}
-          </label>
-          <select
-            value={theme}
-            onChange={(e) => setTheme(e.target.value as 'system' | 'light' | 'dark')}
-            className="w-full px-3 py-2 border rounded"
-          >
-            <option value="system">{t.themes.system}</option>
-            <option value="light">{t.themes.light}</option>
-            <option value="dark">{t.themes.dark}</option>
-          </select>
-        </div>
+            <Field label={t.auth.locale}>
+              <SelectInput
+                value={locale}
+                onChange={(e) => setLocale(e.target.value as 'en-US' | 'zh-CN' | 'zh-TW')}
+                className="w-full"
+              >
+                <option value="en-US">{t.locales.enUS}</option>
+                <option value="zh-CN">{t.locales.zhCN}</option>
+                <option value="zh-TW">{t.locales.zhTW}</option>
+              </SelectInput>
+            </Field>
 
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
-        >
-          {saving ? t.common.loading : t.common.save}
-        </button>
+            <Field label={t.auth.theme}>
+              <SelectInput
+                value={theme}
+                onChange={(e) => setTheme(e.target.value as 'system' | 'light' | 'dark')}
+                className="w-full"
+              >
+                <option value="system">{t.themes.system}</option>
+                <option value="light">{t.themes.light}</option>
+                <option value="dark">{t.themes.dark}</option>
+              </SelectInput>
+            </Field>
 
-        {message && (
-          <div className="mt-4 p-3 rounded bg-green-100 text-green-800">
-            {message}
+            <div className="flex items-center gap-3 pt-2">
+              <Button
+                onClick={handleSave}
+                disabled={saving}
+                variant="primary"
+                icon="save"
+              >
+                {saving ? t.common.loading : t.common.save}
+              </Button>
+
+              {message && (
+                <div
+                  className={cn(
+                    'rounded-md border px-3 py-2 text-sm',
+                    message === t.common.success
+                      ? 'border-emerald-500/25 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
+                      : 'border-destructive/25 bg-destructive/10 text-destructive',
+                  )}
+                >
+                  {message}
+                </div>
+              )}
+            </div>
           </div>
-        )}
+        </div>
       </div>
     </div>
+  )
+}
+
+function Field({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <label className="block">
+      <span className="mb-2 block text-sm font-medium text-foreground">{label}</span>
+      {children}
+    </label>
   )
 }

@@ -126,6 +126,8 @@ export interface Translations {
       title: string
       sessions: string
       password: string
+      activeSessions: string
+      noSessions: string
       revokeAll: string
       revoke: string
     }
@@ -296,6 +298,8 @@ export const enUS: Translations = {
       title: 'Security',
       sessions: 'Sessions',
       password: 'Password',
+      activeSessions: 'active sessions',
+      noSessions: 'No active sessions were returned.',
       revokeAll: 'Revoke All Other Sessions',
       revoke: 'Revoke',
     },
@@ -466,6 +470,8 @@ export const zhCN: Translations = {
       title: '安全',
       sessions: '会话',
       password: '密码',
+      activeSessions: '个活动会话',
+      noSessions: '没有返回活动会话。',
       revokeAll: '撤销所有其他会话',
       revoke: '撤销',
     },
@@ -636,6 +642,8 @@ export const zhTW: Translations = {
       title: '安全',
       sessions: '工作階段',
       password: '密碼',
+      activeSessions: '個使用中的工作階段',
+      noSessions: '沒有返回使用中的工作階段。',
       revokeAll: '撤銷所有其他工作階段',
       revoke: '撤銷',
     },
