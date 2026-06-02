@@ -7,6 +7,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/spcent/plumego/core"
 )
@@ -29,6 +30,10 @@ type AppConfig struct {
 	// AdminUser and AdminPassword are the login credentials for the web UI.
 	AdminUser     string
 	AdminPassword string
+	// AdminRole is the single-user role: admin or readonly.
+	AdminRole string
+	// SessionTTL controls how long web UI sessions remain valid.
+	SessionTTL time.Duration
 	// EncryptionKey is a 32-byte hex-encoded AES-GCM key for encrypting connection passwords.
 	EncryptionKey string
 	Version       string
@@ -36,6 +41,14 @@ type AppConfig struct {
 	QueryTimeoutSeconds int
 	// QueryCancelEnabled enables query cancellation support (default: true).
 	QueryCancelEnabled bool
+	// RedisCommandTimeoutSeconds is the maximum execution time for Redis commands (default: 30).
+	RedisCommandTimeoutSeconds int
+	// MongoQueryTimeoutSeconds is the maximum execution time for MongoDB operations (default: 30).
+	MongoQueryTimeoutSeconds int
+	// ESQueryTimeoutSeconds is the maximum execution time for Elasticsearch operations (default: 30).
+	ESQueryTimeoutSeconds int
+	// ResourceListTimeoutSeconds is the maximum execution time for resource-tree listing (default: 30).
+	ResourceListTimeoutSeconds int
 }
 
 // Defaults returns safe configuration values for local development.
@@ -45,16 +58,22 @@ func Defaults() Config {
 	return Config{
 		Core: coreCfg,
 		App: AppConfig{
-			EnvFile:             ".env",
-			ServiceName:         "dbadmin",
-			MaxBodyBytes:        512 << 20, // 512 MiB (accommodates large SQLite uploads)
-			MaxUploadBytes:      512 << 20, // 512 MiB per SQLite file
-			DataDir:             "./data",
-			AdminUser:           "admin",
-			AdminPassword:       "admin",
-			Version:             "dev",
-			QueryTimeoutSeconds: 30,
-			QueryCancelEnabled:  true,
+			EnvFile:                    ".env",
+			ServiceName:                "dbadmin",
+			MaxBodyBytes:               512 << 20, // 512 MiB (accommodates large SQLite uploads)
+			MaxUploadBytes:             512 << 20, // 512 MiB per SQLite file
+			DataDir:                    "./data",
+			AdminUser:                  "admin",
+			AdminPassword:              "admin",
+			AdminRole:                  "admin",
+			SessionTTL:                 24 * time.Hour,
+			Version:                    "dev",
+			QueryTimeoutSeconds:        30,
+			QueryCancelEnabled:         true,
+			RedisCommandTimeoutSeconds: 30,
+			MongoQueryTimeoutSeconds:   30,
+			ESQueryTimeoutSeconds:      30,
+			ResourceListTimeoutSeconds: 30,
 		},
 	}
 }
@@ -96,6 +115,12 @@ func Validate(cfg Config) error {
 	if cfg.App.AdminPassword == "" {
 		return fmt.Errorf("DBADMIN_PASSWORD is required")
 	}
+	if cfg.App.AdminRole != "admin" && cfg.App.AdminRole != "readonly" {
+		return fmt.Errorf("DBADMIN_ROLE must be admin or readonly")
+	}
+	if cfg.App.SessionTTL <= 0 {
+		return fmt.Errorf("DBADMIN_SESSION_TTL must be positive")
+	}
 	return nil
 }
 
@@ -131,6 +156,13 @@ func applyEnv(cfg *Config, lookupEnv func(string) (string, bool)) {
 			}
 		}
 	}
+	durationf := func(key string, dest *time.Duration) {
+		if val, ok := lookupEnv(key); ok {
+			if d, err := time.ParseDuration(strings.TrimSpace(val)); err == nil && d > 0 {
+				*dest = d
+			}
+		}
+	}
 	str("APP_ADDR", &cfg.Core.Addr)
 	str("APP_ENV_FILE", &cfg.App.EnvFile)
 	str("APP_SERVICE_NAME", &cfg.App.ServiceName)
@@ -142,9 +174,15 @@ func applyEnv(cfg *Config, lookupEnv func(string) (string, bool)) {
 	str("DBADMIN_DATA_DIR", &cfg.App.DataDir)
 	str("DBADMIN_USER", &cfg.App.AdminUser)
 	str("DBADMIN_PASSWORD", &cfg.App.AdminPassword)
+	str("DBADMIN_ROLE", &cfg.App.AdminRole)
+	durationf("DBADMIN_SESSION_TTL", &cfg.App.SessionTTL)
 	str("DBADMIN_ENCRYPTION_KEY", &cfg.App.EncryptionKey)
 	intf("DBADMIN_QUERY_TIMEOUT_SECONDS", &cfg.App.QueryTimeoutSeconds)
 	boolf("DBADMIN_QUERY_CANCEL_ENABLED", &cfg.App.QueryCancelEnabled)
+	intf("DBADMIN_REDIS_COMMAND_TIMEOUT_SECONDS", &cfg.App.RedisCommandTimeoutSeconds)
+	intf("DBADMIN_MONGO_QUERY_TIMEOUT_SECONDS", &cfg.App.MongoQueryTimeoutSeconds)
+	intf("DBADMIN_ES_QUERY_TIMEOUT_SECONDS", &cfg.App.ESQueryTimeoutSeconds)
+	intf("DBADMIN_RESOURCE_LIST_TIMEOUT_SECONDS", &cfg.App.ResourceListTimeoutSeconds)
 }
 
 func applyEnvMap(cfg *Config, values map[string]string) {

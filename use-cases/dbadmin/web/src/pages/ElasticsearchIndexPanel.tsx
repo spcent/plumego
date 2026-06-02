@@ -1,13 +1,14 @@
 import { useParams } from 'react-router-dom'
-import { useEffect, useState } from 'react'
-import { useI18n } from '../i18n'
-import { useCurrentConn } from './MainLayout'
+import { useCallback, useEffect, useState } from 'react'
+import { useI18n } from '../i18nContext'
+import { useCurrentConn } from '../context/connections'
 import { api } from '../api'
 import type { ESClusterInfo, ESIndexInfo, ESSearchResponse, ESDocument } from '../api'
 import WorkbenchHeader from '../components/WorkbenchHeader'
 import ErrorState from '../components/ErrorState'
-import { useToast } from '../components/Toast'
+import { useToast } from '../components/toastContext'
 import { useEsHistory } from '../hooks/useEsHistory'
+import { XIcon } from '../components/Icons'
 
 type Tab = 'overview' | 'mapping' | 'settings' | 'search' | 'documents'
 
@@ -33,21 +34,13 @@ export default function ElasticsearchIndexPanel() {
   const [selectedHit, setSelectedHit] = useState<Record<string, unknown> | null>(null)
   const [copied, setCopied] = useState(false)
   const [loadError, setLoadError] = useState<string>('')
+  const [showImportModal, setShowImportModal] = useState(false)
+  const [importData, setImportData] = useState(`[
+  {"title":"Example"}
+]`)
+  const [importing, setImporting] = useState(false)
 
-  useEffect(() => {
-    if (!connId || !esIndex) return
-    loadOverview()
-  }, [connId, esIndex])
-
-  useEffect(() => {
-    if (activeTab === 'mapping' && connId && esIndex) {
-      loadMapping()
-    } else if (activeTab === 'settings' && connId && esIndex) {
-      loadSettings()
-    }
-  }, [activeTab, connId, esIndex])
-
-  const loadOverview = async () => {
+  const loadOverview = useCallback(async () => {
     if (!connId) return
     try {
       const [info, indicesRes] = await Promise.all([
@@ -59,9 +52,9 @@ export default function ElasticsearchIndexPanel() {
     } catch (err) {
       setLoadError((err as Error).message)
     }
-  }
+  }, [connId])
 
-  const loadMapping = async () => {
+  const loadMapping = useCallback(async () => {
     if (!connId || !esIndex) return
     try {
       const res = await api.esGetMapping(connId, esIndex)
@@ -69,9 +62,9 @@ export default function ElasticsearchIndexPanel() {
     } catch (err) {
       setLoadError((err as Error).message)
     }
-  }
+  }, [connId, esIndex])
 
-  const loadSettings = async () => {
+  const loadSettings = useCallback(async () => {
     if (!connId || !esIndex) return
     try {
       const res = await api.esGetSettings(connId, esIndex)
@@ -79,7 +72,24 @@ export default function ElasticsearchIndexPanel() {
     } catch (err) {
       setLoadError((err as Error).message)
     }
-  }
+  }, [connId, esIndex])
+
+  useEffect(() => {
+    if (!connId || !esIndex) return
+    queueMicrotask(() => {
+      void loadOverview()
+    })
+  }, [connId, esIndex, loadOverview])
+
+  useEffect(() => {
+    queueMicrotask(() => {
+      if (activeTab === 'mapping' && connId && esIndex) {
+        void loadMapping()
+      } else if (activeTab === 'settings' && connId && esIndex) {
+        void loadSettings()
+      }
+    })
+  }, [activeTab, connId, esIndex, loadMapping, loadSettings])
 
   const handleSearch = async () => {
     if (!connId || !esIndex) return
@@ -148,6 +158,44 @@ export default function ElasticsearchIndexPanel() {
 
   const handleDeleteHistoryEntry = (entryId: string) => {
     esHistory.removeEntry(entryId)
+  }
+
+  const handleExport = (format: 'json' | 'ndjson') => {
+    if (!connId || !esIndex) return
+    let parsed: Record<string, unknown> | undefined
+    try {
+      parsed = JSON.parse(dsl)
+    } catch {
+      parsed = undefined
+    }
+    window.location.href = api.esExport(connId, esIndex, format, parsed)
+  }
+
+  const handleImport = async () => {
+    if (!connId || !esIndex) return
+    let documents: Record<string, unknown>[]
+    try {
+      const parsed = JSON.parse(importData)
+      if (!Array.isArray(parsed)) {
+        showToast(t('elasticsearch.import_array_required'), 'error')
+        return
+      }
+      documents = parsed
+    } catch {
+      showToast(t('elasticsearch.invalid_json'), 'error')
+      return
+    }
+    setImporting(true)
+    try {
+      const result = await api.esImport(connId, esIndex, documents, true)
+      showToast(t('elasticsearch.import_success').replace('{count}', String(result.imported_count)), 'success')
+      setShowImportModal(false)
+      await loadOverview()
+    } catch (err) {
+      showToast((err as Error).message, 'error')
+    } finally {
+      setImporting(false)
+    }
   }
 
   const tabs: { id: Tab; label: string }[] = [
@@ -223,6 +271,32 @@ export default function ElasticsearchIndexPanel() {
                 </div>
               </div>
             )}
+
+            <div className="rounded-lg p-4 flex flex-wrap gap-2" style={{ background: 'var(--bg-muted)' }}>
+              <button
+                onClick={() => handleExport('json')}
+                className="px-3 py-1.5 text-sm rounded"
+                style={{ background: 'var(--accent)', color: 'white' }}
+              >
+                {t('elasticsearch.export_json')}
+              </button>
+              <button
+                onClick={() => handleExport('ndjson')}
+                className="px-3 py-1.5 text-sm rounded"
+                style={{ background: 'var(--accent)', color: 'white' }}
+              >
+                {t('elasticsearch.export_ndjson')}
+              </button>
+              {!conn?.readonly && (
+                <button
+                  onClick={() => setShowImportModal(true)}
+                  className="px-3 py-1.5 text-sm rounded"
+                  style={{ background: 'var(--bg-surface)', color: 'var(--text-default)' }}
+                >
+                  {t('elasticsearch.import_json')}
+                </button>
+              )}
+            </div>
 
             <div>
               <h3 className="text-sm font-semibold mb-3" style={{ color: 'var(--text-strong)' }}>
@@ -489,11 +563,11 @@ export default function ElasticsearchIndexPanel() {
                           e.stopPropagation()
                           handleDeleteHistoryEntry(entry.id)
                         }}
-                        className="px-2 py-1 text-xs rounded shrink-0"
+                        className="icon-btn h-7 w-7 shrink-0"
                         style={{ background: 'var(--error)18', color: 'var(--error)' }}
                         title={t('elasticsearch.delete_history_entry')}
                       >
-                        ×
+                        <XIcon className="h-3.5 w-3.5" />
                       </button>
                     </div>
                   ))}
@@ -568,8 +642,7 @@ export default function ElasticsearchIndexPanel() {
           onClick={() => setSelectedHit(null)}
         >
           <div
-            className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[80vh] overflow-auto"
-            style={{ background: 'var(--bg-primary)' }}
+            className="panel max-w-2xl w-full mx-4 max-h-[80vh] overflow-auto p-6"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-4">
@@ -578,10 +651,10 @@ export default function ElasticsearchIndexPanel() {
               </h3>
               <button
                 onClick={() => setSelectedHit(null)}
-                className="text-2xl leading-none"
-                style={{ color: 'var(--text-muted)' }}
+                className="icon-btn"
+                aria-label="Close"
               >
-                ×
+                <XIcon className="h-4 w-4" />
               </button>
             </div>
             <pre
@@ -590,6 +663,51 @@ export default function ElasticsearchIndexPanel() {
             >
               {JSON.stringify(selectedHit, null, 2)}
             </pre>
+          </div>
+        </div>
+      )}
+      {showImportModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="panel max-w-2xl w-full mx-4 p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold" style={{ color: 'var(--text-strong)' }}>
+                {t('elasticsearch.import_json')}
+              </h3>
+              <button
+                onClick={() => setShowImportModal(false)}
+                className="icon-btn"
+                aria-label="Close"
+              >
+                <XIcon className="h-4 w-4" />
+              </button>
+            </div>
+            <textarea
+              value={importData}
+              onChange={e => setImportData(e.target.value)}
+              className="textarea h-64 font-mono text-sm"
+              style={{
+                background: 'var(--bg-muted)',
+                color: 'var(--text-strong)',
+                border: '1px solid var(--border-subtle)',
+              }}
+            />
+            <div className="flex justify-end gap-2 mt-4">
+              <button
+                onClick={() => setShowImportModal(false)}
+                className="px-4 py-2 text-sm rounded"
+                style={{ background: 'var(--bg-muted)', color: 'var(--text-muted)' }}
+              >
+                {t('common.cancel')}
+              </button>
+              <button
+                onClick={handleImport}
+                disabled={importing}
+                className="px-4 py-2 text-sm rounded"
+                style={{ background: 'var(--accent)', color: 'white', opacity: importing ? 0.6 : 1 }}
+              >
+                {importing ? t('elasticsearch.importing') : t('elasticsearch.import_json')}
+              </button>
+            </div>
           </div>
         </div>
       )}

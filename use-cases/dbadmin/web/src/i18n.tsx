@@ -1,6 +1,5 @@
-import { createContext, useCallback, useContext, useState, type ReactNode } from 'react'
-
-export type Locale = 'en' | 'zh'
+import { useCallback, useState, type ReactNode } from 'react'
+import { I18nContext, type Locale } from './i18nContext'
 
 type Dict = Record<string, string>
 
@@ -44,7 +43,7 @@ const en: Dict = {
   'connections.form.save_password_warn': 'Password will be encrypted and stored in the server data directory. Do not use on shared machines without access control.',
 
   // Tables
-  'tables.sql_console': '▶ SQL Console',
+  'tables.sql_console': 'SQL Console',
   'tables.new_table': '+ New Table',
   'tables.col.name': 'Name',
   'tables.col.type': 'Type',
@@ -105,8 +104,10 @@ const en: Dict = {
   // Query
   'query.title': 'SQL Console',
   'query.db_placeholder': '-- database --',
-  'query.run': '▶ Run (Cmd+Enter)',
+  'query.run': 'Run (Cmd+Enter)',
   'query.running': 'Running…',
+  'query.cancel': 'Cancel',
+  'query.cancelled': 'Query cancellation requested',
   'query.copy': 'Copy SQL',
   'query.clear': 'Clear',
   'query.confirm_danger': 'Execute dangerous SQL?',
@@ -128,9 +129,18 @@ const en: Dict = {
   'settings.sql_history': 'SQL History',
   'settings.sql_history_enabled': 'Enable SQL history',
   'settings.sql_history_hint': 'Executed SQL is recorded server-side (max 100 entries per connection, 30-day retention). Manage history in the SQL Console history tab.',
+  'settings.active_operations': 'Active operations',
+  'settings.operations_refresh': 'Refresh',
+  'settings.operations_loading': 'Loading...',
+  'settings.operations_empty': 'No active non-SQL operations',
+  'settings.operations_cancel': 'Cancel',
+  'settings.connection_lifecycle': 'Connection lifecycle',
+  'settings.close_runtime': 'Close runtime',
+  'settings.audit_rbac': 'Audit & RBAC',
+  'settings.audit_empty': 'No audit events yet',
   'nav.settings': 'Settings',
 
-  // History (localStorage)
+  // SQL history
   'history.tab': 'History',
   'history.empty': 'No history yet',
   'history.clear_all': 'Clear all',
@@ -584,6 +594,12 @@ const en: Dict = {
   'elasticsearch.clear_history': 'Clear History',
   'elasticsearch.clear_history_confirm': 'Clear all search history for this connection?',
   'elasticsearch.delete_history_entry': 'Delete this entry',
+  'elasticsearch.export_json': 'Export JSON',
+  'elasticsearch.export_ndjson': 'Export NDJSON',
+  'elasticsearch.import_json': 'Import JSON',
+  'elasticsearch.importing': 'Importing...',
+  'elasticsearch.import_success': 'Imported {count} documents',
+  'elasticsearch.import_array_required': 'Import data must be a JSON array',
   'elasticsearch.fetch_document': 'Fetch',
   'elasticsearch.document_not_found': 'Document not found',
   'elasticsearch.delete_document': 'Delete Document',
@@ -615,7 +631,7 @@ const en: Dict = {
   'danger.import_sql': 'Import SQL',
   'danger.warning_irreversible': 'This operation cannot be undone.',
 
-  // Unified history (localStorage)
+  // Unified history
   'history.sql': 'SQL Query History',
   'history.mongodb': 'MongoDB Query History',
   'history.elasticsearch': 'Elasticsearch Query History',
@@ -676,7 +692,7 @@ const zh: Dict = {
   'connections.form.save_password_warn': '密码将加密存储在服务端数据目录。不建议在无访问控制的共享机器上使用。',
 
   // Tables
-  'tables.sql_console': '▶ SQL 控制台',
+  'tables.sql_console': 'SQL 控制台',
   'tables.new_table': '+ 新建表',
   'tables.col.name': '表名',
   'tables.col.type': '类型',
@@ -737,8 +753,10 @@ const zh: Dict = {
   // Query
   'query.title': 'SQL 控制台',
   'query.db_placeholder': '-- 选择数据库 --',
-  'query.run': '▶ 运行 (Cmd+Enter)',
+  'query.run': '运行 (Cmd+Enter)',
   'query.running': '运行中…',
+  'query.cancel': '取消',
+  'query.cancelled': '已请求取消查询',
   'query.copy': '复制 SQL',
   'query.clear': '清空',
   'query.confirm_danger': '执行危险 SQL？',
@@ -800,9 +818,18 @@ const zh: Dict = {
   'settings.sql_history': 'SQL 历史',
   'settings.sql_history_enabled': '启用 SQL 历史',
   'settings.sql_history_hint': '执行的 SQL 将保存在服务端（每个连接最多 100 条，保留 30 天）。可在 SQL Console 历史 tab 中管理。',
+  'settings.active_operations': '运行中操作',
+  'settings.operations_refresh': '刷新',
+  'settings.operations_loading': '加载中...',
+  'settings.operations_empty': '暂无运行中的非 SQL 操作',
+  'settings.operations_cancel': '取消',
+  'settings.connection_lifecycle': '连接生命周期',
+  'settings.close_runtime': '关闭运行时连接',
+  'settings.audit_rbac': '审计与 RBAC',
+  'settings.audit_empty': '暂无审计事件',
   'nav.settings': '设置',
 
-  // History (localStorage)
+  // SQL history
   'history.tab': '历史',
   'history.empty': '暂无历史记录',
   'history.clear_all': '清空',
@@ -1216,6 +1243,12 @@ const zh: Dict = {
   'elasticsearch.clear_history': '清除历史',
   'elasticsearch.clear_history_confirm': '清除此连接的所有搜索历史？',
   'elasticsearch.delete_history_entry': '删除此条目',
+  'elasticsearch.export_json': '导出 JSON',
+  'elasticsearch.export_ndjson': '导出 NDJSON',
+  'elasticsearch.import_json': '导入 JSON',
+  'elasticsearch.importing': '导入中...',
+  'elasticsearch.import_success': '已导入 {count} 个文档',
+  'elasticsearch.import_array_required': '导入数据必须是 JSON 数组',
   'elasticsearch.fetch_document': '获取',
   'elasticsearch.document_not_found': '文档未找到',
   'elasticsearch.delete_document': '删除文档',
@@ -1247,7 +1280,7 @@ const zh: Dict = {
   'danger.import_sql': '导入 SQL',
   'danger.warning_irreversible': '此操作不可撤销。',
 
-  // Unified history (localStorage)
+  // Unified history
   'history.sql': 'SQL 查询历史',
   'history.mongodb': 'MongoDB 查询历史',
   'history.elasticsearch': 'Elasticsearch 查询历史',
@@ -1269,18 +1302,6 @@ const zh: Dict = {
 }
 
 const dicts: Record<Locale, Dict> = { en, zh }
-
-interface I18nContextValue {
-  lang: Locale
-  setLang: (l: Locale) => void
-  t: (key: string, vars?: Record<string, string | number>) => string
-}
-
-const I18nContext = createContext<I18nContextValue>({
-  lang: 'en',
-  setLang: () => {},
-  t: k => k,
-})
 
 export function I18nProvider({ children }: { children: ReactNode }) {
   const [lang, setLangState] = useState<Locale>(() =>
@@ -1308,5 +1329,3 @@ export function I18nProvider({ children }: { children: ReactNode }) {
     </I18nContext.Provider>
   )
 }
-
-export const useI18n = () => useContext(I18nContext)

@@ -6,6 +6,8 @@ A local-first, security-focused database management workbench for developers. Ma
 
 dbadmin is a self-hosted database workbench designed for local development and internal tools. Unlike cloud-based solutions, dbadmin runs entirely on your machine, keeping your data and credentials private. It provides a unified interface for multiple database types with built-in security features to prevent accidental data loss.
 
+As a Plumego use-case app, dbadmin demonstrates how to build a production-scale internal tool with explicit routing, session authentication, KV-backed state, connection pooling, embedded frontend assets, health checks, and backend-enforced safety controls.
+
 **Who is this for?**
 - Developers who need to inspect and modify data across multiple databases
 - Teams building internal tools that need database access
@@ -17,19 +19,21 @@ dbadmin is a self-hosted database workbench designed for local development and i
 |----------|----------|--------|
 | **MySQL** | Browse tables, execute queries, view/edit rows, DDL operations, import/export | ✅ Stable |
 | **SQLite** | All MySQL features + file upload/download, schema inspection | ✅ Stable |
-| **Redis** | Browse keys by type, execute commands, TTL management, batch operations | ✅ Stable |
+| **Redis** | Browse keys by type, execute commands, command history, TTL management, batch operations | ✅ Stable |
 | **MongoDB** | Browse collections, query with filters, aggregation pipelines, explain plans | ✅ Stable |
-| **Elasticsearch** | Browse indices, DSL queries, document CRUD, cluster health, mappings | ✅ Stable |
+| **Elasticsearch** | Browse indices, DSL queries, document CRUD, import/export, cluster health, mappings | ✅ Stable |
 
 ## Features
 
 ### Core Capabilities
-- **Connection Management**: Save, test, and organize connections with credential encryption
+- **Connection Management**: Save, test, and organize connections with optional credential encryption
 - **Resource Browsing**: Tree view of databases, tables, collections, indices, and keys
-- **Query Execution**: Syntax-highlighted editors with query history and result formatting
+- **Query Execution**: Syntax-highlighted editors with server-side SQL, Redis, MongoDB, and Elasticsearch history plus result formatting
 - **Data Manipulation**: View, edit, insert, delete with confirmation dialogs for dangerous operations
 - **Import/Export**: CSV, JSON, SQL dump formats for data migration
 - **Schema Inspection**: View table structure, indexes, foreign keys, mappings
+- **Operational Diagnostics**: Health, readiness, runtime, and connection-pool endpoints for local troubleshooting
+- **Admin Controls**: Active operation cancellation, connection runtime closing, audit events, and a single-user `admin`/`readonly` role
 
 ### Security & Safety
 - **Read-only Mode**: Block all write operations per connection
@@ -38,6 +42,8 @@ dbadmin is a self-hosted database workbench designed for local development and i
 - **Credential Redaction**: Passwords and API keys redacted in all logs and API responses
 - **Session Management**: Secure cookie-based authentication with automatic timeout
 - **Input Validation**: SQL injection prevention and command injection protection
+- **Bounded Execution**: Configurable SQL, Redis, MongoDB, Elasticsearch, and resource-list timeouts
+- **SQL Query Cancellation**: Cancel active SQL queries from the UI when cancellation is enabled
 
 ### User Experience
 - **Modern UI**: Responsive design with Tailwind CSS
@@ -131,30 +137,46 @@ For development with hot reload, use Docker Compose:
 docker-compose up
 ```
 
+For a guided multi-database demo, see [docs/demo-playbook.md](docs/demo-playbook.md).
+
 ## Configuration
 
 ### Environment Variables
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `APP_ADDR` | `:8080` | Server listen address |
+| `APP_ADDR` | `127.0.0.1:8080` | Server listen address |
 | `DBADMIN_DATA_DIR` | `./data` | Directory for sessions, history, and uploads |
 | `DBADMIN_USER` | `admin` | Admin username |
 | `DBADMIN_PASSWORD` | `admin` | Admin password |
+| `DBADMIN_ROLE` | `admin` | Single-user role: `admin` or `readonly` |
 | `DBADMIN_SESSION_TTL` | `24h` | Session timeout duration |
-| `DBADMIN_ENCRYPTION_KEY` | (auto) | 32-byte hex key for credential encryption |
+| `DBADMIN_ENCRYPTION_KEY` | unset | 32-byte hex key for credential encryption; set this before saving passwords |
+| `DBADMIN_QUERY_TIMEOUT_SECONDS` | `30` | Maximum SQL query execution time in seconds |
+| `DBADMIN_QUERY_CANCEL_ENABLED` | `true` | Enable SQL query and non-SQL operation cancellation endpoints and UI controls |
+| `DBADMIN_REDIS_COMMAND_TIMEOUT_SECONDS` | `30` | Maximum Redis command/listing time in seconds |
+| `DBADMIN_MONGO_QUERY_TIMEOUT_SECONDS` | `30` | Maximum MongoDB operation time in seconds |
+| `DBADMIN_ES_QUERY_TIMEOUT_SECONDS` | `30` | Maximum Elasticsearch operation time in seconds |
+| `DBADMIN_RESOURCE_LIST_TIMEOUT_SECONDS` | `30` | Maximum unified resource-tree listing time in seconds |
 
 ### Configuration File
 
 Create a `.env` file in the project root:
 
 ```bash
-APP_ADDR=:8080
+APP_ADDR=127.0.0.1:8080
 DBADMIN_DATA_DIR=./data
 DBADMIN_USER=admin
 DBADMIN_PASSWORD=your-secure-password
+DBADMIN_ROLE=admin
 DBADMIN_SESSION_TTL=24h
 DBADMIN_ENCRYPTION_KEY=your-32-byte-hex-key
+DBADMIN_QUERY_TIMEOUT_SECONDS=30
+DBADMIN_QUERY_CANCEL_ENABLED=true
+DBADMIN_REDIS_COMMAND_TIMEOUT_SECONDS=30
+DBADMIN_MONGO_QUERY_TIMEOUT_SECONDS=30
+DBADMIN_ES_QUERY_TIMEOUT_SECONDS=30
+DBADMIN_RESOURCE_LIST_TIMEOUT_SECONDS=30
 ```
 
 Generate a secure encryption key:
@@ -172,7 +194,7 @@ openssl rand -hex 32
 
 ```
 use-cases/dbadmin/
-├── cmd/server/          # Application entry point
+├── main.go             # Application entry point
 ├── internal/
 │   ├── app/            # HTTP routes and middleware
 │   ├── config/         # Configuration management
@@ -180,6 +202,7 @@ use-cases/dbadmin/
 │   │   ├── connection/ # Connection CRUD and encryption
 │   │   ├── session/    # Session management
 │   │   ├── history/    # Query history (SQL)
+│   │   ├── redishistory/ # Command history (Redis)
 │   │   ├── mongohistory/ # Query history (MongoDB)
 │   │   └── eshistory/  # Query history (Elasticsearch)
 │   ├── handler/        # HTTP handlers
@@ -191,14 +214,16 @@ use-cases/dbadmin/
 │   ├── redismanager/   # Redis connection management
 │   ├── mongomanager/   # MongoDB connection management
 │   ├── esmanager/      # Elasticsearch connection management
-│   └── security/       # Security utilities
+│   ├── datasource/     # Unified resource tree adapters
+│   └── retry/          # Retry helpers
 ├── web/                # React frontend
 │   ├── src/
 │   │   ├── components/ # Reusable UI components
 │   │   ├── pages/      # Page components
-│   │   ├── services/   # API client
+│   │   ├── api.ts      # API client
 │   │   └── hooks/      # Custom React hooks
 │   └── public/         # Static assets
+├── docker/             # Local datasource seed data and docs
 └── docs/               # Documentation
 ```
 
@@ -266,7 +291,7 @@ If deploying to production:
 6. **Regular backups** - Backup the `data` directory containing sessions and history
 
 ### Security Features
-- **Credential Encryption**: Connection passwords encrypted at rest using AES-256-GCM
+- **Credential Encryption**: Connection passwords encrypted at rest using AES-256-GCM when `DBADMIN_ENCRYPTION_KEY` is configured
 - **Credential Redaction**: Passwords and API keys never logged or exposed in API responses
 - **Dangerous Operation Detection**: Destructive commands require explicit confirmation
 - **Read-only Mode**: Block all write operations per connection

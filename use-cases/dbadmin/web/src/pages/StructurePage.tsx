@@ -2,9 +2,9 @@ import { useEffect, useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { api, type TableStructure } from '../api'
 import WorkbenchHeader from '../components/WorkbenchHeader'
-import { useToast } from '../components/Toast'
-import { useI18n } from '../i18n'
-import { useCurrentConn } from './MainLayout'
+import { useToast } from '../components/toastContext'
+import { useI18n } from '../i18nContext'
+import { useCurrentConn } from '../context/connections'
 import { toMarkdownSchema, toJSONSchemaDesc } from '../utils/copyFormats'
 
 type TabKey = 'columns' | 'indexes' | 'fks' | 'ddl'
@@ -47,7 +47,7 @@ export default function StructurePage() {
     api.tableStructure(connId, dbName, tableName)
       .then(setStructure)
       .catch(e => showToast(e.message))
-  }, [connId, dbName, tableName])
+  }, [connId, dbName, tableName, showToast])
 
   function copyText(text: string) {
     navigator.clipboard.writeText(text).then(
@@ -164,7 +164,9 @@ export default function StructurePage() {
                   <td style={{ ...td, color: 'var(--text-subtle)', fontVariantNumeric: 'tabular-nums' }}>{c.position}</td>
                   <td style={{ ...td, fontFamily: 'monospace', fontWeight: 500, color: 'var(--text-strong)' }}>{c.name}</td>
                   <td style={{ ...td, fontFamily: 'monospace', fontSize: 11, color: 'var(--accent)' }}>{c.full_type}</td>
-                  <td style={{ ...td, textAlign: 'center', color: 'var(--text-muted)' }}>{c.nullable ? '✓' : ''}</td>
+                  <td style={{ ...td, textAlign: 'center', color: 'var(--text-muted)' }}>
+                    {c.nullable ? <span className="status-dot mx-auto" style={{ background: 'var(--success)' }} /> : ''}
+                  </td>
                   <td style={{ ...td, fontFamily: 'monospace', fontSize: 11, color: 'var(--text-subtle)' }}>{c.default ?? ''}</td>
                   <td style={{ ...td, fontSize: 11 }}>
                     {c.primary_key ? <span style={{ color: 'var(--warning)', fontWeight: 600 }}>PK</span> : ''}

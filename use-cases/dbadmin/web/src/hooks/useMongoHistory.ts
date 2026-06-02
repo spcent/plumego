@@ -1,23 +1,24 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useCallback } from 'react'
 import type { MongoPipelineEntry } from '../api'
 
 const STORAGE_KEY = 'mongo_query_history'
 const MAX_ENTRIES = 100
 
-export function useMongoHistory() {
-  const [entries, setEntries] = useState<MongoPipelineEntry[]>([])
-  const [enabled, setEnabled] = useState(true)
-
-  useEffect(() => {
+function loadEntries(): MongoPipelineEntry[] {
+  try {
     const stored = localStorage.getItem(STORAGE_KEY)
     if (stored) {
-      try {
-        setEntries(JSON.parse(stored))
-      } catch {
-        localStorage.removeItem(STORAGE_KEY)
-      }
+      return JSON.parse(stored) as MongoPipelineEntry[]
     }
-  }, [])
+  } catch {
+    localStorage.removeItem(STORAGE_KEY)
+  }
+  return []
+}
+
+export function useMongoHistory() {
+  const [entries, setEntries] = useState<MongoPipelineEntry[]>(() => loadEntries())
+  const [enabled, setEnabled] = useState(true)
 
   const addEntry = useCallback((entry: Omit<MongoPipelineEntry, 'id' | 'created_at'>) => {
     if (!enabled) return

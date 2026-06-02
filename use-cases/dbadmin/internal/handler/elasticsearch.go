@@ -2,10 +2,12 @@ package handler
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -23,10 +25,31 @@ import (
 
 // ElasticsearchHandler handles Elasticsearch-specific endpoints.
 type ElasticsearchHandler struct {
-	Connections *connection.Store
-	ESManager   *esmanager.Manager
-	History     *eshistory.Store
-	Logger      plumelog.StructuredLogger
+	Connections         *connection.Store
+	ESManager           *esmanager.Manager
+	History             *eshistory.Store
+	Registry            *OperationRegistry
+	Logger              plumelog.StructuredLogger
+	QueryTimeoutSeconds int
+}
+
+func (h ElasticsearchHandler) registerOperation(cancel context.CancelFunc, kind, connID, resource, summary string) string {
+	if h.Registry == nil {
+		return ""
+	}
+	return h.Registry.Register(OperationInfo{
+		Driver:   string(connection.DriverElasticsearch),
+		Kind:     kind,
+		ConnID:   connID,
+		Resource: resource,
+		Summary:  summary,
+	}, cancel)
+}
+
+func (h ElasticsearchHandler) unregisterOperation(operationID string) {
+	if h.Registry != nil && operationID != "" {
+		h.Registry.Unregister(operationID)
+	}
 }
 
 // --- helpers -----------------------------------------------------------------
@@ -72,6 +95,14 @@ func (h ElasticsearchHandler) readonly(w http.ResponseWriter, r *http.Request) {
 		Type(contract.TypeForbidden).Message("connection is read-only").Build()))
 }
 
+func (h ElasticsearchHandler) timeout(ctx context.Context) (context.Context, context.CancelFunc) {
+	seconds := h.QueryTimeoutSeconds
+	if seconds <= 0 {
+		seconds = 30
+	}
+	return context.WithTimeout(ctx, time.Duration(seconds)*time.Second)
+}
+
 // validateIndexName checks if an index name is valid.
 func validateIndexName(name string, allowWildcard bool) error {
 	if name == "" {
@@ -108,7 +139,10 @@ func (h ElasticsearchHandler) ClusterInfo(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	res, err := client.Info()
+	ctx, cancel := h.timeout(r.Context())
+	defer cancel()
+
+	res, err := client.Info(client.Info.WithContext(ctx))
 	if err != nil {
 		h.internalErr(w, r, "cluster info", err)
 		return
@@ -141,7 +175,10 @@ func (h ElasticsearchHandler) ListIndices(w http.ResponseWriter, r *http.Request
 		Format: "json",
 		H:      []string{"index", "health", "status", "docs.count", "store.size", "pri", "rep"},
 	}
-	res, err := req.Do(r.Context(), client)
+	ctx, cancel := h.timeout(r.Context())
+	defer cancel()
+
+	res, err := req.Do(ctx, client)
 	if err != nil {
 		h.internalErr(w, r, "list indices", err)
 		return
@@ -190,7 +227,10 @@ func (h ElasticsearchHandler) GetMapping(w http.ResponseWriter, r *http.Request)
 	req := esapi.IndicesGetMappingRequest{
 		Index: []string{indexName},
 	}
-	res, err := req.Do(r.Context(), client)
+	ctx, cancel := h.timeout(r.Context())
+	defer cancel()
+
+	res, err := req.Do(ctx, client)
 	if err != nil {
 		h.internalErr(w, r, "get mapping", err)
 		return
@@ -238,7 +278,10 @@ func (h ElasticsearchHandler) GetSettings(w http.ResponseWriter, r *http.Request
 	req := esapi.IndicesGetSettingsRequest{
 		Index: []string{indexName},
 	}
-	res, err := req.Do(r.Context(), client)
+	ctx, cancel := h.timeout(r.Context())
+	defer cancel()
+
+	res, err := req.Do(ctx, client)
 	if err != nil {
 		h.internalErr(w, r, "get settings", err)
 		return
@@ -326,8 +369,13 @@ func (h ElasticsearchHandler) Search(w http.ResponseWriter, r *http.Request) {
 	}
 
 	start := time.Now()
+	ctx, cancel := h.timeout(r.Context())
+	defer cancel()
+	operationID := h.registerOperation(cancel, "search", connID, req.Index, "search DSL")
+	defer h.unregisterOperation(operationID)
+
 	res, err := client.Search(
-		client.Search.WithContext(r.Context()),
+		client.Search.WithContext(ctx),
 		client.Search.WithIndex(req.Index),
 		client.Search.WithBody(bytes.NewReader(enforcedDSL)),
 	)
@@ -434,7 +482,10 @@ func (h ElasticsearchHandler) GetDocument(w http.ResponseWriter, r *http.Request
 		Index:      indexName,
 		DocumentID: docID,
 	}
-	res, err := req.Do(r.Context(), client)
+	ctx, cancel := h.timeout(r.Context())
+	defer cancel()
+
+	res, err := req.Do(ctx, client)
 	if err != nil {
 		h.internalErr(w, r, "get document", err)
 		return
@@ -509,7 +560,12 @@ func (h ElasticsearchHandler) DeleteDocument(w http.ResponseWriter, r *http.Requ
 		Index:      req.Index,
 		DocumentID: req.ID,
 	}
-	res, err := delReq.Do(r.Context(), client)
+	ctx, cancel := h.timeout(r.Context())
+	defer cancel()
+	operationID := h.registerOperation(cancel, "delete", connID, req.Index, "delete document")
+	defer h.unregisterOperation(operationID)
+
+	res, err := delReq.Do(ctx, client)
 	if err != nil {
 		h.internalErr(w, r, "delete document", err)
 		return
@@ -526,6 +582,222 @@ func (h ElasticsearchHandler) DeleteDocument(w http.ResponseWriter, r *http.Requ
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// ExportDocuments exports matching documents from an index as JSON or NDJSON.
+func (h ElasticsearchHandler) ExportDocuments(w http.ResponseWriter, r *http.Request) {
+	connID := router.Param(r, "id")
+	indexName := r.URL.Query().Get("index")
+	format := r.URL.Query().Get("format")
+	query := r.URL.Query().Get("query")
+	limitStr := r.URL.Query().Get("limit")
+
+	if err := validateIndexName(indexName, false); err != nil {
+		h.badRequest(w, r, err.Error())
+		return
+	}
+	if format == "" {
+		format = "json"
+	}
+	if format != "json" && format != "ndjson" {
+		h.badRequest(w, r, "format must be json or ndjson")
+		return
+	}
+	limit := 1000
+	if limitStr != "" {
+		if n, err := strconv.Atoi(limitStr); err == nil && n > 0 {
+			limit = n
+		}
+	}
+	if limit > 10000 {
+		limit = 10000
+	}
+
+	var dsl map[string]any
+	if query != "" {
+		if err := json.Unmarshal([]byte(query), &dsl); err != nil {
+			h.badRequest(w, r, "query must be valid JSON")
+			return
+		}
+	} else {
+		dsl = map[string]any{"query": map[string]any{"match_all": map[string]any{}}}
+	}
+	dsl["size"] = limit
+	body, err := json.Marshal(dsl)
+	if err != nil {
+		h.internalErr(w, r, "marshal export query", err)
+		return
+	}
+
+	client, _ := h.openClient(w, r, connID)
+	if client == nil {
+		return
+	}
+
+	ctx, cancel := h.timeout(r.Context())
+	defer cancel()
+	operationID := h.registerOperation(cancel, "export", connID, indexName, format+" export")
+	defer h.unregisterOperation(operationID)
+
+	res, err := client.Search(
+		client.Search.WithContext(ctx),
+		client.Search.WithIndex(indexName),
+		client.Search.WithBody(bytes.NewReader(body)),
+	)
+	if err != nil {
+		h.internalErr(w, r, "export search", err)
+		return
+	}
+	defer res.Body.Close()
+	if res.IsError() {
+		h.internalErr(w, r, "export search", fmt.Errorf("status: %s", res.Status()))
+		return
+	}
+
+	var result struct {
+		Hits struct {
+			Hits []struct {
+				ID     string         `json:"_id"`
+				Source map[string]any `json:"_source"`
+			} `json:"hits"`
+		} `json:"hits"`
+	}
+	if err := json.NewDecoder(res.Body).Decode(&result); err != nil {
+		h.internalErr(w, r, "decode export result", err)
+		return
+	}
+
+	timestamp := time.Now().Format("20060102_150405")
+	w.Header().Set("Content-Type", "application/octet-stream")
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s_%s.%s\"", indexName, timestamp, format))
+
+	if format == "ndjson" {
+		for _, hit := range result.Hits.Hits {
+			doc := hit.Source
+			if doc == nil {
+				doc = map[string]any{}
+			}
+			doc["_id"] = hit.ID
+			line, _ := json.Marshal(doc)
+			fmt.Fprintf(w, "%s\n", line)
+		}
+		return
+	}
+
+	docs := make([]map[string]any, 0, len(result.Hits.Hits))
+	for _, hit := range result.Hits.Hits {
+		doc := hit.Source
+		if doc == nil {
+			doc = map[string]any{}
+		}
+		doc["_id"] = hit.ID
+		docs = append(docs, doc)
+	}
+	logWriteErr(h.Logger, json.NewEncoder(w).Encode(docs))
+}
+
+// ImportDocuments imports JSON documents into an index via the Bulk API.
+func (h ElasticsearchHandler) ImportDocuments(w http.ResponseWriter, r *http.Request) {
+	connID := router.Param(r, "id")
+	var req struct {
+		Index     string           `json:"index"`
+		Documents []map[string]any `json:"documents"`
+		Confirm   bool             `json:"confirm"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		h.badRequest(w, r, "invalid request body")
+		return
+	}
+	if err := validateIndexName(req.Index, false); err != nil {
+		h.badRequest(w, r, err.Error())
+		return
+	}
+	if !req.Confirm {
+		h.badRequest(w, r, "confirm=true is required for import operations")
+		return
+	}
+	if len(req.Documents) == 0 {
+		h.badRequest(w, r, "no documents to import")
+		return
+	}
+	if len(req.Documents) > 10000 {
+		h.badRequest(w, r, "import is limited to 10000 documents")
+		return
+	}
+
+	client, conn := h.openClient(w, r, connID)
+	if client == nil {
+		return
+	}
+	if conn.Readonly {
+		h.readonly(w, r)
+		return
+	}
+
+	var bulk bytes.Buffer
+	for _, doc := range req.Documents {
+		meta := map[string]any{}
+		source := make(map[string]any, len(doc))
+		for k, v := range doc {
+			if k == "_id" {
+				if id, ok := v.(string); ok && id != "" {
+					meta["_id"] = id
+				}
+				continue
+			}
+			source[k] = v
+		}
+		action, _ := json.Marshal(map[string]any{"index": meta})
+		docBody, _ := json.Marshal(source)
+		bulk.Write(action)
+		bulk.WriteByte('\n')
+		bulk.Write(docBody)
+		bulk.WriteByte('\n')
+	}
+
+	ctx, cancel := h.timeout(r.Context())
+	defer cancel()
+	operationID := h.registerOperation(cancel, "import", connID, req.Index, "bulk import")
+	defer h.unregisterOperation(operationID)
+
+	bulkReq := esapi.BulkRequest{
+		Index: req.Index,
+		Body:  bytes.NewReader(bulk.Bytes()),
+	}
+	res, err := bulkReq.Do(ctx, client)
+	if err != nil {
+		h.internalErr(w, r, "bulk import", err)
+		return
+	}
+	defer res.Body.Close()
+	if res.IsError() {
+		h.internalErr(w, r, "bulk import", fmt.Errorf("status: %s", res.Status()))
+		return
+	}
+
+	var result struct {
+		Errors bool `json:"errors"`
+		Items  []map[string]struct {
+			Status int            `json:"status"`
+			Error  map[string]any `json:"error"`
+		} `json:"items"`
+	}
+	if err := json.NewDecoder(res.Body).Decode(&result); err != nil {
+		h.internalErr(w, r, "decode bulk response", err)
+		return
+	}
+	errorsCount := 0
+	for _, item := range result.Items {
+		for _, op := range item {
+			if op.Status >= 300 || op.Error != nil {
+				errorsCount++
+			}
+		}
+	}
+	logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusOK, map[string]any{
+		"imported_count": len(req.Documents) - errorsCount,
+		"errors":         errorsCount,
+	}, nil))
 }
 
 // ListHistory returns search history for a connection.

@@ -89,7 +89,10 @@ func (a *ESAdapter) InspectResource(_ context.Context, _ *Session, _ ResourceRef
 // listIndices returns es_index nodes for all user indices.
 // System indices (starting with '.') are excluded from the listing.
 func (a *ESAdapter) listIndices(ctx context.Context, client *elasticsearch.Client, profileID string) ([]ResourceNode, error) {
-	res, err := client.Cat.Indices(client.Cat.Indices.WithFormat("json"))
+	res, err := client.Cat.Indices(
+		client.Cat.Indices.WithContext(ctx),
+		client.Cat.Indices.WithFormat("json"),
+	)
 	if err != nil {
 		return nil, fmt.Errorf("list indices: %w", err)
 	}

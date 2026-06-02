@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ColumnInfo } from '../api'
-import { useI18n } from '../i18n'
+import { useI18n } from '../i18nContext'
+import { XIcon } from './Icons'
 
 interface RowDrawerProps {
   columns: ColumnInfo[]
@@ -73,11 +74,6 @@ export default function RowDrawer({ columns, pkCols, mode, initialValues, saving
   const firstInputRef = useRef<HTMLInputElement | null>(null)
 
   useEffect(() => {
-    setFields(initFields(columns, pkCols, mode, initialValues))
-    setError('')
-  }, [columns, pkCols, mode, initialValues])
-
-  useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -117,7 +113,7 @@ export default function RowDrawer({ columns, pkCols, mode, initialValues, saving
     }
   }
 
-  const inputCls = 'w-full border border-gray-300 dark:border-gray-600 rounded px-2 py-1.5 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-blue-500'
+  const inputCls = 'input'
   const disabledCls = 'opacity-40 pointer-events-none'
 
   const title = mode === 'insert' ? t('data.insert.title') : t('data.edit.title')
@@ -131,17 +127,22 @@ export default function RowDrawer({ columns, pkCols, mode, initialValues, saving
       <div className="flex-1 bg-black/40" onClick={onClose} />
 
       {/* Drawer panel */}
-      <div className="w-96 bg-white dark:bg-gray-800 flex flex-col shadow-xl overflow-hidden">
+      <div className="flex w-96 flex-col overflow-hidden border-l" style={{ background: 'var(--bg-surface)', borderColor: 'var(--border-subtle)', boxShadow: 'var(--shadow-lg)' }}>
         {/* Header */}
-        <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between shrink-0">
-          <h2 className="font-semibold text-gray-900 dark:text-gray-100 text-sm">{title}</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-lg leading-none">×</button>
+        <div className="flex shrink-0 items-center justify-between border-b px-4 py-3" style={{ borderColor: 'var(--border-subtle)' }}>
+          <h2 className="text-sm font-semibold" style={{ color: 'var(--text-strong)' }}>{title}</h2>
+          <button onClick={onClose} className="icon-btn" aria-label="Close">
+            <XIcon className="h-4 w-4" />
+          </button>
         </div>
 
         {/* Fields */}
         <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
           {error && (
-            <div className="p-2 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 rounded text-red-700 dark:text-red-400 text-xs">
+            <div
+              className="rounded-md border p-2 text-xs"
+              style={{ background: 'var(--danger-soft)', borderColor: 'var(--danger-border)', color: 'var(--danger)' }}
+            >
               {error}
             </div>
           )}
@@ -161,16 +162,16 @@ export default function RowDrawer({ columns, pkCols, mode, initialValues, saving
               >
                 {/* Label row */}
                 <div className="flex items-center justify-between mb-0.5">
-                  <label className="text-xs font-medium text-gray-700 dark:text-gray-300 truncate flex-1">
+                  <label className="flex-1 truncate text-xs font-medium" style={{ color: 'var(--text-default)' }}>
                     {col.name}
                     {isPK && <span className="ml-1 text-amber-500 text-xs">PK</span>}
-                    {col.auto_increment && <span className="ml-1 text-gray-400 text-xs">AUTO</span>}
-                    <span className="ml-1 text-gray-400 font-normal text-xs">{col.full_type}</span>
+                    {col.auto_increment && <span className="ml-1 text-xs" style={{ color: 'var(--text-subtle)' }}>AUTO</span>}
+                    <span className="ml-1 text-xs font-normal" style={{ color: 'var(--text-subtle)' }}>{col.full_type}</span>
                   </label>
                   <div className="flex items-center gap-2 ml-2 shrink-0">
                     {/* Insert-mode include toggle (non-PK fields only) */}
                     {mode === 'insert' && (
-                      <label className="flex items-center gap-1 text-xs text-gray-500 cursor-pointer">
+                      <label className="flex cursor-pointer items-center gap-1 text-xs" style={{ color: 'var(--text-muted)' }}>
                         <input
                           type="checkbox"
                           checked={f.include}
@@ -182,7 +183,7 @@ export default function RowDrawer({ columns, pkCols, mode, initialValues, saving
                     )}
                     {/* NULL checkbox for nullable fields */}
                     {col.nullable && (
-                      <label className="flex items-center gap-1 text-xs text-gray-500 cursor-pointer">
+                      <label className="flex cursor-pointer items-center gap-1 text-xs" style={{ color: 'var(--text-muted)' }}>
                         <input
                           type="checkbox"
                           checked={f.isNull}
@@ -215,7 +216,7 @@ export default function RowDrawer({ columns, pkCols, mode, initialValues, saving
                           disabled={fieldDisabled}
                           className={`rounded ${fieldDisabled ? disabledCls : ''}`}
                         />
-                        <span className="text-xs text-gray-500">{f.value === 'true' || f.value === '1' ? 'true' : 'false'}</span>
+                        <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{f.value === 'true' || f.value === '1' ? 'true' : 'false'}</span>
                       </div>
                     ) : (
                       <input
@@ -236,7 +237,7 @@ export default function RowDrawer({ columns, pkCols, mode, initialValues, saving
                     )}
                     {/* Diff hint in edit mode */}
                     {changed && initialValues && (
-                      <div className="text-xs text-amber-600 dark:text-amber-400 mt-0.5 truncate">
+                      <div className="mt-0.5 truncate text-xs" style={{ color: 'var(--warning)' }}>
                         was: {initialValues[col.name] === null ? 'NULL' : String(initialValues[col.name])}
                       </div>
                     )}
@@ -248,15 +249,15 @@ export default function RowDrawer({ columns, pkCols, mode, initialValues, saving
         </div>
 
         {/* Footer */}
-        <div className="px-4 py-3 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-2 shrink-0">
+        <div className="flex shrink-0 justify-end gap-2 border-t px-4 py-3" style={{ borderColor: 'var(--border-subtle)' }}>
           <button
             onClick={onClose}
-            className="px-4 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800"
+            className="btn btn-ghost"
           >{t('data.cancel')}</button>
           <button
             onClick={handleSubmit}
             disabled={saving}
-            className="px-4 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+            className="btn btn-primary disabled:opacity-50"
           >{saving ? '…' : t('data.save')}</button>
         </div>
       </div>

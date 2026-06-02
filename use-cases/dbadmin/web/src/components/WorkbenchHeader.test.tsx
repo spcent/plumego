@@ -3,7 +3,7 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import WorkbenchHeader from './WorkbenchHeader'
 
 // Mock useI18n hook
-vi.mock('../i18n', () => ({
+vi.mock('../i18nContext', () => ({
   useI18n: () => ({
     t: (key: string) => key,
   }),

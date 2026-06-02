@@ -25,10 +25,12 @@ import (
 	"dbadmin/internal/config"
 	"dbadmin/internal/datasource"
 	"dbadmin/internal/dbmanager"
+	"dbadmin/internal/domain/audit"
 	"dbadmin/internal/domain/connection"
 	"dbadmin/internal/domain/eshistory"
 	"dbadmin/internal/domain/history"
 	"dbadmin/internal/domain/mongohistory"
+	"dbadmin/internal/domain/redishistory"
 	"dbadmin/internal/domain/session"
 	"dbadmin/internal/esmanager"
 	"dbadmin/internal/handler"
@@ -45,6 +47,8 @@ type App struct {
 	HistoryStore      *history.Store
 	MongoHistoryStore *mongohistory.Store
 	ESHistoryStore    *eshistory.Store
+	RedisHistoryStore *redishistory.Store
+	AuditStore        *audit.Store
 	DBManager         *dbmanager.Manager
 	RedisManager      *redismanager.Manager
 	MongoManager      *mongomanager.Manager
@@ -55,6 +59,7 @@ type App struct {
 	ESAdapter         *datasource.ESAdapter
 	UploadDir         string
 	QueryRegistry     *handler.QueryRegistry
+	OperationRegistry *handler.OperationRegistry
 	StartTime         time.Time // Track app start time for uptime monitoring
 }
 
@@ -102,6 +107,20 @@ func New(cfg config.Config) (*App, error) {
 		return nil, fmt.Errorf("create ES history KV store: %w", err)
 	}
 
+	redisHistKV, err := kvstore.NewKVStore(kvstore.Options{
+		DataDir: cfg.App.DataDir + "/redis-history",
+	})
+	if err != nil {
+		return nil, fmt.Errorf("create Redis history KV store: %w", err)
+	}
+
+	auditKV, err := kvstore.NewKVStore(kvstore.Options{
+		DataDir: cfg.App.DataDir + "/audit",
+	})
+	if err != nil {
+		return nil, fmt.Errorf("create audit KV store: %w", err)
+	}
+
 	securityMw, err := midsecurity.Middleware(midsecurity.Config{})
 	if err != nil {
 		return nil, fmt.Errorf("configure security headers middleware: %w", err)
@@ -144,21 +163,24 @@ func New(cfg config.Config) (*App, error) {
 	return &App{
 		Core:              coreApp,
 		Cfg:               cfg,
-		SessionStore:      session.NewStore(sessKV),
+		SessionStore:      session.NewStore(sessKV, cfg.App.SessionTTL),
 		ConnectionStore:   connStore,
 		HistoryStore:      history.NewStore(histKV),
 		MongoHistoryStore: mongohistory.NewStore(mongoHistKV),
 		ESHistoryStore:    eshistory.NewStore(esHistKV),
+		RedisHistoryStore: redishistory.NewStore(redisHistKV),
+		AuditStore:        audit.NewStore(auditKV),
 		DBManager:         mgr,
 		RedisManager:      redisMgr,
 		MongoManager:      mongoMgr,
 		ESManager:         esMgr,
 		SQLAdapter:        datasource.NewSQLAdapter(mgr),
-		RedisAdapter:      datasource.NewRedisAdapter(redisMgr),
+		RedisAdapter:      datasource.NewRedisAdapter(redisMgr, cfg.App.ResourceListTimeoutSeconds),
 		MongoAdapter:      datasource.NewMongoAdapter(mongoMgr),
 		ESAdapter:         datasource.NewESAdapter(esMgr),
 		UploadDir:         uploadDir,
 		QueryRegistry:     handler.NewQueryRegistry(),
+		OperationRegistry: handler.NewOperationRegistry(),
 		StartTime:         time.Now(),
 	}, nil
 }

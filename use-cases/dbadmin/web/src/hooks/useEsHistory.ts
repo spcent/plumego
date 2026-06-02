@@ -1,23 +1,24 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useCallback } from 'react'
 import type { ESHistoryEntry } from '../api'
 
 const STORAGE_KEY = 'elasticsearch_query_history'
 const MAX_ENTRIES = 100
 
-export function useEsHistory() {
-  const [entries, setEntries] = useState<ESHistoryEntry[]>([])
-  const [enabled, setEnabled] = useState(true)
-
-  useEffect(() => {
+function loadEntries(): ESHistoryEntry[] {
+  try {
     const stored = localStorage.getItem(STORAGE_KEY)
     if (stored) {
-      try {
-        setEntries(JSON.parse(stored))
-      } catch {
-        localStorage.removeItem(STORAGE_KEY)
-      }
+      return JSON.parse(stored) as ESHistoryEntry[]
     }
-  }, [])
+  } catch {
+    localStorage.removeItem(STORAGE_KEY)
+  }
+  return []
+}
+
+export function useEsHistory() {
+  const [entries, setEntries] = useState<ESHistoryEntry[]>(() => loadEntries())
+  const [enabled, setEnabled] = useState(true)
 
   const addEntry = useCallback((entry: Omit<ESHistoryEntry, 'id' | 'created_at'>) => {
     if (!enabled) return

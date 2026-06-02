@@ -12,10 +12,7 @@ import (
 	kvstore "github.com/spcent/plumego/store/kv"
 )
 
-const (
-	sessionTTL     = 24 * time.Hour
-	tokenKeyPrefix = "session:"
-)
+const tokenKeyPrefix = "session:"
 
 // ErrNotFound is returned when a session token is not found or has expired.
 var ErrNotFound = errors.New("session: not found or expired")
@@ -29,12 +26,16 @@ type Session struct {
 
 // Store persists sessions in a KV store.
 type Store struct {
-	kv *kvstore.KVStore
+	kv  *kvstore.KVStore
+	ttl time.Duration
 }
 
 // NewStore creates a Store backed by the provided KV store.
-func NewStore(kv *kvstore.KVStore) *Store {
-	return &Store{kv: kv}
+func NewStore(kv *kvstore.KVStore, ttl time.Duration) *Store {
+	if ttl <= 0 {
+		ttl = 24 * time.Hour
+	}
+	return &Store{kv: kv, ttl: ttl}
 }
 
 // Create generates a new session for user, persists it, and returns the token.
@@ -52,7 +53,7 @@ func (s *Store) Create(user string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("marshal session: %w", err)
 	}
-	if err := s.kv.Set(tokenKeyPrefix+token, data, sessionTTL); err != nil {
+	if err := s.kv.Set(tokenKeyPrefix+token, data, s.ttl); err != nil {
 		return "", fmt.Errorf("persist session: %w", err)
 	}
 	return token, nil

@@ -117,7 +117,7 @@ describe('ConfirmDialog', () => {
       />
     )
     const confirmButton = screen.getByText('Confirm')
-    expect(confirmButton.className).toContain('bg-red-600')
+    expect(confirmButton.className).toContain('btn-danger')
   })
 
   it('applies normal styling when dangerous=false', () => {
@@ -132,6 +132,6 @@ describe('ConfirmDialog', () => {
       />
     )
     const confirmButton = screen.getByText('Confirm')
-    expect(confirmButton.className).toContain('bg-blue-600')
+    expect(confirmButton.className).toContain('btn-primary')
   })
 })

@@ -1,7 +1,8 @@
 import { useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../api'
-import { useI18n } from '../i18n'
+import { useI18n } from '../i18nContext'
+import { DatabaseIcon } from '../components/Icons'
 
 export default function LoginPage() {
   const [username, setUsername] = useState('admin')
@@ -26,39 +27,55 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-8 w-full max-w-sm">
-        <h1 className="text-2xl font-bold text-gray-800 dark:text-gray-100 mb-6 text-center">DBAdmin</h1>
+    <div className="app-shell flex min-h-[100dvh] items-center justify-center px-4">
+      <div className="panel w-full max-w-[380px] p-7">
+        <div className="mb-6 flex flex-col items-center text-center">
+          <div
+            className="mb-3 grid h-12 w-12 place-items-center rounded-xl border"
+            style={{ borderColor: 'var(--border-subtle)', background: 'var(--bg-muted)', color: 'var(--accent)' }}
+          >
+            <DatabaseIcon className="h-6 w-6" />
+          </div>
+          <h1 className="text-xl font-semibold" style={{ color: 'var(--text-default)' }}>DBAdmin</h1>
+          <p className="mt-1 text-sm" style={{ color: 'var(--text-muted)' }}>
+            Secure database operations console
+          </p>
+        </div>
         {error && (
-          <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 rounded text-red-700 dark:text-red-400 text-sm">
+          <div
+            className="mb-4 rounded-md border px-3 py-2 text-sm"
+            style={{ borderColor: 'var(--danger-border)', background: 'var(--danger-soft)', color: 'var(--danger)' }}
+          >
             {error}
           </div>
         )}
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('login.username')}</label>
+            <label className="mb-1 block text-sm font-medium" style={{ color: 'var(--text-muted)' }}>{t('login.username')}</label>
             <input
               type="text"
               value={username}
               onChange={e => setUsername(e.target.value)}
-              className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="input"
+              autoComplete="username"
               required
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('login.password')}</label>
+            <label className="mb-1 block text-sm font-medium" style={{ color: 'var(--text-muted)' }}>{t('login.password')}</label>
             <input
               type="password"
               value={password}
               onChange={e => setPassword(e.target.value)}
-              className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="input"
+              autoComplete="current-password"
               required
             />
           </div>
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-medium py-2 rounded text-sm transition-colors"
+            className="btn btn-primary w-full justify-center disabled:opacity-50"
           >
             {loading ? t('login.submitting') : t('login.submit')}
           </button>

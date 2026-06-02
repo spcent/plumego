@@ -17,6 +17,8 @@ import (
 type AuthHandler struct {
 	AdminUser     string
 	AdminPassword string
+	AdminRole     string
+	SessionTTL    time.Duration
 	Sessions      *session.Store
 	Logger        plumelog.StructuredLogger
 }
@@ -28,6 +30,7 @@ type loginRequest struct {
 
 type meResponse struct {
 	User string `json:"user"`
+	Role string `json:"role"`
 }
 
 // Login validates credentials and issues a session cookie.
@@ -63,9 +66,23 @@ func (h AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		HttpOnly: true,
 		Secure:   true,
 		SameSite: http.SameSiteLaxMode,
-		MaxAge:   int((24 * time.Hour).Seconds()),
+		MaxAge:   int(h.sessionTTL().Seconds()),
 	})
-	logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusOK, meResponse{User: req.Username}, nil))
+	logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusOK, meResponse{User: req.Username, Role: h.role()}, nil))
+}
+
+func (h AuthHandler) sessionTTL() time.Duration {
+	if h.SessionTTL <= 0 {
+		return 24 * time.Hour
+	}
+	return h.SessionTTL
+}
+
+func (h AuthHandler) role() string {
+	if h.AdminRole == "" {
+		return "admin"
+	}
+	return h.AdminRole
 }
 
 // Logout deletes the session and clears the cookie.
@@ -97,5 +114,5 @@ func (h AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 			Build()))
 		return
 	}
-	logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusOK, meResponse{User: principal.Subject}, nil))
+	logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusOK, meResponse{User: principal.Subject, Role: h.role()}, nil))
 }

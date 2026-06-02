@@ -15,14 +15,18 @@ import (
 	"github.com/spcent/plumego/router"
 
 	"dbadmin/internal/domain/connection"
+	"dbadmin/internal/domain/redishistory"
 	"dbadmin/internal/redismanager"
 )
 
 // RedisHandler handles all Redis-specific endpoints.
 type RedisHandler struct {
-	Connections  *connection.Store
-	RedisManager *redismanager.Manager
-	Logger       plumelog.StructuredLogger
+	Connections           *connection.Store
+	RedisManager          *redismanager.Manager
+	History               *redishistory.Store
+	Registry              *OperationRegistry
+	Logger                plumelog.StructuredLogger
+	CommandTimeoutSeconds int
 }
 
 // --- write commands that must be blocked in readonly mode --------------------
@@ -85,6 +89,14 @@ func (h RedisHandler) internalErr(w http.ResponseWriter, r *http.Request, err er
 		Type(contract.TypeInternal).Message("internal error").Build()))
 }
 
+func (h RedisHandler) timeout(ctx context.Context) (context.Context, context.CancelFunc) {
+	seconds := h.CommandTimeoutSeconds
+	if seconds <= 0 {
+		seconds = 30
+	}
+	return context.WithTimeout(ctx, time.Duration(seconds)*time.Second)
+}
+
 func dbIndexParam(r *http.Request) (int, error) {
 	s := router.Param(r, "dbIndex")
 	if s == "" {
@@ -124,7 +136,7 @@ func (h RedisHandler) ListDBs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	ctx, cancel := h.timeout(r.Context())
 	defer cancel()
 
 	dbCount := 16
@@ -222,7 +234,7 @@ func (h RedisHandler) ListKeys(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
+	ctx, cancel := h.timeout(r.Context())
 	defer cancel()
 
 	keys, nextCursor, err := cl.Scan(ctx, cursor, pattern, count).Result()
@@ -335,7 +347,7 @@ func (h RedisHandler) GetKey(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	ctx, cancel := h.timeout(r.Context())
 	defer cancel()
 
 	keyType, err := cl.Type(ctx, key).Result()
@@ -505,7 +517,7 @@ func (h RedisHandler) SetTTL(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	ctx, cancel := h.timeout(r.Context())
 	defer cancel()
 
 	if req.TTL < 0 {
@@ -566,7 +578,7 @@ func (h RedisHandler) DeleteKey(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	ctx, cancel := h.timeout(r.Context())
 	defer cancel()
 
 	if err := cl.Del(ctx, req.Key).Err(); err != nil {
@@ -622,7 +634,7 @@ func (h RedisHandler) BatchPreview(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+	ctx, cancel := h.timeout(r.Context())
 	defer cancel()
 
 	var allKeys []keyEntry
@@ -747,7 +759,7 @@ func (h RedisHandler) BatchDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+	ctx, cancel := h.timeout(r.Context())
 	defer cancel()
 
 	deleted, err := cl.Del(ctx, req.Keys...).Result()
@@ -820,8 +832,10 @@ func (h RedisHandler) Command(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+	ctx, cancel := h.timeout(r.Context())
 	defer cancel()
+	operationID := h.registerOperation(cancel, connID, fmt.Sprintf("db%d", dbIndex), redisOperationSummary(parts))
+	defer h.unregisterOperation(operationID)
 
 	args := make([]any, len(parts))
 	for i, p := range parts {
@@ -839,7 +853,102 @@ func (h RedisHandler) Command(w http.ResponseWriter, r *http.Request) {
 		resp.Result = formatRedisResult(res)
 	}
 
+	h.recordHistory(connID, dbIndex, req.Command, elapsed, resp.Error)
+
 	logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusOK, resp, nil))
+}
+
+func (h RedisHandler) registerOperation(cancel context.CancelFunc, connID, resource, summary string) string {
+	if h.Registry == nil {
+		return ""
+	}
+	return h.Registry.Register(OperationInfo{
+		Driver:   string(connection.DriverRedis),
+		Kind:     "command",
+		ConnID:   connID,
+		Resource: resource,
+		Summary:  summary,
+	}, cancel)
+}
+
+func (h RedisHandler) unregisterOperation(operationID string) {
+	if h.Registry != nil && operationID != "" {
+		h.Registry.Unregister(operationID)
+	}
+}
+
+func redisOperationSummary(parts []string) string {
+	if len(parts) == 0 {
+		return ""
+	}
+	verb := strings.ToUpper(parts[0])
+	if verb == "AUTH" || verb == "HELLO" {
+		return verb
+	}
+	return verb
+}
+
+func (h RedisHandler) recordHistory(connID string, dbIndex int, command string, durationMS int64, errStr string) {
+	if h.History == nil {
+		return
+	}
+	id, _ := generateHistoryID()
+	if addErr := h.History.Add(&redishistory.Entry{
+		ID:        id,
+		ConnID:    connID,
+		DBIndex:   dbIndex,
+		Command:   strings.TrimSpace(command),
+		Duration:  durationMS,
+		Success:   errStr == "",
+		Error:     errStr,
+		CreatedAt: time.Now().UTC(),
+	}); addErr != nil {
+		h.Logger.Warn("record redis history failed", plumelog.Fields{"error": addErr.Error()})
+	}
+}
+
+// ListHistory returns Redis command history for a connection.
+func (h RedisHandler) ListHistory(w http.ResponseWriter, r *http.Request) {
+	if h.History == nil {
+		logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusOK, []redishistory.Entry{}, nil))
+		return
+	}
+	connID := router.Param(r, "id")
+	entries, err := h.History.List(connID)
+	if err != nil {
+		h.internalErr(w, r, err)
+		return
+	}
+	logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusOK, entries, map[string]any{"count": len(entries)}))
+}
+
+// DeleteHistoryEntry deletes a single Redis command history entry.
+func (h RedisHandler) DeleteHistoryEntry(w http.ResponseWriter, r *http.Request) {
+	if h.History == nil {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	connID := router.Param(r, "id")
+	entryID := router.Param(r, "entryId")
+	if err := h.History.Delete(connID, entryID); err != nil {
+		h.internalErr(w, r, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// ClearHistory clears Redis command history for a connection.
+func (h RedisHandler) ClearHistory(w http.ResponseWriter, r *http.Request) {
+	if h.History == nil {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	connID := router.Param(r, "id")
+	if err := h.History.Clear(connID); err != nil {
+		h.internalErr(w, r, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // parseCommand splits a Redis command line respecting quoted strings.

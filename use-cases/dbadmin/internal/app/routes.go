@@ -43,9 +43,19 @@ func (a *App) RegisterRoutes() error {
 		Logger:    a.Core.Logger(),
 		StartTime: a.StartTime,
 	}
+	operationsH := handler.OperationsHandler{
+		Registry: a.OperationRegistry,
+		Logger:   a.Core.Logger(),
+	}
+	auditH := handler.AuditHandler{
+		Store:  a.AuditStore,
+		Logger: a.Core.Logger(),
+	}
 	authH := handler.AuthHandler{
 		AdminUser:     a.Cfg.App.AdminUser,
 		AdminPassword: a.Cfg.App.AdminPassword,
+		AdminRole:     a.Cfg.App.AdminRole,
+		SessionTTL:    a.Cfg.App.SessionTTL,
 		Sessions:      a.SessionStore,
 		Logger:        a.Core.Logger(),
 	}
@@ -90,7 +100,10 @@ func (a *App) RegisterRoutes() error {
 		History:             a.HistoryStore,
 		Logger:              a.Core.Logger(),
 		QueryTimeoutSeconds: a.Cfg.App.QueryTimeoutSeconds,
-		Registry:            a.QueryRegistry,
+		Registry:            nil,
+	}
+	if a.Cfg.App.QueryCancelEnabled {
+		queryH.Registry = a.QueryRegistry
 	}
 	rowH := handler.RowHandler{
 		Connections: a.ConnectionStore,
@@ -111,17 +124,21 @@ func (a *App) RegisterRoutes() error {
 		Logger:       a.Core.Logger(),
 	}
 	resourceH := handler.ResourceHandler{
-		Connections:  a.ConnectionStore,
-		SQLAdapter:   a.SQLAdapter,
-		RedisAdapter: a.RedisAdapter,
-		MongoAdapter: a.MongoAdapter,
-		ESAdapter:    a.ESAdapter,
-		Logger:       a.Core.Logger(),
+		Connections:    a.ConnectionStore,
+		SQLAdapter:     a.SQLAdapter,
+		RedisAdapter:   a.RedisAdapter,
+		MongoAdapter:   a.MongoAdapter,
+		ESAdapter:      a.ESAdapter,
+		Logger:         a.Core.Logger(),
+		TimeoutSeconds: a.Cfg.App.ResourceListTimeoutSeconds,
 	}
 	redisH := handler.RedisHandler{
-		Connections:  a.ConnectionStore,
-		RedisManager: a.RedisManager,
-		Logger:       a.Core.Logger(),
+		Connections:           a.ConnectionStore,
+		RedisManager:          a.RedisManager,
+		History:               a.RedisHistoryStore,
+		Registry:              a.OperationRegistry,
+		Logger:                a.Core.Logger(),
+		CommandTimeoutSeconds: a.Cfg.App.RedisCommandTimeoutSeconds,
 	}
 	sqliteH := handler.SQLiteHandler{
 		Connections:    a.ConnectionStore,
@@ -131,24 +148,31 @@ func (a *App) RegisterRoutes() error {
 		Logger:         a.Core.Logger(),
 	}
 	mongoH := handler.MongoDBHandler{
-		Connections:  a.ConnectionStore,
-		MongoManager: a.MongoManager,
-		History:      a.MongoHistoryStore,
-		Logger:       a.Core.Logger(),
+		Connections:         a.ConnectionStore,
+		MongoManager:        a.MongoManager,
+		History:             a.MongoHistoryStore,
+		Registry:            a.OperationRegistry,
+		Logger:              a.Core.Logger(),
+		QueryTimeoutSeconds: a.Cfg.App.MongoQueryTimeoutSeconds,
 	}
 	esH := handler.ElasticsearchHandler{
-		Connections: a.ConnectionStore,
-		ESManager:   a.ESManager,
-		History:     a.ESHistoryStore,
-		Logger:      a.Core.Logger(),
+		Connections:         a.ConnectionStore,
+		ESManager:           a.ESManager,
+		History:             a.ESHistoryStore,
+		Registry:            a.OperationRegistry,
+		Logger:              a.Core.Logger(),
+		QueryTimeoutSeconds: a.Cfg.App.ESQueryTimeoutSeconds,
 	}
 
 	// Protected routes — all require a valid session cookie.
-	guard := func(h http.Handler) http.Handler { return authMw(h) }
+	roleMw := handler.RoleMiddleware(a.Cfg.App.AdminRole, a.Core.Logger())
+	auditMw := handler.AuditMiddleware(a.AuditStore, a.Core.Logger())
+	guard := func(h http.Handler) http.Handler { return authMw(auditMw(roleMw(h))) }
 
 	protected := newRouteReg(a.Core)
 	protected.post("/api/auth/logout", guard(http.HandlerFunc(authH.Logout)))
 	protected.get("/api/auth/me", guard(http.HandlerFunc(authH.Me)))
+	protected.get("/api/audit/events", guard(http.HandlerFunc(auditH.List)))
 
 	// Connection management.
 	protected.get("/api/connections", guard(http.HandlerFunc(connH.List)))
@@ -157,6 +181,9 @@ func (a *App) RegisterRoutes() error {
 	protected.put("/api/connections/:id", guard(http.HandlerFunc(connH.Update)))
 	protected.delete("/api/connections/:id", guard(http.HandlerFunc(connH.Delete)))
 	protected.post("/api/connections/:id/test", guard(http.HandlerFunc(connH.Test)))
+	protected.delete("/api/connections/:id/runtime", guard(http.HandlerFunc(connH.CloseRuntime)))
+	protected.get("/api/pool-stats", guard(http.HandlerFunc(poolStatsH.GetAllStats)))
+	protected.get("/api/pool-stats/sql", guard(http.HandlerFunc(poolStatsH.GetSQLPoolStats)))
 
 	// Unified resource tree — driver-agnostic.
 	// GET /api/connections/:id/resources?parentId=<path>
@@ -196,8 +223,12 @@ func (a *App) RegisterRoutes() error {
 	protected.delete("/api/conn/:id/history/:entryId", guard(http.HandlerFunc(queryH.DeleteHistory)))
 
 	// Query cancellation — cancel active queries and list running queries.
-	protected.post("/api/queries/cancel", guard(http.HandlerFunc(queryH.Cancel)))
-	protected.get("/api/queries/active", guard(http.HandlerFunc(queryH.ListActive)))
+	if a.Cfg.App.QueryCancelEnabled {
+		protected.post("/api/queries/cancel", guard(http.HandlerFunc(queryH.Cancel)))
+		protected.get("/api/queries/active", guard(http.HandlerFunc(queryH.ListActive)))
+		protected.post("/api/operations/cancel", guard(http.HandlerFunc(operationsH.Cancel)))
+		protected.get("/api/operations/active", guard(http.HandlerFunc(operationsH.ListActive)))
+	}
 
 	// Redis operations — Redis-specific route group.
 	protected.get("/api/conn/:id/redis/databases", guard(http.HandlerFunc(redisH.ListDBs)))
@@ -208,6 +239,9 @@ func (a *App) RegisterRoutes() error {
 	protected.post("/api/conn/:id/redis/:dbIndex/command", guard(http.HandlerFunc(redisH.Command)))
 	protected.post("/api/conn/:id/redis/:dbIndex/batch-preview", guard(http.HandlerFunc(redisH.BatchPreview)))
 	protected.post("/api/conn/:id/redis/:dbIndex/batch-delete", guard(http.HandlerFunc(redisH.BatchDelete)))
+	protected.get("/api/conn/:id/redis/history", guard(http.HandlerFunc(redisH.ListHistory)))
+	protected.delete("/api/conn/:id/redis/history", guard(http.HandlerFunc(redisH.ClearHistory)))
+	protected.delete("/api/conn/:id/redis/history/:entryId", guard(http.HandlerFunc(redisH.DeleteHistoryEntry)))
 
 	// SQLite file upload and download.
 	protected.post("/api/sqlite/upload", guard(http.HandlerFunc(sqliteH.Upload)))
@@ -244,6 +278,8 @@ func (a *App) RegisterRoutes() error {
 	protected.post("/api/connections/:id/es/search", guard(http.HandlerFunc(esH.Search)))
 	protected.get("/api/connections/:id/es/document", guard(http.HandlerFunc(esH.GetDocument)))
 	protected.delete("/api/connections/:id/es/document", guard(http.HandlerFunc(esH.DeleteDocument)))
+	protected.get("/api/connections/:id/es/export", guard(http.HandlerFunc(esH.ExportDocuments)))
+	protected.post("/api/connections/:id/es/import", guard(http.HandlerFunc(esH.ImportDocuments)))
 	protected.get("/api/connections/:id/es/history", guard(http.HandlerFunc(esH.ListHistory)))
 	protected.delete("/api/connections/:id/es/history/:entryId", guard(http.HandlerFunc(esH.DeleteHistoryEntry)))
 	protected.delete("/api/connections/:id/es/history", guard(http.HandlerFunc(esH.ClearHistory)))

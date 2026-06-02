@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
-import { useToast } from './Toast'
-import { useI18n } from '../i18n'
+import { useToast } from './toastContext'
+import { useI18n } from '../i18nContext'
+import { XIcon } from './Icons'
 
 type ContentType = 'null' | 'empty' | 'blob' | 'json' | 'text'
 
@@ -181,19 +182,13 @@ export default function CellViewer({ column, value, onClose }: CellViewerProps) 
     marginBottom: -1,
   })
 
-  const btnStyle: React.CSSProperties = {
-    border: '1px solid var(--border-strong)',
-    color: 'var(--text-default)',
-    background: 'var(--bg-muted)',
-  }
-
   return (
     <div
       className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
       onClick={e => { if (e.target === e.currentTarget) onClose() }}
     >
-      <div className="rounded-lg shadow-2xl w-full max-w-2xl flex flex-col"
-        style={{ maxHeight: '80vh', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)' }}>
+      <div className="panel w-full max-w-2xl flex flex-col"
+        style={{ maxHeight: '80vh' }}>
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 shrink-0"
           style={{ borderBottom: '1px solid var(--border-subtle)' }}>
@@ -203,9 +198,11 @@ export default function CellViewer({ column, value, onClose }: CellViewerProps) 
           </div>
           <button
             onClick={onClose}
-            className="ml-3 shrink-0 text-xl leading-none"
-            style={{ color: 'var(--text-subtle)' }}
-          >✕</button>
+            className="icon-btn ml-3 shrink-0"
+            aria-label="Close"
+          >
+            <XIcon className="h-4 w-4" />
+          </button>
         </div>
 
         {/* Tabs — only for JSON */}
@@ -232,27 +229,24 @@ export default function CellViewer({ column, value, onClose }: CellViewerProps) 
             <>
               <button
                 onClick={() => copy(parsed.minifiedJson!)}
-                className="text-sm px-3 py-1.5 rounded"
-                style={btnStyle}
+                className="btn btn-ghost"
               >{t('cell.copy_minified')}</button>
               <button
                 onClick={() => copy(parsed.prettyJson!)}
-                className="text-sm px-3 py-1.5 rounded"
-                style={btnStyle}
+                className="btn btn-ghost"
               >{t('cell.copy_pretty')}</button>
             </>
           )}
           {canCopyRaw && (
             <button
               onClick={() => copy(parsed.raw)}
-              className="text-sm px-3 py-1.5 bg-blue-600 text-white rounded hover:bg-blue-700"
+              className="btn btn-primary"
             >{t('cell.copy')}</button>
           )}
           {!canCopyRaw && (
             <button
               onClick={onClose}
-              className="text-sm px-3 py-1.5 rounded"
-              style={btnStyle}
+              className="btn btn-ghost"
             >{t('confirm.cancel')}</button>
           )}
         </div>

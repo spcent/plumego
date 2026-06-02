@@ -1,68 +1,46 @@
 import { useState, useEffect, useCallback } from 'react'
+import { api, type RedisHistoryEntry } from '../api'
 
-const STORAGE_KEY = 'redis_command_history'
-const MAX_ENTRIES = 100
-
-export interface RedisHistoryEntry {
-  id: string
-  command: string
-  duration_ms: number
-  success: boolean
-  created_at: string
-}
-
-export function useRedisHistory() {
+export function useRedisHistory(connId?: string) {
   const [entries, setEntries] = useState<RedisHistoryEntry[]>([])
-  const [enabled, setEnabled] = useState(true)
+  const [loading, setLoading] = useState(false)
+
+  const reload = useCallback(async () => {
+    if (!connId) {
+      setEntries([])
+      return
+    }
+    setLoading(true)
+    try {
+      setEntries(await api.redisListHistory(connId))
+    } finally {
+      setLoading(false)
+    }
+  }, [connId])
 
   useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY)
-    if (stored) {
-      try {
-        setEntries(JSON.parse(stored))
-      } catch {
-        localStorage.removeItem(STORAGE_KEY)
-      }
-    }
-  }, [])
-
-  const addEntry = useCallback((entry: Omit<RedisHistoryEntry, 'id' | 'created_at'>) => {
-    if (!enabled) return
-    setEntries(prev => {
-      const newEntry: RedisHistoryEntry = {
-        ...entry,
-        id: Date.now().toString(),
-        created_at: new Date().toISOString(),
-      }
-      const updated = [newEntry, ...prev].slice(0, MAX_ENTRIES)
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated))
-      return updated
+    queueMicrotask(() => {
+      void reload()
     })
-  }, [enabled])
+  }, [reload])
 
-  const removeEntry = useCallback((id: string) => {
-    setEntries(prev => {
-      const updated = prev.filter(e => e.id !== id)
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated))
-      return updated
-    })
-  }, [])
+  const removeEntry = useCallback(async (id: string) => {
+    if (!connId) return
+    await api.redisDeleteHistoryEntry(connId, id)
+    setEntries(prev => prev.filter(e => e.id !== id))
+  }, [connId])
 
-  const clearHistory = useCallback(() => {
+  const clearHistory = useCallback(async () => {
+    if (!connId) return
+    await api.redisClearHistory(connId)
     setEntries([])
-    localStorage.removeItem(STORAGE_KEY)
-  }, [])
-
-  const toggleEnabled = useCallback((value: boolean) => {
-    setEnabled(value)
-  }, [])
+  }, [connId])
 
   return {
     entries,
-    addEntry,
+    loading,
+    reload,
     removeEntry,
     clearHistory,
-    enabled,
-    toggleEnabled,
   }
 }

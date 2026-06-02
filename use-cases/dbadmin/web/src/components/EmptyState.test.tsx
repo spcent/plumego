@@ -41,6 +41,6 @@ describe('EmptyState', () => {
 
   it('renders empty state icon', () => {
     const { container } = render(<EmptyState message="Empty" />)
-    expect(container.textContent).toContain('∅')
+    expect(container.querySelector('svg')).not.toBeNull()
   })
 })

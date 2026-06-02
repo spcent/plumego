@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams } from 'react-router-dom'
-import { useI18n } from '../i18n'
-import { useToast } from '../components/Toast'
+import { useI18n } from '../i18nContext'
+import { useToast } from '../components/toastContext'
 import { api } from '../api'
 import type {
   MongoDocQuery,
@@ -18,6 +18,7 @@ import ErrorState from '../components/ErrorState'
 import EmptyState from '../components/EmptyState'
 import ConfirmDialog from '../components/ConfirmDialog'
 import WorkbenchHeader from '../components/WorkbenchHeader'
+import { XIcon } from '../components/Icons'
 
 type ViewMode = 'table' | 'json'
 type ActiveTab = 'documents' | 'aggregation' | 'schema' | 'stats'
@@ -264,13 +265,16 @@ export default function MongoCollectionPanel() {
 
   // Load data when tab changes
   useEffect(() => {
-    if (activeTab === 'documents') {
-      executeQuery()
-    } else if (activeTab === 'schema' && !schema && !schemaLoading) {
-      analyzeSchema()
-    } else if (activeTab === 'stats' && !stats && !statsLoading) {
-      loadStats()
-    }
+    const id = window.setTimeout(() => {
+      if (activeTab === 'documents') {
+        void executeQuery()
+      } else if (activeTab === 'schema' && !schema && !schemaLoading) {
+        void analyzeSchema()
+      } else if (activeTab === 'stats' && !stats && !statsLoading) {
+        void loadStats()
+      }
+    }, 0)
+    return () => window.clearTimeout(id)
   }, [activeTab, schema, schemaLoading, stats, statsLoading, analyzeSchema, loadStats, executeQuery])
 
   if (!connectionId || !database || !collection) {
@@ -1134,16 +1138,17 @@ function ExportModal(props: {
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-[var(--bg-primary)] rounded-lg shadow-xl max-w-md w-full">
+      <div className="panel max-w-md w-full">
         <div className="px-6 py-4 border-b border-[var(--border-primary)] flex items-center justify-between">
           <h2 className="text-lg font-semibold text-[var(--text-primary)]">
             {t('mongodb.p1.export.title')}
           </h2>
           <button
             onClick={onClose}
-            className="text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+            className="icon-btn"
+            aria-label="Close"
           >
-            ✕
+            <XIcon className="h-4 w-4" />
           </button>
         </div>
 
@@ -1218,16 +1223,17 @@ function ImportModal(props: {
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-[var(--bg-primary)] rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] flex flex-col">
+      <div className="panel max-w-2xl w-full max-h-[90vh] flex flex-col">
         <div className="px-6 py-4 border-b border-[var(--border-primary)] flex items-center justify-between">
           <h2 className="text-lg font-semibold text-[var(--text-primary)]">
             {t('mongodb.p1.import.title')}
           </h2>
           <button
             onClick={onClose}
-            className="text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+            className="icon-btn"
+            aria-label="Close"
           >
-            ✕
+            <XIcon className="h-4 w-4" />
           </button>
         </div>
 
@@ -1305,7 +1311,7 @@ function HistoryModal(props: {
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-[var(--bg-primary)] rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] flex flex-col">
+      <div className="panel max-w-4xl w-full max-h-[90vh] flex flex-col">
         <div className="px-6 py-4 border-b border-[var(--border-primary)] flex items-center justify-between">
           <h2 className="text-lg font-semibold text-[var(--text-primary)]">
             {t('mongodb.p1.history.title')}
@@ -1321,9 +1327,10 @@ function HistoryModal(props: {
             )}
             <button
               onClick={onClose}
-              className="text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+              className="icon-btn"
+              aria-label="Close"
             >
-              ✕
+              <XIcon className="h-4 w-4" />
             </button>
           </div>
         </div>
@@ -1397,16 +1404,17 @@ function ObjectIdModal(props: {
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-[var(--bg-primary)] rounded-lg shadow-xl max-w-md w-full">
+      <div className="panel max-w-md w-full">
         <div className="px-6 py-4 border-b border-[var(--border-primary)] flex items-center justify-between">
           <h2 className="text-lg font-semibold text-[var(--text-primary)]">
             {t('mongodb.p1.objectid.title')}
           </h2>
           <button
             onClick={onClose}
-            className="text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+            className="icon-btn"
+            aria-label="Close"
           >
-            ✕
+            <XIcon className="h-4 w-4" />
           </button>
         </div>
 
@@ -1489,16 +1497,17 @@ function DocumentViewerModal({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-[var(--bg-primary)] rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] flex flex-col">
+      <div className="panel max-w-4xl w-full max-h-[90vh] flex flex-col">
         <div className="px-6 py-4 border-b border-[var(--border-primary)] flex items-center justify-between">
           <h2 className="text-lg font-semibold text-[var(--text-primary)]">
             {editing ? t('mongodb.document.editor_title') : t('mongodb.document.viewer_title')}
           </h2>
           <button
             onClick={onClose}
-            className="text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+            className="icon-btn"
+            aria-label="Close"
           >
-            ✕
+            <XIcon className="h-4 w-4" />
           </button>
         </div>
 
@@ -1577,16 +1586,17 @@ function InsertDocumentModal({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-[var(--bg-primary)] rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] flex flex-col">
+      <div className="panel max-w-2xl w-full max-h-[90vh] flex flex-col">
         <div className="px-6 py-4 border-b border-[var(--border-primary)] flex items-center justify-between">
           <h2 className="text-lg font-semibold text-[var(--text-primary)]">
             {t('mongodb.document.insert_title')}
           </h2>
           <button
             onClick={onClose}
-            className="text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+            className="icon-btn"
+            aria-label="Close"
           >
-            ✕
+            <XIcon className="h-4 w-4" />
           </button>
         </div>
 
@@ -1650,16 +1660,17 @@ function IndexesModal({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-[var(--bg-primary)] rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] flex flex-col">
+      <div className="panel max-w-4xl w-full max-h-[90vh] flex flex-col">
         <div className="px-6 py-4 border-b border-[var(--border-primary)] flex items-center justify-between">
           <h2 className="text-lg font-semibold text-[var(--text-primary)]">
             {t('mongodb.indexes.title')}
           </h2>
           <button
             onClick={onClose}
-            className="text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+            className="icon-btn"
+            aria-label="Close"
           >
-            ✕
+            <XIcon className="h-4 w-4" />
           </button>
         </div>
 
@@ -1692,8 +1703,8 @@ function IndexesModal({
                     {index.name}
                   </div>
                   <div className="text-xs text-[var(--text-secondary)] mb-2">
-                    {index.unique && <span className="mr-3">✓ {t('mongodb.indexes.unique')}</span>}
-                    {index.sparse && <span>✓ {t('mongodb.indexes.sparse')}</span>}
+                    {index.unique && <span className="mr-3 inline-flex items-center gap-1.5"><span className="status-dot" style={{ background: 'var(--success)' }} />{t('mongodb.indexes.unique')}</span>}
+                    {index.sparse && <span className="inline-flex items-center gap-1.5"><span className="status-dot" style={{ background: 'var(--success)' }} />{t('mongodb.indexes.sparse')}</span>}
                   </div>
                   <pre className="text-xs font-mono text-[var(--text-primary)] bg-[var(--bg-primary)] p-3 rounded">
                     {JSON.stringify(index.key, null, 2)}

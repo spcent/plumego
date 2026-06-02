@@ -1,8 +1,9 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { Link, useNavigate, useParams, useLocation } from 'react-router-dom'
 import { api, type Connection, type ResourceNode, type ResourceNodeType } from '../api'
-import { useI18n } from '../i18n'
-import { useToast } from './Toast'
+import { useI18n } from '../i18nContext'
+import { useToast } from './toastContext'
+import { ChevronDownIcon, ChevronRightIcon, DatabaseIcon, RefreshIcon, TableIcon } from './Icons'
 
 // ── Context Menu ───────────────────────────────────────────────────────────
 
@@ -56,18 +57,19 @@ function ContextMenu({ state, onClose }: { state: ContextMenuState; onClose: () 
 
 function nodeIcon(type: ResourceNodeType): React.ReactNode {
   const s: React.CSSProperties = { color: 'var(--sb-muted)', fontSize: 12 }
+  const iconClass = 'h-3.5 w-3.5'
   switch (type) {
-    case 'sql_database':    return <span style={s}>🗄</span>
-    case 'sql_table':       return <span style={{ ...s, fontSize: 10 }}>▤</span>
-    case 'sql_view':        return <span style={{ ...s, fontSize: 10 }}>◧</span>
-    case 'redis_db':        return <span style={{ ...s, color: '#f87171' }}>⬡</span>
-    case 'redis_key':       return <span style={{ ...s, fontSize: 10, color: '#fb923c' }}>⬡</span>
+    case 'sql_database':    return <DatabaseIcon className={iconClass} style={{ color: 'var(--sb-muted)' }} />
+    case 'sql_table':       return <TableIcon className={iconClass} style={{ color: 'var(--sb-muted)' }} />
+    case 'sql_view':        return <TableIcon className={iconClass} style={{ color: 'var(--sb-muted)', opacity: 0.72 }} />
+    case 'redis_db':        return <span className="h-3 w-3 rounded-[3px] border" style={{ borderColor: '#f87171', background: '#f8717120' }} />
+    case 'redis_key':       return <span className="h-1.5 w-1.5 rounded-full" style={{ background: '#fb923c' }} />
     case 'mongo_database':  return <span style={{ ...s, color: '#4ade80', fontWeight: 700 }}>M</span>
     case 'mongo_collection':return <span style={{ ...s, fontSize: 10, color: '#22d3ee' }}>C</span>
     case 'es_index':        return <span style={{ ...s, color: '#fbbf24', fontWeight: 700 }}>E</span>
     case 'es_alias':        return <span style={{ ...s, fontSize: 10, color: '#a78bfa' }}>~</span>
-    case 'es_data_stream':  return <span style={{ ...s, fontSize: 10, color: '#34d399' }}>↓</span>
-    default:                return <span style={{ ...s, fontSize: 10 }}>•</span>
+    case 'es_data_stream':  return <span style={{ ...s, color: '#34d399', fontWeight: 700 }}>D</span>
+    default:                return <span className="h-1.5 w-1.5 rounded-full" style={{ background: 'var(--sb-muted)' }} />
   }
 }
 
@@ -154,8 +156,8 @@ function TreeItem({
 }) {
   const paddingLeft = 12 + depth * 16
   const cls = [
-    'flex items-center gap-1.5 h-[28px] w-full text-[13px] rounded-sm mx-1 pr-2 cursor-pointer select-none truncate',
-    'transition-colors duration-75',
+    'flex items-center gap-1.5 h-[30px] w-full text-[13px] rounded-md mx-1 pr-2 cursor-pointer select-none truncate',
+    'transition-colors duration-100 hover:bg-white/10',
     active ? 'font-medium' : '',
   ].join(' ')
   const style: React.CSSProperties = {
@@ -167,8 +169,8 @@ function TreeItem({
   const inner = (
     <>
       {expandable && (
-        <span className="shrink-0 text-[10px] w-3 text-center" style={{ color: 'var(--sb-muted)' }}>
-          {expanded ? '▾' : '▸'}
+        <span className="grid h-4 w-3 shrink-0 place-items-center" style={{ color: 'var(--sb-muted)' }}>
+          {expanded ? <ChevronDownIcon className="h-3.5 w-3.5" /> : <ChevronRightIcon className="h-3.5 w-3.5" />}
         </span>
       )}
       {icon && <span className="shrink-0">{icon}</span>}
@@ -187,7 +189,7 @@ interface Props {
   onRefresh: () => void
 }
 
-export default function ResourceExplorer({ connections, onRefresh: _onRefresh }: Props) {
+export default function ResourceExplorer({ connections, onRefresh }: Props) {
   const params = useParams<{ connId?: string; dbName?: string; tableName?: string; redisDb?: string; mongoDb?: string; mongoColl?: string; esIndex?: string; esAlias?: string; esDataStream?: string }>()
   const location = useLocation()
   const navigate = useNavigate()
@@ -241,7 +243,9 @@ export default function ResourceExplorer({ connections, onRefresh: _onRefresh }:
     try {
       const nodes = await api.resources(connId, node.id)
       setResourceCache(c => ({ ...c, [key]: nodes }))
-    } catch {}
+    } catch {
+      // Leave this branch unloaded; expanding or refreshing can retry.
+    }
   }, [resourceCache])
 
   const toggleConn = useCallback((connId: string) => {
@@ -295,6 +299,24 @@ export default function ResourceExplorer({ connections, onRefresh: _onRefresh }:
 
   return (
     <nav className="flex-1 overflow-y-auto py-1 overflow-x-hidden" onClick={() => setContextMenu(null)}>
+      <div className="flex items-center justify-between px-3 py-2">
+        <div className="text-[11px] font-semibold uppercase tracking-[0.14em]" style={{ color: 'var(--sb-muted)' }}>
+          Connections
+        </div>
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation()
+            onRefresh()
+          }}
+          className="grid h-6 w-6 place-items-center rounded-md transition-colors hover:bg-white/10"
+          style={{ color: 'var(--sb-muted)' }}
+          title={t('Refresh')}
+          aria-label={t('Refresh')}
+        >
+          <RefreshIcon className="h-3.5 w-3.5" />
+        </button>
+      </div>
       {connections.length === 0 && (
         <div className="px-4 py-3 text-[12px]" style={{ color: 'var(--sb-muted)' }}>
           {t('connections.empty')}
@@ -326,9 +348,7 @@ export default function ResourceExplorer({ connections, onRefresh: _onRefresh }:
               extra={
                 <>
                   {isLoading && (
-                    <span className="shrink-0 text-[10px] animate-spin" style={{ color: 'var(--sb-muted)' }}>
-                      ⟳
-                    </span>
+                    <RefreshIcon className="h-3 w-3 shrink-0 animate-spin" style={{ color: 'var(--sb-muted)' }} />
                   )}
                   {conn.readonly && (
                     <span
@@ -348,7 +368,7 @@ export default function ResourceExplorer({ connections, onRefresh: _onRefresh }:
                 {(conn.driver === 'mysql' || conn.driver === 'sqlite') && (
                   <TreeItem
                     depth={1}
-                    icon={<span style={{ color: 'var(--sb-muted)', fontSize: 11 }}>▶</span>}
+                    icon={<ChevronRightIcon className="h-3.5 w-3.5" style={{ color: 'var(--sb-muted)' }} />}
                     label={t('nav.sql_console')}
                     active={connActive}
                     to={`/conn/${conn.id}/query`}
@@ -509,7 +529,7 @@ function ResourceNodeRow({
           {node.type === 'sql_database' && (
             <TreeItem
               depth={depth + 1}
-              icon={<span style={{ color: 'var(--sb-muted)', fontSize: 10 }}>⊞</span>}
+              icon={<TableIcon className="h-3.5 w-3.5" style={{ color: 'var(--sb-muted)' }} />}
               label="Tables"
               active={
                 params.connId === connId &&
@@ -524,7 +544,7 @@ function ResourceNodeRow({
           {node.type === 'mongo_database' && (
             <TreeItem
               depth={depth + 1}
-              icon={<span style={{ color: '#22d3ee', fontSize: 10 }}>⊞</span>}
+              icon={<TableIcon className="h-3.5 w-3.5" style={{ color: '#22d3ee' }} />}
               label="Collections"
               active={
                 params.connId === connId &&

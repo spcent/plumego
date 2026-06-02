@@ -37,6 +37,7 @@ type queryRequest struct {
 	Database         string `json:"database"`
 	Readonly         bool   `json:"readonly"`
 	ConfirmDangerous bool   `json:"confirmDangerous"`
+	QueryID          string `json:"queryId"`
 }
 
 type selectResult struct {
@@ -231,7 +232,10 @@ func (h QueryHandler) Execute(w http.ResponseWriter, r *http.Request) {
 	originalSQL := req.SQL // preserve original for history
 
 	// Register query for cancellation if registry is available.
-	queryID, _ := generateHistoryID()
+	queryID := strings.TrimSpace(req.QueryID)
+	if queryID == "" {
+		queryID, _ = generateHistoryID()
+	}
 	if h.Registry != nil {
 		h.Registry.Register(queryID, connID, req.Database, originalSQL, cancel)
 		defer h.Registry.Unregister(queryID)

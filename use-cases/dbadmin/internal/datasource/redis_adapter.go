@@ -24,12 +24,13 @@ func (r RedisConfig) DSType() DataSourceType { return TypeRedis }
 // RedisAdapter implements DataSourceDriver for Redis.
 // The ResourceExplorer uses it to list DBs (0-15) in the sidebar.
 type RedisAdapter struct {
-	manager *redismanager.Manager
+	manager        *redismanager.Manager
+	timeoutSeconds int
 }
 
 // NewRedisAdapter creates a RedisAdapter backed by the given manager.
-func NewRedisAdapter(mgr *redismanager.Manager) *RedisAdapter {
-	return &RedisAdapter{manager: mgr}
+func NewRedisAdapter(mgr *redismanager.Manager, timeoutSeconds int) *RedisAdapter {
+	return &RedisAdapter{manager: mgr, timeoutSeconds: timeoutSeconds}
 }
 
 // Type returns TypeRedis.
@@ -75,7 +76,7 @@ func (a *RedisAdapter) ListResources(ctx context.Context, sess *Session, parent 
 		return nil, fmt.Errorf("redis adapter: unexpected handle type %T", sess.Handle)
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, timeoutDuration(a.timeoutSeconds, 30*time.Second))
 	defer cancel()
 
 	dbCount := 16

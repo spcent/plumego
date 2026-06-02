@@ -1,12 +1,12 @@
 # Stability Audit Report
 
 **Date**: 2026-05-30  
-**Status**: Phase 1 Complete (SQL Query Timeout)  
+**Status**: Phase 2 Complete (timeouts, SQL cancellation, large-value previews)
 **Priority**: P0 Stability Fixes
 
 ## Executive Summary
 
-Completed systematic stability audit across all datasources (SQLite, MySQL, Redis, MongoDB, Elasticsearch). Identified and fixed critical SQL query timeout issue. Remaining P0 items require implementation of cancel query functionality and large data protection limits.
+Completed systematic stability audit across all datasources (SQLite, MySQL, Redis, MongoDB, Elasticsearch). SQL query timeout, SQL query cancellation, non-SQL active operation cancellation, large-value previews, configurable operation timeouts, connection runtime controls, and audit/RBAC basics are implemented. Remaining P0 work is broader integration coverage.
 
 ## Completed Improvements
 
@@ -61,80 +61,50 @@ Comprehensive feature matrix covering:
 | Datasource | Current Implementation | Status |
 |------------|----------------------|--------|
 | SQL (MySQL/SQLite) | Configurable timeout | ✅ FIXED |
-| MongoDB | Hardcoded 10-60s | ⚠️ Needs config |
-| Redis | Hardcoded 10-30s | ⚠️ Needs config |
-| Elasticsearch | Request context | ✅ Uses context |
+| MongoDB | Configurable timeout | ✅ FIXED |
+| Redis | Configurable timeout | ✅ FIXED |
+| Elasticsearch | Configurable timeout | ✅ FIXED |
 
-## Remaining P0 Work
+## Completed P0 Work
 
 ### 1. Cancel Query Functionality
 
-**Problem**: Users cannot cancel long-running queries.
+**Status**: ✅ Implemented for SQL.
 
-**Required Implementation**:
-- Add `POST /api/conn/:id/query/cancel` endpoint
-- Track active queries with context.CancelFunc
-- Implement frontend cancel button
-- Add query ID tracking mechanism
-
-**Estimated Effort**: 2-3 hours
-
-**Files to Modify**:
-- `internal/handler/query.go` - Add cancel endpoint and query tracking
-- `internal/app/routes.go` - Register cancel route
-- `web/src/pages/QueryPage.tsx` - Add cancel button UI
+Implemented:
+- `POST /api/queries/cancel`
+- `GET /api/queries/active`
+- Active query tracking with `context.CancelFunc`
+- Frontend cancel button for running SQL queries
 
 ### 2. Large Data Protection
 
-**Problem**: Large BLOB/TEXT/JSON fields can crash browser or cause OOM.
+**Status**: ✅ Preview protection implemented.
 
-**Required Implementation**:
-
-#### A. Preview Size Limits
-```go
-const LargeValuePreviewSize = 10 * 1024 // 10KB
-
-func truncateForPreview(value []byte) ([]byte, bool) {
-    if len(value) > LargeValuePreviewSize {
-        return value[:LargeValuePreviewSize], true
-    }
-    return value, false
-}
-```
-
-#### B. CellRenderer Enhancement
-- Detect large values (>10KB)
-- Show preview with "View Full" button
-- Load full content on demand via separate API
-
-**Estimated Effort**: 3-4 hours
-
-**Files to Modify**:
-- `internal/handler/rows.go` - Add preview truncation
-- `web/src/components/CellRenderer.tsx` - Handle large values
-- `internal/handler/rows.go` - Add `/api/conn/:id/db/:db/tables/:table/rows/:rowId/columns/:colName` endpoint for full content
+Remaining gap: full BLOB download and full-value on-demand loading from the Data page.
 
 ### 3. Unified Timeout Configuration
 
-**Problem**: MongoDB and Redis use hardcoded timeouts.
+**Status**: ✅ Implemented.
 
-**Required Implementation**:
-```go
-type AppConfig struct {
-    SQLQueryTimeoutSeconds  int  // default: 30
-    MongoQueryTimeoutSeconds int // default: 30
-    RedisCommandTimeoutSeconds int // default: 10
-    ESQueryTimeoutSeconds int // default: 30
-}
-```
+Environment variables:
+- `DBADMIN_QUERY_TIMEOUT_SECONDS`
+- `DBADMIN_REDIS_COMMAND_TIMEOUT_SECONDS`
+- `DBADMIN_MONGO_QUERY_TIMEOUT_SECONDS`
+- `DBADMIN_ES_QUERY_TIMEOUT_SECONDS`
+- `DBADMIN_RESOURCE_LIST_TIMEOUT_SECONDS`
 
-**Estimated Effort**: 1-2 hours
+## Remaining P0 Work
 
-**Files to Modify**:
-- `internal/config/config.go` - Add timeout fields
-- `internal/handler/mongodb.go` - Use config instead of hardcoded values
-- `internal/handler/redis.go` - Use config instead of hardcoded values
-- `env.example` - Document new options
+### 1. Connection Lifecycle Management
+
+**Problem**: Connection state is visible through health and pool stats, but stale/disconnected states are not surfaced clearly enough in the main UI.
+
+Recommended implementation:
+- Add last health-check status per connection.
+- Show stale/disconnected state in the connection list.
+- Add explicit close/reconnect action for cached pools/clients.
+- Add integration tests for reconnect after server restart.
 
 ## Security Verification
 
@@ -175,7 +145,7 @@ All datasources require confirmation:
 | Aspect | Status | Notes |
 |--------|--------|-------|
 | Connection pooling | ✅ | Implemented for SQL |
-| Timeout handling | ⚠️ | Partial (SQL fixed, others hardcoded) |
+| Timeout handling | ✅ | Configurable for SQL, Redis, MongoDB, Elasticsearch, and resource listing |
 | Disconnect detection | ✅ | Context cancellation |
 | Resource cleanup | ✅ | Defer statements in place |
 
@@ -230,9 +200,9 @@ contract.TypeInternal      // 500
 ### Query Execution
 
 - SQL: Timeout prevents indefinite execution ✅
-- MongoDB: Hardcoded timeouts need config ⚠️
-- Redis: Hardcoded timeouts need config ⚠️
-- Elasticsearch: Uses request context ✅
+- MongoDB: Configurable request timeout ✅
+- Redis: Configurable command/listing timeout ✅
+- Elasticsearch: Configurable request timeout ✅
 
 ### Memory Usage
 
@@ -288,21 +258,20 @@ Before deploying to production:
 
 ## Known Limitations
 
-1. **No query cancellation**: Users must wait for timeout or close browser
-2. **Large values**: BLOB/TEXT fields >10KB may cause UI issues
-3. **MongoDB/Redis timeouts**: Hardcoded, not configurable
-4. **No connection pool monitoring**: Cannot view active connections
-5. **No query queue**: Concurrent queries may overwhelm database
+1. **Large full-value access**: Preview truncation exists, but BLOB download and full-value on-demand loading are not implemented.
+2. **Connection health in main workspace**: Runtime controls exist in Settings, but stale/disconnected state is not surfaced inline in the resource tree.
+3. **No query queue**: Concurrent queries may overwhelm a target database.
+4. **RBAC granularity**: Single-user `admin`/`readonly` only; no per-connection grants.
 
 ## Next Steps
 
 ### Immediate (This Week)
 1. ✅ SQL query timeout - COMPLETED
-2. ⏳ Implement cancel query functionality
-3. ⏳ Add large data protection
+2. ✅ SQL query cancellation - COMPLETED
+3. ✅ Large value preview protection - COMPLETED
 
 ### Short-term (Next 2 Weeks)
-1. Unify timeout configuration across all datasources
+1. Add connection lifecycle status to the connection list
 2. Add connection health monitoring
 3. Implement query queue with concurrency limits
 
@@ -313,7 +282,7 @@ Before deploying to production:
 
 ## Conclusion
 
-The dbadmin workbench is functionally complete with good test coverage. The P0 stability issues are being systematically addressed. SQL query timeout is now implemented and working. Cancel query and large data protection are the next priorities.
+The dbadmin workbench is functionally complete with broad unit coverage. The main remaining stability work is connection lifecycle UX and integration coverage across real database containers.
 
 **Current Stability Level**: Production-ready for internal use with known limitations  
 **Recommended Action**: Complete cancel query and large data protection before public release

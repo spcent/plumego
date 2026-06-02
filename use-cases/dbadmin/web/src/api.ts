@@ -29,9 +29,10 @@ async function req<T>(method: string, path: string, body?: unknown): Promise<T> 
 
 export const api = {
   login: (username: string, password: string) =>
-    req<{ user: string }>('POST', '/auth/login', { username, password }),
+    req<{ user: string; role: string }>('POST', '/auth/login', { username, password }),
   logout: () => req<void>('POST', '/auth/logout'),
-  me: () => req<{ user: string }>('GET', '/auth/me'),
+  me: () => req<{ user: string; role: string }>('GET', '/auth/me'),
+  listAuditEvents: () => req<AuditEvent[]>('GET', '/audit/events'),
 
   listConnections: () => req<Connection[]>('GET', '/connections'),
   getConnection: (id: string) => req<Connection>('GET', `/connections/${id}`),
@@ -40,6 +41,8 @@ export const api = {
   deleteConnection: (id: string, deleteFile = false) =>
     req<void>('DELETE', `/connections/${id}${deleteFile ? '?deleteFile=true' : ''}`),
   testConnection: (id: string) => req<{ ok: boolean; error?: string }>('POST', `/connections/${id}/test`),
+  closeConnectionRuntime: (id: string) => req<void>('DELETE', `/connections/${id}/runtime`),
+  poolStats: () => req<PoolStats>('GET', '/pool-stats'),
 
   // Unified resource tree — works for all datasource types.
   // parentId is ResourceNode.path; omit to list top-level nodes (databases for SQL).
@@ -67,8 +70,16 @@ export const api = {
     req<void>('DELETE', `/conn/${id}/db/${db}/tables/${table}/rows`, { primaryKey, confirm: true }),
 
   executeQuery: (id: string, db: string, sql: string,
-                opts?: { readonly?: boolean; confirmDangerous?: boolean }) =>
+                opts?: { readonly?: boolean; confirmDangerous?: boolean; queryId?: string }) =>
     req<QueryResult>('POST', `/conn/${id}/db/${db}/query`, { sql, database: db, ...opts }),
+  cancelQuery: (queryId: string) =>
+    req<{ status: string; queryId: string }>('POST', '/queries/cancel', { queryId }),
+  listActiveQueries: () =>
+    req<ActiveQuery[]>('GET', '/queries/active'),
+  listActiveOperations: () =>
+    req<ActiveOperation[]>('GET', '/operations/active'),
+  cancelOperation: (operationId: string) =>
+    req<{ status: string; operationId: string }>('POST', '/operations/cancel', { operationId }),
   listHistory: (id: string) => req<HistoryEntry[]>('GET', `/conn/${id}/history`),
   deleteHistory: (id: string, entryId: string) => req<void>('DELETE', `/conn/${id}/history/${entryId}`),
   clearHistory: (id: string) => req<void>('DELETE', `/conn/${id}/history`),
@@ -148,6 +159,12 @@ export const api = {
     req<{ ok: boolean }>('DELETE', `/conn/${id}/redis/${dbIndex}/key`, { key, confirm: true }),
   redisCommand: (id: string, dbIndex: number, command: string) =>
     req<RedisCommandResult>('POST', `/conn/${id}/redis/${dbIndex}/command`, { command }),
+  redisListHistory: (id: string) =>
+    req<RedisHistoryEntry[]>('GET', `/conn/${id}/redis/history`),
+  redisDeleteHistoryEntry: (id: string, entryId: string) =>
+    req<void>('DELETE', `/conn/${id}/redis/history/${encodeURIComponent(entryId)}`),
+  redisClearHistory: (id: string) =>
+    req<void>('DELETE', `/conn/${id}/redis/history`),
   redisBatchPreview: (id: string, dbIndex: number, pattern: string, maxKeys: number) =>
     req<RedisBatchPreviewResponse>('POST', `/conn/${id}/redis/${dbIndex}/batch-preview`, {
       pattern,
@@ -238,6 +255,15 @@ export const api = {
   esDeleteDocument: (connId: string, index: string, id: string, confirm: boolean) =>
     req<void>('DELETE', `/connections/${connId}/es/document`, { index, id, confirm }),
 
+  esExport: (connId: string, index: string, format: 'json' | 'ndjson' = 'json', query?: Record<string, unknown>) => {
+    const params = new URLSearchParams({ index, format })
+    if (query) params.set('query', JSON.stringify(query))
+    return `${BASE}/connections/${connId}/es/export?${params.toString()}`
+  },
+
+  esImport: (connId: string, index: string, documents: Record<string, unknown>[], confirm: boolean) =>
+    req<ESImportResponse>('POST', `/connections/${connId}/es/import`, { index, documents, confirm }),
+
   esListHistory: (connId: string) =>
     req<ESHistoryEntry[]>('GET', `/connections/${connId}/es/history`),
 
@@ -279,6 +305,37 @@ export interface Connection {
   save_password?: boolean
   uploaded_file?: boolean
   original_filename?: string
+}
+
+export interface SQLPoolStats {
+  connection_id: string
+  driver: string
+  max_open: number
+  open: number
+  in_use: number
+  idle: number
+  wait_count: number
+  wait_duration: string
+  max_idle_closed: number
+  max_lifetime_closed: number
+}
+
+export interface PoolStats {
+  sql_connections?: SQLPoolStats[]
+  redis_connections: number
+  mongodb_connections: number
+  es_connections: number
+  timestamp: string
+}
+
+export interface AuditEvent {
+  id: string
+  user: string
+  action: string
+  method: string
+  path: string
+  status: number
+  created_at: string
 }
 
 export interface ColumnInfo {
@@ -344,6 +401,7 @@ export interface RowsResponse {
 
 export interface SelectResult {
   type: 'result_set'
+  queryId?: string
   columns: string[]
   rows: Record<string, unknown>[]
   executionTimeMs: number
@@ -352,12 +410,33 @@ export interface SelectResult {
 
 export interface ExecResult {
   type: 'exec_result'
+  queryId?: string
   rowsAffected: number
   lastInsertId: number
   executionTimeMs: number
 }
 
 export type QueryResult = SelectResult | ExecResult
+
+export interface ActiveQuery {
+  queryId: string
+  connId: string
+  database: string
+  sql: string
+  startTime: string
+  duration: string
+}
+
+export interface ActiveOperation {
+  operationId: string
+  driver: string
+  kind: string
+  connId: string
+  resource: string
+  summary: string
+  startTime: string
+  duration: string
+}
 
 export interface ImportErrorDetail { index: number; snippet: string; error: string }
 export interface ImportResult {
@@ -473,6 +552,17 @@ export interface RedisCommandResult {
   result: unknown
   error?: string
   timeMs: number
+}
+
+export interface RedisHistoryEntry {
+  id: string
+  conn_id: string
+  db_index: number
+  command: string
+  duration_ms: number
+  success: boolean
+  error?: string
+  created_at: string
 }
 
 export interface RedisBatchPreviewResponse {
@@ -614,6 +704,11 @@ export interface ESDocument {
   _id: string
   _version: number
   _source: Record<string, unknown>
+}
+
+export interface ESImportResponse {
+  imported_count: number
+  errors: number
 }
 
 export interface ESHistoryEntry {

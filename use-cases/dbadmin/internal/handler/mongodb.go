@@ -26,10 +26,31 @@ import (
 
 // MongoDBHandler handles all MongoDB-specific endpoints.
 type MongoDBHandler struct {
-	Connections  *connection.Store
-	MongoManager *mongomanager.Manager
-	History      *mongohistory.Store
-	Logger       plumelog.StructuredLogger
+	Connections         *connection.Store
+	MongoManager        *mongomanager.Manager
+	History             *mongohistory.Store
+	Registry            *OperationRegistry
+	Logger              plumelog.StructuredLogger
+	QueryTimeoutSeconds int
+}
+
+func (h MongoDBHandler) registerOperation(cancel context.CancelFunc, kind, connID, resource, summary string) string {
+	if h.Registry == nil {
+		return ""
+	}
+	return h.Registry.Register(OperationInfo{
+		Driver:   string(connection.DriverMongoDB),
+		Kind:     kind,
+		ConnID:   connID,
+		Resource: resource,
+		Summary:  summary,
+	}, cancel)
+}
+
+func (h MongoDBHandler) unregisterOperation(operationID string) {
+	if h.Registry != nil && operationID != "" {
+		h.Registry.Unregister(operationID)
+	}
 }
 
 // --- helpers -----------------------------------------------------------------
@@ -61,6 +82,14 @@ func (h MongoDBHandler) badRequest(w http.ResponseWriter, r *http.Request, msg s
 func (h MongoDBHandler) readonly(w http.ResponseWriter, r *http.Request) {
 	logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
 		Type(contract.TypeForbidden).Message("connection is read-only").Build()))
+}
+
+func (h MongoDBHandler) timeout(ctx context.Context) (context.Context, context.CancelFunc) {
+	seconds := h.QueryTimeoutSeconds
+	if seconds <= 0 {
+		seconds = 30
+	}
+	return context.WithTimeout(ctx, time.Duration(seconds)*time.Second)
 }
 
 // validateName checks if a database or collection name is valid.
@@ -200,7 +229,7 @@ func (h MongoDBHandler) ListDatabases(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	ctx, cancel := h.timeout(r.Context())
 	defer cancel()
 
 	result, err := client.ListDatabases(ctx, bson.M{})
@@ -267,7 +296,7 @@ func (h MongoDBHandler) ListCollections(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	ctx, cancel := h.timeout(r.Context())
 	defer cancel()
 
 	cursor, err := client.Database(dbName).ListCollections(ctx, bson.M{})
@@ -370,8 +399,10 @@ func (h MongoDBHandler) QueryDocuments(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+	ctx, cancel := h.timeout(r.Context())
 	defer cancel()
+	operationID := h.registerOperation(cancel, "query", connID, req.Database+"."+req.Collection, "find documents")
+	defer h.unregisterOperation(operationID)
 
 	var filter bson.M
 	if req.Filter != "" {
@@ -502,7 +533,7 @@ func (h MongoDBHandler) ListIndexes(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	ctx, cancel := h.timeout(r.Context())
 	defer cancel()
 
 	cursor, err := client.Database(dbName).Collection(collName).Indexes().List(ctx)
@@ -586,7 +617,7 @@ func (h MongoDBHandler) InsertDocument(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	ctx, cancel := h.timeout(r.Context())
 	defer cancel()
 
 	var doc bson.M
@@ -674,7 +705,7 @@ func (h MongoDBHandler) UpdateDocument(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	ctx, cancel := h.timeout(r.Context())
 	defer cancel()
 
 	var doc bson.M
@@ -778,7 +809,7 @@ func (h MongoDBHandler) DeleteDocument(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	ctx, cancel := h.timeout(r.Context())
 	defer cancel()
 
 	filterID, err := parseID(req.ID)
@@ -898,8 +929,10 @@ func (h MongoDBHandler) Aggregate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+	ctx, cancel := h.timeout(r.Context())
 	defer cancel()
+	operationID := h.registerOperation(cancel, "aggregate", connID, req.Database+"."+req.Collection, "aggregation pipeline")
+	defer h.unregisterOperation(operationID)
 
 	// Convert pipeline to bson.A
 	pipeline := bson.A{}
@@ -1053,7 +1086,7 @@ func (h MongoDBHandler) ExplainQuery(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	ctx, cancel := h.timeout(r.Context())
 	defer cancel()
 
 	// Build find command for explain
@@ -1167,7 +1200,7 @@ func (h MongoDBHandler) SchemaSample(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+	ctx, cancel := h.timeout(r.Context())
 	defer cancel()
 
 	// Use $sample aggregation to get random documents
@@ -1328,7 +1361,7 @@ func (h MongoDBHandler) CollectionStats(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	ctx, cancel := h.timeout(r.Context())
 	defer cancel()
 
 	// Run collStats command
@@ -1458,8 +1491,10 @@ func (h MongoDBHandler) ExportDocuments(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 60*time.Second)
+	ctx, cancel := h.timeout(r.Context())
 	defer cancel()
+	operationID := h.registerOperation(cancel, "export", connID, dbName+"."+collName, format+" export")
+	defer h.unregisterOperation(operationID)
 
 	filter := bson.M{}
 	if filterStr != "" {
@@ -1491,18 +1526,18 @@ func (h MongoDBHandler) ExportDocuments(w http.ResponseWriter, r *http.Request) 
 
 	switch format {
 	case "json":
-		h.exportJSON(w, cursor)
+		h.exportJSON(ctx, w, cursor)
 	case "ndjson":
-		h.exportNDJSON(w, cursor)
+		h.exportNDJSON(ctx, w, cursor)
 	case "csv":
-		h.exportCSV(w, cursor)
+		h.exportCSV(ctx, w, cursor)
 	}
 }
 
-func (h MongoDBHandler) exportJSON(w http.ResponseWriter, cursor *mongo.Cursor) {
+func (h MongoDBHandler) exportJSON(ctx context.Context, w http.ResponseWriter, cursor *mongo.Cursor) {
 	fmt.Fprint(w, "[\n")
 	first := true
-	for cursor.Next(context.Background()) {
+	for cursor.Next(ctx) {
 		var doc bson.M
 		if err := cursor.Decode(&doc); err != nil {
 			continue
@@ -1517,8 +1552,8 @@ func (h MongoDBHandler) exportJSON(w http.ResponseWriter, cursor *mongo.Cursor) 
 	fmt.Fprint(w, "\n]\n")
 }
 
-func (h MongoDBHandler) exportNDJSON(w http.ResponseWriter, cursor *mongo.Cursor) {
-	for cursor.Next(context.Background()) {
+func (h MongoDBHandler) exportNDJSON(ctx context.Context, w http.ResponseWriter, cursor *mongo.Cursor) {
+	for cursor.Next(ctx) {
 		var doc bson.M
 		if err := cursor.Decode(&doc); err != nil {
 			continue
@@ -1528,12 +1563,12 @@ func (h MongoDBHandler) exportNDJSON(w http.ResponseWriter, cursor *mongo.Cursor
 	}
 }
 
-func (h MongoDBHandler) exportCSV(w http.ResponseWriter, cursor *mongo.Cursor) {
+func (h MongoDBHandler) exportCSV(ctx context.Context, w http.ResponseWriter, cursor *mongo.Cursor) {
 	writer := csv.NewWriter(w)
 	defer writer.Flush()
 
 	headerWritten := false
-	for cursor.Next(context.Background()) {
+	for cursor.Next(ctx) {
 		var doc bson.M
 		if err := cursor.Decode(&doc); err != nil {
 			continue
@@ -1658,8 +1693,10 @@ func (h MongoDBHandler) ImportDocuments(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 60*time.Second)
+	ctx, cancel := h.timeout(r.Context())
 	defer cancel()
+	operationID := h.registerOperation(cancel, "import", connID, req.Database+"."+req.Collection, "import documents")
+	defer h.unregisterOperation(operationID)
 
 	// Convert documents to bson.M
 	docs := make([]any, len(req.Documents))

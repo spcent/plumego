@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, act } from '@testing-library/react'
-import { ToastProvider, useToast } from './Toast'
+import { ToastProvider } from './Toast'
+import { useToast } from './toastContext'
 
 // Test component that uses the toast hook
 function TestComponent({ message, type = 'info' }: { message: string; type?: 'info' | 'success' | 'error' }) {
@@ -70,7 +71,7 @@ describe('Toast', () => {
       button.click()
     })
 
-    const toast = screen.getByText('Info message').closest('.bg-gray-700')
+    const toast = screen.getByText('Info message').closest('[role="status"]')
     expect(toast).toBeInTheDocument()
   })
 
@@ -86,7 +87,7 @@ describe('Toast', () => {
       button.click()
     })
 
-    const toast = screen.getByText('Success message').closest('.bg-green-600')
+    const toast = screen.getByText('Success message').closest('[role="status"]')
     expect(toast).toBeInTheDocument()
   })
 
@@ -102,7 +103,7 @@ describe('Toast', () => {
       button.click()
     })
 
-    const toast = screen.getByText('Error message').closest('.bg-red-600')
+    const toast = screen.getByText('Error message').closest('[role="status"]')
     expect(toast).toBeInTheDocument()
   })
 })

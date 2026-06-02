@@ -70,6 +70,10 @@ The MySQL and MongoDB containers automatically load seed data on first startup:
 - **MySQL:** `docker/mysql/init/01-seed.sql` creates `users`, `products`, `orders`, `order_items` tables with sample data, plus a view and stored procedure
 - **MongoDB:** `docker/mongodb/init/01-seed.js` creates `users`, `products`, `orders`, `datatypes` collections with sample documents
 
+Redis and Elasticsearch are intentionally started empty. To seed quick demo
+records for those services, use the commands in
+[`docs/demo-playbook.md`](../docs/demo-playbook.md#seed-optional-redis-and-elasticsearch-data).
+
 To re-seed:
 ```bash
 # Stop and remove volumes

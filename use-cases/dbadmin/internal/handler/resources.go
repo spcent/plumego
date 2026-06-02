@@ -1,7 +1,9 @@
 package handler
 
 import (
+	"context"
 	"net/http"
+	"time"
 
 	"github.com/spcent/plumego/contract"
 	plumelog "github.com/spcent/plumego/log"
@@ -18,12 +20,13 @@ import (
 // parentId is the ResourceNode.Path of the parent node.
 // Omit parentId to list top-level nodes (databases for SQL, db-indices for Redis, databases for MongoDB).
 type ResourceHandler struct {
-	Connections  *connection.Store
-	SQLAdapter   *datasource.SQLAdapter
-	RedisAdapter *datasource.RedisAdapter
-	MongoAdapter *datasource.MongoAdapter
-	ESAdapter    *datasource.ESAdapter
-	Logger       plumelog.StructuredLogger
+	Connections    *connection.Store
+	SQLAdapter     *datasource.SQLAdapter
+	RedisAdapter   *datasource.RedisAdapter
+	MongoAdapter   *datasource.MongoAdapter
+	ESAdapter      *datasource.ESAdapter
+	Logger         plumelog.StructuredLogger
+	TimeoutSeconds int
 }
 
 // ListResources returns child ResourceNodes for the given parent within a connection.
@@ -49,7 +52,10 @@ func (h ResourceHandler) ListResources(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	session, err := drv.Open(r.Context(), buildConnectionConfig(conn))
+	ctx, cancel := resourceContext(r.Context(), h.TimeoutSeconds)
+	defer cancel()
+
+	session, err := drv.Open(ctx, buildConnectionConfig(conn))
 	if err != nil {
 		h.Logger.Error("open session for resources", plumelog.Fields{
 			"conn_id": connID,
@@ -69,7 +75,7 @@ func (h ResourceHandler) ListResources(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	nodes, err := drv.ListResources(r.Context(), session, parentRef)
+	nodes, err := drv.ListResources(ctx, session, parentRef)
 	if err != nil {
 		h.Logger.Error("list resources", plumelog.Fields{
 			"conn_id": connID,
@@ -83,6 +89,13 @@ func (h ResourceHandler) ListResources(w http.ResponseWriter, r *http.Request) {
 
 	logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusOK, nodes,
 		map[string]any{"count": len(nodes)}))
+}
+
+func resourceContext(parent context.Context, timeoutSeconds int) (context.Context, context.CancelFunc) {
+	if timeoutSeconds <= 0 {
+		timeoutSeconds = 30
+	}
+	return context.WithTimeout(parent, time.Duration(timeoutSeconds)*time.Second)
 }
 
 // driverFor returns the appropriate DataSourceDriver for the connection's driver type.

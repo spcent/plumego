@@ -10,7 +10,7 @@ Mark each step ✅ pass / ❌ fail / ⏭ skipped.
 ```bash
 # Start the server (default: http://127.0.0.1:8080)
 cd use-cases/dbadmin
-go run . -addr 127.0.0.1:8080 -data /tmp/dbadmin-test -admin-user admin -admin-password admin
+DBADMIN_USER=admin DBADMIN_PASSWORD=admin go run . -addr=127.0.0.1:8080 -data-dir=/tmp/dbadmin-test
 ```
 
 Open http://127.0.0.1:8080 in a browser and log in with `admin / admin`.
@@ -25,7 +25,7 @@ Open http://127.0.0.1:8080 in a browser and log in with `admin / admin`.
 | 1.2 | Fill in a valid MySQL DSN (host, port, database, username). Leave **Save password** unchecked. Save. | Connection appears in list, no password stored (reload page, edit → password field empty) |
 | 1.3 | Click **Test** on the connection | Green "✓ Connected" badge |
 | 1.4 | Click **Open** | Redirected to SQL Console for that connection |
-| 1.5 | Edit the connection, enable **Save password**, enter password | Amber warning shown; save; reload page, edit → password field shows placeholder (stored encrypted) |
+| 1.5 | Set `DBADMIN_ENCRYPTION_KEY`, edit the connection, enable **Save password**, enter password | Amber warning shown; save; reload page, edit → password field shows placeholder (stored encrypted) |
 
 ---
 
@@ -218,7 +218,7 @@ Open http://127.0.0.1:8080 in a browser and log in with `admin / admin`.
 | Import SQL with danger confirmation | ✅ |
 | Export CSV and SQL dump | ✅ |
 | Read-only mode (backend enforced, frontend disabled) | ✅ |
-| Save password (encrypted AES-GCM, opt-in) | ✅ |
+| Save password (AES-GCM encrypted when `DBADMIN_ENCRYPTION_KEY` is configured, opt-in) | ✅ |
 | Cell detail viewer (JSON pretty-print, BLOB metadata, NULL/empty distinction) | ✅ |
 | Copy as Markdown schema / JSON schema / DDL | ✅ |
 | Copy rows as JSON / CSV / SQL INSERT | ✅ |
@@ -238,10 +238,8 @@ Open http://127.0.0.1:8080 in a browser and log in with `admin / admin`.
 | Capability | Notes |
 |-----------|-------|
 | PostgreSQL support | MySQL and SQLite only |
-| Per-connection / per-database access control | All authenticated users can access all connections |
-| Query execution timeout | Long-running queries are bounded only by HTTP server timeout (60s) |
-| Row-level audit log | No record of who modified which row and when |
-| Frontend unit tests | TypeScript strict compilation is the baseline; no Vitest suite |
+| Per-connection / per-database access control | Single-user `admin`/`readonly` role only; no per-connection grants |
+| Row-level audit log | Audit events capture control-plane actions; row-level before/after diffs are not recorded |
 | `IN` / `NOT IN` / `BETWEEN` filter operators | Not yet in the filter builder |
 | BLOB download from Data page | Cell viewer shows metadata; actual binary download not implemented |
 | Multi-tenant / team access | Single admin user only |

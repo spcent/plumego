@@ -110,7 +110,7 @@ func (h ConnectionHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// Invalidate cached pool on update.
-	h.Manager.Close(id)
+	h.closeRuntime(id)
 	c.Redact()
 	logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusOK, c, nil))
 }
@@ -132,7 +132,7 @@ func (h ConnectionHandler) Delete(w http.ResponseWriter, r *http.Request) {
 			Type(contract.TypeInternal).Message("failed to delete connection").Build()))
 		return
 	}
-	h.Manager.Close(id)
+	h.closeRuntime(id)
 
 	// Optionally remove the server-managed temp file.
 	if fetchErr == nil && conn.UploadedFile && conn.FilePath != "" &&
@@ -141,6 +141,31 @@ func (h ConnectionHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// CloseRuntime closes cached clients/pools for a saved connection without
+// deleting the saved connection itself.
+func (h ConnectionHandler) CloseRuntime(w http.ResponseWriter, r *http.Request) {
+	id := router.Param(r, "id")
+	if _, err := h.Connections.Get(id); err != nil {
+		if err == connection.ErrNotFound {
+			logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+				Type(contract.TypeNotFound).Message("connection not found").Build()))
+			return
+		}
+		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+			Type(contract.TypeInternal).Message("failed to get connection").Build()))
+		return
+	}
+	h.closeRuntime(id)
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h ConnectionHandler) closeRuntime(id string) {
+	h.Manager.Close(id)
+	h.RedisManager.Close(id)
+	h.MongoManager.Close(id)
+	h.ESManager.Close(id)
 }
 
 // Test opens a temporary connection and pings it.

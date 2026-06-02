@@ -3,12 +3,13 @@ import { useParams } from 'react-router-dom'
 import Editor from '@monaco-editor/react'
 import { api, ApiError, type QueryResult } from '../api'
 import ConfirmDialog from '../components/ConfirmDialog'
-import { useToast } from '../components/Toast'
-import { useI18n } from '../i18n'
-import { useCurrentConn } from './MainLayout'
+import { useToast } from '../components/toastContext'
+import { useI18n } from '../i18nContext'
+import { useCurrentConn } from '../context/connections'
 import WorkbenchHeader from '../components/WorkbenchHeader'
 import ErrorState from '../components/ErrorState'
 import { useSqlHistory } from '../hooks/useSqlHistory'
+import { XIcon } from '../components/Icons'
 
 interface ConfirmState {
   reason: string
@@ -27,6 +28,11 @@ function clientClassify(sql: string): { dangerous: boolean; reason: string } {
   return { dangerous: false, reason: '' }
 }
 
+function makeQueryId(): string {
+  if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID()
+  return `q_${Date.now().toString(36)}_${Math.random().toString(36).slice(2)}`
+}
+
 export default function QueryPage() {
   const { connId } = useParams<{ connId: string }>()
   const [databases, setDatabases] = useState<string[]>([])
@@ -35,6 +41,7 @@ export default function QueryPage() {
   const [result, setResult] = useState<QueryResult | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [running, setRunning] = useState(false)
+  const [activeQueryId, setActiveQueryId] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<'result' | 'history'>('result')
   const [confirmState, setConfirmState] = useState<ConfirmState | null>(null)
   const editorRef = useRef<unknown>(null)
@@ -42,6 +49,7 @@ export default function QueryPage() {
   const { showToast } = useToast()
   const { t } = useI18n()
   const currentConn = useCurrentConn(connId)
+  const connectionName = currentConn?.name ?? ''
   const isReadonly = currentConn?.readonly ?? false
   const sqlHistory = useSqlHistory()
 
@@ -50,7 +58,7 @@ export default function QueryPage() {
     api.resources(connId)
       .then(nodes => setDatabases(nodes.filter(n => n.type === 'sql_database').map(n => n.name)))
       .catch(e => showToast(e.message))
-  }, [connId])
+  }, [connId, showToast])
 
   const handleRun = useCallback(async (confirmDangerous = false) => {
     if (!connId || !sql.trim()) return
@@ -65,16 +73,18 @@ export default function QueryPage() {
     }
 
     setRunning(true)
+    const queryId = makeQueryId()
+    setActiveQueryId(queryId)
     const startTime = Date.now()
     try {
-      const r = await api.executeQuery(connId, selectedDb, sql, { confirmDangerous })
+      const r = await api.executeQuery(connId, selectedDb, sql, { confirmDangerous, queryId })
       setResult(r)
       setActiveTab('result')
       // Record to localStorage history
       sqlHistory.add({
         sql: sql.trim(),
         database: selectedDb,
-        connectionName: currentConn?.name ?? '',
+        connectionName,
         executionTimeMs: Date.now() - startTime,
         success: true,
       })
@@ -88,15 +98,16 @@ export default function QueryPage() {
         sqlHistory.add({
           sql: sql.trim(),
           database: selectedDb,
-          connectionName: currentConn?.name ?? '',
+          connectionName,
           executionTimeMs: Date.now() - startTime,
           success: false,
         })
       }
     } finally {
       setRunning(false)
+      setActiveQueryId(null)
     }
-  }, [connId, selectedDb, sql, sqlHistory])
+  }, [connId, selectedDb, sql, sqlHistory, connectionName])
 
   // Keep runRef in sync so Monaco keybinding never captures a stale closure.
   useEffect(() => {
@@ -128,6 +139,16 @@ export default function QueryPage() {
     sqlHistory.clear()
   }
 
+  async function handleCancelQuery() {
+    if (!activeQueryId) return
+    try {
+      await api.cancelQuery(activeQueryId)
+      showToast(t('query.cancelled'), 'success')
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : 'Cancel failed', 'error')
+    }
+  }
+
   const tabLabel = result
     ? `(${result.type === 'result_set' ? result.rows.length : result.rowsAffected} ${
         result.type === 'result_set' ? 'rows' : 'affected'
@@ -144,12 +165,11 @@ export default function QueryPage() {
       />
       <div className="flex flex-col flex-1 overflow-hidden p-4 gap-3">
       {/* Toolbar */}
-      <div className="flex items-center gap-2 flex-wrap">
+      <div className="toolbar rounded-md">
         <select
           value={selectedDb}
           onChange={e => setSelectedDb(e.target.value)}
-          className="border rounded px-2 py-1 text-sm"
-          style={{ borderColor: 'var(--border-strong)', background: 'var(--bg-surface)', color: 'var(--text-default)' }}
+          className="select max-w-60"
         >
           <option value="">{t('query.db_placeholder')}</option>
           {databases.map(db => <option key={db} value={db}>{db}</option>)}
@@ -157,25 +177,30 @@ export default function QueryPage() {
         <button
           onClick={() => handleRun(false)}
           disabled={running}
-          className="disabled:opacity-50 text-white px-4 py-1.5 rounded text-sm"
-          style={{ background: 'var(--accent)' }}
+          className="btn btn-primary disabled:opacity-50"
         >
           {running ? t('query.running') : t('query.run')}
         </button>
+        {running && activeQueryId && (
+          <button
+            onClick={handleCancelQuery}
+            className="btn btn-danger"
+          >
+            {t('query.cancel')}
+          </button>
+        )}
         <button
           onClick={handleCopy}
-          className="text-sm px-3 py-1.5 rounded"
-          style={{ background: 'var(--bg-muted)', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)' }}
+          className="btn btn-ghost"
         >{t('query.copy')}</button>
         <button
           onClick={() => setSql('')}
-          className="text-sm px-3 py-1.5 rounded"
-          style={{ background: 'var(--bg-muted)', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)' }}
+          className="btn btn-ghost"
         >{t('query.clear')}</button>
       </div>
 
       {/* Editor */}
-      <div className="rounded-lg overflow-hidden shrink-0" style={{ height: 240, border: '1px solid var(--border-subtle)' }}>
+      <div className="overflow-hidden rounded-md shrink-0" style={{ height: 240, border: '1px solid var(--border-subtle)' }}>
         <Editor
           defaultLanguage="sql"
           value={sql}
@@ -243,9 +268,12 @@ export default function QueryPage() {
               truncated={result.truncated}
             />
           ) : (
-            <div className="p-4 rounded text-sm"
-              style={{ background: 'var(--bg-muted)', border: '1px solid var(--success)', color: 'var(--success)' }}>
-              ✓ {result.rowsAffected} {t('query.rows_affected')} · {result.executionTimeMs}ms
+            <div
+              className="flex items-center gap-2 rounded-md border p-4 text-sm"
+              style={{ background: 'var(--success-soft)', borderColor: 'var(--success-border)', color: 'var(--success)' }}
+            >
+              <span className="status-dot" style={{ background: 'var(--success)' }} />
+              {result.rowsAffected} {t('query.rows_affected')} · {result.executionTimeMs}ms
               {result.lastInsertId > 0 && (
                 <span className="ml-2">
                   · {t('query.last_insert_id')}: {result.lastInsertId}
@@ -270,8 +298,8 @@ export default function QueryPage() {
               {sqlHistory.entries.map(h => (
                 <div
                   key={h.id}
-                  className="group relative p-3 rounded"
-                  style={{ border: '1px solid var(--border-subtle)' }}
+                  className="group relative rounded-md border p-3 transition-colors hover:bg-[var(--bg-hover)]"
+                  style={{ borderColor: 'var(--border-subtle)' }}
                 >
                   <div onClick={() => setSql(h.sql)} className="cursor-pointer">
                     <div className="flex items-center justify-between mb-0.5">
@@ -283,15 +311,20 @@ export default function QueryPage() {
                     </div>
                     <pre className="text-xs font-mono truncate" style={{ color: 'var(--text-default)' }}>{h.sql}</pre>
                     {!h.success && (
-                      <div className="text-xs mt-0.5" style={{ color: 'var(--danger)' }}>✗ Failed</div>
+                      <div className="mt-1 flex items-center gap-1.5 text-xs" style={{ color: 'var(--danger)' }}>
+                        <span className="status-dot" style={{ background: 'var(--danger)' }} />
+                        Failed
+                      </div>
                     )}
                   </div>
                   <button
                     onClick={() => handleDeleteHistory(h.id)}
-                    className="absolute top-2 right-2 text-xs px-1 opacity-0 group-hover:opacity-100"
-                    style={{ color: 'var(--text-subtle)' }}
+                    className="icon-btn absolute right-2 top-2 opacity-0 group-hover:opacity-100"
                     title={t('history.delete')}
-                  >×</button>
+                    aria-label={t('history.delete')}
+                  >
+                    <XIcon className="h-3.5 w-3.5" />
+                  </button>
                 </div>
               ))}
               {sqlHistory.entries.length === 0 && (

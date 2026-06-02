@@ -1,5 +1,6 @@
-import { useI18n } from '../i18n'
+import { useI18n } from '../i18nContext'
 import type { DataSourceType } from '../api'
+import { RefreshIcon } from './Icons'
 
 interface WorkbenchHeaderProps {
   connectionName?: string
@@ -31,19 +32,23 @@ export default function WorkbenchHeader({
 
   return (
     <div
-      className="px-4 py-3 border-b flex items-center gap-3 shrink-0"
-      style={{ borderColor: 'var(--border-subtle)' }}
+      className="px-5 py-3 border-b flex items-center gap-3 shrink-0"
+      style={{
+        borderColor: 'var(--border-subtle)',
+        background: 'color-mix(in srgb, var(--bg-surface) 92%, transparent)',
+        backdropFilter: 'blur(10px)',
+      }}
     >
       <span
-        className="text-xs font-mono font-bold px-2 py-0.5 rounded"
-        style={{ background: badge.color + '22', color: badge.color }}
+        className="text-xs font-mono font-bold px-2 py-1 rounded-md"
+        style={{ background: badge.color + '1f', color: badge.color, border: `1px solid ${badge.color}33` }}
       >
         {badge.label}
       </span>
 
       {connectionName && (
         <span
-          className="text-xs font-mono px-2 py-0.5 rounded"
+          className="badge font-mono"
           style={{ background: 'var(--bg-muted)', color: 'var(--text-muted)' }}
         >
           {connectionName}
@@ -101,14 +106,11 @@ export default function WorkbenchHeader({
       {onRefresh && (
         <button
           onClick={onRefresh}
-          className="text-xs px-2.5 py-1 rounded border shrink-0 transition-colors hover:opacity-80"
-          style={{
-            borderColor: 'var(--border-subtle)',
-            color: 'var(--text-muted)',
-          }}
+          className="btn btn-ghost shrink-0"
           title={t('workbench.refresh')}
         >
-          ↻ {t('workbench.refresh')}
+          <RefreshIcon className="h-3.5 w-3.5" />
+          {t('workbench.refresh')}
         </button>
       )}
     </div>

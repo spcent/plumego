@@ -22,7 +22,9 @@ function loadSettings(): Settings {
   try {
     const raw = localStorage.getItem(SETTINGS_KEY)
     if (raw) return { sqlHistoryEnabled: true, ...JSON.parse(raw) }
-  } catch {}
+  } catch {
+    localStorage.removeItem(SETTINGS_KEY)
+  }
   return { sqlHistoryEnabled: true }
 }
 
@@ -34,7 +36,9 @@ function loadEntries(): SqlHistoryEntry[] {
   try {
     const raw = localStorage.getItem(HISTORY_KEY)
     if (raw) return JSON.parse(raw) as SqlHistoryEntry[]
-  } catch {}
+  } catch {
+    localStorage.removeItem(HISTORY_KEY)
+  }
   return []
 }
 

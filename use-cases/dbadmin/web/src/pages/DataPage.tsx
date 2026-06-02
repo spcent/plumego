@@ -6,10 +6,11 @@ import CellViewer from '../components/CellViewer'
 import ConfirmDialog from '../components/ConfirmDialog'
 import RowDrawer from '../components/RowDrawer'
 import WorkbenchHeader from '../components/WorkbenchHeader'
-import { useToast } from '../components/Toast'
-import { useI18n } from '../i18n'
-import { useCurrentConn } from './MainLayout'
+import { useToast } from '../components/toastContext'
+import { useI18n } from '../i18nContext'
+import { useCurrentConn } from '../context/connections'
 import { toInsertSQL, toCSV, toRowJSON } from '../utils/copyFormats'
+import { XIcon } from '../components/Icons'
 
 interface ConfirmState {
   title: string
@@ -97,12 +98,13 @@ export default function DataPage() {
         filters: filters.length ? filters : undefined,
       })
       setData(r)
+      setSelectedRows(new Set())
     } catch (e) {
       showToast(e instanceof Error ? e.message : t('data.load_failed'))
     } finally {
       setLoading(false)
     }
-  }, [connId, dbName, tableName, page, pageSize, sortColumn, sortDirection, filters])
+  }, [connId, dbName, tableName, page, pageSize, sortColumn, sortDirection, filters, showToast, t])
 
   useEffect(() => {
     if (!connId || !dbName || !tableName) return
@@ -110,12 +112,9 @@ export default function DataPage() {
   }, [connId, dbName, tableName])
 
   useEffect(() => {
-    load()
+    const id = window.setTimeout(() => { void load() }, 0)
+    return () => window.clearTimeout(id)
   }, [load])
-
-  useEffect(() => {
-    setSelectedRows(new Set())
-  }, [data.rows])
 
   useEffect(() => {
     if (selectAllRef.current) {
@@ -323,9 +322,10 @@ export default function DataPage() {
                   {f.value && <span className="font-mono">{f.value}</span>}
                   <button
                     onClick={() => handleRemoveFilter(i)}
-                    className="ml-1 hover:opacity-60"
+                    className="ml-1 grid h-4 w-4 place-items-center rounded hover:bg-[var(--bg-hover)]"
+                    aria-label={t('data.filter.remove')}
                   >
-                    ×
+                    <XIcon className="h-3 w-3" />
                   </button>
                 </span>
               ))}
@@ -629,6 +629,7 @@ export default function DataPage() {
       {/* ── Row drawer ──────────────────────────────────── */}
       {drawerMode && structure && (
         <RowDrawer
+          key={`${drawerMode}:${structure.columns.map(c => c.name).join('|')}:${pkCols.map(k => String(drawerInitial[k] ?? '')).join('|')}`}
           columns={structure.columns}
           pkCols={pkCols}
           mode={drawerMode}
@@ -659,12 +660,9 @@ export default function DataPage() {
 
       {exportOpen && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div
-            className="rounded-lg shadow-xl p-6 w-full max-w-sm mx-4"
-            style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)' }}
-          >
+          <div className="panel w-full max-w-sm mx-4 p-6">
             <h2
-              className="font-bold mb-4 text-sm"
+              className="font-semibold mb-4 text-sm"
               style={{ color: 'var(--text-strong)' }}
             >
               {t('export.title')}
@@ -703,17 +701,15 @@ export default function DataPage() {
             <div className="flex justify-end gap-2">
               <button
                 onClick={() => setExportOpen(false)}
-                className="px-4 py-1.5 text-[12px] hover:opacity-70 transition-opacity"
-                style={{ color: 'var(--text-muted)' }}
+                className="btn btn-ghost h-8 px-3 text-xs"
               >
                 {t('data.cancel')}
               </button>
               <button
                 onClick={handleExportDownload}
-                className="px-4 py-1.5 text-[12px] rounded hover:opacity-80 transition-opacity"
-                style={{ background: 'var(--accent)', color: '#fff' }}
+                className="btn btn-primary h-8 px-3 text-xs"
               >
-                ↓ {t('export.download')}
+                {t('export.download')}
               </button>
             </div>
           </div>
