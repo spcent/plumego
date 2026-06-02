@@ -10,6 +10,7 @@ import WorkbenchHeader from '../components/WorkbenchHeader'
 import ErrorState from '../components/ErrorState'
 import { useSqlHistory } from '../hooks/useSqlHistory'
 import { XIcon } from '../components/Icons'
+import { CodePanel, PageBody, PageShell, PageStatusBar, PageToolbar, StatusBanner } from '../components/workbench'
 
 interface ConfirmState {
   reason: string
@@ -156,186 +157,178 @@ export default function QueryPage() {
     : ''
 
   return (
-    <div className="flex flex-col h-full">
+    <PageShell>
       <WorkbenchHeader
         connectionName={currentConn?.name}
         resourcePath={[t('query.title')]}
         datasourceType={currentConn?.driver ?? 'mysql'}
         readonly={isReadonly}
       />
-      <div className="flex flex-col flex-1 overflow-hidden p-4 gap-3">
-      {/* Toolbar */}
-      <div className="toolbar rounded-md">
-        <select
-          value={selectedDb}
-          onChange={e => setSelectedDb(e.target.value)}
-          className="select max-w-60"
-        >
-          <option value="">{t('query.db_placeholder')}</option>
-          {databases.map(db => <option key={db} value={db}>{db}</option>)}
-        </select>
-        <button
-          onClick={() => handleRun(false)}
-          disabled={running}
-          className="btn btn-primary disabled:opacity-50"
-        >
-          {running ? t('query.running') : t('query.run')}
-        </button>
-        {running && activeQueryId && (
-          <button
-            onClick={handleCancelQuery}
-            className="btn btn-danger"
+      <PageToolbar
+        leading={
+          <select
+            value={selectedDb}
+            onChange={e => setSelectedDb(e.target.value)}
+            className="select max-w-60"
           >
-            {t('query.cancel')}
-          </button>
-        )}
-        <button
-          onClick={handleCopy}
-          className="btn btn-ghost"
-        >{t('query.copy')}</button>
-        <button
-          onClick={() => setSql('')}
-          className="btn btn-ghost"
-        >{t('query.clear')}</button>
-      </div>
-
-      {/* Editor */}
-      <div className="overflow-hidden rounded-md shrink-0" style={{ height: 240, border: '1px solid var(--border-subtle)' }}>
-        <Editor
-          defaultLanguage="sql"
-          value={sql}
-          onChange={v => setSql(v || '')}
-          onMount={handleEditorMount}
-          theme="vs-dark"
-          options={{
-            fontSize: 13,
-            minimap: { enabled: false },
-            lineNumbers: 'on',
-            wordWrap: 'on',
-            scrollBeyondLastLine: false,
-          }}
-        />
-      </div>
-
-      {/* Error banner */}
-      {error && (
-        <ErrorState
-          title="Query Error"
-          message={error}
-          onRetry={() => handleRun(false)}
-        />
-      )}
-
-      {/* Result / History tabs */}
-      <div className="flex-1 overflow-auto min-h-0">
-        <div className="flex gap-3 mb-3" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
-          <button
-            onClick={() => setActiveTab('result')}
-            style={{
-              padding: '6px 12px',
-              fontSize: 13,
-              fontWeight: activeTab === 'result' ? 500 : 400,
-              borderBottom: activeTab === 'result' ? '2px solid var(--accent)' : '2px solid transparent',
-              color: activeTab === 'result' ? 'var(--accent)' : 'var(--text-muted)',
-              background: 'transparent',
-              marginBottom: -1,
-            }}
-          >
-            {t('query.tab.result')} {tabLabel}
-          </button>
-          <button
-            onClick={() => setActiveTab('history')}
-            style={{
-              padding: '6px 12px',
-              fontSize: 13,
-              fontWeight: activeTab === 'history' ? 500 : 400,
-              borderBottom: activeTab === 'history' ? '2px solid var(--accent)' : '2px solid transparent',
-              color: activeTab === 'history' ? 'var(--accent)' : 'var(--text-muted)',
-              background: 'transparent',
-              marginBottom: -1,
-            }}
-          >
-            {t('history.tab')} ({sqlHistory.entries.length})
-          </button>
-        </div>
-
-        {activeTab === 'result' && result && (
-          result.type === 'result_set' ? (
-            <ResultTable
-              columns={result.columns}
-              rows={result.rows}
-              duration={result.executionTimeMs}
-              truncated={result.truncated}
-            />
-          ) : (
-            <div
-              className="flex items-center gap-2 rounded-md border p-4 text-sm"
-              style={{ background: 'var(--success-soft)', borderColor: 'var(--success-border)', color: 'var(--success)' }}
+            <option value="">{t('query.db_placeholder')}</option>
+            {databases.map(db => <option key={db} value={db}>{db}</option>)}
+          </select>
+        }
+        trailing={
+          <>
+            <button
+              onClick={() => handleRun(false)}
+              disabled={running}
+              className="btn btn-primary disabled:opacity-50"
             >
-              <span className="status-dot" style={{ background: 'var(--success)' }} />
-              {result.rowsAffected} {t('query.rows_affected')} · {result.executionTimeMs}ms
-              {result.lastInsertId > 0 && (
-                <span className="ml-2">
-                  · {t('query.last_insert_id')}: {result.lastInsertId}
-                </span>
-              )}
-            </div>
-          )
-        )}
-
-        {activeTab === 'history' && (
-          <div>
-            {sqlHistory.entries.length > 0 && (
-              <div className="flex justify-end mb-2">
-                <button
-                  onClick={handleClearHistory}
-                  className="text-xs px-2 py-1"
-                  style={{ color: 'var(--text-subtle)' }}
-                >{t('history.clear_all')}</button>
-              </div>
+              {running ? t('query.running') : t('query.run')}
+            </button>
+            {running && activeQueryId && (
+              <button
+                onClick={handleCancelQuery}
+                className="btn btn-danger"
+              >
+                {t('query.cancel')}
+              </button>
             )}
-            <div className="space-y-1">
-              {sqlHistory.entries.map(h => (
-                <div
-                  key={h.id}
-                  className="group relative rounded-md border p-3 transition-colors hover:bg-[var(--bg-hover)]"
-                  style={{ borderColor: 'var(--border-subtle)' }}
-                >
-                  <div onClick={() => setSql(h.sql)} className="cursor-pointer">
-                    <div className="flex items-center justify-between mb-0.5">
-                      <span className="text-xs" style={{ color: 'var(--text-subtle)' }}>
-                        {new Date(h.executedAt).toLocaleString()}
-                        {h.database ? ` · ${h.database}` : ''}
+            <button
+              onClick={handleCopy}
+              className="btn btn-ghost"
+            >{t('query.copy')}</button>
+            <button
+              onClick={() => setSql('')}
+              className="btn btn-ghost"
+            >{t('query.clear')}</button>
+          </>
+        }
+      />
+      <PageBody>
+        <div className="flex h-full flex-col gap-3 p-4">
+          <CodePanel height={240}>
+            <Editor
+              defaultLanguage="sql"
+              value={sql}
+              onChange={v => setSql(v || '')}
+              onMount={handleEditorMount}
+              theme="vs-dark"
+              options={{
+                fontSize: 13,
+                minimap: { enabled: false },
+                lineNumbers: 'on',
+                wordWrap: 'on',
+                scrollBeyondLastLine: false,
+              }}
+            />
+          </CodePanel>
+
+          {error && (
+            <ErrorState
+              title="Query Error"
+              message={error}
+              onRetry={() => handleRun(false)}
+            />
+          )}
+
+          <div className="flex min-h-0 flex-1 flex-col">
+            <div className="mb-3 flex gap-1 border-b" style={{ borderColor: 'var(--border-subtle)' }}>
+              <button
+                onClick={() => setActiveTab('result')}
+                className="tab-btn rounded-b-none"
+                data-active={activeTab === 'result'}
+              >
+                {t('query.tab.result')} {tabLabel}
+              </button>
+              <button
+                onClick={() => setActiveTab('history')}
+                className="tab-btn rounded-b-none"
+                data-active={activeTab === 'history'}
+              >
+                {t('history.tab')} ({sqlHistory.entries.length})
+              </button>
+            </div>
+
+            <div className="min-h-0 flex-1 overflow-auto">
+              {activeTab === 'result' && result && (
+                result.type === 'result_set' ? (
+                  <ResultTable
+                    columns={result.columns}
+                    rows={result.rows}
+                    duration={result.executionTimeMs}
+                    truncated={result.truncated}
+                  />
+                ) : (
+                  <StatusBanner tone="success">
+                    {result.rowsAffected} {t('query.rows_affected')} · {result.executionTimeMs}ms
+                    {result.lastInsertId > 0 && (
+                      <span className="ml-2">
+                        · {t('query.last_insert_id')}: {result.lastInsertId}
                       </span>
-                      <span className="text-xs" style={{ color: 'var(--text-subtle)' }}>{h.executionTimeMs}ms</span>
+                    )}
+                  </StatusBanner>
+                )
+              )}
+
+              {activeTab === 'history' && (
+                <div>
+                  {sqlHistory.entries.length > 0 && (
+                    <div className="mb-2 flex justify-end">
+                      <button
+                        onClick={handleClearHistory}
+                        className="btn btn-ghost h-7 px-2 text-xs"
+                      >{t('history.clear_all')}</button>
                     </div>
-                    <pre className="text-xs font-mono truncate" style={{ color: 'var(--text-default)' }}>{h.sql}</pre>
-                    {!h.success && (
-                      <div className="mt-1 flex items-center gap-1.5 text-xs" style={{ color: 'var(--danger)' }}>
-                        <span className="status-dot" style={{ background: 'var(--danger)' }} />
-                        Failed
+                  )}
+                  <div className="space-y-1">
+                    {sqlHistory.entries.map(h => (
+                      <div
+                        key={h.id}
+                        className="group relative rounded-md border p-3 transition-colors hover:bg-[var(--bg-hover)]"
+                        style={{ borderColor: 'var(--border-subtle)' }}
+                      >
+                        <div onClick={() => setSql(h.sql)} className="cursor-pointer">
+                          <div className="mb-0.5 flex items-center justify-between">
+                            <span className="text-xs" style={{ color: 'var(--text-subtle)' }}>
+                              {new Date(h.executedAt).toLocaleString()}
+                              {h.database ? ` · ${h.database}` : ''}
+                            </span>
+                            <span className="text-xs" style={{ color: 'var(--text-subtle)' }}>{h.executionTimeMs}ms</span>
+                          </div>
+                          <pre className="truncate font-mono text-xs" style={{ color: 'var(--text-default)' }}>{h.sql}</pre>
+                          {!h.success && (
+                            <div className="mt-1 flex items-center gap-1.5 text-xs" style={{ color: 'var(--danger)' }}>
+                              <span className="status-dot" style={{ background: 'var(--danger)' }} />
+                              Failed
+                            </div>
+                          )}
+                        </div>
+                        <button
+                          onClick={() => handleDeleteHistory(h.id)}
+                          className="icon-btn absolute right-2 top-2 opacity-0 group-hover:opacity-100"
+                          title={t('history.delete')}
+                          aria-label={t('history.delete')}
+                        >
+                          <XIcon className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                    {sqlHistory.entries.length === 0 && (
+                      <div className="py-6 text-center text-sm" style={{ color: 'var(--text-subtle)' }}>
+                        {t('history.empty')}
                       </div>
                     )}
                   </div>
-                  <button
-                    onClick={() => handleDeleteHistory(h.id)}
-                    className="icon-btn absolute right-2 top-2 opacity-0 group-hover:opacity-100"
-                    title={t('history.delete')}
-                    aria-label={t('history.delete')}
-                  >
-                    <XIcon className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-              ))}
-              {sqlHistory.entries.length === 0 && (
-                <div className="text-center py-6 text-sm" style={{ color: 'var(--text-subtle)' }}>
-                  {t('history.empty')}
                 </div>
               )}
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      </PageBody>
+      <PageStatusBar
+        left={selectedDb || t('query.db_placeholder')}
+        center={running ? t('query.running') : result ? `${tabLabel || ''} ${result.executionTimeMs}ms` : t('history.empty')}
+        right={`${sqlHistory.entries.length} ${t('history.tab').toLowerCase()}`}
+      />
 
       {/* Dangerous SQL confirmation dialog */}
       <ConfirmDialog
@@ -347,8 +340,7 @@ export default function QueryPage() {
         onConfirm={() => { setConfirmState(null); handleRun(true) }}
         onCancel={() => setConfirmState(null)}
       />
-    </div>
-    </div>
+    </PageShell>
   )
 }
 
@@ -364,19 +356,19 @@ function ResultTable({
   return (
     <div>
       {truncated && (
-        <div className="mb-2 px-3 py-1.5 rounded text-xs"
+        <div className="mb-2 rounded px-3 py-1.5 text-xs"
           style={{ background: 'var(--bg-muted)', border: '1px solid var(--warning)', color: 'var(--warning)' }}>
           {t('query.truncated')}
         </div>
       )}
       <div className="text-xs mb-2" style={{ color: 'var(--text-subtle)' }}>{rows.length} rows · {duration}ms</div>
-      <div className="overflow-auto rounded-lg" style={{ border: '1px solid var(--border-subtle)' }}>
-        <table style={{ width: '100%', minWidth: 'max-content', fontSize: 12, borderCollapse: 'collapse' }}>
+      <div className="data-table-wrap rounded-md">
+        <table className="data-table">
           <thead>
-            <tr style={{ background: 'var(--bg-muted)', borderBottom: '1px solid var(--border-subtle)' }}>
+            <tr>
               {columns.map(c => (
                 <th key={c} className="text-left px-3 py-2 font-mono whitespace-nowrap"
-                  style={{ fontWeight: 500, color: 'var(--text-muted)', fontSize: 11 }}>
+                  style={{ fontSize: 11 }}>
                   {c}
                 </th>
               ))}
@@ -384,8 +376,7 @@ function ResultTable({
           </thead>
           <tbody>
             {rows.map((row, i) => (
-              <tr key={i} className="hover:bg-[var(--bg-hover)]"
-                style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+              <tr key={i}>
                 {columns.map(c => (
                   <td key={c} className="px-3 py-1.5 max-w-xs truncate"
                     style={{ color: row[c] === null || row[c] === undefined ? 'var(--text-subtle)' : 'var(--text-default)' }}>

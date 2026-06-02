@@ -46,12 +46,12 @@ export default function MainLayout() {
     <div className="app-shell flex h-[100dvh] overflow-hidden">
       {/* ── Sidebar ──────────────────────────────────────────── */}
       <aside
-        className="flex flex-col shrink-0 overflow-hidden"
+        className="app-sidebar flex flex-col shrink-0 overflow-hidden"
         style={{
           width: 272,
           background: 'var(--sb-bg)',
           borderRight: '1px solid var(--sb-border)',
-          boxShadow: '10px 0 32px -28px rgba(0,0,0,.9)',
+          boxShadow: 'var(--sb-shadow)',
         }}
       >
         {/* Sidebar header */}
@@ -60,7 +60,7 @@ export default function MainLayout() {
           style={{ borderBottom: '1px solid var(--sb-border)' }}
         >
           <div className="flex items-center gap-2 min-w-0">
-            <span className="grid h-8 w-8 place-items-center rounded-lg" style={{ background: 'var(--sb-surface)', color: '#8bb8ff' }}>
+            <span className="grid h-8 w-8 place-items-center rounded-lg" style={{ background: 'var(--sb-surface)', color: 'var(--accent)' }}>
               <DatabaseIcon className="h-4 w-4" />
             </span>
             <div className="min-w-0">

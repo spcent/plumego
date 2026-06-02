@@ -11,6 +11,7 @@ import { useI18n } from '../i18nContext'
 import { useCurrentConn } from '../context/connections'
 import { toInsertSQL, toCSV, toRowJSON } from '../utils/copyFormats'
 import { XIcon } from '../components/Icons'
+import { ModalShell, PageBody, PageShell, PageStatusBar, PageToolbar } from '../components/workbench'
 
 interface ConfirmState {
   title: string
@@ -217,17 +218,11 @@ export default function DataPage() {
 
   const needsValue = (op: FilterOperator) => op !== 'is_null' && op !== 'is_not_null'
 
-  const copyBtnClass = 'text-[12px] px-2 py-0.5 rounded border hover:opacity-80 transition-opacity'
-  const copyBtnStyle = { borderColor: 'var(--border-strong)', color: 'var(--text-muted)' }
-
   const colType = (colName: string) =>
     structure?.columns.find(c => c.name === colName)?.data_type
 
   return (
-    <div
-      className="flex flex-col h-full"
-      style={{ background: 'var(--bg-surface)' }}
-    >
+    <PageShell>
       <WorkbenchHeader
         connectionName={currentConn?.name}
         resourcePath={dbName && tableName ? [dbName, tableName] : []}
@@ -236,74 +231,66 @@ export default function DataPage() {
         onRefresh={load}
         meta={{ rowCount: data.total }}
       />
-      {/* ── Title / toolbar ──────────────────────────────── */}
-      <div
-        className="flex items-center justify-between px-4 py-2 shrink-0"
-        style={{ borderBottom: '1px solid var(--border-subtle)' }}
-      >
-        <h1
-          className="text-sm font-semibold flex items-center gap-2 min-w-0"
-          style={{ color: 'var(--text-strong)' }}
-        >
-          {loading && (
-            <span className="text-[11px] shrink-0 animate-pulse" style={{ color: 'var(--accent)' }}>
-              {t('data.loading')}
-            </span>
-          )}
-        </h1>
-
-        <div className="flex gap-1.5 flex-wrap justify-end items-center ml-4 shrink-0">
-          {selectedRows.size > 0 && (
-            <div className="flex items-center gap-1">
-              <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
-                {t('copy.rows_selected', { n: selectedRows.size })}
+      <PageToolbar
+        leading={
+          <>
+            {selectedRows.size > 0 && (
+              <div className="flex flex-wrap items-center gap-1">
+                <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                  {t('copy.rows_selected', { n: selectedRows.size })}
+                </span>
+                <button onClick={() => copySelectedRows('json')} className="btn btn-ghost h-7 px-2 text-xs">{t('copy.json')}</button>
+                <button onClick={() => copySelectedRows('csv')} className="btn btn-ghost h-7 px-2 text-xs">{t('copy.csv')}</button>
+                <button onClick={() => copySelectedRows('insert')} className="btn btn-ghost h-7 px-2 text-xs">{t('copy.insert')}</button>
+              </div>
+            )}
+            {loading && (
+              <span className="badge" style={{ color: 'var(--accent)' }}>
+                <span className="status-dot animate-pulse" style={{ background: 'var(--accent)' }} />
+                {t('data.loading')}
               </span>
-              <button onClick={() => copySelectedRows('json')} className={copyBtnClass} style={copyBtnStyle}>{t('copy.json')}</button>
-              <button onClick={() => copySelectedRows('csv')} className={copyBtnClass} style={copyBtnStyle}>{t('copy.csv')}</button>
-              <button onClick={() => copySelectedRows('insert')} className={copyBtnClass} style={copyBtnStyle}>{t('copy.insert')}</button>
-            </div>
-          )}
-
+            )}
+          </>
+        }
+        trailing={
+          <>
           <button
             onClick={load}
-            className="text-[12px] px-2.5 py-1 rounded hover:opacity-80 transition-opacity"
-            style={{ background: 'var(--bg-muted)', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)' }}
+            className="btn btn-ghost h-8 px-3 text-xs"
           >
             {t('data.refresh')}
           </button>
           <button
             onClick={() => setShowFilters(v => !v)}
-            className="text-[12px] px-2.5 py-1 rounded transition-colors"
-            style={showFilters
-              ? { background: 'var(--accent)', color: '#fff', border: '1px solid var(--accent)' }
-              : { background: 'var(--bg-muted)', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)' }
-            }
+            className={`btn h-8 px-3 text-xs ${showFilters ? 'btn-primary' : 'btn-ghost'}`}
           >
             {t('data.filter.show')}{filters.length > 0 && ` (${filters.length})`}
           </button>
           {!isReadonly && (
             <button
               onClick={() => { setDrawerInitial({}); setDrawerMode('insert') }}
-              className="text-[12px] px-2.5 py-1 rounded hover:opacity-80 transition-opacity"
-              style={{ background: 'var(--success)', color: '#fff' }}
+              className="btn h-8 px-3 text-xs"
+              style={{ background: 'var(--success)', color: '#fff', borderColor: 'transparent' }}
             >
               {t('data.insert')}
             </button>
           )}
           <button
             onClick={() => setExportOpen(true)}
-            className="text-[12px] px-2.5 py-1 rounded hover:opacity-80 transition-opacity"
-            style={{ background: 'var(--bg-muted)', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)' }}
+            className="btn btn-ghost h-8 px-3 text-xs"
           >
-            ↓ {t('export.title')}
+            {t('export.title')}
           </button>
-        </div>
-      </div>
+          </>
+        }
+      />
 
+      <PageBody>
+        <div className="flex h-full flex-col">
       {/* ── Filter panel ─────────────────────────────────── */}
       {showFilters && (
         <div
-          className="px-4 py-2 shrink-0 space-y-2"
+          className="shrink-0 space-y-2 px-4 py-3"
           style={{
             background: 'var(--bg-muted)',
             borderBottom: '1px solid var(--border-subtle)',
@@ -342,12 +329,7 @@ export default function DataPage() {
             <select
               value={addCol}
               onChange={e => setAddCol(e.target.value)}
-              className="rounded px-2 py-1 text-[12px] min-w-28"
-              style={{
-                border: '1px solid var(--border-strong)',
-                background: 'var(--bg-surface)',
-                color: 'var(--text-default)',
-              }}
+              className="select min-w-32 text-xs"
             >
               <option value="">{t('data.filter.col_placeholder')}</option>
               {data.columns.map(c => <option key={c} value={c}>{c}</option>)}
@@ -355,12 +337,7 @@ export default function DataPage() {
             <select
               value={addOp}
               onChange={e => setAddOp(e.target.value as FilterOperator)}
-              className="rounded px-2 py-1 text-[12px]"
-              style={{
-                border: '1px solid var(--border-strong)',
-                background: 'var(--bg-surface)',
-                color: 'var(--text-default)',
-              }}
+              className="select w-auto min-w-28 text-xs"
             >
               {OPERATORS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
@@ -370,19 +347,13 @@ export default function DataPage() {
                 onChange={e => setAddVal(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && handleAddFilter()}
                 placeholder={t('data.filter.val_placeholder')}
-                className="rounded px-2 py-1 text-[12px] w-32"
-                style={{
-                  border: '1px solid var(--border-strong)',
-                  background: 'var(--bg-surface)',
-                  color: 'var(--text-default)',
-                }}
+                className="input w-40 text-xs"
               />
             )}
             <button
               onClick={handleAddFilter}
               disabled={!addCol}
-              className="text-[12px] px-3 py-1 rounded disabled:opacity-40"
-              style={{ background: 'var(--accent)', color: '#fff' }}
+              className="btn btn-primary h-8 px-3 text-xs disabled:opacity-40"
             >
               {t('data.filter.add')}
             </button>
@@ -391,16 +362,10 @@ export default function DataPage() {
       )}
 
       {/* ── Table ────────────────────────────────────────── */}
-      <div
-        className="flex-1 overflow-auto min-h-0"
-        style={{ borderBottom: '1px solid var(--border-subtle)' }}
-      >
-        <table
-          className="border-collapse"
-          style={{ minWidth: 'max-content', width: '100%', fontSize: 12 }}
-        >
-          <thead style={{ background: 'var(--bg-muted)', position: 'sticky', top: 0, zIndex: 10 }}>
-            <tr style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+      <div className="data-table-wrap flex-1">
+        <table className="data-table">
+          <thead>
+            <tr>
               {/* Checkbox col */}
               <th style={{ width: 36, padding: '0 8px' }}>
                 <input
@@ -444,8 +409,8 @@ export default function DataPage() {
                       )}
                       <span>{col}</span>
                       {isSorted && (
-                        <span className="shrink-0 text-[10px]">
-                          {sortDirection === 'asc' ? '▲' : '▼'}
+                        <span className="badge h-4 min-h-0 px-1 text-[9px] uppercase">
+                          {sortDirection}
                         </span>
                       )}
                     </div>
@@ -477,9 +442,7 @@ export default function DataPage() {
                   background: selectedRows.has(ri)
                     ? 'var(--bg-selected)'
                     : 'transparent',
-                  borderBottom: '1px solid var(--border-subtle)',
                 }}
-                className="hover:bg-[var(--bg-hover)]"
               >
                 <td style={{ width: 36, padding: '0 8px' }} onClick={e => e.stopPropagation()}>
                   <input
@@ -522,7 +485,7 @@ export default function DataPage() {
                         }}
                         disabled={!hasPK || isReadonly}
                         title={isReadonly ? t('readonly.badge') : hasPK ? undefined : noPKTitle}
-                        className="text-[11px] px-1.5 py-0.5 rounded transition-colors"
+                        className="btn btn-ghost h-6 px-1.5 text-[11px]"
                         style={hasPK && !isReadonly
                           ? { color: 'var(--accent)' }
                           : { color: 'var(--text-subtle)', cursor: 'not-allowed' }
@@ -550,7 +513,7 @@ export default function DataPage() {
                         }}
                         disabled={!hasPK || isReadonly}
                         title={isReadonly ? t('readonly.badge') : hasPK ? undefined : noPKTitle}
-                        className="text-[11px] px-1.5 py-0.5 rounded transition-colors"
+                        className="btn btn-ghost h-6 px-1.5 text-[11px]"
                         style={hasPK && !isReadonly
                           ? { color: 'var(--danger)' }
                           : { color: 'var(--text-subtle)', cursor: 'not-allowed' }
@@ -578,53 +541,43 @@ export default function DataPage() {
           </tbody>
         </table>
       </div>
+        </div>
+      </PageBody>
 
       {/* ── Pagination bar ───────────────────────────────── */}
-      <div
-        className="flex items-center justify-between px-4 py-2 shrink-0 text-[12px]"
-        style={{
-          background: 'var(--bg-muted)',
-          borderTop: '1px solid var(--border-subtle)',
-          color: 'var(--text-muted)',
-        }}
-      >
-        <div>{t('data.pagination', { page, total: pageCount })}</div>
-        <div className="flex gap-1.5">
-          <button
-            onClick={() => setPage(p => Math.max(1, p - 1))}
-            disabled={page <= 1}
-            className="px-2.5 py-1 rounded disabled:opacity-40 hover:opacity-80 transition-opacity"
-            style={{ border: '1px solid var(--border-subtle)', background: 'var(--bg-surface)' }}
-          >
-            {t('data.prev')}
-          </button>
-          <button
-            onClick={() => setPage(p => Math.min(pageCount, p + 1))}
-            disabled={page >= pageCount}
-            className="px-2.5 py-1 rounded disabled:opacity-40 hover:opacity-80 transition-opacity"
-            style={{ border: '1px solid var(--border-subtle)', background: 'var(--bg-surface)' }}
-          >
-            {t('data.next')}
-          </button>
-        </div>
-        <div className="flex items-center gap-3">
-          <select
-            value={pageSize}
-            onChange={e => { setPageSize(Number(e.target.value)); setPage(1) }}
-            className="rounded px-2 py-1 text-[12px]"
-            style={{
-              border: '1px solid var(--border-subtle)',
-              background: 'var(--bg-surface)',
-              color: 'var(--text-default)',
-            }}
-          >
-            {[50, 100, 200, 500].map(n => <option key={n} value={n}>{t('data.page_size', { n })}</option>)}
-          </select>
-          {data.executionTimeMs > 0 && (
-            <span style={{ color: 'var(--text-subtle)' }}>{data.executionTimeMs}ms</span>
-          )}
-        </div>
-      </div>
+      <PageStatusBar
+        left={t('data.pagination', { page, total: pageCount })}
+        center={
+          <div className="flex gap-1.5">
+            <button
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              disabled={page <= 1}
+              className="btn btn-ghost h-7 px-2 text-xs disabled:opacity-40"
+            >
+              {t('data.prev')}
+            </button>
+            <button
+              onClick={() => setPage(p => Math.min(pageCount, p + 1))}
+              disabled={page >= pageCount}
+              className="btn btn-ghost h-7 px-2 text-xs disabled:opacity-40"
+            >
+              {t('data.next')}
+            </button>
+          </div>
+        }
+        right={
+          <div className="inline-flex items-center gap-3">
+            <select
+              value={pageSize}
+              onChange={e => { setPageSize(Number(e.target.value)); setPage(1) }}
+              className="select h-7 min-h-0 w-auto py-0 text-xs"
+            >
+              {[50, 100, 200, 500].map(n => <option key={n} value={n}>{t('data.page_size', { n })}</option>)}
+            </select>
+            {data.executionTimeMs > 0 && <span>{data.executionTimeMs}ms</span>}
+          </div>
+        }
+      />
 
       {/* ── Row drawer ──────────────────────────────────── */}
       {drawerMode && structure && (
@@ -659,15 +612,28 @@ export default function DataPage() {
       )}
 
       {exportOpen && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="panel w-full max-w-sm mx-4 p-6">
-            <h2
-              className="font-semibold mb-4 text-sm"
-              style={{ color: 'var(--text-strong)' }}
-            >
-              {t('export.title')}
-            </h2>
-            <div className="mb-4">
+        <ModalShell
+          title={t('export.title')}
+          widthClass="max-w-sm"
+          onClose={() => setExportOpen(false)}
+          footer={
+            <>
+              <button
+                onClick={() => setExportOpen(false)}
+                className="btn btn-ghost h-8 px-3 text-xs"
+              >
+                {t('data.cancel')}
+              </button>
+              <button
+                onClick={handleExportDownload}
+                className="btn btn-primary h-8 px-3 text-xs"
+              >
+                {t('export.download')}
+              </button>
+            </>
+          }
+        >
+            <div>
               <div className="text-[12px] font-medium mb-1" style={{ color: 'var(--text-muted)' }}>
                 {t('export.format')}
               </div>
@@ -698,23 +664,8 @@ export default function DataPage() {
                 </label>
               </div>
             )}
-            <div className="flex justify-end gap-2">
-              <button
-                onClick={() => setExportOpen(false)}
-                className="btn btn-ghost h-8 px-3 text-xs"
-              >
-                {t('data.cancel')}
-              </button>
-              <button
-                onClick={handleExportDownload}
-                className="btn btn-primary h-8 px-3 text-xs"
-              >
-                {t('export.download')}
-              </button>
-            </div>
-          </div>
-        </div>
+        </ModalShell>
       )}
-    </div>
+    </PageShell>
   )
 }

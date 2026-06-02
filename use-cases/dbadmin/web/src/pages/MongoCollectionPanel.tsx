@@ -19,6 +19,7 @@ import EmptyState from '../components/EmptyState'
 import ConfirmDialog from '../components/ConfirmDialog'
 import WorkbenchHeader from '../components/WorkbenchHeader'
 import { XIcon } from '../components/Icons'
+import { PageBody, PageShell, PageToolbar } from '../components/workbench'
 
 type ViewMode = 'table' | 'json'
 type ActiveTab = 'documents' | 'aggregation' | 'schema' | 'stats'
@@ -287,7 +288,7 @@ export default function MongoCollectionPanel() {
   }
 
   return (
-    <div className="flex flex-col h-full bg-[var(--bg-primary)]">
+    <PageShell>
       <WorkbenchHeader
         connectionName={connectionId || undefined}
         resourcePath={database && collection ? [database, collection] : []}
@@ -296,54 +297,43 @@ export default function MongoCollectionPanel() {
         onRefresh={() => activeTab === 'documents' && executeQuery()}
       />
 
-      {/* Tabs */}
-      <div className="px-6 py-3 border-b border-[var(--border-primary)] bg-[var(--bg-secondary)]">
-        <div className="flex gap-2">
+      <PageToolbar
+        leading={
+          <div className="flex flex-wrap gap-1">
           <button
             onClick={() => setActiveTab('documents')}
-            className={`px-4 py-2 text-sm font-medium rounded transition-colors ${
-              activeTab === 'documents'
-                ? 'bg-[var(--accent-primary)] text-white'
-                : 'bg-[var(--bg-tertiary)] text-[var(--text-primary)] hover:bg-[var(--bg-hover)]'
-            }`}
+            className="tab-btn"
+            data-active={activeTab === 'documents'}
           >
             {t('mongodb.p1.tab.documents')}
           </button>
           <button
             onClick={() => setActiveTab('aggregation')}
-            className={`px-4 py-2 text-sm font-medium rounded transition-colors ${
-              activeTab === 'aggregation'
-                ? 'bg-[var(--accent-primary)] text-white'
-                : 'bg-[var(--bg-tertiary)] text-[var(--text-primary)] hover:bg-[var(--bg-hover)]'
-            }`}
+            className="tab-btn"
+            data-active={activeTab === 'aggregation'}
           >
             {t('mongodb.p1.tab.aggregation')}
           </button>
           <button
             onClick={() => setActiveTab('schema')}
-            className={`px-4 py-2 text-sm font-medium rounded transition-colors ${
-              activeTab === 'schema'
-                ? 'bg-[var(--accent-primary)] text-white'
-                : 'bg-[var(--bg-tertiary)] text-[var(--text-primary)] hover:bg-[var(--bg-hover)]'
-            }`}
+            className="tab-btn"
+            data-active={activeTab === 'schema'}
           >
             {t('mongodb.p1.tab.schema')}
           </button>
           <button
             onClick={() => setActiveTab('stats')}
-            className={`px-4 py-2 text-sm font-medium rounded transition-colors ${
-              activeTab === 'stats'
-                ? 'bg-[var(--accent-primary)] text-white'
-                : 'bg-[var(--bg-tertiary)] text-[var(--text-primary)] hover:bg-[var(--bg-hover)]'
-            }`}
+            className="tab-btn"
+            data-active={activeTab === 'stats'}
           >
             {t('mongodb.p1.tab.stats')}
           </button>
-        </div>
-      </div>
+          </div>
+        }
+      />
 
       {/* Tab Content */}
-      <div className="flex-1 overflow-auto">
+      <PageBody scroll>
         {activeTab === 'documents' && (
           <DocumentsTab
             connectionId={connectionId}
@@ -417,7 +407,7 @@ export default function MongoCollectionPanel() {
             loadStats={loadStats}
           />
         )}
-      </div>
+      </PageBody>
 
       {/* Modals */}
       {selectedDoc && (
@@ -501,7 +491,7 @@ export default function MongoCollectionPanel() {
           objectIdInfo={objectIdInfo}
         />
       )}
-    </div>
+    </PageShell>
   )
 }
 

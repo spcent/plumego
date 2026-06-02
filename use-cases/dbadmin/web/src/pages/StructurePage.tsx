@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type CSSProperties } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { api, type TableStructure } from '../api'
 import WorkbenchHeader from '../components/WorkbenchHeader'
@@ -6,11 +6,12 @@ import { useToast } from '../components/toastContext'
 import { useI18n } from '../i18nContext'
 import { useCurrentConn } from '../context/connections'
 import { toMarkdownSchema, toJSONSchemaDesc } from '../utils/copyFormats'
+import { CodePanel, PageBody, PageShell, PageToolbar } from '../components/workbench'
 
 type TabKey = 'columns' | 'indexes' | 'fks' | 'ddl'
 const VALID_TABS: TabKey[] = ['columns', 'indexes', 'fks', 'ddl']
 
-const th: React.CSSProperties = {
+const th: CSSProperties = {
   textAlign: 'left',
   padding: '6px 16px',
   fontWeight: 500,
@@ -23,7 +24,7 @@ const th: React.CSSProperties = {
   zIndex: 10,
 }
 
-const td: React.CSSProperties = {
+const td: CSSProperties = {
   padding: '6px 16px',
   fontSize: 13,
   borderBottom: '1px solid var(--border-subtle)',
@@ -58,9 +59,13 @@ export default function StructurePage() {
 
   if (!structure) {
     return (
-      <div className="p-6 text-sm" style={{ color: 'var(--text-muted)' }}>
-        Loading…
-      </div>
+      <PageShell>
+        <PageBody scroll>
+          <div className="p-6 text-sm" style={{ color: 'var(--text-muted)' }}>
+            Loading…
+          </div>
+        </PageBody>
+      </PageShell>
     )
   }
 
@@ -71,82 +76,59 @@ export default function StructurePage() {
     ddl: t('structure.tab.ddl'),
   }
 
-  const copyBtnStyle: React.CSSProperties = {
-    fontSize: 11,
-    padding: '3px 10px',
-    borderRadius: 4,
-    border: '1px solid var(--border-strong)',
-    color: 'var(--text-muted)',
-    background: 'transparent',
-    cursor: 'pointer',
-  }
-
   return (
-    <div className="flex flex-col h-full">
+    <PageShell>
       <WorkbenchHeader
         connectionName={currentConn?.name}
         resourcePath={dbName && tableName ? [dbName, tableName] : []}
         datasourceType={currentConn?.driver ?? 'mysql'}
       />
-      {/* Header + tabs */}
-      <div
-        className="px-6 pt-5 pb-0 shrink-0"
-        style={{ borderBottom: '1px solid var(--border-subtle)' }}
-      >
-        <div className="flex items-start justify-between mb-3">
-          <h1 className="text-lg font-bold" style={{ color: 'var(--text-strong)' }}>
-            Structure — <span className="font-mono">{tableName}</span>
-          </h1>
+      <PageToolbar
+        leading={
+          <div className="flex min-w-0 flex-wrap items-center gap-1">
+            {VALID_TABS.map(tk => (
+              <button
+                key={tk}
+                onClick={() => setTab(tk)}
+                className="tab-btn"
+                data-active={tab === tk}
+              >
+                {tabLabel[tk]}
+              </button>
+            ))}
+          </div>
+        }
+        trailing={
+          <>
           {tab === 'columns' && (
             <div className="flex items-center gap-1.5">
               <span className="text-xs" style={{ color: 'var(--text-subtle)' }}>{t('copy.as')}</span>
-              <button style={copyBtnStyle} onClick={() => copyText(toMarkdownSchema(tableName!, structure.columns))}>
+              <button className="btn btn-ghost h-7 px-2 text-xs" onClick={() => copyText(toMarkdownSchema(tableName!, structure.columns))}>
                 {t('copy.markdown')}
               </button>
-              <button style={copyBtnStyle} onClick={() => copyText(toJSONSchemaDesc(tableName!, structure.columns))}>
+              <button className="btn btn-ghost h-7 px-2 text-xs" onClick={() => copyText(toJSONSchemaDesc(tableName!, structure.columns))}>
                 {t('copy.json_schema')}
               </button>
               {structure.ddl && (
-                <button style={copyBtnStyle} onClick={() => copyText(structure.ddl!)}>
+                <button className="btn btn-ghost h-7 px-2 text-xs" onClick={() => copyText(structure.ddl!)}>
                   {t('copy.ddl')}
                 </button>
               )}
             </div>
           )}
           {tab === 'ddl' && structure.ddl && (
-            <button style={copyBtnStyle} onClick={() => copyText(structure.ddl!)}>
+            <button className="btn btn-ghost h-7 px-2 text-xs" onClick={() => copyText(structure.ddl!)}>
               {t('copy.ddl')}
             </button>
           )}
-        </div>
+          </>
+        }
+      />
 
-        <div className="flex gap-1">
-          {VALID_TABS.map(tk => (
-            <button
-              key={tk}
-              onClick={() => setTab(tk)}
-              style={{
-                padding: '6px 16px',
-                fontSize: 13,
-                fontWeight: tab === tk ? 500 : 400,
-                borderBottom: tab === tk ? '2px solid var(--accent)' : '2px solid transparent',
-                color: tab === tk ? 'var(--accent)' : 'var(--text-muted)',
-                background: 'transparent',
-                cursor: 'pointer',
-                marginBottom: -1,
-                transition: 'color 75ms',
-              }}
-            >
-              {tabLabel[tk]}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Tab content */}
-      <div className="flex-1 overflow-auto">
+      <PageBody>
+        <div className="data-table-wrap h-full">
         {tab === 'columns' && (
-          <table style={{ width: '100%', minWidth: 'max-content', borderCollapse: 'collapse', fontSize: 13 }}>
+          <table className="data-table" style={{ fontSize: 13 }}>
             <thead>
               <tr>
                 {['#', 'Name', 'Type', 'Nullable', 'Default', 'Key', 'Extra'].map(h => (
@@ -179,7 +161,7 @@ export default function StructurePage() {
         )}
 
         {tab === 'indexes' && (
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+          <table className="data-table" style={{ fontSize: 13 }}>
             <thead>
               <tr>
                 {['Name', 'Unique', 'Columns', 'Type'].map(h => (
@@ -210,7 +192,7 @@ export default function StructurePage() {
         )}
 
         {tab === 'fks' && (
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+          <table className="data-table" style={{ fontSize: 13 }}>
             <thead>
               <tr>
                 {['Name', 'Column', 'References', 'On Delete', 'On Update'].map(h => (
@@ -240,24 +222,23 @@ export default function StructurePage() {
         )}
 
         {tab === 'ddl' && (
-          <pre
-            style={{
-              margin: 16,
-              padding: 16,
-              borderRadius: 8,
-              fontSize: 12,
-              fontFamily: 'monospace',
-              background: '#0d1117',
-              color: '#56d364',
-              overflowX: 'auto',
-              whiteSpace: 'pre-wrap',
-              border: '1px solid var(--border-subtle)',
-            }}
-          >
-            {structure.ddl || '-- DDL not available'}
-          </pre>
+          <div className="h-full p-4">
+            <CodePanel height="100%">
+              <pre
+                className="h-full overflow-auto p-4 text-xs"
+                style={{
+                  fontFamily: 'monospace',
+                  color: '#56d364',
+                  whiteSpace: 'pre-wrap',
+                }}
+              >
+                {structure.ddl || '-- DDL not available'}
+              </pre>
+            </CodePanel>
+          </div>
         )}
-      </div>
-    </div>
+        </div>
+      </PageBody>
+    </PageShell>
   )
 }

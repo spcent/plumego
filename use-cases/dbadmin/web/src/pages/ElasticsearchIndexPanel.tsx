@@ -9,6 +9,7 @@ import ErrorState from '../components/ErrorState'
 import { useToast } from '../components/toastContext'
 import { useEsHistory } from '../hooks/useEsHistory'
 import { XIcon } from '../components/Icons'
+import { PageBody, PageShell, PageToolbar } from '../components/workbench'
 
 type Tab = 'overview' | 'mapping' | 'settings' | 'search' | 'documents'
 
@@ -207,7 +208,7 @@ export default function ElasticsearchIndexPanel() {
   ]
 
   return (
-    <div className="h-full flex flex-col">
+    <PageShell>
       <WorkbenchHeader
         connectionName={conn?.name}
         resourcePath={esIndex ? [esIndex] : []}
@@ -216,26 +217,26 @@ export default function ElasticsearchIndexPanel() {
         onRefresh={loadOverview}
       />
 
-      {/* Tabs */}
-      <div className="px-4 py-2 border-b flex gap-2" style={{ borderColor: 'var(--border-subtle)' }}>
-        {tabs.map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className="px-3 py-1.5 text-sm rounded transition-colors"
-            style={{
-              background: activeTab === tab.id ? 'var(--accent)' : 'transparent',
-              color: activeTab === tab.id ? 'white' : 'var(--text-muted)',
-              fontWeight: activeTab === tab.id ? 600 : 400,
-            }}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
+      <PageToolbar
+        leading={
+          <div className="flex flex-wrap gap-1">
+            {tabs.map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className="tab-btn"
+                data-active={activeTab === tab.id}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        }
+      />
 
       {/* Content */}
-      <div className="flex-1 overflow-auto p-4">
+      <PageBody scroll>
+        <div className="p-4">
         {loadError && (
           <ErrorState
             title={t('common.error')}
@@ -633,7 +634,8 @@ export default function ElasticsearchIndexPanel() {
             )}
           </div>
         )}
-      </div>
+        </div>
+      </PageBody>
 
       {/* Document detail modal */}
       {selectedHit && (
@@ -711,6 +713,6 @@ export default function ElasticsearchIndexPanel() {
           </div>
         </div>
       )}
-    </div>
+    </PageShell>
   )
 }

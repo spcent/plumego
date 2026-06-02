@@ -1,9 +1,24 @@
-import { useState, useCallback, useEffect, useRef } from 'react'
-import { Link, useNavigate, useParams, useLocation } from 'react-router-dom'
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
+import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import { api, type Connection, type ResourceNode, type ResourceNodeType } from '../api'
 import { useI18n } from '../i18nContext'
 import { useToast } from './toastContext'
-import { ChevronDownIcon, ChevronRightIcon, DatabaseIcon, RefreshIcon, TableIcon } from './Icons'
+import {
+  ChevronDownIcon,
+  ChevronRightIcon,
+  DatabaseIcon,
+  ElasticsearchIcon,
+  MongoDBIcon,
+  MySQLIcon,
+  RedisIcon,
+  RefreshIcon,
+  SQLiteIcon,
+  TableIcon,
+  XIcon,
+} from './Icons'
+
+const EXPANDED_CONNS_KEY = 'dbadmin.resourceExplorer.expandedConnections.v1'
+const EXPANDED_NODES_KEY = 'dbadmin.resourceExplorer.expandedNodes.v1'
 
 // ── Context Menu ───────────────────────────────────────────────────────────
 
@@ -53,22 +68,104 @@ function ContextMenu({ state, onClose }: { state: ContextMenuState; onClose: () 
   )
 }
 
+function readExpandedState(key: string): Record<string, boolean> {
+  try {
+    const raw = localStorage.getItem(key)
+    if (!raw) return {}
+    const parsed = JSON.parse(raw) as unknown
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {}
+
+    return Object.fromEntries(
+      Object.entries(parsed)
+        .filter((entry): entry is [string, boolean] => typeof entry[1] === 'boolean')
+        .filter(([, expanded]) => expanded),
+    )
+  } catch {
+    return {}
+  }
+}
+
+function writeExpandedState(key: string, state: Record<string, boolean>) {
+  try {
+    const expandedOnly = Object.fromEntries(Object.entries(state).filter(([, expanded]) => expanded))
+    localStorage.setItem(key, JSON.stringify(expandedOnly))
+  } catch {
+    // Best-effort preference persistence; the tree remains usable without storage.
+  }
+}
+
+async function copyText(value: string) {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(value)
+    return
+  }
+
+  const textarea = document.createElement('textarea')
+  textarea.value = value
+  textarea.setAttribute('readonly', '')
+  textarea.style.position = 'fixed'
+  textarea.style.opacity = '0'
+  document.body.appendChild(textarea)
+  textarea.select()
+  document.execCommand('copy')
+  document.body.removeChild(textarea)
+}
+
+function textMatches(value: string, query: string): boolean {
+  return value.toLowerCase().includes(query)
+}
+
+function connectionMatches(conn: Connection, query: string): boolean {
+  return (
+    textMatches(conn.name, query) ||
+    textMatches(conn.driver, query) ||
+    textMatches(conn.host ?? '', query) ||
+    textMatches(conn.database ?? '', query)
+  )
+}
+
+function resourceNodeMatches(node: ResourceNode, query: string): boolean {
+  return (
+    textMatches(node.name, query) ||
+    textMatches(node.path, query) ||
+    textMatches(node.type, query) ||
+    textMatches(node.datasource_type, query)
+  )
+}
+
+function resourceNodeHasMatch(
+  connId: string,
+  node: ResourceNode,
+  resourceCache: Record<string, ResourceNode[]>,
+  query: string,
+  visited = new Set<string>(),
+): boolean {
+  if (resourceNodeMatches(node, query)) return true
+
+  const key = `${connId}:${node.path}`
+  if (visited.has(key)) return false
+  visited.add(key)
+
+  return (resourceCache[key] ?? []).some(child =>
+    resourceNodeHasMatch(connId, child, resourceCache, query, visited),
+  )
+}
+
 // ── Icon dispatch ──────────────────────────────────────────────────────────
 
 function nodeIcon(type: ResourceNodeType): React.ReactNode {
-  const s: React.CSSProperties = { color: 'var(--sb-muted)', fontSize: 12 }
   const iconClass = 'h-3.5 w-3.5'
   switch (type) {
     case 'sql_database':    return <DatabaseIcon className={iconClass} style={{ color: 'var(--sb-muted)' }} />
     case 'sql_table':       return <TableIcon className={iconClass} style={{ color: 'var(--sb-muted)' }} />
     case 'sql_view':        return <TableIcon className={iconClass} style={{ color: 'var(--sb-muted)', opacity: 0.72 }} />
-    case 'redis_db':        return <span className="h-3 w-3 rounded-[3px] border" style={{ borderColor: '#f87171', background: '#f8717120' }} />
+    case 'redis_db':        return <RedisIcon className={iconClass} style={{ color: '#d94f4f' }} />
     case 'redis_key':       return <span className="h-1.5 w-1.5 rounded-full" style={{ background: '#fb923c' }} />
-    case 'mongo_database':  return <span style={{ ...s, color: '#4ade80', fontWeight: 700 }}>M</span>
-    case 'mongo_collection':return <span style={{ ...s, fontSize: 10, color: '#22d3ee' }}>C</span>
-    case 'es_index':        return <span style={{ ...s, color: '#fbbf24', fontWeight: 700 }}>E</span>
-    case 'es_alias':        return <span style={{ ...s, fontSize: 10, color: '#a78bfa' }}>~</span>
-    case 'es_data_stream':  return <span style={{ ...s, color: '#34d399', fontWeight: 700 }}>D</span>
+    case 'mongo_database':  return <MongoDBIcon className={iconClass} style={{ color: '#35a869' }} />
+    case 'mongo_collection':return <TableIcon className={iconClass} style={{ color: '#35a869' }} />
+    case 'es_index':        return <ElasticsearchIcon className={iconClass} style={{ color: '#d79a2b' }} />
+    case 'es_alias':        return <ChevronRightIcon className={iconClass} style={{ color: '#9b7bd8' }} />
+    case 'es_data_stream':  return <ElasticsearchIcon className={iconClass} style={{ color: '#2eaa91' }} />
     default:                return <span className="h-1.5 w-1.5 rounded-full" style={{ background: 'var(--sb-muted)' }} />
   }
 }
@@ -119,29 +216,41 @@ function nodeUrl(connId: string, node: ResourceNode): string | null {
 // ── TreeItem ───────────────────────────────────────────────────────────────
 
 function DriverBadge({ driver }: { driver: string }) {
-  const label =
-    driver === 'mysql'  ? 'MY' :
-    driver === 'sqlite' ? 'SQ' :
-    driver === 'redis'  ? 'RD' :
-    driver === 'mongodb'? 'MG' :
-    driver === 'elasticsearch' ? 'ES' :
-    driver.slice(0, 2).toUpperCase()
+  const iconClass = 'h-3.5 w-3.5'
+  const icon =
+    driver === 'mysql'  ? <MySQLIcon className={iconClass} /> :
+    driver === 'sqlite' ? <SQLiteIcon className={iconClass} /> :
+    driver === 'redis'  ? <RedisIcon className={iconClass} /> :
+    driver === 'mongodb'? <MongoDBIcon className={iconClass} /> :
+    driver === 'elasticsearch' ? <ElasticsearchIcon className={iconClass} /> :
+    <DatabaseIcon className={iconClass} />
+
+  const color =
+    driver === 'mysql'  ? '#2f7dbd' :
+    driver === 'sqlite' ? '#4f86c6' :
+    driver === 'redis'  ? '#d94f4f' :
+    driver === 'mongodb'? '#35a869' :
+    driver === 'elasticsearch' ? '#d79a2b' :
+    'var(--sb-muted)'
+
   return (
     <span
-      className="shrink-0 text-[10px] font-mono px-1 py-px rounded leading-none"
+      className="grid h-5 w-5 shrink-0 place-items-center rounded-md"
       style={{
         background: 'var(--sb-surface)',
-        color: 'var(--sb-muted)',
+        color,
         border: '1px solid var(--sb-border)',
       }}
+      title={driver}
+      aria-label={driver}
     >
-      {label}
+      {icon}
     </span>
   )
 }
 
 function TreeItem({
-  depth, icon, label, active, expanded, expandable, onClick, to, extra, onContextMenu,
+  depth, icon, label, active, expanded, expandable, onClick, to, extra, actions, onContextMenu,
 }: {
   depth: number
   icon?: React.ReactNode
@@ -152,34 +261,112 @@ function TreeItem({
   onClick?: () => void
   to?: string
   extra?: React.ReactNode
+  actions?: React.ReactNode
   onContextMenu?: (e: React.MouseEvent) => void
 }) {
+  const navigate = useNavigate()
   const paddingLeft = 12 + depth * 16
   const cls = [
-    'flex items-center gap-1.5 h-[30px] w-full text-[13px] rounded-md mx-1 pr-2 cursor-pointer select-none truncate',
-    'transition-colors duration-100 hover:bg-white/10',
+    'group/treeitem grid h-[30px] w-full items-center rounded-md mx-1 pr-1 cursor-pointer select-none truncate',
+    'transition-colors duration-100',
+    'hover:bg-[var(--sb-hover)] focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[var(--focus-ring)]',
     active ? 'font-medium' : '',
   ].join(' ')
   const style: React.CSSProperties = {
     paddingLeft,
     width: 'calc(100% - 8px)',
+    gridTemplateColumns: '14px 22px minmax(0, 1fr) auto',
+    columnGap: 6,
     color: active ? '#fff' : 'var(--sb-text)',
     background: active ? 'var(--sb-active)' : 'transparent',
   }
-  const inner = (
-    <>
-      {expandable && (
-        <span className="grid h-4 w-3 shrink-0 place-items-center" style={{ color: 'var(--sb-muted)' }}>
-          {expanded ? <ChevronDownIcon className="h-3.5 w-3.5" /> : <ChevronRightIcon className="h-3.5 w-3.5" />}
-        </span>
-      )}
-      {icon && <span className="shrink-0">{icon}</span>}
-      <span className="truncate flex-1 min-w-0">{label}</span>
-      {extra}
-    </>
+
+  const activate = () => {
+    if (onClick) {
+      onClick()
+      return
+    }
+    if (to) navigate(to)
+  }
+
+  const onKeyDown = (event: React.KeyboardEvent) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return
+    event.preventDefault()
+    activate()
+  }
+
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      aria-expanded={expandable ? expanded : undefined}
+      className={cls}
+      style={style}
+      title={label}
+      onClick={activate}
+      onKeyDown={onKeyDown}
+      onContextMenu={onContextMenu}
+    >
+      <span className="grid h-4 w-[14px] place-items-center" style={{ color: active ? 'rgba(255,255,255,0.76)' : 'var(--sb-muted)' }}>
+        {expandable ? (
+          expanded ? <ChevronDownIcon className="h-3.5 w-3.5" /> : <ChevronRightIcon className="h-3.5 w-3.5" />
+        ) : null}
+      </span>
+      <span className="grid h-[22px] w-[22px] place-items-center">{icon}</span>
+      <span className="min-w-0 truncate text-left">{label}</span>
+      <span className="flex min-w-0 shrink-0 items-center justify-end gap-1">
+        {extra}
+        {actions && (
+          <span className="ml-1 flex items-center gap-0.5 opacity-0 transition-opacity group-hover/treeitem:opacity-100 group-focus-within/treeitem:opacity-100">
+            {actions}
+          </span>
+        )}
+      </span>
+    </div>
   )
-  if (to) return <Link to={to} className={cls} style={style} title={label} onContextMenu={onContextMenu}>{inner}</Link>
-  return <button onClick={onClick} onContextMenu={onContextMenu} className={cls} style={style} title={label}>{inner}</button>
+}
+
+function TreeActionButton({
+  title,
+  children,
+  onClick,
+}: {
+  title: string
+  children: React.ReactNode
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      title={title}
+      aria-label={title}
+      className="grid h-5 min-w-5 place-items-center rounded px-1 text-[10px] font-medium leading-none transition-colors hover:bg-[var(--sb-surface)] active:translate-y-px"
+      style={{ color: 'var(--sb-muted)', border: '1px solid transparent' }}
+      onClick={(event) => {
+        event.stopPropagation()
+        onClick()
+      }}
+      onContextMenu={(event) => event.stopPropagation()}
+    >
+      {children}
+    </button>
+  )
+}
+
+function ResourceSkeletonRows({ depth }: { depth: number }) {
+  return (
+    <div className="py-1">
+      {[0, 1, 2].map(row => (
+        <div key={row} className="flex h-[30px] items-center gap-2 px-3" style={{ paddingLeft: 12 + depth * 16 }}>
+          <span className="skeleton h-4 w-4 rounded" style={{ background: 'var(--sb-surface)' }} />
+          <span
+            className="skeleton h-3 rounded"
+            style={{ width: `${68 - row * 12}%`, background: 'var(--sb-surface)' }}
+          />
+        </div>
+      ))}
+    </div>
+  )
 }
 
 // ── ResourceExplorer ───────────────────────────────────────────────────────
@@ -197,8 +384,8 @@ export default function ResourceExplorer({ connections, onRefresh }: Props) {
   const { showToast } = useToast()
 
   // Expanded state: connection IDs and node paths
-  const [expandedConns, setExpandedConns] = useState<Record<string, boolean>>({})
-  const [expandedNodes, setExpandedNodes] = useState<Record<string, boolean>>({})
+  const [expandedConns, setExpandedConns] = useState<Record<string, boolean>>(() => readExpandedState(EXPANDED_CONNS_KEY))
+  const [expandedNodes, setExpandedNodes] = useState<Record<string, boolean>>(() => readExpandedState(EXPANDED_NODES_KEY))
 
   // Cached resource nodes: key = connId (top-level) or "connId:dbPath" (children)
   const [resourceCache, setResourceCache] = useState<Record<string, ResourceNode[]>>({})
@@ -207,8 +394,18 @@ export default function ResourceExplorer({ connections, onRefresh }: Props) {
   const [loadingConns, setLoadingConns] = useState<Set<string>>(new Set())
   const [connErrors, setConnErrors] = useState<Record<string, string>>({})
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
+  const [filterText, setFilterText] = useState('')
 
   const isQueryPage = location.pathname.includes('/query')
+  const filterQuery = filterText.trim().toLowerCase()
+
+  useEffect(() => {
+    writeExpandedState(EXPANDED_CONNS_KEY, expandedConns)
+  }, [expandedConns])
+
+  useEffect(() => {
+    writeExpandedState(EXPANDED_NODES_KEY, expandedNodes)
+  }, [expandedNodes])
 
   // Fetch top-level nodes (databases) for a connection
   const fetchTopLevel = useCallback(async (connId: string, forceRefresh = false) => {
@@ -235,6 +432,12 @@ export default function ResourceExplorer({ connections, onRefresh }: Props) {
       })
     }
   }, [resourceCache])
+
+  useEffect(() => {
+    connections.forEach(conn => {
+      if (expandedConns[conn.id]) void fetchTopLevel(conn.id)
+    })
+  }, [connections, expandedConns, fetchTopLevel])
 
   // Fetch child nodes (tables/views) under a database node
   const fetchChildren = useCallback(async (connId: string, node: ResourceNode, forceRefresh = false) => {
@@ -285,6 +488,15 @@ export default function ResourceExplorer({ connections, onRefresh }: Props) {
     showToast(t('resource.refresh'), 'success')
   }, [fetchChildren, showToast, t])
 
+  const handleCopyResource = useCallback(async (value: string) => {
+    try {
+      await copyText(value)
+      showToast(t('resource.copy_success'), 'success')
+    } catch {
+      showToast(t('data.copy_failed'), 'error')
+    }
+  }, [showToast, t])
+
   const handleContextMenu = useCallback((e: React.MouseEvent, items: ContextMenuItem[]) => {
     e.preventDefault()
     setContextMenu({ x: e.clientX, y: e.clientY, items })
@@ -296,6 +508,16 @@ export default function ResourceExplorer({ connections, onRefresh }: Props) {
     if (url) navigate(url)
     // Future drivers: add custom click actions here based on node.datasource_type
   }, [navigate])
+
+  const filteredConnections = useMemo(() => {
+    if (!filterQuery) return connections
+    return connections.filter(conn => {
+      if (connectionMatches(conn, filterQuery)) return true
+      return (resourceCache[conn.id] ?? []).some(node =>
+        resourceNodeHasMatch(conn.id, node, resourceCache, filterQuery),
+      )
+    })
+  }, [connections, filterQuery, resourceCache])
 
   return (
     <nav className="flex-1 overflow-y-auto py-1 overflow-x-hidden" onClick={() => setContextMenu(null)}>
@@ -317,18 +539,60 @@ export default function ResourceExplorer({ connections, onRefresh }: Props) {
           <RefreshIcon className="h-3.5 w-3.5" />
         </button>
       </div>
+      <div className="px-3 pb-2">
+        <div className="relative">
+          <input
+            value={filterText}
+            onChange={(event) => setFilterText(event.target.value)}
+            onClick={(event) => event.stopPropagation()}
+            placeholder={t('resource.search_placeholder')}
+            className="h-7 w-full rounded-md border px-2.5 pr-7 text-[12px] outline-none transition-colors"
+            style={{
+              background: 'var(--sb-surface)',
+              borderColor: 'var(--sb-border)',
+              color: 'var(--sb-text)',
+            }}
+          />
+          {filterText && (
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation()
+                setFilterText('')
+              }}
+              className="absolute right-1 top-1 grid h-5 w-5 place-items-center rounded transition-colors hover:bg-[var(--sb-hover)]"
+              style={{ color: 'var(--sb-muted)' }}
+              title={t('resource.clear_search')}
+              aria-label={t('resource.clear_search')}
+            >
+              <XIcon className="h-3 w-3" />
+            </button>
+          )}
+        </div>
+      </div>
       {connections.length === 0 && (
         <div className="px-4 py-3 text-[12px]" style={{ color: 'var(--sb-muted)' }}>
           {t('connections.empty')}
         </div>
       )}
 
-      {connections.map(conn => {
+      {connections.length > 0 && filteredConnections.length === 0 && (
+        <div className="px-4 py-3 text-[12px]" style={{ color: 'var(--sb-muted)' }}>
+          {t('resource.no_matches')}
+        </div>
+      )}
+
+      {filteredConnections.map(conn => {
         const connExpanded = expandedConns[conn.id]
         const connActive = params.connId === conn.id && isQueryPage
         const topNodes: ResourceNode[] = resourceCache[conn.id] ?? []
         const isLoading = loadingConns.has(conn.id)
         const error = connErrors[conn.id]
+        const connSelfMatches = filterQuery ? connectionMatches(conn, filterQuery) : true
+        const visibleTopNodes = filterQuery
+          ? topNodes.filter(node => resourceNodeHasMatch(conn.id, node, resourceCache, filterQuery))
+          : topNodes
+        const showConnBody = connExpanded || Boolean(filterQuery)
 
         return (
           <div key={conn.id}>
@@ -342,7 +606,12 @@ export default function ResourceExplorer({ connections, onRefresh }: Props) {
               onClick={() => toggleConn(conn.id)}
               onContextMenu={(e) => {
                 handleContextMenu(e, [
+                  ...(conn.driver === 'mysql' || conn.driver === 'sqlite'
+                    ? [{ label: t('resource.open_console'), onClick: () => navigate(`/conn/${conn.id}/query`) }]
+                    : []),
+                  { label: t('resource.copy_name'), onClick: () => void handleCopyResource(conn.name) },
                   { label: t('resource.refresh'), onClick: () => handleRefreshConn(conn.id) },
+                  { label: t('resource.manage_connection'), onClick: () => navigate('/connections') },
                 ])
               }}
               extra={
@@ -360,12 +629,24 @@ export default function ResourceExplorer({ connections, onRefresh }: Props) {
                   )}
                 </>
               }
+              actions={
+                <>
+                  {(conn.driver === 'mysql' || conn.driver === 'sqlite') && (
+                    <TreeActionButton title={t('resource.open_console')} onClick={() => navigate(`/conn/${conn.id}/query`)}>
+                      SQL
+                    </TreeActionButton>
+                  )}
+                  <TreeActionButton title={t('resource.refresh')} onClick={() => handleRefreshConn(conn.id)}>
+                    <RefreshIcon className="h-3 w-3" />
+                  </TreeActionButton>
+                </>
+              }
             />
 
-            {connExpanded && (
+            {showConnBody && (
               <>
                 {/* SQL Console shortcut — SQL drivers only */}
-                {(conn.driver === 'mysql' || conn.driver === 'sqlite') && (
+                {(conn.driver === 'mysql' || conn.driver === 'sqlite') && (!filterQuery || connSelfMatches || textMatches(t('nav.sql_console'), filterQuery)) && (
                   <TreeItem
                     depth={1}
                     icon={<ChevronRightIcon className="h-3.5 w-3.5" style={{ color: 'var(--sb-muted)' }} />}
@@ -388,15 +669,25 @@ export default function ResourceExplorer({ connections, onRefresh }: Props) {
                   </div>
                 )}
 
+                {isLoading && topNodes.length === 0 && (
+                  <ResourceSkeletonRows depth={1} />
+                )}
+
                 {/* Empty state */}
-                {!isLoading && !error && topNodes.length === 0 && (
+                {!filterQuery && !isLoading && !error && topNodes.length === 0 && (
                   <div className="px-4 py-2 text-[12px]" style={{ color: 'var(--sb-muted)' }}>
                     {t('resource.empty')}
                   </div>
                 )}
 
                 {/* Resource tree nodes */}
-                {topNodes.map(node => (
+                {filterQuery && !isLoading && !error && topNodes.length > 0 && visibleTopNodes.length === 0 && connSelfMatches && (
+                  <div className="px-4 py-2 text-[12px]" style={{ color: 'var(--sb-muted)' }}>
+                    {t('resource.no_matches')}
+                  </div>
+                )}
+
+                {visibleTopNodes.map(node => (
                   <ResourceNodeRow
                     key={node.id}
                     connId={conn.id}
@@ -410,7 +701,8 @@ export default function ResourceExplorer({ connections, onRefresh }: Props) {
                     onLeafClick={handleNodeClick}
                     onContextMenu={handleContextMenu}
                     onRefresh={handleRefreshNode}
-                    driver={conn.driver}
+                    onCopy={handleCopyResource}
+                    filterQuery={filterQuery}
                   />
                 ))}
               </>
@@ -434,7 +726,7 @@ export default function ResourceExplorer({ connections, onRefresh }: Props) {
 
 function ResourceNodeRow({
   connId, node, depth, params, isQueryPage,
-  expandedNodes, resourceCache, onToggle, onLeafClick, onContextMenu, onRefresh, driver,
+  expandedNodes, resourceCache, onToggle, onLeafClick, onContextMenu, onRefresh, onCopy, filterQuery,
 }: {
   connId: string
   node: ResourceNode
@@ -447,18 +739,80 @@ function ResourceNodeRow({
   onLeafClick: (connId: string, node: ResourceNode) => void
   onContextMenu: (e: React.MouseEvent, items: ContextMenuItem[]) => void
   onRefresh: (connId: string, node: ResourceNode) => void
-  driver: string
+  onCopy: (value: string) => void
+  filterQuery: string
 }) {
   const { t } = useI18n()
   const navigate = useNavigate()
   const nodeKey = `${connId}:${node.path}`
   const expanded = expandedNodes[nodeKey] ?? false
   const children: ResourceNode[] = resourceCache[nodeKey] ?? []
+  const hasFilter = Boolean(filterQuery)
 
   const isActive = nodeIsActive(node, connId, params, isQueryPage)
   const expandable = node.type === 'sql_database' || node.type === 'mongo_database'
-
+  const selfMatches = !hasFilter || resourceNodeMatches(node, filterQuery)
+  const visibleChildren = hasFilter && !selfMatches
+    ? children.filter(child => resourceNodeHasMatch(connId, child, resourceCache, filterQuery))
+    : children
   const to = expandable ? undefined : (nodeUrl(connId, node) ?? undefined)
+
+  if (hasFilter && !selfMatches && visibleChildren.length === 0) {
+    return null
+  }
+
+  const openNode = () => {
+    const url = nodeUrl(connId, node)
+    if (url) navigate(url)
+  }
+
+  const actionButtons = (
+    <>
+      {node.type === 'sql_database' && (
+        <TreeActionButton title={t('resource.open_console')} onClick={() => navigate(`/conn/${connId}/query`)}>
+          SQL
+        </TreeActionButton>
+      )}
+      {(node.type === 'sql_table' || node.type === 'sql_view') && (
+        <>
+          <TreeActionButton title={t('resource.view_data')} onClick={openNode}>
+            Data
+          </TreeActionButton>
+          <TreeActionButton
+            title={t('resource.view_structure')}
+            onClick={() => {
+              const slash = node.path.indexOf('/')
+              if (slash < 0) return
+              const db = node.path.slice(0, slash)
+              const table = node.path.slice(slash + 1)
+              navigate(`/conn/${connId}/db/${encodeURIComponent(db)}/tables/${encodeURIComponent(table)}/structure`)
+            }}
+          >
+            DDL
+          </TreeActionButton>
+        </>
+      )}
+      {(node.type === 'mongo_database' ||
+        node.type === 'mongo_collection' ||
+        node.type === 'redis_db' ||
+        node.type === 'redis_key' ||
+        node.type === 'es_index' ||
+        node.type === 'es_alias' ||
+        node.type === 'es_data_stream') && (
+        <TreeActionButton title={t('resource.open')} onClick={openNode}>
+          Open
+        </TreeActionButton>
+      )}
+      {expandable && (
+        <TreeActionButton title={t('resource.refresh')} onClick={() => onRefresh(connId, node)}>
+          <RefreshIcon className="h-3 w-3" />
+        </TreeActionButton>
+      )}
+      <TreeActionButton title={t('resource.copy_path')} onClick={() => onCopy(node.path || node.name)}>
+        Copy
+      </TreeActionButton>
+    </>
+  )
 
   // Build context menu items based on node type
   const handleContextMenu = (e: React.MouseEvent) => {
@@ -466,8 +820,12 @@ function ResourceNodeRow({
 
     if (node.type === 'sql_database') {
       items.push({
+        label: t('resource.open'),
+        onClick: openNode,
+      })
+      items.push({
         label: t('resource.open_console'),
-        onClick: () => navigate(`/conn/${connId}/db/${encodeURIComponent(node.path)}/query`),
+        onClick: () => navigate(`/conn/${connId}/query`),
       })
     } else if (node.type === 'sql_table' || node.type === 'sql_view') {
       const slash = node.path.indexOf('/')
@@ -483,28 +841,26 @@ function ResourceNodeRow({
           onClick: () => navigate(`/conn/${connId}/db/${encodeURIComponent(db)}/tables/${encodeURIComponent(table)}/structure`),
         })
       }
-    } else if (node.type === 'mongo_collection') {
-      const slash = node.path.indexOf('/')
-      if (slash >= 0) {
-        const db = node.path.slice(0, slash)
-        const coll = node.path.slice(slash + 1)
-        items.push({
-          label: t('resource.open'),
-          onClick: () => navigate(`/conn/${connId}/mongo/${encodeURIComponent(db)}/${encodeURIComponent(coll)}/documents`),
-        })
-      }
-    } else if (node.type === 'es_index') {
+    } else if (nodeUrl(connId, node)) {
       items.push({
         label: t('resource.open'),
-        onClick: () => navigate(`/conn/${connId}/es/${encodeURIComponent(node.path)}`),
+        onClick: openNode,
       })
     }
 
-    if (items.length > 0) {
+    items.push({
+      label: t('resource.copy_path'),
+      onClick: () => onCopy(node.path || node.name),
+    })
+
+    if (expandable) {
       items.push({
         label: t('resource.refresh'),
         onClick: () => onRefresh(connId, node),
       })
+    }
+
+    if (items.length > 0) {
       onContextMenu(e, items)
     }
   }
@@ -521,16 +877,17 @@ function ResourceNodeRow({
         to={to}
         onClick={expandable ? () => onToggle(connId, node) : () => onLeafClick(connId, node)}
         onContextMenu={handleContextMenu}
+        actions={actionButtons}
       />
 
-      {expandable && expanded && (
+      {expandable && (expanded || hasFilter) && (
         <>
           {/* Tables overview link — SQL databases only */}
-          {node.type === 'sql_database' && (
+          {node.type === 'sql_database' && (!hasFilter || selfMatches || textMatches(t('resource.tables'), filterQuery)) && (
             <TreeItem
               depth={depth + 1}
               icon={<TableIcon className="h-3.5 w-3.5" style={{ color: 'var(--sb-muted)' }} />}
-              label="Tables"
+              label={t('resource.tables')}
               active={
                 params.connId === connId &&
                 params.dbName === node.path &&
@@ -541,11 +898,11 @@ function ResourceNodeRow({
             />
           )}
           {/* Collections overview link — MongoDB databases only */}
-          {node.type === 'mongo_database' && (
+          {node.type === 'mongo_database' && (!hasFilter || selfMatches || textMatches(t('resource.collections'), filterQuery)) && (
             <TreeItem
               depth={depth + 1}
               icon={<TableIcon className="h-3.5 w-3.5" style={{ color: '#22d3ee' }} />}
-              label="Collections"
+              label={t('resource.collections')}
               active={
                 params.connId === connId &&
                 params.mongoDb === node.path &&
@@ -554,7 +911,7 @@ function ResourceNodeRow({
               to={`/conn/${connId}/mongo/${encodeURIComponent(node.path)}/collections`}
             />
           )}
-          {children.map(child => (
+          {visibleChildren.map(child => (
             <ResourceNodeRow
               key={child.id}
               connId={connId}
@@ -568,7 +925,8 @@ function ResourceNodeRow({
               onLeafClick={onLeafClick}
               onContextMenu={onContextMenu}
               onRefresh={onRefresh}
-              driver={driver}
+              onCopy={onCopy}
+              filterQuery={filterQuery}
             />
           ))}
         </>

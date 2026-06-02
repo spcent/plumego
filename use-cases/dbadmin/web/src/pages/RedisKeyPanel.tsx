@@ -8,6 +8,7 @@ import WorkbenchHeader from '../components/WorkbenchHeader'
 import ConfirmDialog from '../components/ConfirmDialog'
 import { useRedisHistory } from '../hooks/useRedisHistory'
 import { XIcon } from '../components/Icons'
+import { PageShell } from '../components/workbench'
 
 interface ConfirmState {
   title: string
@@ -274,7 +275,7 @@ export default function RedisKeyPanel() {
   }
 
   return (
-    <div className="h-full flex flex-col">
+    <PageShell>
       <WorkbenchHeader
         connectionName={conn?.name}
         resourcePath={[t('redis.browser.db', { n: dbIndex })]}
@@ -729,7 +730,7 @@ export default function RedisKeyPanel() {
         onConfirm={() => confirmState?.onConfirm()}
         onCancel={() => setConfirmState(null)}
       />
-    </div>
+    </PageShell>
   )
 }
 

@@ -109,7 +109,7 @@ export default function RowDrawer({ columns, pkCols, mode, initialValues, saving
     try {
       await onSave(values)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Save failed')
+      setError(e instanceof Error ? e.message : t('data.save_failed'))
     }
   }
 
@@ -120,6 +120,9 @@ export default function RowDrawer({ columns, pkCols, mode, initialValues, saving
   const visibleCols = mode === 'insert'
     ? columns.filter(c => !(pkCols.includes(c.name) && c.auto_increment))
     : columns
+  const changedCount = mode === 'edit'
+    ? visibleCols.filter(c => isChanged(c.name, fields, initialValues)).length
+    : visibleCols.filter(c => fields[c.name]?.include).length
 
   return (
     <div className="fixed inset-0 z-50 flex">
@@ -127,10 +130,17 @@ export default function RowDrawer({ columns, pkCols, mode, initialValues, saving
       <div className="flex-1 bg-black/40" onClick={onClose} />
 
       {/* Drawer panel */}
-      <div className="flex w-96 flex-col overflow-hidden border-l" style={{ background: 'var(--bg-surface)', borderColor: 'var(--border-subtle)', boxShadow: 'var(--shadow-lg)' }}>
+      <div className="flex w-full max-w-[440px] flex-col overflow-hidden border-l" style={{ background: 'var(--bg-surface)', borderColor: 'var(--border-subtle)', boxShadow: 'var(--shadow-lg)' }}>
         {/* Header */}
         <div className="flex shrink-0 items-center justify-between border-b px-4 py-3" style={{ borderColor: 'var(--border-subtle)' }}>
-          <h2 className="text-sm font-semibold" style={{ color: 'var(--text-strong)' }}>{title}</h2>
+          <div className="min-w-0">
+            <h2 className="text-sm font-semibold" style={{ color: 'var(--text-strong)' }}>{title}</h2>
+            <div className="mt-0.5 text-xs" style={{ color: 'var(--text-muted)' }}>
+              {mode === 'edit'
+                ? t('data.drawer.changed_summary', { changed: changedCount, total: visibleCols.length })
+                : t('data.drawer.included_summary', { included: changedCount, total: visibleCols.length })}
+            </div>
+          </div>
           <button onClick={onClose} className="icon-btn" aria-label="Close">
             <XIcon className="h-4 w-4" />
           </button>
@@ -158,7 +168,8 @@ export default function RowDrawer({ columns, pkCols, mode, initialValues, saving
             return (
               <div
                 key={col.name}
-                className={`${changed ? 'border-l-2 border-amber-400 pl-2' : ''}`}
+                className="field-card"
+                data-changed={changed}
               >
                 {/* Label row */}
                 <div className="flex items-center justify-between mb-0.5">
@@ -178,7 +189,7 @@ export default function RowDrawer({ columns, pkCols, mode, initialValues, saving
                           onChange={e => setFieldProp(col.name, 'include', e.target.checked)}
                           className="rounded"
                         />
-                        include
+                        {t('data.drawer.include')}
                       </label>
                     )}
                     {/* NULL checkbox for nullable fields */}
@@ -238,7 +249,9 @@ export default function RowDrawer({ columns, pkCols, mode, initialValues, saving
                     {/* Diff hint in edit mode */}
                     {changed && initialValues && (
                       <div className="mt-0.5 truncate text-xs" style={{ color: 'var(--warning)' }}>
-                        was: {initialValues[col.name] === null ? 'NULL' : String(initialValues[col.name])}
+                        {t('data.drawer.original', {
+                          value: initialValues[col.name] === null ? 'NULL' : String(initialValues[col.name]),
+                        })}
                       </div>
                     )}
                   </>
@@ -249,16 +262,25 @@ export default function RowDrawer({ columns, pkCols, mode, initialValues, saving
         </div>
 
         {/* Footer */}
-        <div className="flex shrink-0 justify-end gap-2 border-t px-4 py-3" style={{ borderColor: 'var(--border-subtle)' }}>
-          <button
-            onClick={onClose}
-            className="btn btn-ghost"
-          >{t('data.cancel')}</button>
-          <button
-            onClick={handleSubmit}
-            disabled={saving}
-            className="btn btn-primary disabled:opacity-50"
-          >{saving ? '…' : t('data.save')}</button>
+        <div className="flex shrink-0 items-center justify-between gap-3 border-t px-4 py-3" style={{ borderColor: 'var(--border-subtle)' }}>
+          <div className="min-w-0 truncate text-xs" style={{ color: changedCount > 0 ? 'var(--warning)' : 'var(--text-subtle)' }}>
+            {mode === 'edit'
+              ? changedCount > 0
+                ? t('data.drawer.pending_changes', { n: changedCount })
+                : t('data.drawer.no_field_changes')
+              : t('data.drawer.fields_will_send', { n: changedCount })}
+          </div>
+          <div className="flex shrink-0 gap-2">
+            <button
+              onClick={onClose}
+              className="btn btn-ghost"
+            >{t('data.cancel')}</button>
+            <button
+              onClick={handleSubmit}
+              disabled={saving || (mode === 'edit' && changedCount === 0)}
+              className="btn btn-primary disabled:opacity-50"
+            >{saving ? '…' : t('data.save')}</button>
+          </div>
         </div>
       </div>
     </div>

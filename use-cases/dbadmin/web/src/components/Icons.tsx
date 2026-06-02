@@ -29,6 +29,58 @@ export function DatabaseIcon(props: IconProps) {
   )
 }
 
+export function MySQLIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <ellipse cx="12" cy="5.5" rx="6.5" ry="2.8" />
+      <path d="M5.5 5.5v5.2c0 1.5 2.9 2.8 6.5 2.8s6.5-1.3 6.5-2.8V5.5" />
+      <path d="M7.5 16.4c1.2.8 2.7 1.1 4.5 1.1 3.6 0 6.5-1.3 6.5-2.8" />
+      <path d="M15.5 13.6c1.6 1.2 3.1 2.7 4.2 4.5" />
+      <path d="M17.2 17.5h3.4v-3.4" />
+    </Icon>
+  )
+}
+
+export function SQLiteIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M6 3.8h8.1L18 7.7v12.5H6z" />
+      <path d="M14 3.8V8h4" />
+      <path d="M8.7 15.8c2.8-1.8 5.4-4.6 7.4-8.2" />
+      <path d="M9.4 11.7c.9.4 2.3.5 3.7.2" />
+    </Icon>
+  )
+}
+
+export function RedisIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="m12 4 7 3.2-7 3.2-7-3.2Z" />
+      <path d="m5 11 7 3.2 7-3.2" />
+      <path d="m5 15 7 3.2 7-3.2" />
+    </Icon>
+  )
+}
+
+export function MongoDBIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M12 21s5-5.2 5-11.1C17 5.2 12 2 12 2s-5 3.2-5 7.9C7 15.8 12 21 12 21Z" />
+      <path d="M12 8v13" />
+    </Icon>
+  )
+}
+
+export function ElasticsearchIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M8.5 4.5h6.9l4.1 7.5-4.1 7.5H8.5L4.5 12Z" />
+      <path d="M8.5 4.5 12 12l-3.5 7.5" />
+      <path d="M12 12h7.5" />
+    </Icon>
+  )
+}
+
 export function TableIcon(props: IconProps) {
   return (
     <Icon {...props}>
