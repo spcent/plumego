@@ -75,6 +75,11 @@ func (h ConnectionHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := h.Connections.Create(&c); err != nil {
+		if err == connection.ErrEncryptionRequired {
+			logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+				Type(contract.TypeValidation).Message("DBADMIN_ENCRYPTION_KEY is required to save connection credentials").Build()))
+			return
+		}
 		h.Logger.Error("create connection", plumelog.Fields{"error": err.Error()})
 		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeInternal).Message("failed to save connection").Build()))
@@ -103,6 +108,11 @@ func (h ConnectionHandler) Update(w http.ResponseWriter, r *http.Request) {
 		if err == connection.ErrNotFound {
 			logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
 				Type(contract.TypeNotFound).Message("connection not found").Build()))
+			return
+		}
+		if err == connection.ErrEncryptionRequired {
+			logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+				Type(contract.TypeValidation).Message("DBADMIN_ENCRYPTION_KEY is required to save connection credentials").Build()))
 			return
 		}
 		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().

@@ -177,3 +177,13 @@ docker compose -f docker-compose.dev.yml -p dbadmin-ci up -d --wait
 # Run tests
 docker compose -f docker-compose.dev.yml -p dbadmin-ci down -v
 ```
+
+For release readiness, prefer the scripted smoke test from `use-cases/dbadmin/`:
+
+```bash
+make release-smoke
+```
+
+The smoke test starts the datasource stack, builds the frontend, runs dbadmin
+with an explicit password and encryption key, logs in, creates MySQL, Redis,
+MongoDB, and Elasticsearch connections, and verifies each connection.

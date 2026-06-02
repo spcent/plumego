@@ -40,7 +40,7 @@ As a Plumego use-case app, dbadmin demonstrates how to build a production-scale 
 - **Dangerous Operation Detection**: Intercept DROP, DELETE, FLUSH, and other destructive commands
 - **Confirmation Dialogs**: Require explicit confirmation before executing dangerous operations
 - **Credential Redaction**: Passwords and API keys redacted in all logs and API responses
-- **Session Management**: Secure cookie-based authentication with automatic timeout
+- **Session Management**: HttpOnly cookie-based authentication with automatic timeout, login rate limiting, and same-origin checks for unsafe requests
 - **Input Validation**: SQL injection prevention and command injection protection
 - **Bounded Execution**: Configurable SQL, Redis, MongoDB, Elasticsearch, and resource-list timeouts
 - **SQL Query Cancellation**: Cancel active SQL queries from the UI when cancellation is enabled
@@ -55,9 +55,9 @@ As a Plumego use-case app, dbadmin demonstrates how to build a production-scale 
 ## Quick Start
 
 ### Prerequisites
-- Go 1.21 or later
-- Node.js 18 or later
-- npm or yarn
+- Go 1.26 or later
+- Node.js 24 or later
+- npm
 
 ### Installation
 
@@ -76,14 +76,14 @@ npm run build
 cd ..
 
 # Start the server
-go run main.go
+DBADMIN_PASSWORD=your-secure-password go run main.go
 ```
 
 Visit `http://localhost:8080`
 
-**Default credentials:** `admin` / `admin`
+**Default user:** `admin`
 
-⚠️ **Security Notice**: Change the default password in production. See [Configuration](#configuration) for details.
+⚠️ **Security Notice**: dbadmin refuses to start without `DBADMIN_PASSWORD`. The demo-only `admin/admin` credential requires `DBADMIN_ALLOW_DEFAULT_PASSWORD=true` and should never be used for real deployments.
 
 ## Development
 
@@ -124,11 +124,14 @@ The binary includes all frontend assets and can be deployed without Node.js.
 ### Using Docker
 
 ```bash
-# Build image
-docker build -t dbadmin .
+# From the repository root. The dbadmin module uses a local replace directive.
+docker build -f use-cases/dbadmin/Dockerfile -t dbadmin .
 
 # Run container
-docker run -p 8080:8080 -v ./data:/app/data dbadmin
+docker run -p 8080:8080 -v ./data:/app/data \
+  -e DBADMIN_PASSWORD=your-secure-password \
+  -e DBADMIN_ENCRYPTION_KEY=$(openssl rand -hex 32) \
+  dbadmin
 ```
 
 For development with hot reload, use Docker Compose:
@@ -148,10 +151,11 @@ For a guided multi-database demo, see [docs/demo-playbook.md](docs/demo-playbook
 | `APP_ADDR` | `127.0.0.1:8080` | Server listen address |
 | `DBADMIN_DATA_DIR` | `./data` | Directory for sessions, history, and uploads |
 | `DBADMIN_USER` | `admin` | Admin username |
-| `DBADMIN_PASSWORD` | `admin` | Admin password |
+| `DBADMIN_PASSWORD` | required | Admin password |
 | `DBADMIN_ROLE` | `admin` | Single-user role: `admin` or `readonly` |
+| `DBADMIN_ALLOW_DEFAULT_PASSWORD` | `false` | Demo-only override that permits `admin/admin` |
 | `DBADMIN_SESSION_TTL` | `24h` | Session timeout duration |
-| `DBADMIN_ENCRYPTION_KEY` | unset | 32-byte hex key for credential encryption; set this before saving passwords |
+| `DBADMIN_ENCRYPTION_KEY` | unset | 32-byte hex key for credential encryption; required before saving passwords, API keys, or Mongo URIs with embedded credentials |
 | `DBADMIN_QUERY_TIMEOUT_SECONDS` | `30` | Maximum SQL query execution time in seconds |
 | `DBADMIN_QUERY_CANCEL_ENABLED` | `true` | Enable SQL query and non-SQL operation cancellation endpoints and UI controls |
 | `DBADMIN_REDIS_COMMAND_TIMEOUT_SECONDS` | `30` | Maximum Redis command/listing time in seconds |
@@ -169,6 +173,7 @@ DBADMIN_DATA_DIR=./data
 DBADMIN_USER=admin
 DBADMIN_PASSWORD=your-secure-password
 DBADMIN_ROLE=admin
+DBADMIN_ALLOW_DEFAULT_PASSWORD=false
 DBADMIN_SESSION_TTL=24h
 DBADMIN_ENCRYPTION_KEY=your-32-byte-hex-key
 DBADMIN_QUERY_TIMEOUT_SECONDS=30
@@ -283,21 +288,21 @@ dbadmin is designed for local development and internal use. By default, it binds
 
 ### Production Deployment
 If deploying to production:
-1. **Change default credentials** - Set strong `DBADMIN_USER` and `DBADMIN_PASSWORD`
+1. **Set credentials explicitly** - Set strong `DBADMIN_USER` and `DBADMIN_PASSWORD`
 2. **Use HTTPS** - Configure TLS certificates or use a reverse proxy with SSL
-3. **Set encryption key** - Generate a secure `DBADMIN_ENCRYPTION_KEY` for credential encryption
+3. **Set encryption key** - Generate a secure `DBADMIN_ENCRYPTION_KEY` before saving connection credentials
 4. **Restrict network access** - Use firewall rules or VPN to limit access
 5. **Enable read-only mode** - For connections that don't need write access
 6. **Regular backups** - Backup the `data` directory containing sessions and history
 
 ### Security Features
-- **Credential Encryption**: Connection passwords encrypted at rest using AES-256-GCM when `DBADMIN_ENCRYPTION_KEY` is configured
+- **Credential Encryption**: Connection passwords, Elasticsearch secrets, and MongoDB URIs with embedded credentials require `DBADMIN_ENCRYPTION_KEY` and are encrypted at rest using AES-256-GCM
 - **Credential Redaction**: Passwords and API keys never logged or exposed in API responses
 - **Dangerous Operation Detection**: Destructive commands require explicit confirmation
 - **Read-only Mode**: Block all write operations per connection
 - **Session Timeout**: Automatic logout after configurable inactivity period
 - **Input Validation**: SQL injection and command injection prevention
-- **Secure Cookies**: HttpOnly, Secure, SameSite attributes on session cookies
+- **Secure Cookies**: HttpOnly and SameSite attributes on session cookies; Secure is set for HTTPS and trusted HTTPS reverse-proxy requests
 
 ## Troubleshooting
 

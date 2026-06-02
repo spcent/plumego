@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
+	"net"
 	"os"
 	"strconv"
 	"strings"
@@ -32,6 +33,8 @@ type AppConfig struct {
 	AdminPassword string
 	// AdminRole is the single-user role: admin or readonly.
 	AdminRole string
+	// AllowDefaultPassword permits the demo-only admin/admin password.
+	AllowDefaultPassword bool
 	// SessionTTL controls how long web UI sessions remain valid.
 	SessionTTL time.Duration
 	// EncryptionKey is a 32-byte hex-encoded AES-GCM key for encrypting connection passwords.
@@ -64,7 +67,7 @@ func Defaults() Config {
 			MaxUploadBytes:             512 << 20, // 512 MiB per SQLite file
 			DataDir:                    "./data",
 			AdminUser:                  "admin",
-			AdminPassword:              "admin",
+			AdminPassword:              "",
 			AdminRole:                  "admin",
 			SessionTTL:                 24 * time.Hour,
 			Version:                    "dev",
@@ -114,6 +117,12 @@ func Validate(cfg Config) error {
 	}
 	if cfg.App.AdminPassword == "" {
 		return fmt.Errorf("DBADMIN_PASSWORD is required")
+	}
+	if isPublicAddr(cfg.Core.Addr) && cfg.App.AdminPassword == "admin" {
+		return fmt.Errorf("refusing default password on non-loopback listen address")
+	}
+	if !cfg.App.AllowDefaultPassword && cfg.App.AdminUser == "admin" && cfg.App.AdminPassword == "admin" {
+		return fmt.Errorf("refusing default admin/admin credentials; set DBADMIN_PASSWORD or DBADMIN_ALLOW_DEFAULT_PASSWORD=true for disposable loopback demos")
 	}
 	if cfg.App.AdminRole != "admin" && cfg.App.AdminRole != "readonly" {
 		return fmt.Errorf("DBADMIN_ROLE must be admin or readonly")
@@ -175,6 +184,7 @@ func applyEnv(cfg *Config, lookupEnv func(string) (string, bool)) {
 	str("DBADMIN_USER", &cfg.App.AdminUser)
 	str("DBADMIN_PASSWORD", &cfg.App.AdminPassword)
 	str("DBADMIN_ROLE", &cfg.App.AdminRole)
+	boolf("DBADMIN_ALLOW_DEFAULT_PASSWORD", &cfg.App.AllowDefaultPassword)
 	durationf("DBADMIN_SESSION_TTL", &cfg.App.SessionTTL)
 	str("DBADMIN_ENCRYPTION_KEY", &cfg.App.EncryptionKey)
 	intf("DBADMIN_QUERY_TIMEOUT_SECONDS", &cfg.App.QueryTimeoutSeconds)
@@ -183,6 +193,21 @@ func applyEnv(cfg *Config, lookupEnv func(string) (string, bool)) {
 	intf("DBADMIN_MONGO_QUERY_TIMEOUT_SECONDS", &cfg.App.MongoQueryTimeoutSeconds)
 	intf("DBADMIN_ES_QUERY_TIMEOUT_SECONDS", &cfg.App.ESQueryTimeoutSeconds)
 	intf("DBADMIN_RESOURCE_LIST_TIMEOUT_SECONDS", &cfg.App.ResourceListTimeoutSeconds)
+}
+
+func isPublicAddr(addr string) bool {
+	host, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		return true
+	}
+	if host == "" {
+		return true
+	}
+	ip := net.ParseIP(host)
+	if ip == nil {
+		return host != "localhost"
+	}
+	return !ip.IsLoopback()
 }
 
 func applyEnvMap(cfg *Config, values map[string]string) {

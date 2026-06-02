@@ -32,11 +32,13 @@ const (
 )
 
 var (
-	ErrNotFound  = errors.New("connection: not found")
-	ErrDuplicate = errors.New("connection: ID already exists")
+	ErrNotFound           = errors.New("connection: not found")
+	ErrDuplicate          = errors.New("connection: ID already exists")
+	ErrEncryptionRequired = errors.New("connection: encryption key required to persist credentials")
 
-	idKeyPrefix = "conn:"
-	listKey     = "conn:__index__"
+	idKeyPrefix  = "conn:"
+	listKey      = "conn:__index__"
+	secretPrefix = "enc:"
 )
 
 // Connection is a saved database connection configuration.
@@ -171,11 +173,32 @@ func (s *Store) Get(id string) (*Connection, error) {
 		return nil, fmt.Errorf("unmarshal connection: %w", err)
 	}
 	if c.Password != "" && s.key != nil {
-		plain, err := decrypt(s.key, c.Password)
+		plain, err := s.decryptPassword(c.Password)
 		if err != nil {
 			return nil, fmt.Errorf("decrypt password: %w", err)
 		}
 		c.Password = plain
+	}
+	if c.MongoURI != "" && s.key != nil {
+		plain, err := decryptSecret(s.key, c.MongoURI)
+		if err != nil {
+			return nil, fmt.Errorf("decrypt mongo uri: %w", err)
+		}
+		c.MongoURI = plain
+	}
+	if c.ESPassword != "" && s.key != nil {
+		plain, err := decryptSecret(s.key, c.ESPassword)
+		if err != nil {
+			return nil, fmt.Errorf("decrypt elasticsearch password: %w", err)
+		}
+		c.ESPassword = plain
+	}
+	if c.ESAPIKey != "" && s.key != nil {
+		plain, err := decryptSecret(s.key, c.ESAPIKey)
+		if err != nil {
+			return nil, fmt.Errorf("decrypt elasticsearch api key: %w", err)
+		}
+		c.ESAPIKey = plain
 	}
 	return &c, nil
 }
@@ -235,11 +258,14 @@ func (s *Store) save(c *Connection, isNew bool) error {
 	if !toStore.SavePassword {
 		toStore.Password = "" // never persist when user opted out
 	} else if toStore.Password != "" && s.key != nil {
-		enc, err := encrypt(s.key, toStore.Password)
+		enc, err := encryptSecret(s.key, toStore.Password)
 		if err != nil {
 			return fmt.Errorf("encrypt password: %w", err)
 		}
 		toStore.Password = enc
+	}
+	if err := s.prepareSensitiveFields(&toStore); err != nil {
+		return err
 	}
 	data, err := json.Marshal(toStore)
 	if err != nil {
@@ -254,6 +280,69 @@ func (s *Store) save(c *Connection, isNew bool) error {
 		return s.saveIndex(ids)
 	}
 	return nil
+}
+
+func (s *Store) prepareSensitiveFields(c *Connection) error {
+	if s.key == nil {
+		if c.Password != "" || c.ESPassword != "" || c.ESAPIKey != "" || mongoURIHasPassword(c.MongoURI) {
+			return ErrEncryptionRequired
+		}
+		return nil
+	}
+	var err error
+	if c.MongoURI != "" && mongoURIHasPassword(c.MongoURI) {
+		c.MongoURI, err = encryptSecret(s.key, c.MongoURI)
+		if err != nil {
+			return fmt.Errorf("encrypt mongo uri: %w", err)
+		}
+	}
+	if c.ESPassword != "" {
+		c.ESPassword, err = encryptSecret(s.key, c.ESPassword)
+		if err != nil {
+			return fmt.Errorf("encrypt elasticsearch password: %w", err)
+		}
+	}
+	if c.ESAPIKey != "" {
+		c.ESAPIKey, err = encryptSecret(s.key, c.ESAPIKey)
+		if err != nil {
+			return fmt.Errorf("encrypt elasticsearch api key: %w", err)
+		}
+	}
+	return nil
+}
+
+func (s *Store) decryptPassword(value string) (string, error) {
+	if strings.HasPrefix(value, secretPrefix) {
+		return decryptSecret(s.key, value)
+	}
+	plain, err := decrypt(s.key, value)
+	if err == nil {
+		return plain, nil
+	}
+	return value, nil
+}
+
+func encryptSecret(key []byte, plaintext string) (string, error) {
+	enc, err := encrypt(key, plaintext)
+	if err != nil {
+		return "", err
+	}
+	return secretPrefix + enc, nil
+}
+
+func decryptSecret(key []byte, value string) (string, error) {
+	if !strings.HasPrefix(value, secretPrefix) {
+		return value, nil
+	}
+	return decrypt(key, strings.TrimPrefix(value, secretPrefix))
+}
+
+func mongoURIHasPassword(uri string) bool {
+	if uri == "" || !strings.Contains(uri, "://") {
+		return false
+	}
+	sanitized := SanitizeMongoURI(uri)
+	return sanitized != uri
 }
 
 func (s *Store) loadIndex() ([]string, error) {

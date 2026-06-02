@@ -1,8 +1,13 @@
 package handler
 
 import (
+	"crypto/sha256"
+	"crypto/subtle"
 	"encoding/json"
+	"net"
 	"net/http"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/spcent/plumego/contract"
@@ -20,6 +25,7 @@ type AuthHandler struct {
 	AdminRole     string
 	SessionTTL    time.Duration
 	Sessions      *session.Store
+	LoginLimiter  *LoginLimiter
 	Logger        plumelog.StructuredLogger
 }
 
@@ -35,6 +41,14 @@ type meResponse struct {
 
 // Login validates credentials and issues a session cookie.
 func (h AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
+	remote := clientAddr(r)
+	if h.LoginLimiter != nil && !h.LoginLimiter.Allow(remote) {
+		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+			Type(contract.TypeRateLimited).
+			Message("too many failed login attempts; try again later").
+			Build()))
+		return
+	}
 	var req loginRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
@@ -43,12 +57,18 @@ func (h AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 			Build()))
 		return
 	}
-	if req.Username != h.AdminUser || req.Password != h.AdminPassword {
+	if !secureEqual(req.Username, h.AdminUser) || !secureEqual(req.Password, h.AdminPassword) {
+		if h.LoginLimiter != nil {
+			h.LoginLimiter.RecordFailure(remote)
+		}
 		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeUnauthorized).
 			Message("invalid credentials").
 			Build()))
 		return
+	}
+	if h.LoginLimiter != nil {
+		h.LoginLimiter.Reset(remote)
 	}
 	token, err := h.Sessions.Create(req.Username)
 	if err != nil {
@@ -64,7 +84,7 @@ func (h AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		Value:    token,
 		Path:     "/",
 		HttpOnly: true,
-		Secure:   true,
+		Secure:   secureCookie(r),
 		SameSite: http.SameSiteLaxMode,
 		MaxAge:   int(h.sessionTTL().Seconds()),
 	})
@@ -98,7 +118,7 @@ func (h AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 		Value:    "",
 		Path:     "/",
 		HttpOnly: true,
-		Secure:   true,
+		Secure:   secureCookie(r),
 		MaxAge:   -1,
 	})
 	logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusOK, map[string]string{"status": "ok"}, nil))
@@ -115,4 +135,88 @@ func (h AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusOK, meResponse{User: principal.Subject, Role: h.role()}, nil))
+}
+
+func secureEqual(a, b string) bool {
+	ha := sha256.Sum256([]byte(a))
+	hb := sha256.Sum256([]byte(b))
+	return subtle.ConstantTimeCompare(ha[:], hb[:]) == 1
+}
+
+func secureCookie(r *http.Request) bool {
+	if r.TLS != nil {
+		return true
+	}
+	proto := strings.ToLower(strings.TrimSpace(r.Header.Get("X-Forwarded-Proto")))
+	return proto == "https"
+}
+
+func clientAddr(r *http.Request) string {
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err == nil && host != "" {
+		return host
+	}
+	return r.RemoteAddr
+}
+
+// LoginLimiter tracks failed login attempts per client address.
+type LoginLimiter struct {
+	mu       sync.Mutex
+	max      int
+	window   time.Duration
+	attempts map[string]loginAttempt
+}
+
+type loginAttempt struct {
+	count      int
+	firstSeen  time.Time
+	blockUntil time.Time
+}
+
+func NewLoginLimiter(max int, window time.Duration) *LoginLimiter {
+	if max <= 0 {
+		max = 5
+	}
+	if window <= 0 {
+		window = 15 * time.Minute
+	}
+	return &LoginLimiter{max: max, window: window, attempts: make(map[string]loginAttempt)}
+}
+
+func (l *LoginLimiter) Allow(key string) bool {
+	now := time.Now()
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	a, ok := l.attempts[key]
+	if !ok {
+		return true
+	}
+	if !a.blockUntil.IsZero() && now.Before(a.blockUntil) {
+		return false
+	}
+	if now.Sub(a.firstSeen) > l.window {
+		delete(l.attempts, key)
+	}
+	return true
+}
+
+func (l *LoginLimiter) RecordFailure(key string) {
+	now := time.Now()
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	a := l.attempts[key]
+	if a.firstSeen.IsZero() || now.Sub(a.firstSeen) > l.window {
+		a = loginAttempt{firstSeen: now}
+	}
+	a.count++
+	if a.count >= l.max {
+		a.blockUntil = now.Add(l.window)
+	}
+	l.attempts[key] = a
+}
+
+func (l *LoginLimiter) Reset(key string) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	delete(l.attempts, key)
 }

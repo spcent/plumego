@@ -3,6 +3,7 @@ package app
 import (
 	"io/fs"
 	"net/http"
+	"time"
 
 	midauth "github.com/spcent/plumego/middleware/auth"
 	"github.com/spcent/plumego/x/frontend"
@@ -57,6 +58,7 @@ func (a *App) RegisterRoutes() error {
 		AdminRole:     a.Cfg.App.AdminRole,
 		SessionTTL:    a.Cfg.App.SessionTTL,
 		Sessions:      a.SessionStore,
+		LoginLimiter:  handler.NewLoginLimiter(5, 15*time.Minute),
 		Logger:        a.Core.Logger(),
 	}
 
@@ -74,7 +76,8 @@ func (a *App) RegisterRoutes() error {
 	root.get("/pool-stats", http.HandlerFunc(poolStatsH.GetAllStats))
 	root.get("/pool-stats/sql", http.HandlerFunc(poolStatsH.GetSQLPoolStats))
 	root.get("/runtime-stats", http.HandlerFunc(runtimeStatsH.GetStats))
-	root.post("/api/auth/login", http.HandlerFunc(authH.Login))
+	sameOriginMw := handler.SameOriginMiddleware(a.Core.Logger())
+	root.post("/api/auth/login", sameOriginMw(http.HandlerFunc(authH.Login)))
 	if root.err != nil {
 		return root.err
 	}
@@ -167,7 +170,7 @@ func (a *App) RegisterRoutes() error {
 	// Protected routes — all require a valid session cookie.
 	roleMw := handler.RoleMiddleware(a.Cfg.App.AdminRole, a.Core.Logger())
 	auditMw := handler.AuditMiddleware(a.AuditStore, a.Core.Logger())
-	guard := func(h http.Handler) http.Handler { return authMw(auditMw(roleMw(h))) }
+	guard := func(h http.Handler) http.Handler { return sameOriginMw(authMw(auditMw(roleMw(h)))) }
 
 	protected := newRouteReg(a.Core)
 	protected.post("/api/auth/logout", guard(http.HandlerFunc(authH.Logout)))

@@ -1,4 +1,4 @@
-.PHONY: dev build test lint clean package frontend-build frontend-dev help
+.PHONY: dev build test lint clean package frontend-build frontend-dev docker-build release-smoke help
 
 # Default target
 help:
@@ -10,6 +10,8 @@ help:
 	@echo "  make test        - Run all tests (Go + frontend)"
 	@echo "  make lint        - Run linters (Go + frontend)"
 	@echo "  make package     - Create distributable package"
+	@echo "  make docker-build - Build release Docker image"
+	@echo "  make release-smoke - Run multi-datasource release smoke test"
 	@echo "  make clean       - Remove build artifacts"
 	@echo ""
 	@echo "Development:"
@@ -86,6 +88,15 @@ package: build
 	@cd dist && tar -czf ../dbadmin-$(shell date +%Y%m%d)-$(shell uname -s)-$(shell uname -m).tar.gz *
 	@rm -rf dist
 	@echo "✓ Package created: dbadmin-*.tar.gz"
+
+# Build release Docker image. Run from the repository root context because
+# dbadmin's go.mod uses replace github.com/spcent/plumego => ../..
+docker-build:
+	cd ../.. && docker build -f use-cases/dbadmin/Dockerfile -t dbadmin:local .
+
+# Run release smoke test against Docker Compose datasources.
+release-smoke:
+	bash scripts/release-smoke.sh
 
 # Frontend development server only
 frontend-dev:

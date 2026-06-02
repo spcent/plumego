@@ -94,7 +94,8 @@
 
 1. **真实数据库集成覆盖不足**
    - Redis/MongoDB/Elasticsearch 已接入 active operation registry
-   - 仍需在 Docker 多数据源环境补充端到端取消验证
+   - 已新增 `make release-smoke` 覆盖 Docker 多数据源连接 smoke
+   - 仍需补充端到端取消验证和导入导出深度验证
 
 2. **大数据完整内容访问不完整**
    - BLOB/TEXT/JSON 预览已有限制
@@ -154,6 +155,8 @@
 - [x] 统一 Redis/MongoDB/Elasticsearch 超时配置
 - [x] 添加 BLOB/TEXT/JSON 预览大小限制
 - [x] 完善连接生命周期管理
+- [x] 对外发布默认安全：显式密码、登录限速、Same-Origin 写请求防护
+- [x] 对外发布工件：Dockerfile、npm lockfile 单一来源、release smoke 脚本
 
 ### 优先级 P1（体验优化）
 - [ ] 统一错误码和错误展示
@@ -181,3 +184,5 @@
 - [ ] 超时机制正常工作
 - [ ] 错误信息不泄露敏感信息
 - [ ] 前端错误展示一致
+- [ ] `make release-smoke` 在 Docker 多数据源环境通过
+- [ ] 非 loopback 暴露前确认已配置强密码、TLS/反代和 `DBADMIN_ENCRYPTION_KEY`

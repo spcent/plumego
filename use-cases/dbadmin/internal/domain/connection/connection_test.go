@@ -1,7 +1,12 @@
 package connection
 
 import (
+	"encoding/json"
+	"errors"
+	"strings"
 	"testing"
+
+	kvstore "github.com/spcent/plumego/store/kv"
 )
 
 func TestSanitizeMongoURI(t *testing.T) {
@@ -165,4 +170,80 @@ func TestConnection_Redact(t *testing.T) {
 			t.Errorf("MongoURI should be empty")
 		}
 	})
+}
+
+func TestStoreRejectsPersistentCredentialsWithoutEncryptionKey(t *testing.T) {
+	kv, err := kvstore.NewKVStore(kvstore.Options{DataDir: t.TempDir()})
+	if err != nil {
+		t.Fatalf("NewKVStore: %v", err)
+	}
+	store, err := NewStore(kv, "")
+	if err != nil {
+		t.Fatalf("NewStore: %v", err)
+	}
+	err = store.Create(&Connection{
+		Name:         "mysql",
+		Driver:       DriverMySQL,
+		Host:         "localhost",
+		Port:         3306,
+		Username:     "root",
+		Password:     "secret",
+		SavePassword: true,
+	})
+	if !errors.Is(err, ErrEncryptionRequired) {
+		t.Fatalf("Create error = %v, want ErrEncryptionRequired", err)
+	}
+}
+
+func TestStoreEncryptsAndDecryptsDatasourceCredentials(t *testing.T) {
+	kv, err := kvstore.NewKVStore(kvstore.Options{DataDir: t.TempDir()})
+	if err != nil {
+		t.Fatalf("NewKVStore: %v", err)
+	}
+	store, err := NewStore(kv, strings.Repeat("1", 64))
+	if err != nil {
+		t.Fatalf("NewStore: %v", err)
+	}
+	conn := &Connection{
+		Name:       "mongo",
+		Driver:     DriverMongoDB,
+		MongoURI:   "mongodb://user:pass@localhost:27017",
+		Readonly:   true,
+		ESPassword: "es-pass",
+		ESAPIKey:   "api-key",
+	}
+	if err := store.Create(conn); err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+
+	raw, err := kv.Get(idKeyPrefix + conn.ID)
+	if err != nil {
+		t.Fatalf("raw get: %v", err)
+	}
+	var stored Connection
+	if err := json.Unmarshal(raw, &stored); err != nil {
+		t.Fatalf("unmarshal raw connection: %v", err)
+	}
+	for name, value := range map[string]string{
+		"mongo_uri":   stored.MongoURI,
+		"es_password": stored.ESPassword,
+		"es_api_key":  stored.ESAPIKey,
+	} {
+		for _, secret := range []string{"user:pass", "es-pass", "api-key"} {
+			if strings.Contains(value, secret) {
+				t.Fatalf("stored %s contains secret %q: %s", name, secret, value)
+			}
+		}
+	}
+
+	got, err := store.Get(conn.ID)
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	if got.MongoURI != "mongodb://user:pass@localhost:27017" {
+		t.Fatalf("MongoURI = %q, want original", got.MongoURI)
+	}
+	if got.ESPassword != "es-pass" || got.ESAPIKey != "api-key" {
+		t.Fatalf("ES credentials not decrypted: password=%q apiKey=%q", got.ESPassword, got.ESAPIKey)
+	}
 }
