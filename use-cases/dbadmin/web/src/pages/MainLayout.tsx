@@ -4,6 +4,7 @@ import { api, type Connection } from '../api'
 import { useTheme } from '../theme'
 import { useI18n } from '../i18nContext'
 import ResourceExplorer from '../components/ResourceExplorer'
+import RecentResources from '../components/RecentResources'
 import { DatabaseIcon, LogoutIcon, MoonIcon, SettingsIcon, SunIcon } from '../components/Icons'
 import { ConnectionsCtx } from '../context/connections'
 
@@ -113,6 +114,8 @@ export default function MainLayout() {
             <SettingsIcon className="h-4 w-4" />
           </Link>
         </div>
+
+        <RecentResources connections={connections} />
 
         {/* Resource Explorer — data-source-aware tree, replaces DatabaseTree */}
         <ResourceExplorer connections={connections} onRefresh={refreshConnections} />

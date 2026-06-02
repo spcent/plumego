@@ -655,7 +655,7 @@ const en: Dict = {
   'resource.error': 'Failed to load resources',
   'resource.retry': 'Retry',
   'resource.refresh': 'Refresh',
-  'resource.search_placeholder': 'Search connections and loaded resources',
+  'resource.search_placeholder': 'Search resources',
   'resource.clear_search': 'Clear search',
   'resource.no_matches': 'No matching resources',
   'resource.open_console': 'Open SQL Console',
@@ -668,6 +668,13 @@ const en: Dict = {
   'resource.manage_connection': 'Manage Connection',
   'resource.tables': 'Tables',
   'resource.collections': 'Collections',
+
+  // Recent resources
+  'recent.title': 'Recent',
+  'recent.clear': 'Clear recent resources',
+  'recent.redis_key': 'Redis Key',
+  'recent.es_alias': 'Alias',
+  'recent.es_data_stream': 'Data Stream',
 }
 
 const zh: Dict = {
@@ -1322,7 +1329,7 @@ const zh: Dict = {
   'resource.error': '加载资源失败',
   'resource.retry': '重试',
   'resource.refresh': '刷新',
-  'resource.search_placeholder': '搜索连接和已加载资源',
+  'resource.search_placeholder': '搜索资源',
   'resource.clear_search': '清空搜索',
   'resource.no_matches': '没有匹配的资源',
   'resource.open_console': '打开 SQL 控制台',
@@ -1335,6 +1342,13 @@ const zh: Dict = {
   'resource.manage_connection': '管理连接',
   'resource.tables': '表',
   'resource.collections': '集合',
+
+  // Recent resources
+  'recent.title': '最近访问',
+  'recent.clear': '清空最近访问',
+  'recent.redis_key': 'Redis Key',
+  'recent.es_alias': '别名',
+  'recent.es_data_stream': '数据流',
 }
 
 const dicts: Record<Locale, Dict> = { en, zh }
