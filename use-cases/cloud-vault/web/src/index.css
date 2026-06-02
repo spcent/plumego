@@ -6,6 +6,7 @@
   :root {
     --background: 210 20% 98%;
     --surface: 0 0% 100%;
+    --surface-raised: 0 0% 100%;
     --foreground: 220 24% 9%;
     --muted: 210 18% 93%;
     --muted-foreground: 216 10% 42%;
@@ -24,6 +25,7 @@
   .dark {
     --background: 220 22% 9%;
     --surface: 220 18% 12%;
+    --surface-raised: 220 16% 15%;
     --foreground: 210 24% 96%;
     --muted: 220 15% 18%;
     --muted-foreground: 216 12% 66%;
@@ -47,6 +49,11 @@
     @apply bg-background text-foreground;
     font-family: ui-sans-serif, 'Avenir Next', 'SF Pro Text', 'Segoe UI', Roboto, sans-serif;
     letter-spacing: 0;
+    text-rendering: optimizeLegibility;
+  }
+
+  ::selection {
+    background: hsl(var(--primary) / 0.22);
   }
 
   select {
@@ -120,6 +127,21 @@
 .dark .text-red-700,
 .dark .text-red-800 {
   color: rgb(252 165 165);
+}
+
+.dark .text-orange-700,
+.dark .text-purple-700 {
+  color: hsl(var(--primary));
+}
+
+.dark .bg-orange-100,
+.dark .bg-purple-100 {
+  background-color: hsl(var(--muted));
+}
+
+.dark .hover\:bg-green-200:hover,
+.dark .hover\:bg-blue-200:hover {
+  background-color: hsl(var(--accent));
 }
 
 /* CodeMirror overrides */

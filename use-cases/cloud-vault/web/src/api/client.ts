@@ -17,6 +17,13 @@ export class APIResponseError extends Error {
 // Prevent multiple simultaneous redirects
 let isRedirecting = false
 
+function shouldRedirectToLogin(path: string, status: number) {
+  if (status !== 401) return false
+  if (path.startsWith('/api/v1/auth/')) return false
+  if (window.location.pathname === '/login' || window.location.pathname === '/setup') return false
+  return !isRedirecting
+}
+
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(path, {
     headers: { 'Content-Type': 'application/json', ...options?.headers },
@@ -26,13 +33,8 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const body = await res.json().catch(() => null)
 
   if (!res.ok) {
-    // Handle 401 Unauthorized - redirect to login (except for auth endpoints)
-    if (
-      res.status === 401 &&
-      !path.includes('/api/v1/auth/login') &&
-      !path.includes('/api/v1/auth/setup') &&
-      !isRedirecting
-    ) {
+    // Handle 401 Unauthorized for protected API calls only.
+    if (shouldRedirectToLogin(path, res.status)) {
       isRedirecting = true
       window.location.href = '/login'
       // Delay error throw to allow redirect to complete

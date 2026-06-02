@@ -5,7 +5,7 @@ A local-first Markdown knowledge vault for your AI-generated notes.
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Version](https://img.shields.io/badge/version-1.0.0-green.svg)](docs/release-notes.md)
 
-[Download Desktop App](https://example.com/download) | [Deploy Server](docs/server-deploy.md) | [Documentation](docs/)
+[Download Desktop App](https://vault.birdor.com/download) | [Deploy Server](docs/server-deploy.md) | [Documentation](docs/)
 
 ---
 
@@ -24,10 +24,10 @@ A local-first Markdown knowledge vault for your AI-generated notes.
 ### Desktop App
 
 1. Download the installer for your platform:
-   - [macOS (Apple Silicon)](https://example.com/downloads/Cloud-Vault-v1.0.0-macOS-arm64.dmg)
-   - [macOS (Intel)](https://example.com/downloads/Cloud-Vault-v1.0.0-macOS-amd64.dmg)
-   - [Windows](https://example.com/downloads/Cloud-Vault-v1.0.0-windows-amd64.exe)
-   - [Linux](https://example.com/downloads/Cloud-Vault-v1.0.0-linux-amd64.AppImage)
+   - [macOS (Apple Silicon)](https://vault.birdor.com/downloads/Cloud-Vault-v1.0.0-macOS-arm64.dmg)
+   - [macOS (Intel)](https://vault.birdor.com/downloads/Cloud-Vault-v1.0.0-macOS-amd64.dmg)
+   - [Windows](https://vault.birdor.com/downloads/Cloud-Vault-v1.0.0-windows-amd64.exe)
+   - [Linux](https://vault.birdor.com/downloads/Cloud-Vault-v1.0.0-linux-amd64.AppImage)
 
 2. Install and launch the application
 3. On first run, create an admin account
@@ -40,7 +40,7 @@ See [Desktop Guide](docs/desktop.md) for detailed instructions.
 
 1. Download the server binary:
    ```bash
-   curl -L -o cloud-vault https://example.com/downloads/cloud-vault-v1.0.0-linux-amd64
+   curl -L -o cloud-vault https://vault.birdor.com/downloads/cloud-vault-v1.0.0-linux-amd64
    chmod +x cloud-vault
    ```
 
@@ -1004,7 +1004,7 @@ bootstrap_admin_enabled = false      # Set to true for automated setup
 
 [auth.bootstrap_admin]
 username = "admin"
-email = "admin@example.com"
+email = "admin@vault.birdor.com"
 password = "Change-Me-Strong-Password-123"
 ```
 
@@ -1028,7 +1028,7 @@ Bootstrap admin settings:
 ```bash
 AUTH_BOOTSTRAP_ADMIN_ENABLED=true
 AUTH_BOOTSTRAP_ADMIN_USERNAME=admin
-AUTH_BOOTSTRAP_ADMIN_EMAIL=admin@example.com
+AUTH_BOOTSTRAP_ADMIN_EMAIL=admin@vault.birdor.com
 AUTH_BOOTSTRAP_ADMIN_PASSWORD=Change-Me-Strong-Password-123
 ```
 
@@ -1047,7 +1047,7 @@ Request:
 ```json
 {
   "username": "admin",
-  "email": "admin@example.com",
+  "email": "admin@vault.birdor.com",
   "password": "StrongPassword123"
 }
 ```
@@ -1107,7 +1107,7 @@ Request:
 ```json
 {
   "display_name": "Admin User",
-  "email": "admin@example.com",
+  "email": "admin@vault.birdor.com",
   "locale": "en-US",
   "theme": "dark"
 }
@@ -1349,7 +1349,7 @@ bootstrap_admin_enabled = true
 
 [auth.bootstrap_admin]
 username = "admin"
-email = "admin@example.com"
+email = "admin@vault.birdor.com"
 password = "Change-Me-Strong-Password-123"
 ```
 

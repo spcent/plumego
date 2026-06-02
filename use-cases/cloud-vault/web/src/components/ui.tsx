@@ -1,5 +1,5 @@
 import { forwardRef } from 'react'
-import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAttributes } from 'react'
+import type { ButtonHTMLAttributes, HTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes } from 'react'
 import { clsx } from 'clsx'
 import { twMerge } from 'tailwind-merge'
 import { Icon, type IconName } from './icons'
@@ -9,7 +9,7 @@ export function cn(...inputs: Parameters<typeof clsx>) {
 }
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'secondary' | 'ghost' | 'danger'
+  variant?: 'primary' | 'secondary' | 'ghost' | 'danger' | 'quiet'
   size?: 'sm' | 'md'
   icon?: IconName
 }
@@ -30,8 +30,9 @@ export function Button({
         'inline-flex shrink-0 items-center justify-center gap-2 rounded-md font-medium transition-[background-color,border-color,color,transform,opacity] duration-150 active:translate-y-px disabled:pointer-events-none disabled:opacity-45',
         size === 'sm' ? 'h-8 px-2.5 text-xs' : 'h-9 px-3 text-sm',
         variant === 'primary' && 'border border-primary bg-primary text-primary-foreground hover:bg-primary/90',
-        variant === 'secondary' && 'border border-border bg-surface text-foreground hover:bg-accent',
+        variant === 'secondary' && 'border border-border bg-surface text-foreground shadow-sm shadow-slate-950/5 hover:bg-accent dark:shadow-none',
         variant === 'ghost' && 'border border-transparent text-muted-foreground hover:bg-accent hover:text-foreground',
+        variant === 'quiet' && 'border border-transparent text-foreground hover:bg-accent',
         variant === 'danger' && 'border border-destructive/25 bg-destructive/10 text-destructive hover:bg-destructive/15',
         className,
       )}
@@ -116,6 +117,180 @@ export function SelectInput({ className, ...props }: SelectHTMLAttributes<HTMLSe
       )}
       {...props}
     />
+  )
+}
+
+export const TextareaInput = forwardRef<HTMLTextAreaElement, TextareaHTMLAttributes<HTMLTextAreaElement>>(function TextareaInput({ className, ...props }, ref) {
+  return (
+    <textarea
+      ref={ref}
+      className={cn(
+        'min-h-24 w-full rounded-md border border-input bg-surface px-3 py-2 text-sm leading-5 text-foreground outline-none transition-[border-color,box-shadow] placeholder:text-muted-foreground focus:border-primary/60 focus:ring-2 focus:ring-primary/10',
+        className,
+      )}
+      {...props}
+    />
+  )
+})
+
+interface PageFrameProps {
+  title: string
+  description?: string
+  action?: ReactNode
+  children: ReactNode
+  width?: 'normal' | 'wide' | 'full'
+  className?: string
+}
+
+export function PageFrame({ title, description, action, children, width = 'normal', className }: PageFrameProps) {
+  return (
+    <div className="h-full overflow-y-auto bg-background">
+      <div
+        className={cn(
+          'mx-auto px-4 py-6 md:px-6 md:py-7',
+          width === 'normal' && 'max-w-4xl',
+          width === 'wide' && 'max-w-6xl',
+          width === 'full' && 'max-w-none',
+          className,
+        )}
+      >
+        <PageTitle title={title} description={description} action={action} />
+        <div className="mt-5 space-y-5">{children}</div>
+      </div>
+    </div>
+  )
+}
+
+export function PageTitle({ title, description, action }: { title: string; description?: string; action?: ReactNode }) {
+  return (
+    <div className="flex min-h-10 items-start justify-between gap-4">
+      <div className="min-w-0">
+        <h1 className="truncate text-xl font-semibold tracking-tight text-foreground md:text-2xl">{title}</h1>
+        {description && <p className="mt-1 max-w-2xl text-sm leading-5 text-muted-foreground">{description}</p>}
+      </div>
+      {action && <div className="flex shrink-0 items-center gap-2">{action}</div>}
+    </div>
+  )
+}
+
+interface PanelProps extends HTMLAttributes<HTMLElement> {
+  title?: string
+  description?: string
+  action?: ReactNode
+  children: ReactNode
+}
+
+export function Panel({ title, description, action, children, className, ...props }: PanelProps) {
+  return (
+    <section
+      className={cn(
+        'overflow-hidden rounded-lg border border-border bg-surface shadow-sm shadow-slate-950/5 dark:shadow-none',
+        className,
+      )}
+      {...props}
+    >
+      {(title || description || action) && (
+        <div className="flex items-start justify-between gap-3 border-b border-border px-4 py-3">
+          <div className="min-w-0">
+            {title && <h2 className="truncate text-sm font-semibold text-foreground">{title}</h2>}
+            {description && <p className="mt-0.5 text-xs leading-5 text-muted-foreground">{description}</p>}
+          </div>
+          {action && <div className="flex shrink-0 items-center gap-2">{action}</div>}
+        </div>
+      )}
+      {children}
+    </section>
+  )
+}
+
+export function Field({ label, helper, error, children }: { label: string; helper?: string; error?: string; children: ReactNode }) {
+  return (
+    <label className="block">
+      <span className="mb-1.5 block text-sm font-medium text-foreground">{label}</span>
+      {children}
+      {helper && !error && <span className="mt-1.5 block text-xs text-muted-foreground">{helper}</span>}
+      {error && <span className="mt-1.5 block text-xs text-destructive">{error}</span>}
+    </label>
+  )
+}
+
+export function StatusBanner({ tone = 'neutral', children }: { tone?: 'neutral' | 'success' | 'warning' | 'danger'; children: ReactNode }) {
+  return (
+    <div
+      className={cn(
+        'rounded-md border px-3 py-2 text-sm leading-5',
+        tone === 'neutral' && 'border-border bg-surface text-muted-foreground',
+        tone === 'success' && 'border-emerald-500/25 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300',
+        tone === 'warning' && 'border-amber-500/25 bg-amber-500/10 text-amber-700 dark:text-amber-300',
+        tone === 'danger' && 'border-destructive/25 bg-destructive/10 text-destructive',
+      )}
+    >
+      {children}
+    </div>
+  )
+}
+
+export function MetricCard({ label, value, tone = 'neutral' }: { label: string; value: ReactNode; tone?: BadgeProps['tone'] }) {
+  return (
+    <div className="rounded-lg border border-border bg-background/45 px-4 py-3">
+      <div
+        className={cn(
+          'font-mono text-2xl font-semibold tracking-tight',
+          tone === 'success' && 'text-emerald-600 dark:text-emerald-300',
+          tone === 'warning' && 'text-amber-600 dark:text-amber-300',
+          tone === 'danger' && 'text-destructive',
+          tone === 'accent' && 'text-primary',
+          tone === 'neutral' && 'text-foreground',
+        )}
+      >
+        {value}
+      </div>
+      <div className="mt-1 text-xs text-muted-foreground">{label}</div>
+    </div>
+  )
+}
+
+export function ProgressLine({ value, label }: { value: number; label?: ReactNode }) {
+  const pct = Math.max(0, Math.min(100, value))
+  return (
+    <div>
+      {label && <div className="mb-1.5 text-xs text-muted-foreground">{label}</div>}
+      <div className="h-2 overflow-hidden rounded-full bg-muted">
+        <div className="h-full rounded-full bg-primary transition-[width] duration-500" style={{ width: `${pct}%` }} />
+      </div>
+    </div>
+  )
+}
+
+export function SegmentedControl<T extends string>({
+  options,
+  value,
+  onChange,
+  className,
+}: {
+  options: ReadonlyArray<{ value: T; label: string }>
+  value: T
+  onChange: (value: T) => void
+  className?: string
+}) {
+  return (
+    <div className={cn('flex flex-wrap gap-1 rounded-lg border border-border bg-surface p-1', className)}>
+      {options.map(option => (
+        <button
+          key={option.value}
+          type="button"
+          onClick={() => onChange(option.value)}
+          className={cn(
+            'h-7 rounded-md px-2.5 text-xs font-medium transition-[background-color,color,transform] active:translate-y-px',
+            value === option.value
+              ? 'bg-primary text-primary-foreground'
+              : 'text-muted-foreground hover:bg-accent hover:text-foreground',
+          )}
+        >
+          {option.label}
+        </button>
+      ))}
+    </div>
   )
 }
 

@@ -11,6 +11,7 @@ export default {
         border: 'hsl(var(--border))',
         background: 'hsl(var(--background))',
         surface: 'hsl(var(--surface))',
+        raised: 'hsl(var(--surface-raised))',
         foreground: 'hsl(var(--foreground))',
         muted: {
           DEFAULT: 'hsl(var(--muted))',

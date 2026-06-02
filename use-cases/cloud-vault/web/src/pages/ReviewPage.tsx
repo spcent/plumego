@@ -1,22 +1,31 @@
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import {
-  getReviewQueue,
   acceptTagSuggestion,
-  rejectTagSuggestion,
-  ignoreSimilarity,
   confirmSimilarity,
+  getReviewQueue,
+  ignoreSimilarity,
+  rejectTagSuggestion,
   runAll,
   type ReviewItem,
 } from '../api/organize'
+import { Badge, Button, EmptyState, PageFrame, Panel, SegmentedControl, SkeletonRows, StatusBanner } from '../components/ui'
 
 const REVIEW_TYPES = [
-  { key: '', label: 'All' },
-  { key: 'duplicates', label: 'Duplicates' },
-  { key: 'similar', label: 'Similar' },
-  { key: 'tag_suggestions', label: 'Tag Suggestions' },
-  { key: 'prompt_candidates', label: 'Prompt Candidates' },
-  { key: 'low_quality', label: 'Low Quality' },
-]
+  { value: '', label: 'All' },
+  { value: 'duplicates', label: 'Duplicates' },
+  { value: 'similar', label: 'Similar' },
+  { value: 'tag_suggestions', label: 'Tags' },
+  { value: 'prompt_candidates', label: 'Prompts' },
+  { value: 'low_quality', label: 'Quality' },
+] as const
+
+function typeTone(type: string): 'neutral' | 'accent' | 'success' | 'warning' | 'danger' {
+  if (type === 'duplicate') return 'danger'
+  if (type === 'similar') return 'accent'
+  if (type === 'tag_suggestion') return 'success'
+  if (type === 'low_quality') return 'warning'
+  return 'neutral'
+}
 
 export default function ReviewPage() {
   const [activeType, setActiveType] = useState('')
@@ -37,8 +46,8 @@ export default function ReviewPage() {
       const result = await getReviewQueue({ type: activeType || undefined, limit: 100 })
       setItems(result.items ?? [])
       setTotal(result.total)
-    } catch (e: any) {
-      setError(e.message)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to load review queue')
     } finally {
       setLoading(false)
     }
@@ -50,8 +59,8 @@ export default function ReviewPage() {
     try {
       await runAll()
       await loadQueue()
-    } catch (e: any) {
-      setError(e.message)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to run analyzers')
     } finally {
       setRunning(false)
     }
@@ -67,158 +76,76 @@ export default function ReviewPage() {
         if (action === 'ignore') await ignoreSimilarity(item.extra.similarity_id)
         else if (action === 'confirm') await confirmSimilarity(item.extra.similarity_id)
       }
-      setItems(prev => prev.filter(i => i !== item))
+      setItems(prev => prev.filter(queueItem => queueItem !== item))
       setTotal(t => Math.max(0, t - 1))
-    } catch (e: any) {
-      setError(e.message)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to update review item')
     }
   }
 
   return (
-    <div className="h-full flex flex-col overflow-hidden">
-      <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
-        <div>
-          <h1 className="text-sm font-semibold">Review Queue</h1>
-          <p className="text-xs text-muted-foreground mt-0.5">{total} item{total !== 1 ? 's' : ''}</p>
-        </div>
-        <button
-          onClick={handleRunAll}
-          disabled={running}
-          className="text-xs px-3 py-1.5 rounded bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-        >
-          {running ? 'Running…' : 'Run All Analyzers'}
-        </button>
-      </div>
-
-      {/* Type filter */}
-      <div className="flex gap-1 px-4 py-2 border-b border-border overflow-x-auto shrink-0">
-        {REVIEW_TYPES.map(t => (
-          <button
-            key={t.key}
-            onClick={() => setActiveType(t.key)}
-            className={`text-xs px-3 py-1 rounded whitespace-nowrap ${
-              activeType === t.key
-                ? 'bg-primary text-primary-foreground'
-                : 'border border-border hover:bg-muted'
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
-
-      {error && (
-        <div className="mx-4 mt-3 text-xs text-destructive border border-destructive/30 rounded px-3 py-2">
-          {error}
-        </div>
-      )}
-
-      <div className="flex-1 overflow-y-auto p-4 space-y-2">
-        {loading && <p className="text-xs text-muted-foreground">Loading…</p>}
+    <PageFrame
+      title="Review Queue"
+      description={`${total.toLocaleString()} item${total === 1 ? '' : 's'} waiting for curation or confirmation.`}
+      action={<Button variant="primary" size="sm" icon="check" onClick={handleRunAll} disabled={running}>{running ? 'Running...' : 'Run Analyzers'}</Button>}
+      width="wide"
+    >
+      {error && <StatusBanner tone="danger">{error}</StatusBanner>}
+      <SegmentedControl options={REVIEW_TYPES} value={activeType} onChange={setActiveType} />
+      <Panel>
+        {loading && <SkeletonRows count={8} />}
         {!loading && items.length === 0 && (
-          <p className="text-xs text-muted-foreground">
-            No items in this queue. Run analyzers first.
-          </p>
+          <EmptyState compact icon="check" title="Nothing to review" description="Run analyzers to populate this queue." />
         )}
+        {!loading && items.length > 0 && (
+          <div className="divide-y divide-border">
+            {items.map((item, index) => (
+              <ReviewItemCard key={index} item={item} onAction={action => handleAction(item, action)} />
+            ))}
+          </div>
+        )}
+      </Panel>
+    </PageFrame>
+  )
+}
 
-        {items.map((item, i) => (
-          <ReviewItemCard key={i} item={item} onAction={action => handleAction(item, action)} />
-        ))}
+function ReviewItemCard({ item, onAction }: { item: ReviewItem; onAction: (action: string) => void }) {
+  return (
+    <div className="flex items-start gap-3 px-4 py-3">
+      <Badge tone={typeTone(item.type)}>{item.type.replace('_', ' ')}</Badge>
+      <div className="min-w-0 flex-1">
+        <div className="truncate text-sm font-medium text-foreground">{item.title}</div>
+        {item.type === 'tag_suggestion' && item.extra?.tag_name && (
+          <div className="text-xs text-muted-foreground">Suggested tag: <span className="font-medium text-foreground">{item.extra.tag_name}</span> · confidence {formatScore(item.score)}%</div>
+        )}
+        {item.type === 'similar' && item.extra?.other_title && (
+          <div className="truncate text-xs text-muted-foreground">Similar to: {item.extra.other_title} · {formatScore(item.score, 100)}%</div>
+        )}
+        {item.type === 'prompt_candidate' && <div className="text-xs text-muted-foreground">Prompt score: {formatScore(item.score)}</div>}
+        {item.type === 'low_quality' && <div className="text-xs text-muted-foreground">Quality score: {formatScore(item.score)}</div>}
+        {item.type === 'duplicate' && item.extra?.count && (
+          <div className="text-xs text-muted-foreground">{item.extra.count} copies with hash {item.extra.content_hash?.slice(0, 8)}...</div>
+        )}
+      </div>
+      <div className="flex shrink-0 gap-2">
+        {item.type === 'tag_suggestion' && (
+          <>
+            <Button size="sm" variant="secondary" onClick={() => onAction('accept')}>Accept</Button>
+            <Button size="sm" variant="ghost" onClick={() => onAction('reject')}>Reject</Button>
+          </>
+        )}
+        {item.type === 'similar' && (
+          <>
+            <Button size="sm" variant="secondary" onClick={() => onAction('confirm')}>Confirm</Button>
+            <Button size="sm" variant="ghost" onClick={() => onAction('ignore')}>Ignore</Button>
+          </>
+        )}
       </div>
     </div>
   )
 }
 
-function ReviewItemCard({
-  item,
-  onAction,
-}: {
-  item: ReviewItem
-  onAction: (action: string) => void
-}) {
-  const typeBadgeClass: Record<string, string> = {
-    duplicate: 'bg-red-100 text-red-700',
-    similar: 'bg-orange-100 text-orange-700',
-    tag_suggestion: 'bg-blue-100 text-blue-700',
-    prompt_candidate: 'bg-purple-100 text-purple-700',
-    low_quality: 'bg-yellow-100 text-yellow-700',
-  }
-
-  return (
-    <div className="border border-border rounded-lg px-3 py-2.5">
-      <div className="flex items-start gap-2">
-        <span
-          className={`text-xs px-1.5 py-0.5 rounded shrink-0 ${
-            typeBadgeClass[item.type] ?? 'bg-muted text-muted-foreground'
-          }`}
-        >
-          {item.type.replace('_', ' ')}
-        </span>
-        <div className="flex-1 min-w-0">
-          <p className="text-xs font-medium truncate">{item.title}</p>
-          {item.type === 'tag_suggestion' && item.extra?.tag_name && (
-            <p className="text-xs text-muted-foreground">
-              Suggested tag: <strong>{item.extra.tag_name}</strong> · confidence:{' '}
-              {Math.round(item.score)}%
-            </p>
-          )}
-          {item.type === 'similar' && item.extra?.other_title && (
-            <p className="text-xs text-muted-foreground truncate">
-              Similar to: {item.extra.other_title} ({item.extra.similarity_type?.replace('_', ' ')}{' '}
-              · {Math.round(item.score * 100)}%)
-            </p>
-          )}
-          {item.type === 'prompt_candidate' && (
-            <p className="text-xs text-muted-foreground">
-              Prompt score: {Math.round(item.score)}
-            </p>
-          )}
-          {item.type === 'low_quality' && (
-            <p className="text-xs text-muted-foreground">
-              Quality score: {Math.round(item.score)}
-            </p>
-          )}
-          {item.type === 'duplicate' && item.extra?.count && (
-            <p className="text-xs text-muted-foreground">
-              {item.extra.count} copies with hash {item.extra.content_hash?.slice(0, 8)}…
-            </p>
-          )}
-        </div>
-        <div className="flex gap-1.5 shrink-0">
-          {item.type === 'tag_suggestion' && (
-            <>
-              <button
-                onClick={() => onAction('accept')}
-                className="text-xs px-2 py-1 rounded bg-green-100 text-green-700 hover:bg-green-200"
-              >
-                Accept
-              </button>
-              <button
-                onClick={() => onAction('reject')}
-                className="text-xs px-2 py-1 rounded border border-border hover:bg-muted text-muted-foreground"
-              >
-                Reject
-              </button>
-            </>
-          )}
-          {item.type === 'similar' && (
-            <>
-              <button
-                onClick={() => onAction('confirm')}
-                className="text-xs px-2 py-1 rounded bg-blue-100 text-blue-700 hover:bg-blue-200"
-              >
-                Confirm
-              </button>
-              <button
-                onClick={() => onAction('ignore')}
-                className="text-xs px-2 py-1 rounded border border-border hover:bg-muted text-muted-foreground"
-              >
-                Ignore
-              </button>
-            </>
-          )}
-        </div>
-      </div>
-    </div>
-  )
+function formatScore(score: number | undefined, multiplier = 1) {
+  if (typeof score !== 'number' || Number.isNaN(score)) return '—'
+  return Math.round(score * multiplier).toLocaleString()
 }

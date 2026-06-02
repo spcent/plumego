@@ -1,9 +1,15 @@
-import { useState, useEffect } from 'react'
-import {
-  listPrompts,
-  deletePrompt,
-  type AIPrompt,
-} from '../api/ai'
+import { useEffect, useState } from 'react'
+import { deletePrompt, listPrompts, type AIPrompt } from '../api/ai'
+import { Badge, Button, EmptyState, PageFrame, Panel, SegmentedControl, SkeletonRows, StatusBanner } from '../components/ui'
+
+const SCENARIOS = [
+  { value: '', label: 'All' },
+  { value: 'summarization', label: 'Summary' },
+  { value: 'code_review', label: 'Code review' },
+  { value: 'qa', label: 'Q&A' },
+  { value: 'writing', label: 'Writing' },
+  { value: 'analysis', label: 'Analysis' },
+] as const
 
 export default function PromptsPage() {
   const [prompts, setPrompts] = useState<AIPrompt[]>([])
@@ -13,7 +19,9 @@ export default function PromptsPage() {
   const [error, setError] = useState('')
   const [selected, setSelected] = useState<AIPrompt | null>(null)
 
-  useEffect(() => { loadPrompts() }, [scenario])
+  useEffect(() => {
+    loadPrompts()
+  }, [scenario])
 
   async function loadPrompts() {
     setLoading(true)
@@ -22,8 +30,8 @@ export default function PromptsPage() {
       const data = await listPrompts(scenario || undefined, 50, 0)
       setPrompts(data.items ?? [])
       setTotal(data.total)
-    } catch (e: any) {
-      setError(e.message)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to load prompts')
     } finally {
       setLoading(false)
     }
@@ -35,10 +43,10 @@ export default function PromptsPage() {
     try {
       await deletePrompt(id)
       setPrompts(prev => prev.filter(p => p.id !== id))
-      setTotal(t => t - 1)
+      setTotal(t => Math.max(0, t - 1))
       if (selected?.id === id) setSelected(null)
-    } catch (e: any) {
-      setError(e.message)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to delete prompt')
     }
   }
 
@@ -48,141 +56,84 @@ export default function PromptsPage() {
 
   if (selected) {
     return (
-      <div className="h-full flex flex-col overflow-hidden">
-        <div className="flex items-center gap-2 px-4 py-3 border-b border-border shrink-0">
-          <button
-            onClick={() => setSelected(null)}
-            className="text-xs text-muted-foreground hover:text-foreground"
-          >
-            ← Prompts
-          </button>
-          <span className="text-xs text-muted-foreground">/</span>
-          <h1 className="text-sm font-semibold truncate">{selected.title}</h1>
-          <div className="ml-auto flex gap-2">
-            <button
-              onClick={() => copyToClipboard(selected.content)}
-              className="text-xs px-3 py-1 rounded border border-border hover:bg-muted"
-            >
-              Copy
-            </button>
-            <button
-              onClick={() => handleDelete(selected.id)}
-              className="text-xs text-destructive hover:underline"
-            >
-              Delete
-            </button>
-          </div>
-        </div>
-
-        {error && (
-          <div className="mx-4 mt-3 text-xs text-destructive border border-destructive/30 rounded px-3 py-2">
-            {error}
-          </div>
-        )}
-
-        <div className="flex-1 overflow-y-auto p-4">
-          <div className="flex gap-4 mb-3 flex-wrap">
-            {selected.scenario && (
-              <span className="text-xs px-2 py-0.5 rounded bg-muted text-muted-foreground">
-                {selected.scenario}
-              </span>
-            )}
-            {selected.model_hint && (
-              <span className="text-xs px-2 py-0.5 rounded bg-blue-50 text-blue-700">
-                {selected.model_hint}
-              </span>
-            )}
-            {selected.quality_score > 0 && (
-              <span className="text-xs text-muted-foreground">
-                Quality: {(selected.quality_score * 100).toFixed(0)}%
-              </span>
+      <PageFrame
+        title={selected.title}
+        description="Prompt detail and extracted source metadata."
+        action={
+          <>
+            <Button size="sm" variant="secondary" icon="chevronLeft" onClick={() => setSelected(null)}>Back</Button>
+            <Button size="sm" variant="secondary" icon="copy" onClick={() => copyToClipboard(selected.content)}>Copy</Button>
+            <Button size="sm" variant="danger" icon="trash" onClick={() => handleDelete(selected.id)}>Delete</Button>
+          </>
+        }
+        width="wide"
+      >
+        {error && <StatusBanner tone="danger">{error}</StatusBanner>}
+        <Panel>
+          <div className="space-y-4 p-4">
+            <div className="flex flex-wrap gap-2">
+              {selected.scenario && <Badge>{selected.scenario}</Badge>}
+              {selected.model_hint && <Badge tone="accent">{selected.model_hint}</Badge>}
+              {selected.quality_score > 0 && <Badge tone="success">Quality {(selected.quality_score * 100).toFixed(0)}%</Badge>}
+            </div>
+            <pre className="whitespace-pre-wrap rounded-lg border border-border bg-background/60 p-4 font-mono text-xs leading-6 text-foreground">
+              {selected.content}
+            </pre>
+            {selected.source_document_id && (
+              <div className="text-xs text-muted-foreground">Source document: <span className="font-mono">{selected.source_document_id}</span></div>
             )}
           </div>
-
-          <div className="border border-border rounded-lg p-4 bg-muted/10 font-mono text-xs whitespace-pre-wrap leading-relaxed">
-            {selected.content}
-          </div>
-
-          {selected.source_document_id && (
-            <p className="text-xs text-muted-foreground mt-3">
-              Source document: <span className="font-mono">{selected.source_document_id}</span>
-            </p>
-          )}
-        </div>
-      </div>
+        </Panel>
+      </PageFrame>
     )
   }
 
   return (
-    <div className="h-full flex flex-col overflow-hidden">
-      <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
-        <div>
-          <h1 className="text-sm font-semibold">Prompt Library</h1>
-          <p className="text-xs text-muted-foreground mt-0.5">{total} prompt{total !== 1 ? 's' : ''}</p>
-        </div>
-      </div>
+    <PageFrame
+      title="Prompt Library"
+      description={`${total.toLocaleString()} prompt${total === 1 ? '' : 's'} extracted from vault documents.`}
+      action={<Button variant="secondary" size="sm" icon="refresh" onClick={loadPrompts}>Refresh</Button>}
+      width="wide"
+    >
+      {error && <StatusBanner tone="danger">{error}</StatusBanner>}
+      <SegmentedControl options={SCENARIOS} value={scenario} onChange={setScenario} />
 
-      {error && (
-        <div className="mx-4 mt-3 text-xs text-destructive border border-destructive/30 rounded px-3 py-2">
-          {error}
-        </div>
-      )}
-
-      {/* Scenario filter */}
-      <div className="flex gap-1 px-4 pt-3 shrink-0 flex-wrap">
-        {['', 'summarization', 'code_review', 'qa', 'writing', 'analysis'].map(s => (
-          <button
-            key={s}
-            onClick={() => setScenario(s)}
-            className={`text-xs px-2 py-1 rounded border ${scenario === s ? 'bg-primary text-primary-foreground border-primary' : 'border-border hover:bg-muted'}`}
-          >
-            {s || 'All'}
-          </button>
-        ))}
-      </div>
-
-      <div className="flex-1 overflow-y-auto p-4 space-y-2">
-        {loading && <p className="text-xs text-muted-foreground">Loading…</p>}
+      <Panel>
+        {loading && <SkeletonRows count={8} />}
         {!loading && prompts.length === 0 && (
-          <p className="text-xs text-muted-foreground">
-            No prompts yet. Use the Vault tab to extract prompts from documents.
-          </p>
+          <EmptyState compact icon="bolt" title="No prompts" description="Extract prompts from documents in the vault to build this library." />
         )}
-
-        {prompts.map(p => (
-          <div
-            key={p.id}
-            className="flex items-start gap-3 px-3 py-2.5 border border-border rounded-lg hover:bg-muted/20 cursor-pointer"
-            onClick={() => setSelected(p)}
-          >
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium truncate">{p.title}</p>
-              <p className="text-xs text-muted-foreground truncate mt-0.5 font-mono">
-                {p.content.slice(0, 100)}{p.content.length > 100 ? '…' : ''}
-              </p>
-            </div>
-            <div className="shrink-0 text-right space-y-1">
-              {p.scenario && (
-                <span className="block text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
-                  {p.scenario}
-                </span>
-              )}
-              {p.quality_score > 0 && (
-                <span className="block text-xs text-muted-foreground">
-                  {(p.quality_score * 100).toFixed(0)}%
-                </span>
-              )}
-            </div>
-            <button
-              onClick={e => { e.stopPropagation(); handleDelete(p.id) }}
-              className="text-xs text-muted-foreground hover:text-destructive shrink-0 mt-0.5"
-              title="Delete prompt"
-            >
-              ✕
-            </button>
+        {!loading && prompts.length > 0 && (
+          <div className="divide-y divide-border">
+            {prompts.map(prompt => (
+              <button
+                key={prompt.id}
+                type="button"
+                onClick={() => setSelected(prompt)}
+                className="flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-accent/70"
+              >
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm font-medium text-foreground">{prompt.title}</div>
+                  <div className="mt-1 truncate font-mono text-xs text-muted-foreground">
+                    {prompt.content.slice(0, 120)}{prompt.content.length > 120 ? '...' : ''}
+                  </div>
+                </div>
+                <div className="flex shrink-0 flex-col items-end gap-1">
+                  {prompt.scenario && <Badge>{prompt.scenario}</Badge>}
+                  {prompt.quality_score > 0 && <span className="text-xs text-muted-foreground">{(prompt.quality_score * 100).toFixed(0)}%</span>}
+                </div>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  icon="trash"
+                  onClick={event => { event.stopPropagation(); handleDelete(prompt.id) }}
+                  aria-label="Delete prompt"
+                />
+              </button>
+            ))}
           </div>
-        ))}
-      </div>
-    </div>
+        )}
+      </Panel>
+    </PageFrame>
   )
 }

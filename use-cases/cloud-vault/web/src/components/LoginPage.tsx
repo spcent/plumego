@@ -1,6 +1,8 @@
 import { useState, FormEvent } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { useI18n } from '../i18n/I18nContext'
+import { Button, Field, Panel, StatusBanner, TextInput } from './ui'
+import { Icon } from './icons'
 
 interface LoginPageProps {
   onLoginSuccess: () => void
@@ -30,65 +32,52 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
-        <div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-foreground">
-            {t.auth.signIn}
-          </h2>
+    <div className="flex min-h-[100dvh] items-center justify-center bg-background px-4 py-10">
+      <div className="w-full max-w-md">
+        <div className="mb-5 flex flex-col items-center text-center">
+          <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg border border-primary/25 bg-primary/10 text-primary">
+            <Icon name="book" className="h-6 w-6" />
+          </div>
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">Cloud Vault</h1>
+          <p className="mt-1 text-sm text-muted-foreground">{t.auth.signIn}</p>
         </div>
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-          <div className="rounded-md shadow-sm -space-y-px">
-            <div>
-              <label htmlFor="username" className="sr-only">
-                {t.auth.username}
-              </label>
-              <input
+
+        <Panel>
+          <form className="space-y-4 p-5" onSubmit={handleSubmit}>
+            <Field label={t.auth.username}>
+              <TextInput
                 id="username"
                 name="username"
                 type="text"
                 required
-                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-input placeholder-muted-foreground text-foreground rounded-t-md focus:outline-none focus:ring-ring focus:border-ring focus:z-10 sm:text-sm bg-background"
                 placeholder={t.auth.username}
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 disabled={loading}
               />
-            </div>
-            <div>
-              <label htmlFor="password" className="sr-only">
-                {t.auth.password}
-              </label>
-              <input
+            </Field>
+            <Field label={t.auth.password}>
+              <TextInput
                 id="password"
                 name="password"
                 type="password"
                 required
-                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-input placeholder-muted-foreground text-foreground rounded-b-md focus:outline-none focus:ring-ring focus:border-ring focus:z-10 sm:text-sm bg-background"
                 placeholder={t.auth.password}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 disabled={loading}
               />
-            </div>
-          </div>
+            </Field>
 
           {error && (
-            <div className="rounded-md bg-destructive/10 p-4">
-              <div className="text-sm text-destructive">{error}</div>
-            </div>
+            <StatusBanner tone="danger">{error}</StatusBanner>
           )}
 
-          <div>
-            <button
-              type="submit"
-              disabled={loading}
-              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-primary-foreground bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-ring disabled:opacity-50 disabled:cursor-not-allowed"
-            >
+            <Button type="submit" disabled={loading} variant="primary" className="w-full">
               {loading ? t.auth.signingIn : t.auth.signIn}
-            </button>
-          </div>
-        </form>
+            </Button>
+          </form>
+        </Panel>
       </div>
     </div>
   )

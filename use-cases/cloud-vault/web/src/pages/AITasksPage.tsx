@@ -1,26 +1,29 @@
-import { useState, useEffect } from 'react'
-import {
-  listTasks,
-  cancelTask,
-  enqueueQA,
-  type AITask,
-} from '../api/ai'
-import { documentsAPI } from '../api/documents'
-import type { DocumentSummary } from '../api/documents'
+import { useEffect, useState } from 'react'
+import { cancelTask, enqueueQA, listTasks, type AITask } from '../api/ai'
+import { documentsAPI, type DocumentSummary } from '../api/documents'
+import { Badge, Button, EmptyState, PageFrame, Panel, SegmentedControl, SkeletonRows, StatusBanner, TextareaInput } from '../components/ui'
 
-const STATUS_COLORS: Record<string, string> = {
-  pending:   'bg-yellow-100 text-yellow-700',
-  running:   'bg-blue-100 text-blue-700',
-  completed: 'bg-green-100 text-green-700',
-  failed:    'bg-red-100 text-red-700',
-  cancelled: 'bg-muted text-muted-foreground',
-}
+const STATUS_FILTERS = [
+  { value: '', label: 'All' },
+  { value: 'pending', label: 'Pending' },
+  { value: 'running', label: 'Running' },
+  { value: 'completed', label: 'Completed' },
+  { value: 'failed', label: 'Failed' },
+] as const
 
 const TYPE_LABELS: Record<string, string> = {
   document_summary: 'Summary',
-  topic_summary:    'Topic Summary',
-  search_answer:    'Q&A',
-  prompt_extract:   'Prompt Extract',
+  topic_summary: 'Topic Summary',
+  search_answer: 'Q&A',
+  prompt_extract: 'Prompt Extract',
+}
+
+function taskTone(status: string): 'neutral' | 'accent' | 'success' | 'warning' | 'danger' {
+  if (status === 'pending') return 'warning'
+  if (status === 'running') return 'accent'
+  if (status === 'completed') return 'success'
+  if (status === 'failed') return 'danger'
+  return 'neutral'
 }
 
 export default function AITasksPage() {
@@ -31,14 +34,15 @@ export default function AITasksPage() {
   const [error, setError] = useState('')
   const [expanded, setExpanded] = useState<string | null>(null)
 
-  // Q&A form
   const [showQA, setShowQA] = useState(false)
   const [question, setQuestion] = useState('')
   const [docs, setDocs] = useState<DocumentSummary[]>([])
   const [selectedDocIDs, setSelectedDocIDs] = useState<string[]>([])
   const [qaSaving, setQASaving] = useState(false)
 
-  useEffect(() => { loadTasks() }, [status])
+  useEffect(() => {
+    loadTasks()
+  }, [status])
 
   async function loadTasks() {
     setLoading(true)
@@ -47,8 +51,8 @@ export default function AITasksPage() {
       const data = await listTasks(status || undefined, 50, 0)
       setTasks(data.items ?? [])
       setTotal(data.total)
-    } catch (e: any) {
-      setError(e.message)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to load AI tasks')
     } finally {
       setLoading(false)
     }
@@ -59,7 +63,7 @@ export default function AITasksPage() {
       const data = await documentsAPI.list({ limit: 100, offset: 0 })
       setDocs(data.items ?? [])
     } catch {
-      // ignore
+      // Keep Q&A composer usable; the empty document state explains the next step.
     }
   }
 
@@ -68,8 +72,8 @@ export default function AITasksPage() {
     try {
       await cancelTask(id)
       await loadTasks()
-    } catch (e: any) {
-      setError(e.message)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to cancel task')
     }
   }
 
@@ -83,189 +87,147 @@ export default function AITasksPage() {
       setQuestion('')
       setSelectedDocIDs([])
       await loadTasks()
-    } catch (e: any) {
-      setError(e.message)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to enqueue question')
     } finally {
       setQASaving(false)
     }
   }
 
   function toggleDocSelect(id: string) {
-    setSelectedDocIDs(prev =>
-      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
-    )
+    setSelectedDocIDs(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
   }
 
   function parseOutput(task: AITask) {
     if (!task.output_json) return null
-    try { return JSON.parse(task.output_json) } catch { return null }
+    try {
+      return JSON.parse(task.output_json)
+    } catch {
+      return null
+    }
   }
 
   return (
-    <div className="h-full flex flex-col overflow-hidden">
-      <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
-        <div>
-          <h1 className="text-sm font-semibold">AI Tasks</h1>
-          <p className="text-xs text-muted-foreground mt-0.5">{total} task{total !== 1 ? 's' : ''}</p>
-        </div>
-        <div className="flex gap-2">
-          <button
-            onClick={() => { setShowQA(true); loadDocs() }}
-            className="text-xs px-3 py-1.5 rounded bg-primary text-primary-foreground hover:bg-primary/90"
-          >
-            Ask a Question
-          </button>
-          <button onClick={loadTasks} className="text-xs px-2 py-1.5 rounded border border-border hover:bg-muted">
-            Refresh
-          </button>
-        </div>
-      </div>
+    <PageFrame
+      title="AI Tasks"
+      description={`${total.toLocaleString()} task${total === 1 ? '' : 's'} tracked across summaries, answers, and prompt extraction.`}
+      action={
+        <>
+          <Button variant="secondary" size="sm" icon="refresh" onClick={loadTasks}>Refresh</Button>
+          <Button variant="primary" size="sm" icon="spark" onClick={() => { setShowQA(true); loadDocs() }}>Ask</Button>
+        </>
+      }
+      width="wide"
+    >
+      {error && <StatusBanner tone="danger">{error}</StatusBanner>}
 
-      {error && (
-        <div className="mx-4 mt-3 text-xs text-destructive border border-destructive/30 rounded px-3 py-2">
-          {error}
-        </div>
-      )}
-
-      {/* Status filter */}
-      <div className="flex gap-1 px-4 pt-3 shrink-0">
-        {['', 'pending', 'running', 'completed', 'failed'].map(s => (
-          <button
-            key={s}
-            onClick={() => setStatus(s)}
-            className={`text-xs px-2 py-1 rounded border ${status === s ? 'bg-primary text-primary-foreground border-primary' : 'border-border hover:bg-muted'}`}
-          >
-            {s || 'All'}
-          </button>
-        ))}
-      </div>
-
-      {/* Q&A form */}
       {showQA && (
-        <div className="mx-4 mt-3 p-3 border border-border rounded-lg bg-muted/20 space-y-2 shrink-0">
-          <p className="text-xs font-medium">Ask a question (grounded in selected documents)</p>
-          <textarea
-            rows={3}
-            placeholder="Your question..."
-            value={question}
-            onChange={e => setQuestion(e.target.value)}
-            className="w-full text-xs border border-border rounded px-2 py-1.5 bg-background resize-none"
-          />
-          <p className="text-xs text-muted-foreground">Select documents to ground the answer:</p>
-          <div className="max-h-40 overflow-y-auto space-y-1 border border-border rounded p-2 bg-background">
-            {docs.length === 0 && <p className="text-xs text-muted-foreground">Loading...</p>}
-            {docs.map(d => (
-              <label key={d.id} className="flex items-center gap-2 text-xs cursor-pointer hover:bg-muted/30 rounded px-1">
-                <input
-                  type="checkbox"
-                  checked={selectedDocIDs.includes(d.id)}
-                  onChange={() => toggleDocSelect(d.id)}
-                  className="accent-primary"
-                />
-                <span className="truncate">{d.title}</span>
-              </label>
-            ))}
+        <Panel title="Ask a grounded question" description="Select documents first, then enqueue a background answer task.">
+          <div className="space-y-3 p-4">
+            <TextareaInput rows={3} placeholder="Your question..." value={question} onChange={e => setQuestion(e.target.value)} />
+            <div className="rounded-lg border border-border bg-background/45 p-2">
+              {docs.length === 0 ? (
+                <div className="px-2 py-3 text-xs text-muted-foreground">Loading documents...</div>
+              ) : (
+                <div className="max-h-44 space-y-1 overflow-y-auto">
+                  {docs.map(doc => (
+                    <label key={doc.id} className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-xs hover:bg-accent">
+                      <input type="checkbox" checked={selectedDocIDs.includes(doc.id)} onChange={() => toggleDocSelect(doc.id)} className="accent-primary" />
+                      <span className="truncate">{doc.title}</span>
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <Button onClick={handleAskQA} disabled={qaSaving || !question.trim() || selectedDocIDs.length === 0} variant="primary">
+                {qaSaving ? 'Enqueueing...' : 'Ask'}
+              </Button>
+              <Button onClick={() => setShowQA(false)} variant="ghost">Cancel</Button>
+            </div>
           </div>
-          <div className="flex gap-2">
-            <button
-              onClick={handleAskQA}
-              disabled={qaSaving || !question.trim() || selectedDocIDs.length === 0}
-              className="text-xs px-3 py-1 rounded bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-            >
-              {qaSaving ? 'Enqueueing…' : 'Ask'}
-            </button>
-            <button onClick={() => setShowQA(false)} className="text-xs px-3 py-1 rounded border border-border hover:bg-muted">
-              Cancel
-            </button>
-          </div>
-        </div>
+        </Panel>
       )}
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-2">
-        {loading && <p className="text-xs text-muted-foreground">Loading…</p>}
+      <div className="flex items-center justify-between gap-3">
+        <SegmentedControl options={STATUS_FILTERS} value={status} onChange={setStatus} />
+      </div>
+
+      <Panel>
+        {loading && <SkeletonRows count={7} />}
         {!loading && tasks.length === 0 && (
-          <p className="text-xs text-muted-foreground">No tasks yet. Use the Vault tab to summarize documents or ask questions.</p>
+          <EmptyState compact icon="spark" title="No AI tasks" description="Summarize documents or ask a grounded question to create work here." />
         )}
-
-        {tasks.map(task => {
-          const out = parseOutput(task)
-          const isExpanded = expanded === task.id
-          return (
-            <div key={task.id} className="border border-border rounded-lg overflow-hidden">
-              <div
-                className="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-muted/20"
-                onClick={() => setExpanded(isExpanded ? null : task.id)}
-              >
-                <span className={`text-xs px-1.5 py-0.5 rounded shrink-0 ${STATUS_COLORS[task.status] ?? 'bg-muted text-muted-foreground'}`}>
-                  {task.status}
-                </span>
-                <span className="text-xs text-muted-foreground shrink-0">
-                  {TYPE_LABELS[task.task_type] ?? task.task_type}
-                </span>
-                <span className="text-xs text-muted-foreground truncate flex-1">{task.id}</span>
-                <span className="text-xs text-muted-foreground shrink-0">{task.created_at.slice(0, 10)}</span>
-                {task.status === 'pending' && (
+        {!loading && tasks.length > 0 && (
+          <div className="divide-y divide-border">
+            {tasks.map(task => {
+              const out = parseOutput(task)
+              const isExpanded = expanded === task.id
+              return (
+                <div key={task.id}>
                   <button
-                    onClick={e => { e.stopPropagation(); handleCancel(task.id) }}
-                    className="text-xs text-muted-foreground hover:text-destructive shrink-0"
+                    type="button"
+                    onClick={() => setExpanded(isExpanded ? null : task.id)}
+                    className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-accent/70"
                   >
-                    Cancel
+                    <Badge tone={taskTone(task.status)}>{task.status}</Badge>
+                    <span className="shrink-0 text-xs font-medium text-muted-foreground">{TYPE_LABELS[task.task_type] ?? task.task_type}</span>
+                    <span className="min-w-0 flex-1 truncate font-mono text-xs text-muted-foreground">{task.id}</span>
+                    <span className="hidden shrink-0 text-xs text-muted-foreground sm:block">{task.created_at.slice(0, 10)}</span>
+                    {task.status === 'pending' && (
+                      <Button size="sm" variant="ghost" onClick={e => { e.stopPropagation(); handleCancel(task.id) }}>Cancel</Button>
+                    )}
                   </button>
-                )}
-              </div>
 
-              {isExpanded && (
-                <div className="px-3 pb-3 space-y-2 border-t border-border bg-muted/10">
-                  {task.error_message && (
-                    <p className="text-xs text-destructive mt-2">Error: {task.error_message}</p>
-                  )}
-                  {task.output_document_id && (
-                    <p className="text-xs text-muted-foreground mt-2">
-                      Output document: <span className="font-mono">{task.output_document_id}</span>
-                    </p>
-                  )}
-                  {out && (
-                    <div className="mt-2">
-                      {out.summary && (
-                        <div>
-                          <p className="text-xs font-medium mb-1">Summary</p>
-                          <p className="text-xs text-muted-foreground">{out.summary}</p>
-                        </div>
+                  {isExpanded && (
+                    <div className="space-y-3 border-t border-border bg-background/45 px-4 py-3 text-sm">
+                      {task.error_message && <StatusBanner tone="danger">Error: {task.error_message}</StatusBanner>}
+                      {task.output_document_id && (
+                        <div className="text-xs text-muted-foreground">Output document: <span className="font-mono">{task.output_document_id}</span></div>
                       )}
-                      {out.answer && (
-                        <div>
-                          <p className="text-xs font-medium mb-1">Answer</p>
-                          <p className="text-xs text-muted-foreground whitespace-pre-wrap">{out.answer}</p>
-                        </div>
-                      )}
-                      {out.key_points?.length > 0 && (
-                        <div className="mt-2">
-                          <p className="text-xs font-medium mb-1">Key Points</p>
-                          <ul className="list-disc list-inside space-y-0.5">
-                            {out.key_points.map((p: string, i: number) => (
-                              <li key={i} className="text-xs text-muted-foreground">{p}</li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-                      {out.citations?.length > 0 && (
-                        <div className="mt-2">
-                          <p className="text-xs font-medium mb-1">Citations</p>
-                          {out.citations.map((c: any, i: number) => (
-                            <div key={i} className="text-xs text-muted-foreground border-l-2 border-border pl-2 mb-1">
-                              <span className="font-medium">{c.document_title}</span>: {c.excerpt}
+                      {out && (
+                        <div className="space-y-3">
+                          {out.summary && <OutputBlock title="Summary" text={out.summary} />}
+                          {out.answer && <OutputBlock title="Answer" text={out.answer} />}
+                          {out.key_points?.length > 0 && (
+                            <div>
+                              <div className="mb-1 text-xs font-medium text-foreground">Key Points</div>
+                              <ul className="list-disc space-y-1 pl-4 text-xs leading-5 text-muted-foreground">
+                                {out.key_points.map((point: string, index: number) => <li key={index}>{point}</li>)}
+                              </ul>
                             </div>
-                          ))}
+                          )}
+                          {out.citations?.length > 0 && (
+                            <div>
+                              <div className="mb-1 text-xs font-medium text-foreground">Citations</div>
+                              <div className="space-y-2">
+                                {out.citations.map((citation: any, index: number) => (
+                                  <div key={index} className="border-l-2 border-border pl-3 text-xs leading-5 text-muted-foreground">
+                                    <span className="font-medium text-foreground">{citation.document_title}</span>: {citation.excerpt}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
                   )}
                 </div>
-              )}
-            </div>
-          )
-        })}
-      </div>
+              )
+            })}
+          </div>
+        )}
+      </Panel>
+    </PageFrame>
+  )
+}
+
+function OutputBlock({ title, text }: { title: string; text: string }) {
+  return (
+    <div>
+      <div className="mb-1 text-xs font-medium text-foreground">{title}</div>
+      <div className="whitespace-pre-wrap rounded-md border border-border bg-surface p-3 text-xs leading-5 text-muted-foreground">{text}</div>
     </div>
   )
 }

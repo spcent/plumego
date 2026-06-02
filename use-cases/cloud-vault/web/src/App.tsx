@@ -112,13 +112,13 @@ function AppContent() {
     <div className="min-h-[100dvh] bg-background text-foreground md:flex">
       <aside
         className={cn(
-          'hidden shrink-0 border-r border-border bg-surface transition-[width] duration-200 md:flex md:flex-col',
+          'hidden shrink-0 border-r border-border bg-surface/95 transition-[width] duration-200 md:flex md:flex-col',
           sidebarCollapsed ? 'w-16' : 'w-64',
         )}
       >
-        <div className={cn('border-b border-border py-4', sidebarCollapsed ? 'px-3' : 'px-4')}>
+        <div className={cn('border-b border-border py-4', sidebarCollapsed ? 'px-2.5' : 'px-4')}>
           <div className={cn('flex items-center', sidebarCollapsed ? 'justify-center' : 'gap-3')}>
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg border border-primary/20 bg-primary/10 text-primary">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-primary/25 bg-primary/10 text-primary shadow-sm shadow-slate-950/5 dark:shadow-none">
               <Icon name="book" className="h-5 w-5" />
             </div>
             {!sidebarCollapsed && (
@@ -131,7 +131,7 @@ function AppContent() {
               <button
                 type="button"
                 onClick={() => setSidebarCollapsed(true)}
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-[background-color,color,transform] hover:bg-accent hover:text-foreground active:translate-y-px"
                 aria-label="Collapse sidebar"
                 title="Collapse sidebar"
               >
@@ -143,7 +143,7 @@ function AppContent() {
             <button
               type="button"
               onClick={() => setSidebarCollapsed(false)}
-              className="mt-3 flex h-8 w-full items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+              className="mt-3 flex h-8 w-full items-center justify-center rounded-md text-muted-foreground transition-[background-color,color,transform] hover:bg-accent hover:text-foreground active:translate-y-px"
               aria-label="Expand sidebar"
               title="Expand sidebar"
             >
@@ -153,12 +153,13 @@ function AppContent() {
         </div>
         <nav className={cn('flex-1 overflow-y-auto py-4', sidebarCollapsed ? 'px-2' : 'px-3')}>
           {groups.map(group => (
-            <div key={group.label} className={cn('last:mb-0', sidebarCollapsed ? 'mb-3' : 'mb-5')}>
+            <div key={group.label} className={cn('last:mb-0', sidebarCollapsed ? 'mb-4' : 'mb-5')}>
               {!sidebarCollapsed && (
                 <div className="mb-2 px-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
                   {group.label}
                 </div>
               )}
+              {sidebarCollapsed && <div className="mx-auto mb-2 h-px w-7 bg-border" />}
               <div className="space-y-1">
                 {group.items.map(item => (
                   <NavButton
@@ -178,7 +179,7 @@ function AppContent() {
             <button
               type="button"
               onClick={logout}
-              className="flex h-9 w-full items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+              className="flex h-9 w-full items-center justify-center rounded-md text-muted-foreground transition-[background-color,color,transform] hover:bg-accent hover:text-foreground active:translate-y-px"
               aria-label={t.nav.logout}
               title={t.nav.logout}
             >
@@ -193,14 +194,18 @@ function AppContent() {
       </aside>
 
       <div className="flex min-h-[100dvh] min-w-0 flex-1 flex-col">
-        <header className="shrink-0 border-b border-border bg-surface/95">
+        <header className="shrink-0 border-b border-border bg-surface/90">
           <div className="flex min-h-14 items-center gap-3 px-4 md:px-5">
             <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                {activeItem && <Icon name={activeItem.icon} className="h-4 w-4 text-primary" />}
+              <div className="flex items-center gap-2 text-sm font-semibold tracking-tight text-foreground">
+                {activeItem && (
+                  <span className="flex h-7 w-7 items-center justify-center rounded-md border border-border bg-background text-primary">
+                    <Icon name={activeItem.icon} className="h-4 w-4" />
+                  </span>
+                )}
                 <span className="truncate">{activeItem?.label ?? 'Cloud Vault'}</span>
               </div>
-              <div className="hidden truncate text-xs text-muted-foreground sm:block">
+              <div className="hidden truncate pl-9 text-xs text-muted-foreground sm:block">
                 {activeItem?.description ?? 'Markdown workspace'}
               </div>
             </div>
@@ -228,7 +233,7 @@ function AppContent() {
           </nav>
         </header>
 
-        <main className="min-h-0 flex-1 overflow-hidden">
+        <main className="min-h-0 flex-1 overflow-hidden bg-background">
           <Suspense fallback={<FullPageLoading label={t.common.loading} compact />}>
             {page === 'vault' && (
               <VaultPage
@@ -265,15 +270,16 @@ function NavButton({ item, active, collapsed, onClick }: { item: NavItem; active
       aria-label={item.label}
       title={collapsed ? item.label : undefined}
       className={cn(
-        'group flex w-full items-center rounded-md py-2 text-left transition-[background-color,color,transform] duration-150 active:translate-y-px',
+        'group relative flex w-full items-center rounded-md py-2 text-left transition-[background-color,color,transform] duration-150 active:translate-y-px',
         collapsed ? 'justify-center px-0' : 'gap-3 px-2',
-        active ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-accent hover:text-foreground',
+        active ? 'bg-primary/10 text-primary dark:bg-primary/15' : 'text-muted-foreground hover:bg-accent hover:text-foreground',
       )}
     >
+      {active && collapsed && <span className="absolute left-[-7px] h-5 w-0.5 rounded-full bg-primary" />}
       <span
         className={cn(
           'flex h-7 w-7 shrink-0 items-center justify-center rounded-md border transition-colors',
-          active ? 'border-white/20 bg-white/15' : 'border-border bg-surface group-hover:bg-background',
+          active ? 'border-primary/30 bg-primary text-primary-foreground shadow-sm shadow-primary/10' : 'border-border bg-surface group-hover:bg-background',
         )}
       >
         <Icon name={item.icon} className="h-4 w-4" />
@@ -281,7 +287,7 @@ function NavButton({ item, active, collapsed, onClick }: { item: NavItem; active
       {!collapsed && (
         <span className="min-w-0">
           <span className="block truncate text-sm font-medium">{item.label}</span>
-          <span className={cn('block truncate text-[11px]', active ? 'text-primary-foreground/75' : 'text-muted-foreground')}>
+          <span className="block truncate text-[11px] text-muted-foreground">
             {item.description}
           </span>
         </span>

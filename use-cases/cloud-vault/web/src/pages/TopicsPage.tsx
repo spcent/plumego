@@ -1,12 +1,7 @@
-import { useState, useEffect } from 'react'
-import {
-  listTopics,
-  getTopic,
-  buildTopics,
-  type Topic,
-  type DuplicateDoc,
-} from '../api/organize'
+import { useEffect, useState } from 'react'
 import { createCollectionFromSearch } from '../api/collections'
+import { buildTopics, getTopic, listTopics, type DuplicateDoc, type Topic } from '../api/organize'
+import { Badge, Button, EmptyState, PageFrame, Panel, SkeletonRows, StatusBanner } from '../components/ui'
 
 type View = 'list' | 'detail'
 
@@ -18,8 +13,6 @@ export default function TopicsPage() {
   const [loading, setLoading] = useState(false)
   const [building, setBuilding] = useState(false)
   const [error, setError] = useState('')
-
-  // Create collection from topic
   const [converting, setConverting] = useState(false)
 
   useEffect(() => {
@@ -32,23 +25,23 @@ export default function TopicsPage() {
     try {
       const data = await listTopics()
       setTopics(data.items ?? [])
-    } catch (e: any) {
-      setError(e.message)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to load topics')
     } finally {
       setLoading(false)
     }
   }
 
-  async function openTopic(t: Topic) {
+  async function openTopic(topic: Topic) {
     setLoading(true)
     setError('')
     try {
-      const detail = await getTopic(t.id)
+      const detail = await getTopic(topic.id)
       setSelected(detail.topic)
       setDocs(detail.documents ?? [])
       setView('detail')
-    } catch (e: any) {
-      setError(e.message)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to open topic')
     } finally {
       setLoading(false)
     }
@@ -60,8 +53,8 @@ export default function TopicsPage() {
     try {
       await buildTopics()
       await loadTopics()
-    } catch (e: any) {
-      setError(e.message)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to build topics')
     } finally {
       setBuilding(false)
     }
@@ -75,11 +68,10 @@ export default function TopicsPage() {
       await createCollectionFromSearch({
         name: selected.name,
         description: `Created from topic: ${selected.name}`,
-        document_ids: docs.map(d => d.id),
+        document_ids: docs.map(doc => doc.id),
       })
-      alert(`Collection "${selected.name}" created.`)
-    } catch (e: any) {
-      setError(e.message)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to create collection')
     } finally {
       setConverting(false)
     }
@@ -87,125 +79,79 @@ export default function TopicsPage() {
 
   if (view === 'detail' && selected) {
     return (
-      <div className="h-full flex flex-col overflow-hidden">
-        <div className="flex items-center gap-2 px-4 py-3 border-b border-border shrink-0">
-          <button
-            onClick={() => setView('list')}
-            className="text-xs text-muted-foreground hover:text-foreground"
-          >
-            ← Topics
-          </button>
-          <span className="text-xs text-muted-foreground">/</span>
-          <h1 className="text-sm font-semibold">{selected.name}</h1>
-          <span className="text-xs text-muted-foreground ml-1">({docs.length} docs)</span>
-          <div className="ml-auto">
-            <button
-              onClick={handleConvertToCollection}
-              disabled={converting || docs.length === 0}
-              className="text-xs px-3 py-1.5 rounded bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-            >
-              {converting ? 'Creating…' : 'Create Collection'}
-            </button>
-          </div>
-        </div>
-
-        {selected.description && (
-          <p className="px-4 pt-2 text-xs text-muted-foreground">{selected.description}</p>
-        )}
-
-        {error && (
-          <div className="mx-4 mt-3 text-xs text-destructive border border-destructive/30 rounded px-3 py-2">
-            {error}
-          </div>
-        )}
-
-        <div className="flex-1 overflow-y-auto p-4 space-y-1">
-          {docs.length === 0 && (
-            <p className="text-xs text-muted-foreground">No documents in this topic.</p>
-          )}
-          {docs.map(doc => (
-            <div
-              key={doc.id}
-              className="flex items-center gap-3 px-3 py-2 border border-border rounded hover:bg-muted/30"
-            >
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-medium truncate">{doc.title}</p>
-                {doc.original_path && (
-                  <p className="text-xs text-muted-foreground truncate">{doc.original_path}</p>
-                )}
-              </div>
-              <span
-                className={`text-xs px-1.5 py-0.5 rounded shrink-0 ${
-                  doc.status === 'active'
-                    ? 'bg-green-100 text-green-700'
-                    : 'bg-muted text-muted-foreground'
-                }`}
-              >
-                {doc.status}
-              </span>
-              {doc.is_favorite && <span className="text-xs text-yellow-500">★</span>}
+      <PageFrame
+        title={selected.name}
+        description={selected.description || `${docs.length.toLocaleString()} document${docs.length === 1 ? '' : 's'} in this topic.`}
+        action={
+          <>
+            <Button variant="secondary" size="sm" icon="chevronLeft" onClick={() => setView('list')}>Topics</Button>
+            <Button variant="primary" size="sm" icon="folder" onClick={handleConvertToCollection} disabled={converting || docs.length === 0}>
+              {converting ? 'Creating...' : 'Create Collection'}
+            </Button>
+          </>
+        }
+        width="wide"
+      >
+        {error && <StatusBanner tone="danger">{error}</StatusBanner>}
+        <Panel>
+          {docs.length === 0 ? (
+            <EmptyState compact icon="grid" title="No documents" description="This topic does not have matching documents yet." />
+          ) : (
+            <div className="divide-y divide-border">
+              {docs.map(doc => <DocumentRow key={doc.id} doc={doc} />)}
             </div>
-          ))}
-        </div>
-      </div>
+          )}
+        </Panel>
+      </PageFrame>
     )
   }
 
   return (
-    <div className="h-full flex flex-col overflow-hidden">
-      <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
-        <div>
-          <h1 className="text-sm font-semibold">Topics</h1>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            {topics.length} topic{topics.length !== 1 ? 's' : ''} (rule-based)
-          </p>
-        </div>
-        <button
-          onClick={handleBuild}
-          disabled={building}
-          className="text-xs px-3 py-1.5 rounded bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-        >
-          {building ? 'Building…' : 'Build Topics'}
-        </button>
-      </div>
-
-      {error && (
-        <div className="mx-4 mt-3 text-xs text-destructive border border-destructive/30 rounded px-3 py-2">
-          {error}
-        </div>
-      )}
-
-      <div className="flex-1 overflow-y-auto p-4">
-        {loading && <p className="text-xs text-muted-foreground">Loading…</p>}
+    <PageFrame
+      title="Topics"
+      description={`${topics.length.toLocaleString()} rule-based topic${topics.length === 1 ? '' : 's'} generated from tags and paths.`}
+      action={<Button variant="primary" size="sm" icon="grid" onClick={handleBuild} disabled={building}>{building ? 'Building...' : 'Build Topics'}</Button>}
+      width="wide"
+    >
+      {error && <StatusBanner tone="danger">{error}</StatusBanner>}
+      <Panel>
+        {loading && <SkeletonRows count={6} />}
         {!loading && topics.length === 0 && (
-          <p className="text-xs text-muted-foreground">
-            No topics yet. Click "Build Topics" to generate from tags and paths.
-          </p>
+          <EmptyState compact icon="grid" title="No topics" description="Build topics to group documents by tags and folder paths." />
         )}
+        {!loading && topics.length > 0 && (
+          <div className="grid gap-3 p-4 sm:grid-cols-2 xl:grid-cols-3">
+            {topics.map(topic => (
+              <button
+                key={topic.id}
+                type="button"
+                onClick={() => openTopic(topic)}
+                className="rounded-lg border border-border bg-background/45 p-4 text-left transition-colors hover:bg-accent/70"
+              >
+                <div className="truncate text-sm font-semibold text-foreground">{topic.name}</div>
+                {topic.description && <div className="mt-1 truncate text-xs text-muted-foreground">{topic.description}</div>}
+                <div className="mt-3 flex items-center gap-2">
+                  <Badge>{topic.doc_count} docs</Badge>
+                  <Badge tone="accent">{topic.source}</Badge>
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
+      </Panel>
+    </PageFrame>
+  )
+}
 
-        <div className="grid grid-cols-2 gap-2">
-          {topics.map(t => (
-            <div
-              key={t.id}
-              className="border border-border rounded-lg p-3 cursor-pointer hover:bg-muted/20"
-              onClick={() => openTopic(t)}
-            >
-              <p className="text-sm font-medium truncate">{t.name}</p>
-              {t.description && (
-                <p className="text-xs text-muted-foreground truncate mt-0.5">{t.description}</p>
-              )}
-              <div className="flex items-center gap-2 mt-1.5">
-                <span className="text-xs text-muted-foreground">
-                  {t.doc_count} doc{t.doc_count !== 1 ? 's' : ''}
-                </span>
-                <span className="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
-                  {t.source}
-                </span>
-              </div>
-            </div>
-          ))}
-        </div>
+function DocumentRow({ doc }: { doc: DuplicateDoc }) {
+  return (
+    <div className="flex items-center gap-3 px-4 py-3">
+      <div className="min-w-0 flex-1">
+        <div className="truncate text-sm font-medium text-foreground">{doc.title}</div>
+        {doc.original_path && <div className="truncate text-xs text-muted-foreground">{doc.original_path}</div>}
       </div>
+      <Badge tone={doc.status === 'active' ? 'success' : 'neutral'}>{doc.status}</Badge>
+      {doc.is_favorite && <Badge tone="warning">Favorite</Badge>}
     </div>
   )
 }

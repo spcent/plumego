@@ -1,34 +1,30 @@
 import { useEffect, useState } from 'react'
+import type { FormEvent } from 'react'
 import { importsAPI, type ImportJob, type ImportJobItem } from '../api/imports'
+import { Badge, Button, EmptyState, Field, Panel, ProgressLine, SegmentedControl, SkeletonRows, StatusBanner, TextInput, cn } from '../components/ui'
 
-function StatusBadge({ status }: { status: string }) {
-  const colors: Record<string, string> = {
-    pending:   'bg-gray-100 text-gray-600',
-    running:   'bg-blue-100 text-blue-700',
-    paused:    'bg-amber-100 text-amber-700',
-    done:      'bg-green-100 text-green-700',
-    failed:    'bg-red-100 text-red-600',
-    cancelled: 'bg-gray-100 text-gray-500',
-    success:   'bg-green-100 text-green-700',
-    skipped:   'bg-gray-100 text-gray-500',
-  }
-  return (
-    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${colors[status] ?? 'bg-gray-100 text-gray-600'}`}>
-      {status}
-    </span>
-  )
+const ITEM_FILTERS = [
+  { value: '', label: 'All' },
+  { value: 'pending', label: 'Pending' },
+  { value: 'success', label: 'Success' },
+  { value: 'skipped', label: 'Skipped' },
+  { value: 'failed', label: 'Failed' },
+] as const
+
+function statusTone(status: string): 'neutral' | 'accent' | 'success' | 'warning' | 'danger' {
+  if (status === 'running') return 'accent'
+  if (status === 'done' || status === 'success') return 'success'
+  if (status === 'failed') return 'danger'
+  if (status === 'paused' || status === 'pending') return 'warning'
+  return 'neutral'
 }
 
-function ProgressBar({ total, processed }: { total: number; processed: number }) {
-  const pct = total > 0 ? Math.round((processed / total) * 100) : 0
-  return (
-    <div className="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
-      <div
-        className="h-full bg-primary transition-all"
-        style={{ width: `${pct}%` }}
-      />
-    </div>
-  )
+function StatusBadge({ status }: { status: string }) {
+  return <Badge tone={statusTone(status)}>{status}</Badge>
+}
+
+function progressPct(total: number, processed: number) {
+  return total > 0 ? Math.round((processed / total) * 100) : 0
 }
 
 export default function ImportPage() {
@@ -39,7 +35,6 @@ export default function ImportPage() {
   const [itemsLoading, setItemsLoading] = useState(false)
   const [itemFilter, setItemFilter] = useState('')
 
-  // Create form
   const [showForm, setShowForm] = useState(false)
   const [formName, setFormName] = useState('')
   const [formPath, setFormPath] = useState('')
@@ -50,7 +45,6 @@ export default function ImportPage() {
     loadJobs()
   }, [])
 
-  // Poll running jobs.
   useEffect(() => {
     const running = jobs.some(j => j.status === 'running')
     if (!running) return
@@ -62,13 +56,12 @@ export default function ImportPage() {
     try {
       const result = await importsAPI.list(50)
       setJobs(result.items)
-      // Refresh selected job if still active.
       if (selectedJob) {
         const updated = result.items.find(j => j.id === selectedJob.id)
         if (updated) setSelectedJob(updated)
       }
     } catch {
-      // ignore
+      // Keep the current list visible if refresh fails.
     } finally {
       setLoading(false)
     }
@@ -101,11 +94,11 @@ export default function ImportPage() {
         setSelectedJob(updated)
       }
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Action failed')
+      setCreateError(err instanceof Error ? err.message : 'Action failed')
     }
   }
 
-  async function handleCreate(e: React.FormEvent) {
+  async function handleCreate(e: FormEvent) {
     e.preventDefault()
     if (!formPath.trim()) return
     setCreating(true)
@@ -134,225 +127,186 @@ export default function ImportPage() {
   }
 
   return (
-    <div className="h-full flex flex-col overflow-hidden bg-background">
-      {/* Header */}
-      <header className="h-12 flex items-center px-4 border-b border-border gap-3 shrink-0">
-        <span className="text-sm font-semibold text-foreground">Import Jobs</span>
-        <div className="flex-1" />
-        <button
-          onClick={() => setShowForm(v => !v)}
-          className="px-3 py-1 text-xs font-medium bg-primary text-primary-foreground rounded hover:opacity-90 transition-opacity"
-        >
-          + New Import
-        </button>
-      </header>
-
-      {/* Create form */}
-      {showForm && (
-        <form
-          onSubmit={handleCreate}
-          className="px-4 py-3 border-b border-border bg-accent/20 shrink-0"
-        >
-          <div className="flex flex-col gap-2 max-w-lg">
-            <div className="text-sm font-medium text-foreground">New Import Job</div>
-            <input
-              type="text"
-              value={formName}
-              onChange={e => setFormName(e.target.value)}
-              placeholder="Job name (optional)"
-              className="px-3 py-1.5 text-sm border border-border rounded bg-background focus:outline-none"
-            />
-            <input
-              type="text"
-              value={formPath}
-              onChange={e => setFormPath(e.target.value)}
-              placeholder="Source directory path (e.g. /Users/me/docs)"
-              required
-              className="px-3 py-1.5 text-sm border border-border rounded bg-background focus:outline-none"
-            />
-            {createError && (
-              <p className="text-xs text-red-500">{createError}</p>
-            )}
-            <div className="flex gap-2">
-              <button
-                type="submit"
-                disabled={creating || !formPath.trim()}
-                className="px-4 py-1.5 text-sm font-medium bg-primary text-primary-foreground rounded disabled:opacity-50"
-              >
-                {creating ? 'Scanning…' : 'Create & Scan'}
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowForm(false)}
-                className="px-4 py-1.5 text-sm border border-border rounded hover:bg-accent"
-              >
-                Cancel
-              </button>
-            </div>
+    <div className="h-full overflow-hidden bg-background">
+      <div className="flex h-full flex-col">
+        <div className="flex items-start justify-between gap-4 border-b border-border px-5 py-4">
+          <div className="min-w-0">
+            <h1 className="text-xl font-semibold tracking-tight text-foreground">Import Jobs</h1>
+            <p className="mt-1 text-sm text-muted-foreground">Scan local markdown folders and review every imported file.</p>
           </div>
-        </form>
-      )}
+          <div className="flex shrink-0 gap-2">
+            <Button variant="secondary" size="sm" icon="refresh" onClick={loadJobs}>Refresh</Button>
+            <Button variant="primary" size="sm" icon="plus" onClick={() => setShowForm(v => !v)}>
+              New Import
+            </Button>
+          </div>
+        </div>
 
-      {/* Main split: job list + detail */}
-      <div className="flex flex-1 overflow-hidden">
-        {/* Job list */}
-        <aside className="w-72 shrink-0 border-r border-border overflow-y-auto">
-          {loading && (
-            <div className="p-4 text-sm text-muted-foreground text-center">Loading…</div>
-          )}
-          {!loading && jobs.length === 0 && (
-            <div className="p-4 text-sm text-muted-foreground text-center">
-              No import jobs yet. Click "+ New Import" to start.
-            </div>
-          )}
-          {jobs.map(job => (
-            <button
-              key={job.id}
-              onClick={() => handleSelectJob(job)}
-              className={`w-full text-left px-3 py-3 border-b border-border hover:bg-accent transition-colors ${
-                selectedJob?.id === job.id ? 'bg-accent' : ''
-              }`}
-            >
-              <div className="flex items-start justify-between gap-1 mb-1">
-                <span className="text-sm font-medium truncate text-foreground flex-1 min-w-0">
-                  {job.name}
-                </span>
-                <StatusBadge status={job.status} />
+        {showForm && (
+          <form onSubmit={handleCreate} className="border-b border-border bg-surface px-5 py-4">
+            <div className="grid max-w-4xl gap-3 md:grid-cols-[1fr_1.8fr_auto] md:items-end">
+              <Field label="Job name" helper="Optional. Defaults to the folder path.">
+                <TextInput value={formName} onChange={e => setFormName(e.target.value)} placeholder="Research notes" />
+              </Field>
+              <Field label="Source directory" error={createError}>
+                <TextInput value={formPath} onChange={e => setFormPath(e.target.value)} placeholder="/Users/me/docs" required />
+              </Field>
+              <div className="flex gap-2">
+                <Button type="submit" variant="primary" disabled={creating || !formPath.trim()}>
+                  {creating ? 'Scanning...' : 'Create'}
+                </Button>
+                <Button variant="ghost" onClick={() => setShowForm(false)}>Cancel</Button>
               </div>
-              {job.total_count > 0 && (
-                <div className="mb-1">
-                  <ProgressBar total={job.total_count} processed={job.processed_count} />
-                </div>
+            </div>
+          </form>
+        )}
+
+        <div className="grid min-h-0 flex-1 grid-cols-1 overflow-hidden lg:grid-cols-[20rem_1fr]">
+          <aside className="min-h-0 border-b border-border bg-surface lg:border-b-0 lg:border-r">
+            <div className="flex h-11 items-center justify-between border-b border-border px-3">
+              <span className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">Recent imports</span>
+              <Badge>{jobs.length}</Badge>
+            </div>
+            <div className="h-[16rem] overflow-y-auto lg:h-[calc(100%-2.75rem)]">
+              {loading && <SkeletonRows count={5} />}
+              {!loading && jobs.length === 0 && (
+                <EmptyState compact icon="import" title="No import jobs" description="Create an import to scan a markdown folder." />
               )}
-              <div className="text-xs text-muted-foreground">
-                {job.total_count > 0
-                  ? `${job.processed_count}/${job.total_count} · ✓${job.success_count} ⊘${job.skipped_count} ✗${job.failed_count}`
-                  : 'No files scanned'}
-              </div>
-              <div className="text-xs text-muted-foreground mt-0.5">{formatDate(job.created_at)}</div>
-            </button>
-          ))}
-        </aside>
-
-        {/* Job detail */}
-        <main className="flex-1 flex flex-col overflow-hidden">
-          {!selectedJob ? (
-            <div className="flex-1 flex items-center justify-center text-sm text-muted-foreground">
-              Select an import job to see details
-            </div>
-          ) : (
-            <>
-              {/* Job detail header */}
-              <div className="px-4 py-3 border-b border-border shrink-0">
-                <div className="flex items-center gap-3 flex-wrap">
-                  <div className="flex-1 min-w-0">
-                    <div className="font-medium text-foreground truncate">{selectedJob.name}</div>
-                    <div className="text-xs text-muted-foreground truncate">{selectedJob.source_path}</div>
-                  </div>
-                  <StatusBadge status={selectedJob.status} />
-
-                  {/* Action buttons */}
-                  {(selectedJob.status === 'pending' || selectedJob.status === 'paused') && (
-                    <button
-                      onClick={() => handleAction('start', selectedJob.id)}
-                      className="px-3 py-1 text-xs font-medium bg-primary text-primary-foreground rounded hover:opacity-90"
-                    >
-                      {selectedJob.status === 'paused' ? 'Resume' : 'Start'}
-                    </button>
-                  )}
-                  {selectedJob.status === 'running' && (
-                    <button
-                      onClick={() => handleAction('pause', selectedJob.id)}
-                      className="px-3 py-1 text-xs font-medium border border-border rounded hover:bg-accent"
-                    >
-                      Pause
-                    </button>
-                  )}
-                  {selectedJob.failed_count > 0 && selectedJob.status !== 'running' && (
-                    <button
-                      onClick={() => handleAction('retry', selectedJob.id)}
-                      className="px-3 py-1 text-xs font-medium border border-amber-400 text-amber-600 rounded hover:bg-amber-50"
-                    >
-                      Retry Failed
-                    </button>
-                  )}
-                  {(selectedJob.status === 'running' || selectedJob.status === 'pending' || selectedJob.status === 'paused') && (
-                    <button
-                      onClick={() => { if (window.confirm('Cancel this import job?')) handleAction('cancel', selectedJob.id) }}
-                      className="px-3 py-1 text-xs font-medium text-red-500 border border-red-200 rounded hover:bg-red-50"
-                    >
-                      Cancel
-                    </button>
-                  )}
-                </div>
-
-                {/* Progress */}
-                {selectedJob.total_count > 0 && (
-                  <div className="mt-3">
-                    <ProgressBar total={selectedJob.total_count} processed={selectedJob.processed_count} />
-                    <div className="flex justify-between text-xs text-muted-foreground mt-1">
-                      <span>{selectedJob.processed_count} / {selectedJob.total_count} processed</span>
-                      <span className="flex gap-3">
-                        <span className="text-green-600">✓ {selectedJob.success_count}</span>
-                        <span className="text-gray-400">⊘ {selectedJob.skipped_count}</span>
-                        <span className="text-red-500">✗ {selectedJob.failed_count}</span>
-                      </span>
-                    </div>
-                  </div>
-                )}
-                {selectedJob.error_message && (
-                  <p className="mt-2 text-xs text-red-500">{selectedJob.error_message}</p>
-                )}
-              </div>
-
-              {/* Items */}
-              <div className="px-4 py-2 border-b border-border shrink-0 flex gap-2 items-center">
-                <span className="text-xs text-muted-foreground">Filter:</span>
-                {(['', 'pending', 'success', 'skipped', 'failed'] as const).map(s => (
+              {jobs.map(job => {
+                const pct = progressPct(job.total_count, job.processed_count)
+                return (
                   <button
-                    key={s}
-                    onClick={() => handleItemFilterChange(s)}
-                    className={`px-2 py-0.5 text-xs rounded-full border transition-colors ${
-                      itemFilter === s
-                        ? 'bg-primary text-primary-foreground border-primary'
-                        : 'border-border text-muted-foreground hover:bg-accent'
-                    }`}
+                    key={job.id}
+                    onClick={() => handleSelectJob(job)}
+                    className={cn(
+                      'w-full border-b border-border px-3 py-3 text-left transition-colors hover:bg-accent/70',
+                      selectedJob?.id === job.id && 'bg-primary/10',
+                    )}
                   >
-                    {s || 'All'}
-                  </button>
-                ))}
-              </div>
-
-              <div className="flex-1 overflow-y-auto">
-                {itemsLoading && (
-                  <div className="p-4 text-sm text-muted-foreground text-center">Loading…</div>
-                )}
-                {!itemsLoading && items.length === 0 && (
-                  <div className="p-4 text-sm text-muted-foreground text-center">No items</div>
-                )}
-                {items.map(item => (
-                  <div
-                    key={item.id}
-                    className="px-4 py-2 border-b border-border flex items-start justify-between gap-3"
-                  >
-                    <div className="flex-1 min-w-0">
-                      <div className="text-xs font-mono truncate text-foreground" title={item.file_path}>
-                        {item.file_path.split('/').slice(-2).join('/')}
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="truncate text-sm font-medium text-foreground">{job.name}</div>
+                        <div className="mt-0.5 truncate text-xs text-muted-foreground">{formatDate(job.created_at)}</div>
                       </div>
-                      {item.error_message && (
-                        <div className="text-xs text-red-500 mt-0.5 truncate" title={item.error_message}>
-                          {item.error_message}
+                      <StatusBadge status={job.status} />
+                    </div>
+                    {job.total_count > 0 && (
+                      <div className="mt-2">
+                        <ProgressLine value={pct} />
+                        <div className="mt-1 flex justify-between text-xs text-muted-foreground">
+                          <span>{job.processed_count}/{job.total_count}</span>
+                          <span>{pct}%</span>
                         </div>
+                      </div>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+          </aside>
+
+          <main className="min-h-0 overflow-hidden">
+            {!selectedJob ? (
+              <EmptyState icon="import" title="Select an import job" description="Job details, actions, and file-level results appear here." />
+            ) : (
+              <div className="flex h-full flex-col">
+                <Panel
+                  className="m-4 mb-0 shrink-0"
+                  title={selectedJob.name}
+                  description={selectedJob.source_path}
+                  action={<StatusBadge status={selectedJob.status} />}
+                >
+                  <div className="space-y-4 p-4">
+                    {selectedJob.total_count > 0 && (
+                      <ProgressLine
+                        value={progressPct(selectedJob.total_count, selectedJob.processed_count)}
+                        label={`${selectedJob.processed_count} / ${selectedJob.total_count} processed`}
+                      />
+                    )}
+                    <div className="grid grid-cols-3 gap-2 text-xs md:grid-cols-5">
+                      <ImportMetric label="Success" value={selectedJob.success_count} tone="success" />
+                      <ImportMetric label="Skipped" value={selectedJob.skipped_count} />
+                      <ImportMetric label="Failed" value={selectedJob.failed_count} tone="danger" />
+                      <ImportMetric label="Processed" value={selectedJob.processed_count} tone="accent" />
+                      <ImportMetric label="Total" value={selectedJob.total_count} />
+                    </div>
+                    {selectedJob.error_message && <StatusBanner tone="danger">{selectedJob.error_message}</StatusBanner>}
+                    <div className="flex flex-wrap gap-2">
+                      {(selectedJob.status === 'pending' || selectedJob.status === 'paused') && (
+                        <Button size="sm" variant="primary" onClick={() => handleAction('start', selectedJob.id)}>
+                          {selectedJob.status === 'paused' ? 'Resume' : 'Start'}
+                        </Button>
+                      )}
+                      {selectedJob.status === 'running' && (
+                        <Button size="sm" variant="secondary" onClick={() => handleAction('pause', selectedJob.id)}>Pause</Button>
+                      )}
+                      {selectedJob.failed_count > 0 && selectedJob.status !== 'running' && (
+                        <Button size="sm" variant="secondary" onClick={() => handleAction('retry', selectedJob.id)}>Retry failed</Button>
+                      )}
+                      {(selectedJob.status === 'running' || selectedJob.status === 'pending' || selectedJob.status === 'paused') && (
+                        <Button
+                          size="sm"
+                          variant="danger"
+                          onClick={() => { if (window.confirm('Cancel this import job?')) handleAction('cancel', selectedJob.id) }}
+                        >
+                          Cancel
+                        </Button>
                       )}
                     </div>
-                    <StatusBadge status={item.status} />
                   </div>
-                ))}
+                </Panel>
+
+                <div className="flex min-h-0 flex-1 flex-col p-4">
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <div>
+                      <div className="text-sm font-semibold text-foreground">Files</div>
+                      <div className="text-xs text-muted-foreground">Latest 100 results for this job</div>
+                    </div>
+                    <SegmentedControl options={ITEM_FILTERS} value={itemFilter} onChange={handleItemFilterChange} />
+                  </div>
+                  <div className="min-h-0 flex-1 overflow-y-auto rounded-lg border border-border bg-surface">
+                    {itemsLoading && <SkeletonRows count={6} />}
+                    {!itemsLoading && items.length === 0 && <EmptyState compact icon="file" title="No files" description="No files match the current filter." />}
+                    {items.map(item => (
+                      <div key={item.id} className="flex items-start justify-between gap-3 border-b border-border px-3 py-2.5 last:border-b-0">
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate font-mono text-xs text-foreground" title={item.file_path}>
+                            {item.file_path.split('/').slice(-2).join('/')}
+                          </div>
+                          {item.error_message && (
+                            <div className="mt-0.5 truncate text-xs text-destructive" title={item.error_message}>
+                              {item.error_message}
+                            </div>
+                          )}
+                        </div>
+                        <StatusBadge status={item.status} />
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
-            </>
-          )}
-        </main>
+            )}
+          </main>
+        </div>
       </div>
+    </div>
+  )
+}
+
+function ImportMetric({ label, value, tone = 'neutral' }: { label: string; value: number; tone?: 'neutral' | 'accent' | 'success' | 'danger' }) {
+  return (
+    <div className="rounded-md border border-border bg-background/45 px-3 py-2">
+      <div
+        className={cn(
+          'font-mono text-lg font-semibold',
+          tone === 'accent' && 'text-primary',
+          tone === 'success' && 'text-emerald-600 dark:text-emerald-300',
+          tone === 'danger' && 'text-destructive',
+        )}
+      >
+        {value.toLocaleString()}
+      </div>
+      <div className="text-xs text-muted-foreground">{label}</div>
     </div>
   )
 }

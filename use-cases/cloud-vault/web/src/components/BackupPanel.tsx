@@ -1,12 +1,13 @@
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useI18n } from '../i18n/I18nContext'
 import {
   createBackup,
-  listBackups,
   deleteBackup,
   getBackupDownloadUrl,
+  listBackups,
   type Backup,
 } from '../api/system'
+import { Button, EmptyState, Panel, SkeletonRows, StatusBanner } from './ui'
 
 export default function BackupPanel() {
   const { t } = useI18n()
@@ -47,9 +48,7 @@ export default function BackupPanel() {
   }
 
   async function handleDelete(name: string) {
-    if (!window.confirm(t.backup.confirmDelete)) {
-      return
-    }
+    if (!window.confirm(t.backup.confirmDelete)) return
     setDeletingId(name)
     setError('')
     try {
@@ -70,76 +69,57 @@ export default function BackupPanel() {
 
   function formatDate(dateStr: string): string {
     try {
-      const date = new Date(dateStr)
-      return date.toLocaleString()
+      return new Date(dateStr).toLocaleString()
     } catch {
       return dateStr
     }
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold">{t.backup.title}</h3>
-        <button
-          onClick={handleCreate}
-          disabled={creating}
-          className="px-4 py-2 text-sm font-medium bg-primary text-primary-foreground rounded hover:opacity-90 disabled:opacity-50"
-        >
-          {creating ? t.backup.creating : t.backup.create}
-        </button>
-      </div>
-
-      {error && (
-        <div className="text-sm text-destructive border border-destructive/30 rounded px-3 py-2">
-          {error}
-        </div>
-      )}
-
-      {loading && (
-        <div className="text-sm text-muted-foreground">{t.common.loading}</div>
-      )}
-
-      {!loading && backups.length === 0 && (
-        <div className="text-sm text-muted-foreground border border-border rounded-lg p-4 text-center">
-          {t.backup.noBackups}
-        </div>
-      )}
-
-      {!loading && backups.length > 0 && (
-        <div className="space-y-2">
-          {backups.map(backup => (
-            <div
-              key={backup.id}
-              className="border border-border rounded-lg p-3 bg-background flex items-center justify-between gap-3"
-            >
-              <div className="flex-1 min-w-0">
-                <div className="text-sm font-medium truncate">{backup.filename}</div>
-                <div className="text-xs text-muted-foreground mt-0.5 flex gap-3">
-                  <span>{t.backup.size}: {formatSize(backup.size)}</span>
-                  <span>{t.backup.createdAt}: {formatDate(backup.created_at)}</span>
+    <Panel
+      title={t.backup.title}
+      description="Create local archive snapshots before maintenance or recovery work."
+      action={<Button size="sm" variant="primary" icon="archive" onClick={handleCreate} disabled={creating}>{creating ? t.backup.creating : t.backup.create}</Button>}
+    >
+      <div className="p-4">
+        {error && <StatusBanner tone="danger">{error}</StatusBanner>}
+        {loading && <SkeletonRows count={3} />}
+        {!loading && backups.length === 0 && (
+          <EmptyState compact icon="archive" title={t.backup.noBackups} description="Create a backup to keep a restorable snapshot." />
+        )}
+        {!loading && backups.length > 0 && (
+          <div className="divide-y divide-border overflow-hidden rounded-lg border border-border">
+            {backups.map(backup => (
+              <div key={backup.id} className="flex items-center justify-between gap-3 bg-background/45 px-3 py-3">
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm font-medium text-foreground">{backup.filename}</div>
+                  <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                    <span>{t.backup.size}: {formatSize(backup.size)}</span>
+                    <span>{t.backup.createdAt}: {formatDate(backup.created_at)}</span>
+                  </div>
+                </div>
+                <div className="flex shrink-0 gap-2">
+                  <a
+                    href={getBackupDownloadUrl(backup.filename)}
+                    download
+                    className="inline-flex h-8 items-center justify-center rounded-md border border-border bg-surface px-2.5 text-xs font-medium text-foreground transition-colors hover:bg-accent"
+                  >
+                    {t.backup.download}
+                  </a>
+                  <Button
+                    size="sm"
+                    variant="danger"
+                    onClick={() => handleDelete(backup.filename)}
+                    disabled={deletingId === backup.filename}
+                  >
+                    {deletingId === backup.filename ? t.backup.deleting : t.backup.delete}
+                  </Button>
                 </div>
               </div>
-              <div className="flex gap-2">
-                <a
-                  href={getBackupDownloadUrl(backup.filename)}
-                  download
-                  className="px-3 py-1.5 text-xs border border-border rounded hover:bg-accent"
-                >
-                  {t.backup.download}
-                </a>
-                <button
-                  onClick={() => handleDelete(backup.filename)}
-                  disabled={deletingId === backup.filename}
-                  className="px-3 py-1.5 text-xs border border-border rounded hover:bg-destructive/10 disabled:opacity-50"
-                >
-                  {deletingId === backup.filename ? t.backup.deleting : t.backup.delete}
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </Panel>
   )
 }
