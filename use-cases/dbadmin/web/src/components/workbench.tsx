@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { AlertIcon, XIcon } from './Icons'
+import { AlertIcon, EmptyIcon, XIcon } from './Icons'
 
 export function PageShell({ children }: { children: ReactNode }) {
   return <div className="page-shell">{children}</div>
@@ -76,6 +76,72 @@ export function StatusBanner({
         <div style={{ color: 'var(--text-default)' }}>{children}</div>
       </div>
       {action && <div className="shrink-0">{action}</div>}
+    </div>
+  )
+}
+
+export function LoadingState({
+  title,
+  detail,
+  compact = false,
+}: {
+  title: ReactNode
+  detail?: ReactNode
+  compact?: boolean
+}) {
+  return (
+    <div className={`flex flex-col items-center justify-center px-6 text-center ${compact ? 'py-6' : 'py-14'}`}>
+      <div className="mb-3 grid h-10 w-10 place-items-center rounded-xl" style={{ background: 'var(--bg-muted)', color: 'var(--accent)' }}>
+        <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-r-transparent" />
+      </div>
+      <div className="text-sm font-medium" style={{ color: 'var(--text-default)' }}>{title}</div>
+      {detail && <div className="mt-1 max-w-md text-xs leading-relaxed" style={{ color: 'var(--text-muted)' }}>{detail}</div>}
+    </div>
+  )
+}
+
+export function EmptyStatePanel({
+  title,
+  detail,
+  action,
+  compact = false,
+}: {
+  title: ReactNode
+  detail?: ReactNode
+  action?: ReactNode
+  compact?: boolean
+}) {
+  return (
+    <div className={`flex flex-col items-center justify-center px-6 text-center ${compact ? 'py-6' : 'py-14'}`}>
+      <div className="mb-3 grid h-10 w-10 place-items-center rounded-xl" style={{ background: 'var(--bg-muted)', color: 'var(--text-subtle)' }}>
+        <EmptyIcon className="h-5 w-5" />
+      </div>
+      <div className="text-sm font-medium" style={{ color: 'var(--text-default)' }}>{title}</div>
+      {detail && <div className="mt-1 max-w-md text-xs leading-relaxed" style={{ color: 'var(--text-muted)' }}>{detail}</div>}
+      {action && <div className="mt-4">{action}</div>}
+    </div>
+  )
+}
+
+export function ErrorStatePanel({
+  title,
+  message,
+  action,
+  compact = false,
+}: {
+  title?: ReactNode
+  message: ReactNode
+  action?: ReactNode
+  compact?: boolean
+}) {
+  return (
+    <div className={`flex flex-col items-center justify-center px-6 text-center ${compact ? 'py-6' : 'py-14'}`}>
+      <div className="mb-3 grid h-10 w-10 place-items-center rounded-xl" style={{ background: 'var(--danger-soft)', color: 'var(--danger)' }}>
+        <AlertIcon className="h-5 w-5" />
+      </div>
+      <div className="text-sm font-semibold" style={{ color: 'var(--danger)' }}>{title}</div>
+      <div className="mt-1 max-w-md text-xs leading-relaxed" style={{ color: 'var(--text-muted)' }}>{message}</div>
+      {action && <div className="mt-4">{action}</div>}
     </div>
   )
 }

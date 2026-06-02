@@ -14,12 +14,10 @@ import type {
   MongoObjectIdInfo,
 } from '../api'
 import { useMongoHistory } from '../hooks/useMongoHistory'
-import ErrorState from '../components/ErrorState'
-import EmptyState from '../components/EmptyState'
 import ConfirmDialog from '../components/ConfirmDialog'
 import WorkbenchHeader from '../components/WorkbenchHeader'
 import { XIcon } from '../components/Icons'
-import { PageBody, PageShell, PageToolbar } from '../components/workbench'
+import { EmptyStatePanel, ErrorStatePanel, LoadingState, PageBody, PageShell, PageToolbar } from '../components/workbench'
 
 type ViewMode = 'table' | 'json'
 type ActiveTab = 'documents' | 'aggregation' | 'schema' | 'stats'
@@ -280,7 +278,7 @@ export default function MongoCollectionPanel() {
 
   if (!connectionId || !database || !collection) {
     return (
-      <ErrorState
+      <ErrorStatePanel
         title={t('mongodb.invalidRoute')}
         message={t('mongodb.invalidRouteMessage')}
       />
@@ -660,21 +658,24 @@ function DocumentsTab(props: {
       {/* Results */}
       <div className="flex-1 overflow-auto">
         {error && (
-          <ErrorState
+          <ErrorStatePanel
+            compact
             title={t('mongodb.browser.query_error')}
             message={error}
-            onRetry={executeQuery}
+            action={
+              <button className="button-secondary" onClick={() => void executeQuery()}>
+                {t('common.retry')}
+              </button>
+            }
           />
         )}
 
         {!error && loading && (
-          <div className="flex items-center justify-center py-16">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--accent-primary)]" />
-          </div>
+          <LoadingState compact title={t('mongodb.loading')} />
         )}
 
         {!error && !loading && results && results.documents.length === 0 && (
-          <EmptyState message={t('mongodb.browser.no_documents')} />
+          <EmptyStatePanel compact title={t('mongodb.browser.no_documents')} />
         )}
 
         {!error && !loading && results && results.documents.length > 0 && (
@@ -851,7 +852,8 @@ function AggregationTab(props: {
       </div>
 
       {aggError && (
-        <ErrorState
+        <ErrorStatePanel
+          compact
           title={t('mongodb.p1.aggregation.error')}
           message={aggError}
         />
@@ -864,7 +866,7 @@ function AggregationTab(props: {
           </div>
 
           {aggResult.documents.length === 0 ? (
-            <EmptyState message={t('mongodb.p1.aggregation.no_results')} />
+            <EmptyStatePanel compact title={t('mongodb.p1.aggregation.no_results')} />
           ) : (
             <div className="space-y-2">
               {aggResult.documents.map((doc: Record<string, unknown>, idx: number) => (
@@ -916,17 +918,20 @@ function SchemaTab(props: {
       </div>
 
       {schemaError && (
-        <ErrorState
+        <ErrorStatePanel
+          compact
           title={t('mongodb.p1.schema.error')}
           message={schemaError}
-          onRetry={analyzeSchema}
+          action={
+            <button className="button-secondary" onClick={() => void analyzeSchema()}>
+              {t('common.retry')}
+            </button>
+          }
         />
       )}
 
       {schemaLoading && (
-        <div className="flex items-center justify-center py-16">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--accent-primary)]" />
-        </div>
+        <LoadingState compact title={t('mongodb.p1.schema.analyzing')} />
       )}
 
       {!schemaLoading && !schemaError && schema && (
@@ -936,7 +941,7 @@ function SchemaTab(props: {
           </div>
 
           {schema.fields.length === 0 ? (
-            <EmptyState message={t('mongodb.p1.schema.no_fields')} />
+            <EmptyStatePanel compact title={t('mongodb.p1.schema.no_fields')} />
           ) : (
             <div className="border border-[var(--border-primary)] rounded overflow-hidden">
               <table className="w-full text-sm">
@@ -1015,17 +1020,20 @@ function StatsTab(props: {
       </div>
 
       {statsError && (
-        <ErrorState
+        <ErrorStatePanel
+          compact
           title={t('mongodb.p1.stats.error')}
           message={statsError}
-          onRetry={loadStats}
+          action={
+            <button className="button-secondary" onClick={() => void loadStats()}>
+              {t('common.retry')}
+            </button>
+          }
         />
       )}
 
       {statsLoading && (
-        <div className="flex items-center justify-center py-16">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--accent-primary)]" />
-        </div>
+        <LoadingState compact title={t('mongodb.p1.stats.loading')} />
       )}
 
       {!statsLoading && !statsError && stats && (
@@ -1327,7 +1335,7 @@ function HistoryModal(props: {
 
         <div className="flex-1 overflow-auto p-6">
           {history.length === 0 ? (
-            <EmptyState message={t('mongodb.p1.history.no_history')} />
+            <EmptyStatePanel compact title={t('mongodb.p1.history.no_history')} />
           ) : (
             <div className="space-y-3">
               {history.map(entry => (
@@ -1666,20 +1674,19 @@ function IndexesModal({
 
         <div className="flex-1 overflow-auto p-6">
           {loading && (
-            <div className="flex items-center justify-center py-16">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--accent-primary)]" />
-            </div>
+            <LoadingState compact title={t('mongodb.loading')} />
           )}
 
           {error && (
-            <ErrorState
+            <ErrorStatePanel
+              compact
               title={t('mongodb.indexes.load_error')}
               message={error}
             />
           )}
 
           {!loading && !error && indexes.length === 0 && (
-            <EmptyState message={t('mongodb.indexes.no_indexes')} />
+            <EmptyStatePanel compact title={t('mongodb.indexes.no_indexes')} />
           )}
 
           {!loading && !error && indexes.length > 0 && (

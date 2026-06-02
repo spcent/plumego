@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { api, type ResourceNode, type DangerousStatement, ApiError } from '../api'
 import ConfirmDialog from '../components/ConfirmDialog'
@@ -7,11 +7,13 @@ import { useToast } from '../components/toastContext'
 import { useI18n } from '../i18nContext'
 import { useCurrentConn } from '../context/connections'
 import { ChevronRightIcon, TableIcon } from '../components/Icons'
-import { ModalShell, PageBody, PageShell, PageToolbar } from '../components/workbench'
+import { EmptyStatePanel, ErrorStatePanel, LoadingState, ModalShell, PageBody, PageShell, PageToolbar } from '../components/workbench'
 
 export default function TablesPage() {
   const { connId, dbName } = useParams<{ connId: string; dbName: string }>()
   const [tables, setTables] = useState<ResourceNode[]>([])
+  const [loading, setLoading] = useState(false)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [dropTarget, setDropTarget] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
   const [newTableName, setNewTableName] = useState('')
@@ -26,10 +28,25 @@ export default function TablesPage() {
   const currentConn = useCurrentConn(connId)
   const isReadonly = currentConn?.readonly ?? false
 
-  useEffect(() => {
+  const loadTables = useCallback(async () => {
     if (!connId || !dbName) return
-    api.resources(connId, dbName).then(setTables).catch(e => showToast(e.message))
-  }, [connId, dbName, showToast])
+    setLoading(true)
+    setLoadError(null)
+    try {
+      setTables(await api.resources(connId, dbName))
+    } catch (e) {
+      const message = e instanceof Error ? e.message : t('resource.error')
+      setLoadError(message)
+      showToast(message)
+    } finally {
+      setLoading(false)
+    }
+  }, [connId, dbName, showToast, t])
+
+  useEffect(() => {
+    const id = window.setTimeout(() => { void loadTables() }, 0)
+    return () => window.clearTimeout(id)
+  }, [loadTables])
 
   async function handleDropTable() {
     if (!dropTarget) return
@@ -99,7 +116,7 @@ export default function TablesPage() {
           <>
           <button
             onClick={handleCopySchema}
-            disabled={copyingSchema || tables.length === 0}
+            disabled={copyingSchema || loading || tables.length === 0}
             className="btn btn-ghost h-8 px-3 text-xs disabled:opacity-50"
           >
             {copyingSchema ? t('tables.copy_schema.loading') : t('tables.copy_schema')}
@@ -133,7 +150,22 @@ export default function TablesPage() {
       />
 
       <PageBody>
-        <div className="data-table-wrap h-full">
+        {loading && tables.length === 0 ? (
+          <LoadingState title={t('resource.loading')} detail={dbName} />
+        ) : loadError ? (
+          <ErrorStatePanel
+            title={t('resource.error')}
+            message={loadError}
+            action={
+              <button type="button" onClick={() => void loadTables()} className="btn btn-ghost h-8 px-3 text-xs">
+                {t('resource.retry')}
+              </button>
+            }
+          />
+        ) : tables.length === 0 ? (
+          <EmptyStatePanel title={t('tables.empty')} detail={dbName} />
+        ) : (
+          <div className="data-table-wrap h-full">
           <table className="data-table">
             <thead>
               <tr>
@@ -199,14 +231,10 @@ export default function TablesPage() {
                   </tr>
                 )
               })}
-              {tables.length === 0 && (
-                <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center" style={{ color: 'var(--text-muted)' }}>{t('tables.empty')}</td>
-                </tr>
-              )}
             </tbody>
           </table>
-        </div>
+          </div>
+        )}
       </PageBody>
 
       <ConfirmDialog

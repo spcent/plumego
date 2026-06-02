@@ -3,7 +3,7 @@ import { useI18n } from '../i18nContext'
 import { sqlHistorySettings } from '../hooks/useSqlHistory'
 import { api, type ActiveOperation, type AuditEvent, type Connection, type PoolStats } from '../api'
 import { useToast } from '../components/toastContext'
-import { PageBody, PageShell, PageStatusBar, PageToolbar } from '../components/workbench'
+import { EmptyStatePanel, ErrorStatePanel, LoadingState, PageBody, PageShell, PageStatusBar, PageToolbar } from '../components/workbench'
 
 export default function SettingsPage() {
   const { t } = useI18n()
@@ -11,10 +11,14 @@ export default function SettingsPage() {
   const [historyEnabled, setHistoryEnabled] = useState(() => sqlHistorySettings.get().sqlHistoryEnabled)
   const [operations, setOperations] = useState<ActiveOperation[]>([])
   const [operationsLoading, setOperationsLoading] = useState(false)
+  const [operationsError, setOperationsError] = useState<string | null>(null)
   const [connections, setConnections] = useState<Connection[]>([])
   const [poolStats, setPoolStats] = useState<PoolStats | null>(null)
   const [runtimeLoading, setRuntimeLoading] = useState(false)
+  const [runtimeError, setRuntimeError] = useState<string | null>(null)
   const [auditEvents, setAuditEvents] = useState<AuditEvent[]>([])
+  const [auditLoading, setAuditLoading] = useState(false)
+  const [auditError, setAuditError] = useState<string | null>(null)
   const [me, setMe] = useState<{ user: string; role: string } | null>(null)
 
   function toggleHistory(val: boolean) {
@@ -24,10 +28,13 @@ export default function SettingsPage() {
 
   const loadOperations = useCallback(async () => {
     setOperationsLoading(true)
+    setOperationsError(null)
     try {
       setOperations(await api.listActiveOperations())
     } catch (err) {
-      toast.showToast(err instanceof Error ? err.message : 'Failed to load operations', 'error')
+      const message = err instanceof Error ? err.message : 'Failed to load operations'
+      setOperationsError(message)
+      toast.showToast(message, 'error')
     } finally {
       setOperationsLoading(false)
     }
@@ -35,6 +42,7 @@ export default function SettingsPage() {
 
   const loadRuntime = useCallback(async () => {
     setRuntimeLoading(true)
+    setRuntimeError(null)
     try {
       const [conns, stats] = await Promise.all([
         api.listConnections(),
@@ -43,13 +51,17 @@ export default function SettingsPage() {
       setConnections(conns)
       setPoolStats(stats)
     } catch (err) {
-      toast.showToast(err instanceof Error ? err.message : 'Failed to load runtime state', 'error')
+      const message = err instanceof Error ? err.message : 'Failed to load runtime state'
+      setRuntimeError(message)
+      toast.showToast(message, 'error')
     } finally {
       setRuntimeLoading(false)
     }
   }, [toast])
 
   const loadAudit = useCallback(async () => {
+    setAuditLoading(true)
+    setAuditError(null)
     try {
       const [profile, events] = await Promise.all([
         api.me(),
@@ -58,7 +70,11 @@ export default function SettingsPage() {
       setMe(profile)
       setAuditEvents(events)
     } catch (err) {
-      toast.showToast(err instanceof Error ? err.message : 'Failed to load audit events', 'error')
+      const message = err instanceof Error ? err.message : 'Failed to load audit events'
+      setAuditError(message)
+      toast.showToast(message, 'error')
+    } finally {
+      setAuditLoading(false)
     }
   }, [toast])
 
@@ -136,6 +152,21 @@ export default function SettingsPage() {
                 </button>
               }
             >
+              {runtimeLoading && connections.length === 0 ? (
+                <LoadingState compact title={t('settings.operations_loading')} />
+              ) : runtimeError ? (
+                <ErrorStatePanel
+                  compact
+                  title={t('error.operation_failed')}
+                  message={runtimeError}
+                  action={
+                    <button type="button" onClick={() => void loadRuntime()} className="btn btn-ghost h-8 px-3 text-xs">
+                      {t('resource.retry')}
+                    </button>
+                  }
+                />
+              ) : (
+                <>
               {poolStats && (
                 <div className="mb-3 grid grid-cols-2 gap-2 text-xs md:grid-cols-4">
                   <Metric label="SQL" value={String(poolStats.sql_connections?.length ?? 0)} />
@@ -144,6 +175,9 @@ export default function SettingsPage() {
                   <Metric label="ES" value={String(poolStats.es_connections)} />
                 </div>
               )}
+              {connections.length === 0 ? (
+                <EmptyStatePanel compact title={t('connections.empty')} />
+              ) : (
               <div className="space-y-2">
                 {connections.map(conn => {
                   const sqlStats = poolStats?.sql_connections?.find(s => s.connection_id === conn.id)
@@ -173,6 +207,9 @@ export default function SettingsPage() {
                   )
                 })}
               </div>
+              )}
+                </>
+              )}
             </SectionPanel>
 
             <SectionPanel
@@ -188,8 +225,21 @@ export default function SettingsPage() {
                 </button>
               }
             >
-              {operations.length === 0 ? (
-                <EmptyLine>{t('settings.operations_empty')}</EmptyLine>
+              {operationsLoading && operations.length === 0 ? (
+                <LoadingState compact title={t('settings.operations_loading')} />
+              ) : operationsError ? (
+                <ErrorStatePanel
+                  compact
+                  title={t('error.operation_failed')}
+                  message={operationsError}
+                  action={
+                    <button type="button" onClick={() => void loadOperations()} className="btn btn-ghost h-8 px-3 text-xs">
+                      {t('resource.retry')}
+                    </button>
+                  }
+                />
+              ) : operations.length === 0 ? (
+                <EmptyStatePanel compact title={t('settings.operations_empty')} />
               ) : (
                 <div className="space-y-2">
                   {operations.map(op => (
@@ -257,8 +307,21 @@ export default function SettingsPage() {
                 </button>
               }
             >
-              {auditEvents.length === 0 ? (
-                <EmptyLine>{t('settings.audit_empty')}</EmptyLine>
+              {auditLoading && auditEvents.length === 0 ? (
+                <LoadingState compact title={t('settings.operations_loading')} />
+              ) : auditError ? (
+                <ErrorStatePanel
+                  compact
+                  title={t('error.operation_failed')}
+                  message={auditError}
+                  action={
+                    <button type="button" onClick={() => void loadAudit()} className="btn btn-ghost h-8 px-3 text-xs">
+                      {t('resource.retry')}
+                    </button>
+                  }
+                />
+              ) : auditEvents.length === 0 ? (
+                <EmptyStatePanel compact title={t('settings.audit_empty')} />
               ) : (
                 <div className="max-h-[420px] space-y-2 overflow-auto pr-1">
                   {auditEvents.map(event => (
@@ -314,13 +377,5 @@ function SectionPanel({ title, action, children }: { title: string; action?: Rea
       </div>
       {children}
     </section>
-  )
-}
-
-function EmptyLine({ children }: { children: ReactNode }) {
-  return (
-    <div className="rounded-md border border-dashed px-3 py-6 text-center text-sm" style={{ borderColor: 'var(--border-subtle)', color: 'var(--text-muted)' }}>
-      {children}
-    </div>
   )
 }

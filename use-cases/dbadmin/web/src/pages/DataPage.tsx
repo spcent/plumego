@@ -11,7 +11,7 @@ import { useI18n } from '../i18nContext'
 import { useCurrentConn } from '../context/connections'
 import { toInsertSQL, toCSV, toRowJSON } from '../utils/copyFormats'
 import { XIcon } from '../components/Icons'
-import { ModalShell, PageBody, PageShell, PageStatusBar, PageToolbar } from '../components/workbench'
+import { EmptyStatePanel, ErrorStatePanel, LoadingState, ModalShell, PageBody, PageShell, PageStatusBar, PageToolbar } from '../components/workbench'
 
 interface ConfirmState {
   title: string
@@ -40,7 +40,7 @@ function cellTitle(v: unknown): string {
 
 function colWidth(colName: string, structure: TableStructure | null): number {
   if (!structure) return 160
-  const col = structure.columns.find(c => c.name === colName)
+  const col = structure.columns?.find(c => c.name === colName)
   if (!col) return 160
   if (col.primary_key) return 120
   const t = (col.data_type ?? col.full_type ?? '').toLowerCase()
@@ -61,10 +61,13 @@ export default function DataPage() {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
   const [filters, setFilters] = useState<FilterCondition[]>([])
   const [showFilters, setShowFilters] = useState(false)
+  const [showColumns, setShowColumns] = useState(false)
+  const [hiddenColumns, setHiddenColumns] = useState<Set<string>>(new Set())
   const [addCol, setAddCol] = useState('')
   const [addOp, setAddOp] = useState<FilterOperator>('like')
   const [addVal, setAddVal] = useState('')
   const [loading, setLoading] = useState(false)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [drawerMode, setDrawerMode] = useState<'insert' | 'edit' | null>(null)
   const [drawerInitial, setDrawerInitial] = useState<Record<string, unknown>>({})
   const [saving, setSaving] = useState(false)
@@ -81,15 +84,24 @@ export default function DataPage() {
   const currentConn = useCurrentConn(connId)
   const isReadonly = currentConn?.readonly ?? false
 
+  const structureColumns = useMemo(() => structure?.columns ?? [], [structure])
+  const rowColumns = useMemo(() => data.columns ?? [], [data.columns])
+  const dataRows = useMemo(() => data.rows ?? [], [data.rows])
+  const totalRows = data.total ?? dataRows.length
   const pkCols = useMemo(
-    () => structure?.columns.filter(c => c.primary_key).map(c => c.name) ?? [],
-    [structure]
+    () => structureColumns.filter(c => c.primary_key).map(c => c.name),
+    [structureColumns]
   )
   const hasPK = pkCols.length > 0
+  const visibleColumns = useMemo(
+    () => rowColumns.filter(col => !hiddenColumns.has(col)),
+    [rowColumns, hiddenColumns],
+  )
 
   const load = useCallback(async () => {
     if (!connId || !dbName || !tableName) return
     setLoading(true)
+    setLoadError(null)
     try {
       const r = await api.listRows(connId, dbName, tableName, {
         page,
@@ -101,7 +113,9 @@ export default function DataPage() {
       setData(r)
       setSelectedRows(new Set())
     } catch (e) {
-      showToast(e instanceof Error ? e.message : t('data.load_failed'))
+      const message = e instanceof Error ? e.message : t('data.load_failed')
+      setLoadError(message)
+      showToast(message)
     } finally {
       setLoading(false)
     }
@@ -120,9 +134,9 @@ export default function DataPage() {
   useEffect(() => {
     if (selectAllRef.current) {
       selectAllRef.current.indeterminate =
-        selectedRows.size > 0 && selectedRows.size < data.rows.length
+        selectedRows.size > 0 && selectedRows.size < dataRows.length
     }
-  }, [selectedRows.size, data.rows.length])
+  }, [selectedRows.size, dataRows.length])
 
   function handleSort(col: string) {
     if (sortColumn !== col) {
@@ -162,18 +176,19 @@ export default function DataPage() {
 
   function toggleAllRows() {
     setSelectedRows(prev =>
-      prev.size === data.rows.length
+      prev.size === dataRows.length
         ? new Set()
-        : new Set(data.rows.map((_, i) => i))
+        : new Set(dataRows.map((_, i) => i))
     )
   }
 
   function copySelectedRows(format: 'json' | 'csv' | 'insert') {
-    const rows = [...selectedRows].sort((a, b) => a - b).map(i => data.rows[i])
+    const rows = [...selectedRows].sort((a, b) => a - b).map(i => dataRows[i])
+    const columns = visibleColumns.length > 0 ? visibleColumns : rowColumns
     let text: string
-    if (format === 'json') text = toRowJSON(data.columns, rows)
-    else if (format === 'csv') text = toCSV(data.columns, rows)
-    else text = toInsertSQL(tableName!, data.columns, rows)
+    if (format === 'json') text = toRowJSON(columns, rows)
+    else if (format === 'csv') text = toCSV(columns, rows)
+    else text = toInsertSQL(tableName!, columns, rows)
     navigator.clipboard.writeText(text).then(
       () => showToast(t('copy.cell_success'), 'success'),
       () => showToast(t('data.copy_failed')),
@@ -181,7 +196,7 @@ export default function DataPage() {
   }
 
   const noPKTitle = t('data.no_pk_hint')
-  const pageCount = Math.ceil(data.total / pageSize) || 1
+  const pageCount = Math.ceil(totalRows / pageSize) || 1
 
   async function handleSave(values: Record<string, unknown>) {
     setSaving(true)
@@ -219,7 +234,20 @@ export default function DataPage() {
   const needsValue = (op: FilterOperator) => op !== 'is_null' && op !== 'is_not_null'
 
   const colType = (colName: string) =>
-    structure?.columns.find(c => c.name === colName)?.data_type
+    structureColumns.find(c => c.name === colName)?.data_type
+
+  function toggleColumn(col: string) {
+    setHiddenColumns(prev => {
+      const next = new Set(prev)
+      if (next.has(col)) {
+        next.delete(col)
+        return next
+      }
+      if (rowColumns.length - next.size <= 1) return next
+      next.add(col)
+      return next
+    })
+  }
 
   return (
     <PageShell>
@@ -229,21 +257,11 @@ export default function DataPage() {
         datasourceType={currentConn?.driver ?? 'mysql'}
         readonly={isReadonly}
         onRefresh={load}
-        meta={{ rowCount: data.total }}
+        meta={{ rowCount: totalRows }}
       />
       <PageToolbar
         leading={
           <>
-            {selectedRows.size > 0 && (
-              <div className="flex flex-wrap items-center gap-1">
-                <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
-                  {t('copy.rows_selected', { n: selectedRows.size })}
-                </span>
-                <button onClick={() => copySelectedRows('json')} className="btn btn-ghost h-7 px-2 text-xs">{t('copy.json')}</button>
-                <button onClick={() => copySelectedRows('csv')} className="btn btn-ghost h-7 px-2 text-xs">{t('copy.csv')}</button>
-                <button onClick={() => copySelectedRows('insert')} className="btn btn-ghost h-7 px-2 text-xs">{t('copy.insert')}</button>
-              </div>
-            )}
             {loading && (
               <span className="badge" style={{ color: 'var(--accent)' }}>
                 <span className="status-dot animate-pulse" style={{ background: 'var(--accent)' }} />
@@ -265,6 +283,12 @@ export default function DataPage() {
             className={`btn h-8 px-3 text-xs ${showFilters ? 'btn-primary' : 'btn-ghost'}`}
           >
             {t('data.filter.show')}{filters.length > 0 && ` (${filters.length})`}
+          </button>
+          <button
+            onClick={() => setShowColumns(v => !v)}
+            className={`btn h-8 px-3 text-xs ${showColumns ? 'btn-primary' : 'btn-ghost'}`}
+          >
+            {t('data.columns.show')} ({visibleColumns.length})
           </button>
           {!isReadonly && (
             <button
@@ -288,7 +312,7 @@ export default function DataPage() {
       <PageBody>
         <div className="flex h-full flex-col">
       {/* ── Filter panel ─────────────────────────────────── */}
-      {showFilters && (
+      {(showFilters || showColumns) && (
         <div
           className="shrink-0 space-y-2 px-4 py-3"
           style={{
@@ -296,7 +320,7 @@ export default function DataPage() {
             borderBottom: '1px solid var(--border-subtle)',
           }}
         >
-          {filters.length > 0 && (
+          {showFilters && filters.length > 0 && (
             <div className="flex flex-wrap gap-1 items-center">
               {filters.map((f, i) => (
                 <span
@@ -325,6 +349,7 @@ export default function DataPage() {
               </button>
             </div>
           )}
+          {showFilters && (
           <div className="flex gap-2 flex-wrap items-center">
             <select
               value={addCol}
@@ -332,7 +357,7 @@ export default function DataPage() {
               className="select min-w-32 text-xs"
             >
               <option value="">{t('data.filter.col_placeholder')}</option>
-              {data.columns.map(c => <option key={c} value={c}>{c}</option>)}
+              {rowColumns.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
             <select
               value={addOp}
@@ -358,10 +383,61 @@ export default function DataPage() {
               {t('data.filter.add')}
             </button>
           </div>
+          )}
+
+          {showColumns && (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-[11px] font-medium uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>
+                {t('data.columns.visible')}
+              </span>
+              {rowColumns.map(col => (
+                <label
+                  key={col}
+                  className="inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-md border px-2 text-[11px]"
+                  style={{
+                    borderColor: hiddenColumns.has(col) ? 'var(--border-subtle)' : 'var(--accent)',
+                    color: hiddenColumns.has(col) ? 'var(--text-muted)' : 'var(--accent)',
+                    background: hiddenColumns.has(col) ? 'transparent' : 'var(--bg-selected)',
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={!hiddenColumns.has(col)}
+                    onChange={() => toggleColumn(col)}
+                  />
+                  <span className="font-mono">{col}</span>
+                </label>
+              ))}
+              {hiddenColumns.size > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setHiddenColumns(new Set())}
+                  className="btn btn-ghost h-7 px-2 text-xs"
+                >
+                  {t('data.columns.reset')}
+                </button>
+              )}
+            </div>
+          )}
         </div>
       )}
 
       {/* ── Table ────────────────────────────────────────── */}
+      {loading && dataRows.length === 0 ? (
+        <LoadingState title={t('data.loading')} detail={tableName} />
+      ) : loadError ? (
+        <ErrorStatePanel
+          title={t('data.load_failed')}
+          message={loadError}
+          action={
+            <button type="button" onClick={() => void load()} className="btn btn-ghost h-8 px-3 text-xs">
+              {t('resource.retry')}
+            </button>
+          }
+        />
+      ) : dataRows.length === 0 ? (
+        <EmptyStatePanel title={t('data.no_rows')} detail={filters.length > 0 ? t('data.empty.filtered') : tableName} />
+      ) : (
       <div className="data-table-wrap flex-1">
         <table className="data-table">
           <thead>
@@ -371,15 +447,15 @@ export default function DataPage() {
                 <input
                   ref={selectAllRef}
                   type="checkbox"
-                  checked={data.rows.length > 0 && selectedRows.size === data.rows.length}
+                  checked={dataRows.length > 0 && selectedRows.size === dataRows.length}
                   onChange={toggleAllRows}
                   className="cursor-pointer"
-                  disabled={data.rows.length === 0}
+                  disabled={dataRows.length === 0}
                 />
               </th>
 
-              {data.columns.map(col => {
-                const structCol = structure?.columns.find(c => c.name === col)
+              {visibleColumns.map(col => {
+                const structCol = structureColumns.find(c => c.name === col)
                 const isPK = structCol?.primary_key ?? false
                 const typeLabel = structCol?.data_type ?? structCol?.full_type ?? ''
                 const isSorted = sortColumn === col
@@ -427,14 +503,14 @@ export default function DataPage() {
               })}
 
               {/* Actions col */}
-              {data.columns.length > 0 && (
+              {visibleColumns.length > 0 && (
                 <th style={{ width: 120, padding: '6px 8px' }} />
               )}
             </tr>
           </thead>
 
           <tbody>
-            {data.rows.map((row, ri) => (
+            {dataRows.map((row, ri) => (
               <tr
                 key={ri}
                 style={{
@@ -453,7 +529,7 @@ export default function DataPage() {
                   />
                 </td>
 
-                {data.columns.map(col => {
+                {visibleColumns.map(col => {
                   const w = colWidth(col, structure)
                   return (
                     <td
@@ -474,7 +550,7 @@ export default function DataPage() {
                   )
                 })}
 
-                {data.columns.length > 0 && (
+                {visibleColumns.length > 0 && (
                   <td style={{ width: 120, padding: '6px 8px' }}>
                     <div className="flex gap-1 justify-end">
                       <button
@@ -527,20 +603,25 @@ export default function DataPage() {
               </tr>
             ))}
 
-            {data.rows.length === 0 && (
-              <tr>
-                <td
-                  colSpan={data.columns.length + 2}
-                  className="py-12 text-center text-[12px]"
-                  style={{ color: 'var(--text-subtle)' }}
-                >
-                  {t('data.no_rows')}
-                </td>
-              </tr>
-            )}
           </tbody>
         </table>
       </div>
+      )}
+      {selectedRows.size > 0 && (
+        <div className="shrink-0 border-t px-4 py-2" style={{ borderColor: 'var(--border-subtle)', background: 'var(--bg-surface)' }}>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="text-[12px] font-medium" style={{ color: 'var(--text-default)' }}>
+              {t('copy.rows_selected', { n: selectedRows.size })}
+            </div>
+            <div className="flex flex-wrap items-center gap-1">
+              <button onClick={() => copySelectedRows('json')} className="btn btn-ghost h-7 px-2 text-xs">{t('copy.json')}</button>
+              <button onClick={() => copySelectedRows('csv')} className="btn btn-ghost h-7 px-2 text-xs">{t('copy.csv')}</button>
+              <button onClick={() => copySelectedRows('insert')} className="btn btn-ghost h-7 px-2 text-xs">{t('copy.insert')}</button>
+              <button onClick={() => setSelectedRows(new Set())} className="btn btn-ghost h-7 px-2 text-xs">{t('data.selection.clear')}</button>
+            </div>
+          </div>
+        </div>
+      )}
         </div>
       </PageBody>
 
@@ -582,8 +663,8 @@ export default function DataPage() {
       {/* ── Row drawer ──────────────────────────────────── */}
       {drawerMode && structure && (
         <RowDrawer
-          key={`${drawerMode}:${structure.columns.map(c => c.name).join('|')}:${pkCols.map(k => String(drawerInitial[k] ?? '')).join('|')}`}
-          columns={structure.columns}
+          key={`${drawerMode}:${structureColumns.map(c => c.name).join('|')}:${pkCols.map(k => String(drawerInitial[k] ?? '')).join('|')}`}
+          columns={structureColumns}
           pkCols={pkCols}
           mode={drawerMode}
           initialValues={drawerMode === 'edit' ? drawerInitial : undefined}

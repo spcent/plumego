@@ -8,7 +8,7 @@ import WorkbenchHeader from '../components/WorkbenchHeader'
 import ConfirmDialog from '../components/ConfirmDialog'
 import { useRedisHistory } from '../hooks/useRedisHistory'
 import { XIcon } from '../components/Icons'
-import { PageShell } from '../components/workbench'
+import { EmptyStatePanel, LoadingState, PageShell } from '../components/workbench'
 
 interface ConfirmState {
   title: string
@@ -458,9 +458,7 @@ export default function RedisKeyPanel() {
           {/* Key list */}
           <div className="flex-1 overflow-y-auto">
             {keys.length === 0 && !loading && (
-              <div className="p-4 text-center text-sm" style={{ color: 'var(--text-muted)' }}>
-                {t('redis.browser.empty')}
-              </div>
+              <EmptyStatePanel compact title={t('redis.browser.empty')} />
             )}
             {keys.map(key => (
               <div
@@ -596,9 +594,7 @@ export default function RedisKeyPanel() {
             ) : (
               <div className="space-y-2">
                 {redisHistory.loading && (
-                  <div className="text-center py-2 text-xs" style={{ color: 'var(--text-muted)' }}>
-                    {t('redis.browser.loading')}
-                  </div>
+                  <LoadingState compact title={t('redis.browser.loading')} />
                 )}
                 {redisHistory.entries.length > 0 && (
                   <div className="flex justify-end mb-2">
@@ -610,9 +606,7 @@ export default function RedisKeyPanel() {
                   </div>
                 )}
                 {redisHistory.entries.length === 0 && (
-                  <div className="text-center py-6 text-sm" style={{ color: 'var(--text-muted)' }}>
-                    {t('redis.history.empty')}
-                  </div>
+                  <EmptyStatePanel compact title={t('redis.history.empty')} />
                 )}
                 {redisHistory.entries.map(h => (
                   <div
@@ -669,9 +663,7 @@ export default function RedisKeyPanel() {
             </div>
             <div className="flex-1 overflow-y-auto p-6">
               {previewKeys.length === 0 ? (
-                <div className="text-center py-8" style={{ color: 'var(--text-muted)' }}>
-                  {t('redis.batch.no_keys')}
-                </div>
+                <EmptyStatePanel compact title={t('redis.batch.no_keys')} />
               ) : (
                 <div className="space-y-2">
                   {previewKeys.map((key, idx) => (

@@ -5,11 +5,10 @@ import { useCurrentConn } from '../context/connections'
 import { api } from '../api'
 import type { ESClusterInfo, ESIndexInfo, ESSearchResponse, ESDocument } from '../api'
 import WorkbenchHeader from '../components/WorkbenchHeader'
-import ErrorState from '../components/ErrorState'
 import { useToast } from '../components/toastContext'
 import { useEsHistory } from '../hooks/useEsHistory'
 import { XIcon } from '../components/Icons'
-import { PageBody, PageShell, PageToolbar } from '../components/workbench'
+import { EmptyStatePanel, ErrorStatePanel, PageBody, PageShell, PageToolbar } from '../components/workbench'
 
 type Tab = 'overview' | 'mapping' | 'settings' | 'search' | 'documents'
 
@@ -238,15 +237,22 @@ export default function ElasticsearchIndexPanel() {
       <PageBody scroll>
         <div className="p-4">
         {loadError && (
-          <ErrorState
-            title={t('common.error')}
+          <ErrorStatePanel
+            title={t('error.operation_failed')}
             message={loadError}
-            onRetry={() => {
-              setLoadError('')
-              if (activeTab === 'overview') loadOverview()
-              else if (activeTab === 'mapping') loadMapping()
-              else if (activeTab === 'settings') loadSettings()
-            }}
+            action={
+              <button
+                className="button-secondary"
+                onClick={() => {
+                  setLoadError('')
+                  if (activeTab === 'overview') void loadOverview()
+                  else if (activeTab === 'mapping') void loadMapping()
+                  else if (activeTab === 'settings') void loadSettings()
+                }}
+              >
+                {t('common.retry')}
+              </button>
+            }
           />
         )}
         {!loadError && activeTab === 'overview' && (
@@ -304,9 +310,7 @@ export default function ElasticsearchIndexPanel() {
                 {t('elasticsearch.indices')} ({indices.length})
               </h3>
               {indices.length === 0 ? (
-                <div className="text-sm text-center py-8" style={{ color: 'var(--text-muted)' }}>
-                  {t('elasticsearch.no_indices')}
-                </div>
+                <EmptyStatePanel compact title={t('elasticsearch.no_indices')} />
               ) : (
                 <div className="rounded-lg overflow-hidden border" style={{ borderColor: 'var(--border-subtle)' }}>
                   <table className="w-full text-sm">
@@ -446,9 +450,7 @@ export default function ElasticsearchIndexPanel() {
             </div>
 
             {searchError && (
-              <div className="rounded-lg p-3 text-sm" style={{ background: 'var(--error)18', color: 'var(--error)' }}>
-                {searchError}
-              </div>
+              <ErrorStatePanel compact title={t('error.operation_failed')} message={searchError} />
             )}
 
             {searchResult && !showRawJson && (
@@ -475,9 +477,7 @@ export default function ElasticsearchIndexPanel() {
                 </div>
 
                 {searchResult.hits.length === 0 ? (
-                  <div className="text-sm text-center py-8" style={{ color: 'var(--text-muted)' }}>
-                    {t('elasticsearch.no_results')}
-                  </div>
+                  <EmptyStatePanel compact title={t('elasticsearch.no_results')} />
                 ) : (
                   <div className="rounded-lg overflow-hidden border" style={{ borderColor: 'var(--border-subtle)' }}>
                     <table className="w-full text-sm">
@@ -528,7 +528,7 @@ export default function ElasticsearchIndexPanel() {
                 <h3 className="text-sm font-semibold" style={{ color: 'var(--text-strong)' }}>
                   {t('elasticsearch.history')}
                 </h3>
-                {history.length > 0 && (
+                {esHistory.entries.length > 0 && (
                   <button
                     onClick={handleClearHistory}
                     className="px-3 py-1 text-xs rounded"
@@ -539,9 +539,7 @@ export default function ElasticsearchIndexPanel() {
                 )}
               </div>
               {esHistory.entries.length === 0 ? (
-                <div className="text-sm text-center py-4" style={{ color: 'var(--text-muted)' }}>
-                  {t('elasticsearch.history_empty')}
-                </div>
+                <EmptyStatePanel compact title={t('elasticsearch.history_empty')} />
               ) : (
                 <div className="space-y-2 max-h-64 overflow-auto">
                   {esHistory.entries.map(entry => (

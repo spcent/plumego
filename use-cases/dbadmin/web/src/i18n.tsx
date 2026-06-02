@@ -10,6 +10,9 @@ const en: Dict = {
   'login.submit': 'Sign in',
   'login.submitting': 'Signing in…',
 
+  // Common
+  'common.retry': 'Retry',
+
   // Nav
   'nav.manage_connections': '+ Manage Connections',
   'nav.sql_console': 'SQL Console',
@@ -71,6 +74,10 @@ const en: Dict = {
   'data.filter.remove': 'Remove filter',
   'data.filter.col_placeholder': 'Column…',
   'data.filter.val_placeholder': 'Value',
+  'data.columns.show': 'Columns',
+  'data.columns.visible': 'Visible columns',
+  'data.columns.reset': 'Show all',
+  'data.selection.clear': 'Clear selection',
   'data.insert': '+ Insert',
   'data.prev': '← Prev',
   'data.next': 'Next →',
@@ -83,6 +90,7 @@ const en: Dict = {
   'data.save': 'Save',
   'data.cancel': 'Cancel',
   'data.no_rows': 'No rows',
+  'data.empty.filtered': 'No rows match the current filters',
   'data.loading': 'loading…',
   'data.no_pk_hint': 'No primary key — edit/delete unavailable',
   'data.load_failed': 'Load failed',
@@ -127,6 +135,9 @@ const en: Dict = {
   'query.tab.result': 'Result',
   'query.tab.history': 'History',
   'query.history.empty': 'No history yet',
+  'query.result_tab': 'Result {n}',
+  'query.result.close': 'Close result',
+  'query.results.empty': 'Run a query to see results',
 
   // Readonly
   'readonly.badge': 'READ ONLY',
@@ -154,6 +165,11 @@ const en: Dict = {
   'history.clear_all': 'Clear all',
   'history.disabled': 'SQL history is disabled. Enable it in Settings.',
   'history.delete': 'Delete',
+  'history.search_placeholder': 'Search SQL history',
+  'history.favorites_only': 'Favorites',
+  'history.favorite': 'Save',
+  'history.unfavorite': 'Saved',
+  'history.no_matches': 'No matching history',
 
   // Export
   'export.title': 'Export',
@@ -684,6 +700,9 @@ const zh: Dict = {
   'login.submit': '登录',
   'login.submitting': '登录中…',
 
+  // Common
+  'common.retry': '重试',
+
   // Nav
   'nav.manage_connections': '+ 管理连接',
   'nav.sql_console': 'SQL 控制台',
@@ -745,6 +764,10 @@ const zh: Dict = {
   'data.filter.remove': '移除过滤条件',
   'data.filter.col_placeholder': '选择列…',
   'data.filter.val_placeholder': '值',
+  'data.columns.show': '列',
+  'data.columns.visible': '显示列',
+  'data.columns.reset': '显示全部',
+  'data.selection.clear': '清除选择',
   'data.insert': '+ 插入',
   'data.prev': '← 上一页',
   'data.next': '下一页 →',
@@ -757,6 +780,7 @@ const zh: Dict = {
   'data.save': '保存',
   'data.cancel': '取消',
   'data.no_rows': '无数据',
+  'data.empty.filtered': '当前过滤条件下没有匹配行',
   'data.loading': '加载中…',
   'data.no_pk_hint': '无主键 — 编辑和删除不可用',
   'data.load_failed': '加载失败',
@@ -801,6 +825,9 @@ const zh: Dict = {
   'query.tab.result': '结果',
   'query.tab.history': '历史',
   'query.history.empty': '暂无历史记录',
+  'query.result_tab': '结果 {n}',
+  'query.result.close': '关闭结果',
+  'query.results.empty': '运行查询后显示结果',
 
   // Readonly
   'readonly.badge': '只读',
@@ -868,6 +895,11 @@ const zh: Dict = {
   'history.clear_all': '清空',
   'history.disabled': 'SQL 历史已关闭，请在设置中启用。',
   'history.delete': '删除',
+  'history.search_placeholder': '搜索 SQL 历史',
+  'history.favorites_only': '收藏',
+  'history.favorite': '保存',
+  'history.unfavorite': '已保存',
+  'history.no_matches': '没有匹配的历史记录',
 
   // Cell viewer
   'cell.tab.raw': 'Raw',
