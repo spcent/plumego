@@ -32,6 +32,9 @@ const OPERATORS: { value: FilterOperator; label: string }[] = [
   { value: 'is_not_null', label: 'IS NOT NULL' },
 ]
 
+const DEFAULT_EXPORT_LIMIT = 10000
+const MAX_EXPORT_LIMIT = 100000
+
 function cellTitle(v: unknown): string {
   if (v === null || v === undefined) return 'NULL'
   if (v === '') return '(empty string)'
@@ -76,6 +79,7 @@ export default function DataPage() {
   const [exportFormat, setExportFormat] = useState<'csv' | 'sql'>('csv')
   const [exportSchema, setExportSchema] = useState(true)
   const [exportData, setExportData] = useState(true)
+  const [exportLimit, setExportLimit] = useState(DEFAULT_EXPORT_LIMIT)
   const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set())
   const [cellDetail, setCellDetail] = useState<{ column: string; value: unknown } | null>(null)
   const selectAllRef = useRef<HTMLInputElement>(null)
@@ -221,6 +225,7 @@ export default function DataPage() {
     const url = api.exportURL(connId!, dbName!, tableName!, exportFormat, {
       includeSchema: exportSchema,
       includeData: exportData,
+      limit: exportLimit,
     })
     const a = document.createElement('a')
     a.href = url
@@ -745,6 +750,22 @@ export default function DataPage() {
                 </label>
               </div>
             )}
+            <div className="mt-4">
+              <label className="mb-1 block text-[12px] font-medium" style={{ color: 'var(--text-muted)' }}>
+                {t('export.limit')}
+              </label>
+              <input
+                type="number"
+                min={1}
+                max={MAX_EXPORT_LIMIT}
+                value={exportLimit}
+                onChange={e => setExportLimit(Math.min(MAX_EXPORT_LIMIT, Math.max(1, Number(e.target.value) || DEFAULT_EXPORT_LIMIT)))}
+                className="input h-8 text-xs"
+              />
+              <p className="mt-1 text-[11px]" style={{ color: 'var(--text-subtle)' }}>
+                {t('export.limit_hint', { max: MAX_EXPORT_LIMIT })}
+              </p>
+            </div>
         </ModalShell>
       )}
     </PageShell>

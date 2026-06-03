@@ -322,8 +322,7 @@ func (h ElasticsearchHandler) Search(w http.ResponseWriter, r *http.Request) {
 		Index string          `json:"index"`
 		DSL   json.RawMessage `json:"dsl"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		h.badRequest(w, r, "invalid request body")
+	if !decodeJSONLimited(w, r, h.Logger, &req) {
 		return
 	}
 
@@ -354,8 +353,8 @@ func (h ElasticsearchHandler) Search(w http.ResponseWriter, r *http.Request) {
 	if !hasSize {
 		dslMap["size"] = 50
 	} else if sizeFloat, ok := sizeVal.(float64); ok {
-		if sizeFloat > 500 {
-			dslMap["size"] = 500
+		if sizeFloat > MaxESSearchSize {
+			dslMap["size"] = MaxESSearchSize
 		}
 	}
 
@@ -529,8 +528,7 @@ func (h ElasticsearchHandler) DeleteDocument(w http.ResponseWriter, r *http.Requ
 		ID      string `json:"id"`
 		Confirm bool   `json:"confirm"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		h.badRequest(w, r, "invalid request body")
+	if !decodeJSONLimited(w, r, h.Logger, &req) {
 		return
 	}
 
@@ -606,15 +604,7 @@ func (h ElasticsearchHandler) ExportDocuments(w http.ResponseWriter, r *http.Req
 		h.badRequest(w, r, "format must be json or ndjson")
 		return
 	}
-	limit := 1000
-	if limitStr != "" {
-		if n, err := strconv.Atoi(limitStr); err == nil && n > 0 {
-			limit = n
-		}
-	}
-	if limit > 10000 {
-		limit = 10000
-	}
+	limit := parseBoundedLimit(limitStr, DefaultExportRows, MaxESExportRows)
 
 	var dsl map[string]any
 	if query != "" {
@@ -625,7 +615,7 @@ func (h ElasticsearchHandler) ExportDocuments(w http.ResponseWriter, r *http.Req
 	} else {
 		dsl = map[string]any{"query": map[string]any{"match_all": map[string]any{}}}
 	}
-	dsl["size"] = limit
+	dsl["size"] = limit + 1
 	body, err := json.Marshal(dsl)
 	if err != nil {
 		h.internalErr(w, r, "marshal export query", err)
@@ -673,9 +663,14 @@ func (h ElasticsearchHandler) ExportDocuments(w http.ResponseWriter, r *http.Req
 	timestamp := time.Now().Format("20060102_150405")
 	w.Header().Set("Content-Type", "application/octet-stream")
 	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s_%s.%s\"", indexName, timestamp, format))
+	w.Header().Set("X-Export-Row-Limit", strconv.Itoa(limit))
 
 	if format == "ndjson" {
-		for _, hit := range result.Hits.Hits {
+		for i, hit := range result.Hits.Hits {
+			if i >= limit {
+				fmt.Fprintf(w, "{\"_dbadmin_export_truncated\":true,\"limit\":%d,\"max_limit\":%d}\n", limit, MaxESExportRows)
+				break
+			}
 			doc := hit.Source
 			if doc == nil {
 				doc = map[string]any{}
@@ -688,7 +683,15 @@ func (h ElasticsearchHandler) ExportDocuments(w http.ResponseWriter, r *http.Req
 	}
 
 	docs := make([]map[string]any, 0, len(result.Hits.Hits))
-	for _, hit := range result.Hits.Hits {
+	for i, hit := range result.Hits.Hits {
+		if i >= limit {
+			docs = append(docs, map[string]any{
+				"_dbadmin_export_truncated": true,
+				"limit":                     limit,
+				"max_limit":                 MaxESExportRows,
+			})
+			break
+		}
 		doc := hit.Source
 		if doc == nil {
 			doc = map[string]any{}
@@ -707,8 +710,7 @@ func (h ElasticsearchHandler) ImportDocuments(w http.ResponseWriter, r *http.Req
 		Documents []map[string]any `json:"documents"`
 		Confirm   bool             `json:"confirm"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		h.badRequest(w, r, "invalid request body")
+	if !decodeJSONLimited(w, r, h.Logger, &req) {
 		return
 	}
 	if err := validateIndexName(req.Index, false); err != nil {
@@ -723,8 +725,8 @@ func (h ElasticsearchHandler) ImportDocuments(w http.ResponseWriter, r *http.Req
 		h.badRequest(w, r, "no documents to import")
 		return
 	}
-	if len(req.Documents) > 10000 {
-		h.badRequest(w, r, "import is limited to 10000 documents")
+	if len(req.Documents) > MaxBulkImportDocuments {
+		h.badRequest(w, r, "import is limited to "+strconv.Itoa(MaxBulkImportDocuments)+" documents")
 		return
 	}
 

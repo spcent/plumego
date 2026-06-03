@@ -2,7 +2,6 @@ package handler
 
 import (
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -55,9 +54,7 @@ func (h DDLHandler) CreateTable(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req createTableRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
-			Type(contract.TypeBadRequest).Message("invalid request body").Build()))
+	if !decodeJSONLimited(w, r, h.Logger, &req) {
 		return
 	}
 	if req.Name == "" || len(req.Columns) == 0 {
@@ -110,9 +107,7 @@ func (h DDLHandler) AlterTable(w http.ResponseWriter, r *http.Request) {
 	}
 	table := router.Param(r, "table")
 	var req alterTableRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
-			Type(contract.TypeBadRequest).Message("invalid request body").Build()))
+	if !decodeJSONLimited(w, r, h.Logger, &req) {
 		return
 	}
 	for _, col := range req.AddColumns {

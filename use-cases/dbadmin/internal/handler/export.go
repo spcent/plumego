@@ -19,10 +19,6 @@ import (
 	"dbadmin/internal/domain/connection"
 )
 
-// maxExportRows is the default and hard cap on rows returned by export.
-// Prevents unbounded memory consumption and overly long downloads.
-const maxExportRows = 100_000
-
 // ExportHandler handles data export (CSV and SQL dump).
 type ExportHandler struct {
 	Connections *connection.Store
@@ -46,13 +42,7 @@ func (h ExportHandler) Export(w http.ResponseWriter, r *http.Request) {
 	includeData := q.Get("includeData") != "false"
 	ts := time.Now().Format("20060102_150405")
 
-	// Parse optional row limit (default and hard-cap at maxExportRows).
-	limit := maxExportRows
-	if lStr := q.Get("limit"); lStr != "" {
-		if n, err := strconv.Atoi(lStr); err == nil && n > 0 && n < maxExportRows {
-			limit = n
-		}
-	}
+	limit := parseExportLimit(q.Get("limit"))
 
 	conn, err := h.Connections.Get(connID)
 	if err != nil {
@@ -81,7 +71,7 @@ func (h ExportHandler) Export(w http.ResponseWriter, r *http.Request) {
 		tableFQN = fmt.Sprintf(`"%s"`, table)
 	}
 
-	query := fmt.Sprintf("SELECT * FROM %s LIMIT %d", tableFQN, limit)
+	query := fmt.Sprintf("SELECT * FROM %s LIMIT %d", tableFQN, limit+1)
 	rows, err := db.QueryContext(r.Context(), query)
 	if err != nil {
 		h.Logger.Error("export query", plumelog.Fields{"error": err.Error()})
@@ -98,7 +88,6 @@ func (h ExportHandler) Export(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Inform the client of the row limit applied so it can show a truncation warning.
 	w.Header().Set("X-Export-Row-Limit", strconv.Itoa(limit))
 
 	switch format {
@@ -131,6 +120,10 @@ func (h ExportHandler) exportCSV(w http.ResponseWriter, r *http.Request, rows in
 	}
 	n := 0
 	for rows.Next() {
+		if n >= limit {
+			_ = cw.Write([]string{fmt.Sprintf("[export truncated at %d rows — refine the query or increase ?limit= up to %d]", limit, MaxExportRows)})
+			break
+		}
 		if err := rows.Scan(ptrs...); err != nil {
 			h.Logger.Warn("csv scan", plumelog.Fields{"error": err.Error()})
 			continue
@@ -152,9 +145,6 @@ func (h ExportHandler) exportCSV(w http.ResponseWriter, r *http.Request, rows in
 		}
 		_ = cw.Write(record)
 		n++
-	}
-	if n == limit {
-		_ = cw.Write([]string{fmt.Sprintf("[export truncated at %d rows — use filters or increase ?limit= to export more]", limit)})
 	}
 	cw.Flush()
 }
@@ -203,6 +193,10 @@ func (h ExportHandler) exportSQL(w http.ResponseWriter, r *http.Request, rows in
 
 	n := 0
 	for rows.Next() {
+		if n >= limit {
+			fmt.Fprintf(w, "-- Export truncated at %d rows. Refine the query or increase ?limit= up to %d.\n", limit, MaxExportRows)
+			break
+		}
 		if err := rows.Scan(ptrs...); err != nil {
 			continue
 		}
@@ -228,9 +222,6 @@ func (h ExportHandler) exportSQL(w http.ResponseWriter, r *http.Request, rows in
 			strings.Join(quotedCols, ", "),
 			strings.Join(valStrs, ", "))
 		n++
-	}
-	if n == limit {
-		fmt.Fprintf(w, "-- Export truncated at %d rows. Use filters or increase ?limit= to export more.\n", limit)
 	}
 }
 

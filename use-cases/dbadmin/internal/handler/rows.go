@@ -221,9 +221,7 @@ func (h RowHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req insertRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
-			Type(contract.TypeBadRequest).Message("invalid request body").Build()))
+	if !decodeJSONLimited(w, r, h.Logger, &req) {
 		return
 	}
 	if len(req.Values) == 0 {
@@ -257,9 +255,7 @@ func (h RowHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req updateRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
-			Type(contract.TypeBadRequest).Message("invalid request body").Build()))
+	if !decodeJSONLimited(w, r, h.Logger, &req) {
 		return
 	}
 	if !req.Confirm {
@@ -329,9 +325,7 @@ func (h RowHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req deleteRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
-			Type(contract.TypeBadRequest).Message("invalid request body").Build()))
+	if !decodeJSONLimited(w, r, h.Logger, &req) {
 		return
 	}
 	if !req.Confirm {
@@ -535,12 +529,12 @@ func sanitizeIdentifier(s string) string {
 }
 
 // normalizePagination clamps page and pageSize to valid ranges.
-// page < 1 → 1; pageSize ≤ 0 or > 500 → 50.
+// page < 1 -> 1; pageSize <= 0 or > 500 -> 50.
 func normalizePagination(page, pageSize int) (int, int) {
 	if page < 1 {
 		page = 1
 	}
-	if pageSize <= 0 || pageSize > 500 {
+	if pageSize <= 0 || pageSize > MaxPageSize {
 		pageSize = 50
 	}
 	return page, pageSize

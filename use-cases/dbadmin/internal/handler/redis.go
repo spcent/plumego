@@ -2,7 +2,6 @@ package handler
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -493,9 +492,7 @@ func (h RedisHandler) SetTTL(w http.ResponseWriter, r *http.Request) {
 	dbIndex, _ := strconv.Atoi(dbIndexStr)
 
 	var req setTTLRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
-			Type(contract.TypeBadRequest).Message("invalid request body").Build()))
+	if !decodeJSONLimited(w, r, h.Logger, &req) {
 		return
 	}
 	if req.Key == "" {
@@ -549,9 +546,7 @@ func (h RedisHandler) DeleteKey(w http.ResponseWriter, r *http.Request) {
 	dbIndex, _ := strconv.Atoi(dbIndexStr)
 
 	var req deleteKeyRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
-			Type(contract.TypeBadRequest).Message("invalid request body").Build()))
+	if !decodeJSONLimited(w, r, h.Logger, &req) {
 		return
 	}
 	if req.Key == "" {
@@ -610,9 +605,7 @@ func (h RedisHandler) BatchPreview(w http.ResponseWriter, r *http.Request) {
 	dbIndex, _ := strconv.Atoi(dbIndexStr)
 
 	var req batchPreviewRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
-			Type(contract.TypeBadRequest).Message("invalid request body").Build()))
+	if !decodeJSONLimited(w, r, h.Logger, &req) {
 		return
 	}
 	if req.Pattern == "" {
@@ -724,9 +717,7 @@ func (h RedisHandler) BatchDelete(w http.ResponseWriter, r *http.Request) {
 	dbIndex, _ := strconv.Atoi(dbIndexStr)
 
 	var req batchDeleteRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
-			Type(contract.TypeBadRequest).Message("invalid request body").Build()))
+	if !decodeJSONLimited(w, r, h.Logger, &req) {
 		return
 	}
 	if len(req.Keys) == 0 {
@@ -793,9 +784,7 @@ func (h RedisHandler) Command(w http.ResponseWriter, r *http.Request) {
 	dbIndex, _ := strconv.Atoi(dbIndexStr)
 
 	var req commandRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
-			Type(contract.TypeBadRequest).Message("invalid request body").Build()))
+	if !decodeJSONLimited(w, r, h.Logger, &req) {
 		return
 	}
 

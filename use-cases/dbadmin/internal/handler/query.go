@@ -4,8 +4,8 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
-	"encoding/json"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -174,9 +174,7 @@ func (h QueryHandler) Execute(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req queryRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
-			Type(contract.TypeBadRequest).Message("invalid request body").Build()))
+	if !decodeJSONLimited(w, r, h.Logger, &req) {
 		return
 	}
 	sqlStr := strings.TrimSpace(req.SQL)
@@ -254,7 +252,7 @@ func (h QueryHandler) Execute(w http.ResponseWriter, r *http.Request) {
 		// Append LIMIT 1000 if no explicit LIMIT to prevent unbounded result sets.
 		truncated := false
 		if !strings.Contains(strings.ToUpper(sqlStr), "LIMIT") {
-			sqlStr += " LIMIT 1000"
+			sqlStr += " LIMIT " + strconv.Itoa(DefaultQueryRows)
 			truncated = true
 		}
 
@@ -374,9 +372,7 @@ func (h QueryHandler) Cancel(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		QueryID string `json:"queryId"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
-			Type(contract.TypeBadRequest).Message("invalid request body").Build()))
+	if !decodeJSONLimited(w, r, h.Logger, &req) {
 		return
 	}
 

@@ -359,8 +359,7 @@ func (h MongoDBHandler) QueryDocuments(w http.ResponseWriter, r *http.Request) {
 		Skip       int64  `json:"skip"`
 	}
 
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		h.badRequest(w, r, "invalid request body")
+	if !decodeJSONLimited(w, r, h.Logger, &req) {
 		return
 	}
 
@@ -377,8 +376,8 @@ func (h MongoDBHandler) QueryDocuments(w http.ResponseWriter, r *http.Request) {
 	if req.Limit <= 0 {
 		req.Limit = 50
 	}
-	if req.Limit > 500 {
-		req.Limit = 500
+	if req.Limit > MaxMongoQueryLimit {
+		req.Limit = MaxMongoQueryLimit
 	}
 
 	conn, err := h.openClient(connID)
@@ -579,8 +578,7 @@ func (h MongoDBHandler) InsertDocument(w http.ResponseWriter, r *http.Request) {
 		Document   string `json:"document"`
 	}
 
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		h.badRequest(w, r, "invalid request body")
+	if !decodeJSONLimited(w, r, h.Logger, &req) {
 		return
 	}
 
@@ -662,8 +660,7 @@ func (h MongoDBHandler) UpdateDocument(w http.ResponseWriter, r *http.Request) {
 		Document   string `json:"document"`
 	}
 
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		h.badRequest(w, r, "invalid request body")
+	if !decodeJSONLimited(w, r, h.Logger, &req) {
 		return
 	}
 
@@ -761,8 +758,7 @@ func (h MongoDBHandler) DeleteDocument(w http.ResponseWriter, r *http.Request) {
 		Confirm    bool   `json:"confirm"`
 	}
 
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		h.badRequest(w, r, "invalid request body")
+	if !decodeJSONLimited(w, r, h.Logger, &req) {
 		return
 	}
 
@@ -854,8 +850,7 @@ func (h MongoDBHandler) Aggregate(w http.ResponseWriter, r *http.Request) {
 		Confirm    bool   `json:"confirm"`
 	}
 
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		h.badRequest(w, r, "invalid request body")
+	if !decodeJSONLimited(w, r, h.Logger, &req) {
 		return
 	}
 
@@ -1053,8 +1048,7 @@ func (h MongoDBHandler) ExplainQuery(w http.ResponseWriter, r *http.Request) {
 		Projection string `json:"projection"`
 	}
 
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		h.badRequest(w, r, "invalid request body")
+	if !decodeJSONLimited(w, r, h.Logger, &req) {
 		return
 	}
 
@@ -1463,15 +1457,7 @@ func (h MongoDBHandler) ExportDocuments(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	limit := 10000
-	if limitStr != "" {
-		if l, err := strconv.Atoi(limitStr); err == nil && l > 0 {
-			limit = l
-		}
-	}
-	if limit > 100000 {
-		limit = 100000
-	}
+	limit := parseExportLimit(limitStr)
 
 	conn, err := h.openClient(connID)
 	if err != nil {
@@ -1507,7 +1493,7 @@ func (h MongoDBHandler) ExportDocuments(w http.ResponseWriter, r *http.Request) 
 		}
 	}
 
-	opts := options.Find().SetLimit(int64(limit))
+	opts := options.Find().SetLimit(int64(limit + 1))
 	cursor, err := client.Database(dbName).Collection(collName).Find(ctx, filter, opts)
 	if err != nil {
 		h.Logger.Error("export documents failed", plumelog.Fields{
@@ -1526,21 +1512,30 @@ func (h MongoDBHandler) ExportDocuments(w http.ResponseWriter, r *http.Request) 
 	filename := fmt.Sprintf("%s_%s.%s", collName, timestamp, format)
 	w.Header().Set("Content-Type", "application/octet-stream")
 	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", filename))
+	w.Header().Set("X-Export-Row-Limit", strconv.Itoa(limit))
 
 	switch format {
 	case "json":
-		h.exportJSON(ctx, w, cursor)
+		h.exportJSON(ctx, w, cursor, limit)
 	case "ndjson":
-		h.exportNDJSON(ctx, w, cursor)
+		h.exportNDJSON(ctx, w, cursor, limit)
 	case "csv":
-		h.exportCSV(ctx, w, cursor)
+		h.exportCSV(ctx, w, cursor, limit)
 	}
 }
 
-func (h MongoDBHandler) exportJSON(ctx context.Context, w http.ResponseWriter, cursor *mongo.Cursor) {
+func (h MongoDBHandler) exportJSON(ctx context.Context, w http.ResponseWriter, cursor *mongo.Cursor, limit int) {
 	fmt.Fprint(w, "[\n")
 	first := true
+	n := 0
 	for cursor.Next(ctx) {
+		if n >= limit {
+			if !first {
+				fmt.Fprint(w, ",\n")
+			}
+			fmt.Fprintf(w, "  {\"_dbadmin_export_truncated\":true,\"limit\":%d,\"max_limit\":%d}", limit, MaxExportRows)
+			break
+		}
 		var doc bson.M
 		if err := cursor.Decode(&doc); err != nil {
 			continue
@@ -1551,27 +1546,39 @@ func (h MongoDBHandler) exportJSON(ctx context.Context, w http.ResponseWriter, c
 		first = false
 		jsonBytes, _ := json.Marshal(bsonToJSON(doc))
 		fmt.Fprintf(w, "  %s", string(jsonBytes))
+		n++
 	}
 	fmt.Fprint(w, "\n]\n")
 }
 
-func (h MongoDBHandler) exportNDJSON(ctx context.Context, w http.ResponseWriter, cursor *mongo.Cursor) {
+func (h MongoDBHandler) exportNDJSON(ctx context.Context, w http.ResponseWriter, cursor *mongo.Cursor, limit int) {
+	n := 0
 	for cursor.Next(ctx) {
+		if n >= limit {
+			fmt.Fprintf(w, "{\"_dbadmin_export_truncated\":true,\"limit\":%d,\"max_limit\":%d}\n", limit, MaxExportRows)
+			break
+		}
 		var doc bson.M
 		if err := cursor.Decode(&doc); err != nil {
 			continue
 		}
 		jsonBytes, _ := json.Marshal(bsonToJSON(doc))
 		fmt.Fprintf(w, "%s\n", string(jsonBytes))
+		n++
 	}
 }
 
-func (h MongoDBHandler) exportCSV(ctx context.Context, w http.ResponseWriter, cursor *mongo.Cursor) {
+func (h MongoDBHandler) exportCSV(ctx context.Context, w http.ResponseWriter, cursor *mongo.Cursor, limit int) {
 	writer := csv.NewWriter(w)
 	defer writer.Flush()
 
 	headerWritten := false
+	n := 0
 	for cursor.Next(ctx) {
+		if n >= limit {
+			writer.Write([]string{fmt.Sprintf("[export truncated at %d documents — refine the filter or increase ?limit= up to %d]", limit, MaxExportRows)})
+			break
+		}
 		var doc bson.M
 		if err := cursor.Decode(&doc); err != nil {
 			continue
@@ -1595,6 +1602,7 @@ func (h MongoDBHandler) exportCSV(ctx context.Context, w http.ResponseWriter, cu
 			row = append(row, formatCSVValue(value))
 		}
 		writer.Write(row)
+		n++
 	}
 }
 
@@ -1645,8 +1653,7 @@ func (h MongoDBHandler) ImportDocuments(w http.ResponseWriter, r *http.Request) 
 		Confirm    bool   `json:"confirm"`
 	}
 
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		h.badRequest(w, r, "invalid request body")
+	if !decodeJSONLimited(w, r, h.Logger, &req) {
 		return
 	}
 
@@ -1667,6 +1674,10 @@ func (h MongoDBHandler) ImportDocuments(w http.ResponseWriter, r *http.Request) 
 
 	if len(req.Documents) == 0 {
 		h.badRequest(w, r, "no documents to import")
+		return
+	}
+	if len(req.Documents) > MaxBulkImportDocuments {
+		h.badRequest(w, r, "import is limited to "+strconv.Itoa(MaxBulkImportDocuments)+" documents")
 		return
 	}
 

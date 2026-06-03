@@ -176,6 +176,8 @@ const en: Dict = {
   'export.format': 'Format',
   'export.include_schema': 'Include schema (DDL)',
   'export.include_data': 'Include data (INSERTs)',
+  'export.limit': 'Row limit',
+  'export.limit_hint': 'Downloads are capped at {max} rows. A truncation marker is appended when more rows exist.',
   'export.download': 'Download',
 
   // Import
@@ -838,6 +840,8 @@ const zh: Dict = {
   'export.format': '格式',
   'export.include_schema': '包含结构 (DDL)',
   'export.include_data': '包含数据',
+  'export.limit': '行数限制',
+  'export.limit_hint': '下载最多 {max} 行。超出时会在文件末尾追加截断标记。',
   'export.download': '下载',
 
   // Import

@@ -230,10 +230,11 @@ export const api = {
     req<{ markdown: string }>('GET', `/conn/${id}/db/${db}/schema-doc`),
 
   exportURL: (id: string, db: string, table: string, format: 'csv' | 'sql',
-             opts?: { includeSchema?: boolean; includeData?: boolean }) => {
+             opts?: { includeSchema?: boolean; includeData?: boolean; limit?: number }) => {
     const q = new URLSearchParams({ format })
     if (opts?.includeSchema === false) q.set('includeSchema', 'false')
     if (opts?.includeData === false) q.set('includeData', 'false')
+    if (opts?.limit) q.set('limit', String(opts.limit))
     return `${BASE}/conn/${id}/db/${db}/tables/${table}/export?${q}`
   },
 
@@ -348,9 +349,10 @@ export const api = {
   mongoStats: (connId: string, database: string, collection: string) =>
     req<MongoStatsResponse>('GET', `/connections/${connId}/mongo/stats?database=${encodeURIComponent(database)}&collection=${encodeURIComponent(collection)}`),
 
-  mongoExport: (connId: string, database: string, collection: string, format: 'json' | 'ndjson' | 'csv' = 'json', filter?: string) => {
+  mongoExport: (connId: string, database: string, collection: string, format: 'json' | 'ndjson' | 'csv' = 'json', filter?: string, limit?: number) => {
     const params = new URLSearchParams({ database, collection, format })
     if (filter) params.append('filter', filter)
+    if (limit) params.set('limit', String(limit))
     return `${BASE}/connections/${connId}/mongo/export?${params.toString()}`
   },
 
@@ -392,9 +394,10 @@ export const api = {
   esDeleteDocument: (connId: string, index: string, id: string, confirm: boolean) =>
     req<void>('DELETE', `/connections/${connId}/es/document`, { index, id, confirm }),
 
-  esExport: (connId: string, index: string, format: 'json' | 'ndjson' = 'json', query?: Record<string, unknown>) => {
+  esExport: (connId: string, index: string, format: 'json' | 'ndjson' = 'json', query?: Record<string, unknown>, limit?: number) => {
     const params = new URLSearchParams({ index, format })
     if (query) params.set('query', JSON.stringify(query))
+    if (limit) params.set('limit', String(limit))
     return `${BASE}/connections/${connId}/es/export?${params.toString()}`
   },
 

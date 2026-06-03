@@ -22,6 +22,9 @@ import { EmptyStatePanel, ErrorStatePanel, LoadingState, PageBody, PageShell, Pa
 type ViewMode = 'table' | 'json'
 type ActiveTab = 'documents' | 'aggregation' | 'schema' | 'stats'
 
+const DEFAULT_EXPORT_LIMIT = 10000
+const MAX_EXPORT_LIMIT = 100000
+
 export default function MongoCollectionPanel() {
   const { t } = useI18n()
   const { showToast } = useToast()
@@ -1127,9 +1130,10 @@ function ExportModal(props: {
   const { t } = useI18n()
   const { connectionId, database, collection, filter, onClose } = props
   const [format, setFormat] = useState<'json' | 'ndjson' | 'csv'>('json')
+  const [limit, setLimit] = useState(DEFAULT_EXPORT_LIMIT)
 
   const handleExport = () => {
-    const url = api.mongoExport(connectionId, database, collection, format, filter.trim() || undefined)
+    const url = api.mongoExport(connectionId, database, collection, format, filter.trim() || undefined, limit)
     window.open(url, '_blank')
     onClose()
   }
@@ -1164,6 +1168,22 @@ function ExportModal(props: {
               <option value="ndjson">{t('mongodb.p1.export.format_ndjson')}</option>
               <option value="csv">{t('mongodb.p1.export.format_csv')}</option>
             </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
+              {t('mongodb.p1.export.limit')}
+            </label>
+            <input
+              type="number"
+              min={1}
+              max={MAX_EXPORT_LIMIT}
+              value={limit}
+              onChange={e => setLimit(Math.min(MAX_EXPORT_LIMIT, Math.max(1, Number(e.target.value) || DEFAULT_EXPORT_LIMIT)))}
+              className="w-full px-3 py-2 text-sm rounded border border-[var(--border-primary)] bg-[var(--bg-primary)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]"
+            />
+            <p className="mt-1 text-xs text-[var(--text-tertiary)]">
+              {t('mongodb.p1.export.limit_hint', { max: MAX_EXPORT_LIMIT })}
+            </p>
           </div>
         </div>
 

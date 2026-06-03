@@ -2,7 +2,7 @@ import { useParams } from 'react-router-dom'
 import { useCallback, useEffect, useState } from 'react'
 import { useI18n } from '../i18nContext'
 import { useCurrentConn } from '../context/connections'
-import { api } from '../api'
+import { api, errorMessage } from '../api'
 import type { ESClusterInfo, ESIndexInfo, ESSearchResponse, ESDocument } from '../api'
 import WorkbenchHeader from '../components/WorkbenchHeader'
 import { useToast } from '../components/toastContext'
@@ -11,6 +11,8 @@ import { XIcon } from '../components/Icons'
 import { EmptyStatePanel, ErrorStatePanel, PageBody, PageShell, PageToolbar } from '../components/workbench'
 
 type Tab = 'overview' | 'mapping' | 'settings' | 'search' | 'documents'
+
+const DEFAULT_ES_EXPORT_LIMIT = 10000
 
 export default function ElasticsearchIndexPanel() {
   const { connId, esIndex } = useParams<{ connId: string; esIndex: string }>()
@@ -168,7 +170,7 @@ export default function ElasticsearchIndexPanel() {
     } catch {
       parsed = undefined
     }
-    window.location.href = api.esExport(connId, esIndex, format, parsed)
+    window.location.href = api.esExport(connId, esIndex, format, parsed, DEFAULT_ES_EXPORT_LIMIT)
   }
 
   const handleImport = async () => {
@@ -192,7 +194,7 @@ export default function ElasticsearchIndexPanel() {
       setShowImportModal(false)
       await loadOverview()
     } catch (err) {
-      showToast((err as Error).message, 'error')
+      showToast(errorMessage(err, t('error.operation_failed')), 'error')
     } finally {
       setImporting(false)
     }

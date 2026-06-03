@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"encoding/json"
 	"net/http"
 	"strings"
 
@@ -49,9 +48,7 @@ func (h ImportHandler) Import(w http.ResponseWriter, r *http.Request) {
 	dbName := router.Param(r, "db")
 
 	var req importRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
-			Type(contract.TypeBadRequest).Message("invalid request body").Build()))
+	if !decodeJSONLimited(w, r, h.Logger, &req) {
 		return
 	}
 	if strings.TrimSpace(req.SQL) == "" {
