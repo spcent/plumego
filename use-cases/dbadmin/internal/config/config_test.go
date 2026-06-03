@@ -44,6 +44,8 @@ func TestLoadReadsAllowDefaultPassword(t *testing.T) {
 		values := map[string]string{
 			"DBADMIN_PASSWORD":               "admin",
 			"DBADMIN_ALLOW_DEFAULT_PASSWORD": "true",
+			"DBADMIN_AUDIT_RETENTION_DAYS":   "30",
+			"DBADMIN_AUDIT_MAX_EVENTS":       "250",
 		}
 		v, ok := values[key]
 		return v, ok
@@ -53,5 +55,25 @@ func TestLoadReadsAllowDefaultPassword(t *testing.T) {
 	}
 	if !cfg.App.AllowDefaultPassword {
 		t.Fatal("AllowDefaultPassword = false, want true")
+	}
+	if cfg.App.AuditRetentionDays != 30 {
+		t.Fatalf("AuditRetentionDays = %d, want 30", cfg.App.AuditRetentionDays)
+	}
+	if cfg.App.AuditMaxEvents != 250 {
+		t.Fatalf("AuditMaxEvents = %d, want 250", cfg.App.AuditMaxEvents)
+	}
+}
+
+func TestValidateRejectsInvalidAuditRetention(t *testing.T) {
+	cfg := Defaults()
+	cfg.App.AdminPassword = "secret"
+	cfg.App.AuditRetentionDays = 0
+	if err := Validate(cfg); err == nil || !strings.Contains(err.Error(), "DBADMIN_AUDIT_RETENTION_DAYS") {
+		t.Fatalf("Validate error = %v, want audit retention error", err)
+	}
+	cfg.App.AuditRetentionDays = 90
+	cfg.App.AuditMaxEvents = 0
+	if err := Validate(cfg); err == nil || !strings.Contains(err.Error(), "DBADMIN_AUDIT_MAX_EVENTS") {
+		t.Fatalf("Validate error = %v, want audit max events error", err)
 	}
 }

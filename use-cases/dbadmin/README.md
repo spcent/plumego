@@ -162,6 +162,8 @@ For a guided multi-database demo, see [docs/demo-playbook.md](docs/demo-playbook
 | `DBADMIN_MONGO_QUERY_TIMEOUT_SECONDS` | `30` | Maximum MongoDB operation time in seconds |
 | `DBADMIN_ES_QUERY_TIMEOUT_SECONDS` | `30` | Maximum Elasticsearch operation time in seconds |
 | `DBADMIN_RESOURCE_LIST_TIMEOUT_SECONDS` | `30` | Maximum unified resource-tree listing time in seconds |
+| `DBADMIN_AUDIT_RETENTION_DAYS` | `90` | Local audit event retention period in days |
+| `DBADMIN_AUDIT_MAX_EVENTS` | `500` | Maximum local audit events retained |
 
 ### Configuration File
 
@@ -182,6 +184,8 @@ DBADMIN_REDIS_COMMAND_TIMEOUT_SECONDS=30
 DBADMIN_MONGO_QUERY_TIMEOUT_SECONDS=30
 DBADMIN_ES_QUERY_TIMEOUT_SECONDS=30
 DBADMIN_RESOURCE_LIST_TIMEOUT_SECONDS=30
+DBADMIN_AUDIT_RETENTION_DAYS=90
+DBADMIN_AUDIT_MAX_EVENTS=500
 ```
 
 Generate a secure encryption key:
@@ -293,13 +297,15 @@ If deploying to production:
 3. **Set encryption key** - Generate a secure `DBADMIN_ENCRYPTION_KEY` before saving connection credentials
 4. **Restrict network access** - Use firewall rules or VPN to limit access
 5. **Enable read-only mode** - For connections that don't need write access
-6. **Regular backups** - Backup the `data` directory containing sessions and history
+6. **Review audit events** - Export JSON or NDJSON audit events from Settings before pruning old data
+7. **Regular backups** - Backup the `data` directory containing sessions, history, and audit data
 
 ### Security Features
 - **Credential Encryption**: Connection passwords, Elasticsearch secrets, and MongoDB URIs with embedded credentials require `DBADMIN_ENCRYPTION_KEY` and are encrypted at rest using AES-256-GCM
 - **Credential Redaction**: Passwords and API keys never logged or exposed in API responses
 - **Dangerous Operation Detection**: Destructive commands require explicit confirmation
 - **Read-only Mode**: Block all write operations per connection
+- **Audit Export**: Local audit events include role, request ID, source address, RBAC denial reason, and JSON/NDJSON export support
 - **Session Timeout**: Automatic logout after configurable inactivity period
 - **Input Validation**: SQL injection and command injection prevention
 - **Secure Cookies**: HttpOnly and SameSite attributes on session cookies; Secure is set for HTTPS and trusted HTTPS reverse-proxy requests

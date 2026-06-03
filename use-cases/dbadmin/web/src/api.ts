@@ -170,6 +170,7 @@ export const api = {
   logout: () => req<void>('POST', '/auth/logout'),
   me: () => req<{ user: string; role: string }>('GET', '/auth/me'),
   listAuditEvents: () => req<AuditEvent[]>('GET', '/audit/events'),
+  auditExportURL: (format: 'json' | 'ndjson' = 'json') => `${BASE}/audit/export?format=${format}`,
 
   listConnections: () => req<Connection[]>('GET', '/connections'),
   getConnection: (id: string) => req<Connection>('GET', `/connections/${id}`),
@@ -477,10 +478,14 @@ export interface PoolStats {
 export interface AuditEvent {
   id: string
   user: string
+  role?: string
   action: string
   method: string
   path: string
   status: number
+  request_id?: string
+  remote_addr?: string
+  denied_reason?: string
   created_at: string
 }
 

@@ -169,13 +169,14 @@ func (a *App) RegisterRoutes() error {
 
 	// Protected routes — all require a valid session cookie.
 	roleMw := handler.RoleMiddleware(a.Cfg.App.AdminRole, a.Core.Logger())
-	auditMw := handler.AuditMiddleware(a.AuditStore, a.Core.Logger())
+	auditMw := handler.AuditMiddleware(a.AuditStore, a.Cfg.App.AdminRole, a.Core.Logger())
 	guard := func(h http.Handler) http.Handler { return sameOriginMw(authMw(auditMw(roleMw(h)))) }
 
 	protected := newRouteReg(a.Core)
 	protected.post("/api/auth/logout", guard(http.HandlerFunc(authH.Logout)))
 	protected.get("/api/auth/me", guard(http.HandlerFunc(authH.Me)))
 	protected.get("/api/audit/events", guard(http.HandlerFunc(auditH.List)))
+	protected.get("/api/audit/export", guard(http.HandlerFunc(auditH.Export)))
 
 	// Connection management.
 	protected.get("/api/connections", guard(http.HandlerFunc(connH.List)))

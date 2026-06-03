@@ -169,7 +169,11 @@ func New(cfg config.Config) (*App, error) {
 		MongoHistoryStore: mongohistory.NewStore(mongoHistKV),
 		ESHistoryStore:    eshistory.NewStore(esHistKV),
 		RedisHistoryStore: redishistory.NewStore(redisHistKV),
-		AuditStore:        audit.NewStore(auditKV),
+		AuditStore: audit.NewStoreWithOptions(auditKV, audit.Options{
+			MaxEvents: cfg.App.AuditMaxEvents,
+			Retention: time.Duration(cfg.App.AuditRetentionDays) *
+				24 * time.Hour,
+		}),
 		DBManager:         mgr,
 		RedisManager:      redisMgr,
 		MongoManager:      mongoMgr,

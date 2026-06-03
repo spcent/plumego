@@ -157,6 +157,8 @@ const en: Dict = {
   'settings.close_runtime': 'Close runtime',
   'settings.audit_rbac': 'Audit & RBAC',
   'settings.audit_empty': 'No audit events yet',
+  'settings.audit_export_json': 'JSON',
+  'settings.audit_export_ndjson': 'NDJSON',
   'nav.settings': 'Settings',
 
   // SQL history
@@ -901,6 +903,8 @@ const zh: Dict = {
   'settings.close_runtime': '关闭运行时连接',
   'settings.audit_rbac': '审计与 RBAC',
   'settings.audit_empty': '暂无审计事件',
+  'settings.audit_export_json': 'JSON',
+  'settings.audit_export_ndjson': 'NDJSON',
   'nav.settings': '设置',
 
   // SQL history

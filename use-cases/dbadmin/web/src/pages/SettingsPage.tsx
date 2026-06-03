@@ -108,6 +108,10 @@ export default function SettingsPage() {
     }
   }
 
+  function exportAudit(format: 'json' | 'ndjson') {
+    window.location.href = api.auditExportURL(format)
+  }
+
   return (
     <PageShell>
       <PageToolbar
@@ -298,13 +302,29 @@ export default function SettingsPage() {
             <SectionPanel
               title={t('settings.audit_rbac')}
               action={
-                <button
-                  type="button"
-                  onClick={() => void loadAudit()}
-                  className="btn btn-ghost h-8 px-3 text-xs"
-                >
-                  {t('settings.operations_refresh')}
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => exportAudit('json')}
+                    className="btn btn-ghost h-8 px-3 text-xs"
+                  >
+                    {t('settings.audit_export_json')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => exportAudit('ndjson')}
+                    className="btn btn-ghost h-8 px-3 text-xs"
+                  >
+                    {t('settings.audit_export_ndjson')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void loadAudit()}
+                    className="btn btn-ghost h-8 px-3 text-xs"
+                  >
+                    {t('settings.operations_refresh')}
+                  </button>
+                </div>
               }
             >
               {auditLoading && auditEvents.length === 0 ? (
@@ -337,8 +357,15 @@ export default function SettingsPage() {
                       <div className="mt-1 truncate font-mono text-sm" style={{ color: 'var(--text-default)' }}>
                         {event.action}
                       </div>
-                      <div className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                        {event.user}
+                      <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs" style={{ color: 'var(--text-muted)' }}>
+                        <span>{event.user}{event.role ? ` · ${event.role}` : ''}</span>
+                        {event.request_id && <span>{event.request_id}</span>}
+                        {event.remote_addr && <span>{event.remote_addr}</span>}
+                        {event.denied_reason && (
+                          <span className="badge h-5 min-h-0 px-1.5 text-[10px]">
+                            {event.denied_reason}
+                          </span>
+                        )}
                       </div>
                     </div>
                   ))}

@@ -52,6 +52,10 @@ type AppConfig struct {
 	ESQueryTimeoutSeconds int
 	// ResourceListTimeoutSeconds is the maximum execution time for resource-tree listing (default: 30).
 	ResourceListTimeoutSeconds int
+	// AuditRetentionDays controls how long local audit events are retained.
+	AuditRetentionDays int
+	// AuditMaxEvents caps the number of local audit events retained.
+	AuditMaxEvents int
 }
 
 // Defaults returns safe configuration values for local development.
@@ -77,6 +81,8 @@ func Defaults() Config {
 			MongoQueryTimeoutSeconds:   30,
 			ESQueryTimeoutSeconds:      30,
 			ResourceListTimeoutSeconds: 30,
+			AuditRetentionDays:         90,
+			AuditMaxEvents:             500,
 		},
 	}
 }
@@ -129,6 +135,12 @@ func Validate(cfg Config) error {
 	}
 	if cfg.App.SessionTTL <= 0 {
 		return fmt.Errorf("DBADMIN_SESSION_TTL must be positive")
+	}
+	if cfg.App.AuditRetentionDays <= 0 {
+		return fmt.Errorf("DBADMIN_AUDIT_RETENTION_DAYS must be positive")
+	}
+	if cfg.App.AuditMaxEvents <= 0 {
+		return fmt.Errorf("DBADMIN_AUDIT_MAX_EVENTS must be positive")
 	}
 	return nil
 }
@@ -193,6 +205,8 @@ func applyEnv(cfg *Config, lookupEnv func(string) (string, bool)) {
 	intf("DBADMIN_MONGO_QUERY_TIMEOUT_SECONDS", &cfg.App.MongoQueryTimeoutSeconds)
 	intf("DBADMIN_ES_QUERY_TIMEOUT_SECONDS", &cfg.App.ESQueryTimeoutSeconds)
 	intf("DBADMIN_RESOURCE_LIST_TIMEOUT_SECONDS", &cfg.App.ResourceListTimeoutSeconds)
+	intf("DBADMIN_AUDIT_RETENTION_DAYS", &cfg.App.AuditRetentionDays)
+	intf("DBADMIN_AUDIT_MAX_EVENTS", &cfg.App.AuditMaxEvents)
 }
 
 func isPublicAddr(addr string) bool {
