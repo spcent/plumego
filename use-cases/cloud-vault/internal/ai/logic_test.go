@@ -101,7 +101,7 @@ func TestEstimateTokens_LongerInput(t *testing.T) {
 }
 
 func TestEstimateTokens_Proportional(t *testing.T) {
-	small := estimateTokens("aaaa")     // 4 chars → ~1 token + 1 = 2
+	small := estimateTokens("aaaa")                            // 4 chars → ~1 token + 1 = 2
 	large := estimateTokens("aaaa" + strings.Repeat("a", 396)) // 400 chars → 100 + 1 = 101
 	if large <= small {
 		t.Errorf("estimateTokens large should be > small: %d vs %d", large, small)

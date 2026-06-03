@@ -239,6 +239,16 @@
       "path": "reference/standard-service/internal/handler/items.go",
       "symbol": "codeItemPatchUnknownField",
       "type": "TypeBadRequest"
+    },
+    {
+      "path": "use-cases/dbadmin/internal/handler/audit.go",
+      "symbol": "literal:DBADMIN_AUDIT_EXPORT_FORMAT_INVALID",
+      "type": "TypeBadRequest"
+    },
+    {
+      "path": "use-cases/dbadmin/internal/handler/audit.go",
+      "symbol": "literal:DBADMIN_RBAC_DENIED",
+      "type": "TypeForbidden"
     }
   ]
 }

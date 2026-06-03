@@ -716,7 +716,7 @@ func TestScoreQuality_Integration(t *testing.T) {
 	// Create documents with varying characteristics.
 	_, err := docSvc.Create(ctx, document.CreateRequest{
 		Title:   "Short", // short title
-		Content: "x",    // very short content → low quality
+		Content: "x",     // very short content → low quality
 	})
 	if err != nil {
 		t.Fatalf("Create short doc: %v", err)

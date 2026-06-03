@@ -139,9 +139,6 @@ type VersionDetail struct {
 	Note      string    `json:"note,omitempty"`
 }
 
-// RestoreVersionResult is returned after restoring a historical version.
-type RestoreVersionResult = SaveResult
-
 // CreateSnapshotRequest creates or pins a key version for the current content.
 type CreateSnapshotRequest struct {
 	Note string `json:"note"`
