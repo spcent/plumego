@@ -46,7 +46,6 @@ function AppContent() {
   const { t } = useI18n()
   const [page, setPage] = useState<Page>('vault')
   const [openDoc, setOpenDoc] = useState<OpenDoc | null>(null)
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(true)
 
   const groups = useMemo<NavGroup[]>(() => [
     {
@@ -109,64 +108,23 @@ function AppContent() {
   }
 
   return (
-    <div className="min-h-[100dvh] bg-background text-foreground md:flex">
-      <aside
-        className={cn(
-          'hidden shrink-0 border-r border-border bg-surface/95 transition-[width] duration-200 md:flex md:flex-col',
-          sidebarCollapsed ? 'w-16' : 'w-64',
-        )}
-      >
-        <div className={cn('border-b border-border py-4', sidebarCollapsed ? 'px-2.5' : 'px-4')}>
-          <div className={cn('flex items-center', sidebarCollapsed ? 'justify-center' : 'gap-3')}>
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-primary/25 bg-primary/10 text-primary shadow-sm shadow-slate-950/5 dark:shadow-none">
-              <Icon name="book" className="h-5 w-5" />
-            </div>
-            {!sidebarCollapsed && (
-              <div className="min-w-0 flex-1">
-                <div className="text-sm font-semibold tracking-tight">Cloud Vault</div>
-                <div className="text-xs text-muted-foreground">Markdown workspace</div>
-              </div>
-            )}
-            {!sidebarCollapsed && (
-              <button
-                type="button"
-                onClick={() => setSidebarCollapsed(true)}
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-[background-color,color,transform] hover:bg-accent hover:text-foreground active:translate-y-px"
-                aria-label="Collapse sidebar"
-                title="Collapse sidebar"
-              >
-                <Icon name="collapse" className="h-4 w-4" />
-              </button>
-            )}
+    <div className="min-h-[100dvh] bg-[hsl(var(--workspace-bg))] text-[hsl(var(--workspace-text))] md:flex">
+      <aside className="hidden w-16 shrink-0 border-r border-[hsl(var(--workspace-border))] bg-[hsl(var(--workspace-rail))] md:flex md:flex-col">
+        <div className="flex h-14 shrink-0 items-center justify-center border-b border-[hsl(var(--workspace-border))]">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg text-[hsl(var(--workspace-accent))]">
+            <Icon name="book" className="h-5 w-5" />
           </div>
-          {sidebarCollapsed && (
-            <button
-              type="button"
-              onClick={() => setSidebarCollapsed(false)}
-              className="mt-3 flex h-8 w-full items-center justify-center rounded-md text-muted-foreground transition-[background-color,color,transform] hover:bg-accent hover:text-foreground active:translate-y-px"
-              aria-label="Expand sidebar"
-              title="Expand sidebar"
-            >
-              <Icon name="chevronRight" className="h-4 w-4" />
-            </button>
-          )}
         </div>
-        <nav className={cn('flex-1 overflow-y-auto py-4', sidebarCollapsed ? 'px-2' : 'px-3')}>
+        <nav className="flex-1 overflow-y-auto px-2 py-4">
           {groups.map(group => (
-            <div key={group.label} className={cn('last:mb-0', sidebarCollapsed ? 'mb-4' : 'mb-5')}>
-              {!sidebarCollapsed && (
-                <div className="mb-2 px-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                  {group.label}
-                </div>
-              )}
-              {sidebarCollapsed && <div className="mx-auto mb-2 h-px w-7 bg-border" />}
+            <div key={group.label} className="mb-4 last:mb-0">
+              <div className="mx-auto mb-2 h-px w-7 bg-[hsl(var(--workspace-border))]" />
               <div className="space-y-1">
                 {group.items.map(item => (
                   <NavButton
                     key={item.page}
                     item={item}
                     active={page === item.page}
-                    collapsed={sidebarCollapsed}
                     onClick={() => setPage(item.page)}
                   />
                 ))}
@@ -174,46 +132,58 @@ function AppContent() {
             </div>
           ))}
         </nav>
-        <div className="border-t border-border p-3">
-          {sidebarCollapsed ? (
-            <button
-              type="button"
-              onClick={logout}
-              className="flex h-9 w-full items-center justify-center rounded-md text-muted-foreground transition-[background-color,color,transform] hover:bg-accent hover:text-foreground active:translate-y-px"
-              aria-label={t.nav.logout}
-              title={t.nav.logout}
-            >
-              <Icon name="logout" className="h-4 w-4" />
-            </button>
-          ) : (
-            <Button variant="ghost" icon="logout" className="w-full justify-start" onClick={logout}>
-              {t.nav.logout}
-            </Button>
-          )}
+        <div className="border-t border-[hsl(var(--workspace-border))] p-2">
+          <button
+            type="button"
+            onClick={logout}
+            className="flex h-10 w-full items-center justify-center rounded-lg text-[hsl(var(--workspace-muted))] transition-colors hover:bg-[hsl(var(--workspace-panel-soft))] hover:text-[hsl(var(--workspace-text))]"
+            aria-label={t.nav.logout}
+            title={t.nav.logout}
+          >
+            <Icon name="logout" className="h-4 w-4" />
+          </button>
         </div>
       </aside>
 
       <div className="flex min-h-[100dvh] min-w-0 flex-1 flex-col">
-        <header className="shrink-0 border-b border-border bg-surface/90">
-          <div className="flex min-h-14 items-center gap-3 px-4 md:px-5">
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2 text-sm font-semibold tracking-tight text-foreground">
-                {activeItem && (
-                  <span className="flex h-7 w-7 items-center justify-center rounded-md border border-border bg-background text-primary">
-                    <Icon name={activeItem.icon} className="h-4 w-4" />
-                  </span>
-                )}
-                <span className="truncate">{activeItem?.label ?? 'Cloud Vault'}</span>
-              </div>
-              <div className="hidden truncate pl-9 text-xs text-muted-foreground sm:block">
-                {activeItem?.description ?? 'Markdown workspace'}
+        <header className="shrink-0 border-b border-[hsl(var(--workspace-border))] bg-[hsl(var(--workspace-panel))]">
+          <div className="grid min-h-14 grid-cols-1 items-center gap-4 px-4 md:grid-cols-[minmax(220px,1fr)_minmax(220px,1fr)_minmax(220px,1fr)] md:px-5">
+            <div className="flex min-w-0 items-center gap-5">
+              <div className="min-w-[120px] text-sm font-semibold tracking-tight">Cloud Vault</div>
+              <div className="hidden min-w-0 items-center gap-2 text-sm text-[hsl(var(--workspace-muted))] lg:flex">
+                <span>工作区</span>
+                <span>/</span>
+                <span className="truncate text-[hsl(var(--workspace-text))]">{activeItem?.label ?? '文档'}</span>
+                <Icon name="chevronDown" className="h-3.5 w-3.5" />
               </div>
             </div>
-            <Button variant="ghost" size="sm" icon="logout" className="hidden md:inline-flex" onClick={logout}>
-              {t.nav.logout}
-            </Button>
+            <div className="hidden min-w-0 justify-center md:flex">
+              <div className="flex min-w-0 items-center gap-2">
+                <span className="truncate text-sm font-semibold">{page === 'vault' ? '设计系统更新计划' : activeItem?.label}</span>
+                <span className="rounded-md border border-[hsl(var(--workspace-border))] bg-[hsl(var(--workspace-panel-soft))] px-2 py-0.5 text-xs text-[hsl(var(--workspace-muted))]">已保存</span>
+              </div>
+            </div>
+            <div className="flex min-w-0 items-center justify-end gap-3">
+              <div className="relative hidden w-48 lg:block">
+                <Icon name="search" className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[hsl(var(--workspace-muted))]" />
+                <input className="workspace-search-input h-8 pl-8 text-xs" placeholder="搜索 (⌘K)" />
+              </div>
+              <button type="button" className="workspace-icon-button hidden md:inline-flex" aria-label="导出" title="导出">
+                <Icon name="file" className="h-4 w-4" />
+              </button>
+              <button type="button" className="workspace-action-button hidden md:inline-flex">
+                <Icon name="share" className="h-4 w-4" />
+                分享
+              </button>
+              <button type="button" className="workspace-icon-button hidden md:inline-flex" aria-label="更多" title="更多">
+                <Icon name="more" className="h-4 w-4" />
+              </button>
+              <Button variant="ghost" size="sm" icon="logout" className="md:hidden" onClick={logout}>
+                {t.nav.logout}
+              </Button>
+            </div>
           </div>
-          <nav className="flex gap-1 overflow-x-auto border-t border-border px-3 py-2 md:hidden">
+          <nav className="flex gap-1 overflow-x-auto border-t border-[hsl(var(--workspace-border))] px-3 py-2 md:hidden">
             {groups.flatMap(group => group.items).map(item => (
               <button
                 key={item.page}
@@ -262,36 +232,27 @@ function AppContent() {
   )
 }
 
-function NavButton({ item, active, collapsed, onClick }: { item: NavItem; active: boolean; collapsed: boolean; onClick: () => void }) {
+function NavButton({ item, active, onClick }: { item: NavItem; active: boolean; onClick: () => void }) {
   return (
     <button
       type="button"
       onClick={onClick}
       aria-label={item.label}
-      title={collapsed ? item.label : undefined}
+      title={item.label}
       className={cn(
-        'group relative flex w-full items-center rounded-md py-2 text-left transition-[background-color,color,transform] duration-150 active:translate-y-px',
-        collapsed ? 'justify-center px-0' : 'gap-3 px-2',
-        active ? 'bg-primary/10 text-primary dark:bg-primary/15' : 'text-muted-foreground hover:bg-accent hover:text-foreground',
+        'group relative flex h-10 w-full items-center justify-center rounded-lg text-[hsl(var(--workspace-muted))] transition-[background-color,color,transform] duration-150 active:translate-y-px',
+        active ? 'bg-[hsl(var(--workspace-accent)/0.16)] text-[hsl(var(--workspace-accent))]' : 'hover:bg-[hsl(var(--workspace-panel-soft))] hover:text-[hsl(var(--workspace-text))]',
       )}
     >
-      {active && collapsed && <span className="absolute left-[-7px] h-5 w-0.5 rounded-full bg-primary" />}
+      {active && <span className="absolute left-[-8px] h-5 w-0.5 rounded-full bg-[hsl(var(--workspace-accent))]" />}
       <span
         className={cn(
-          'flex h-7 w-7 shrink-0 items-center justify-center rounded-md border transition-colors',
-          active ? 'border-primary/30 bg-primary text-primary-foreground shadow-sm shadow-primary/10' : 'border-border bg-surface group-hover:bg-background',
+          'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border transition-colors',
+          active ? 'border-[hsl(var(--workspace-accent)/0.28)] bg-[hsl(var(--workspace-accent)/0.10)]' : 'border-transparent',
         )}
       >
         <Icon name={item.icon} className="h-4 w-4" />
       </span>
-      {!collapsed && (
-        <span className="min-w-0">
-          <span className="block truncate text-sm font-medium">{item.label}</span>
-          <span className="block truncate text-[11px] text-muted-foreground">
-            {item.description}
-          </span>
-        </span>
-      )}
     </button>
   )
 }

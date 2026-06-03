@@ -33,6 +33,7 @@ export interface Translations {
     signIn: string
     signOut: string
     username: string
+    usernameRequired: string
     password: string
     currentPassword: string
     newPassword: string
@@ -48,6 +49,7 @@ export interface Translations {
     theme: string
     passwordMismatch: string
     passwordTooShort: string
+    passwordStrength: string
     invalidCurrentPassword: string
     signingIn: string
   }
@@ -205,6 +207,7 @@ export const enUS: Translations = {
     signIn: 'Sign in to Cloud Vault',
     signOut: 'Sign out',
     username: 'Username',
+    usernameRequired: 'Username is required',
     password: 'Password',
     currentPassword: 'Current Password',
     newPassword: 'New Password',
@@ -220,6 +223,7 @@ export const enUS: Translations = {
     theme: 'Theme',
     passwordMismatch: 'Passwords do not match',
     passwordTooShort: 'Password must be at least 10 characters',
+    passwordStrength: 'Password must be at least 10 characters and include uppercase, lowercase, and a number',
     invalidCurrentPassword: 'Invalid current password',
     signingIn: 'Signing in...',
   },
@@ -377,6 +381,7 @@ export const zhCN: Translations = {
     signIn: '登录到 Cloud Vault',
     signOut: '退出登录',
     username: '用户名',
+    usernameRequired: '请输入用户名',
     password: '密码',
     currentPassword: '当前密码',
     newPassword: '新密码',
@@ -392,6 +397,7 @@ export const zhCN: Translations = {
     theme: '主题',
     passwordMismatch: '两次输入的密码不匹配',
     passwordTooShort: '密码必须至少 10 个字符',
+    passwordStrength: '密码必须至少 10 个字符，并包含大写字母、小写字母和数字',
     invalidCurrentPassword: '当前密码错误',
     signingIn: '登录中...',
   },
@@ -549,6 +555,7 @@ export const zhTW: Translations = {
     signIn: '登入到 Cloud Vault',
     signOut: '登出',
     username: '使用者名稱',
+    usernameRequired: '請輸入使用者名稱',
     password: '密碼',
     currentPassword: '目前密碼',
     newPassword: '新密碼',
@@ -564,6 +571,7 @@ export const zhTW: Translations = {
     theme: '主題',
     passwordMismatch: '密碼不匹配',
     passwordTooShort: '密碼必須至少 10 個字元',
+    passwordStrength: '密碼必須至少 10 個字元，並包含大寫字母、小寫字母和數字',
     invalidCurrentPassword: '當前密碼錯誤',
     signingIn: '登入中...',
   },

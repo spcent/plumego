@@ -16,6 +16,7 @@ local operating rules.
 
 | App | What it is |
 |---|---|
+| `dbadmin/` | Local-first multi-database admin workbench — MySQL, SQLite, Redis, MongoDB, and Elasticsearch inspection with safety guardrails |
 | `workerfleet/` | Worker fleet monitoring service — HTTP ingestion, domain events, MongoDB storage, Kubernetes reconciliation, Prometheus metrics, Feishu/webhook alerting |
 
 For canonical application layout, see `reference/standard-service`.

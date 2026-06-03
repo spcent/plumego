@@ -8,7 +8,7 @@ This document contains release notes for all versions of Markdown Cloud Vault.
 
 ### Overview
 
-Version 1.0.0 is the first stable release of Markdown Cloud Vault, featuring a complete document management system with full-text search, AI-powered features, and comprehensive organization tools.
+Version 1.0.0 is the first source-ready release of Markdown Cloud Vault, featuring local-first Markdown document management, full-text search, optional AI assistance, authentication, diagnostics, manual backup/restore, and server packaging.
 
 ### Features
 
@@ -16,23 +16,21 @@ Version 1.0.0 is the first stable release of Markdown Cloud Vault, featuring a c
 
 - **Document Management**
   - Create, edit, and delete Markdown documents
-  - Version history with diff view
+  - Bounded version history with key-version restore
   - Document metadata and tags
   - Collections for organizing documents
 
 - **Import/Export**
-  - Import from directories and ZIP archives
+  - Import from local directories
   - Automatic duplicate detection
   - Metadata extraction from frontmatter
   - Auto-tagging based on filename and path
-  - Export to Markdown, JSON, or CSV
 
 - **Full-Text Search**
   - Powered by SQLite FTS5
   - Search across document content, titles, and tags
-  - Advanced search operators (phrase, wildcard, boolean)
   - Search result highlighting
-  - Search history and saved searches
+  - Search history
 
 - **Organization**
   - Collections for grouping documents
@@ -47,26 +45,21 @@ Version 1.0.0 is the first stable release of Markdown Cloud Vault, featuring a c
   - Prompt extraction
   - Auto-tagging suggestions
   - Topic detection
-  - Support for OpenAI, Azure OpenAI, and local LLMs (Ollama)
+  - Support for OpenAI-compatible providers
 
 - **Storage**
   - Local filesystem storage (default)
   - Qiniu cloud storage integration
-  - Automatic backup and restore
-  - Storage optimization and cleanup
+  - Configurable document version retention
 
 - **Authentication**
   - User authentication with secure passwords
   - Session management with secure cookies
-  - Role-based access control (admin, user, readonly)
   - Rate limiting and brute force protection
-  - Optional two-factor authentication (2FA)
 
 - **Desktop Application**
-  - Native apps for Windows, macOS, and Linux
-  - System tray integration
-  - Automatic updates
-  - Desktop notifications
+  - Desktop build target
+  - Local server integration
   - Keyboard shortcuts
 
 - **Server Deployment**
@@ -81,16 +74,13 @@ Version 1.0.0 is the first stable release of Markdown Cloud Vault, featuring a c
 - **Web Interface**
   - Modern, responsive design
   - Dark mode support
-  - Keyboard shortcuts
-  - Drag-and-drop file upload
+  - Editor toolbar and split preview
   - Real-time search
   - Markdown preview with syntax highlighting
 
 - **Desktop Application**
   - Native look and feel
-  - System tray integration
-  - Automatic updates
-  - Desktop notifications
+  - Build target for native packages
 
 #### Administration
 
@@ -107,10 +97,9 @@ Version 1.0.0 is the first stable release of Markdown Cloud Vault, featuring a c
   - Health check reports
 
 - **Backup & Restore**
-  - Automatic scheduled backups
   - Manual backup creation
   - Restore from backup
-  - Backup verification
+  - Download and delete backup archives
 
 ### Security
 
@@ -220,9 +209,9 @@ Version 1.0.0 is the first stable release of Markdown Cloud Vault, featuring a c
 **Breaking Changes**: None
 
 **Migration Steps**:
-1. Backup your data: `./cloud-vault backup create`
+1. Backup your data through the web UI or `POST /api/v1/system/backup`
 2. Stop the service: `sudo systemctl stop cloud-vault`
-3. Update the binary: Download v1.0.0
+3. Update the binary from your release owner's artifact or rebuild from source
 4. Update configuration: Review new configuration options
 5. Start the service: `sudo systemctl start cloud-vault`
 6. Verify: `./cloud-vault doctor check`

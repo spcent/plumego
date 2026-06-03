@@ -114,6 +114,7 @@ export default function SecurityPage() {
               <Field label={t.auth.currentPassword}>
                 <TextInput
                   type="password"
+                  autoComplete="current-password"
                   value={currentPassword}
                   onChange={(e) => setCurrentPassword(e.target.value)}
                 />
@@ -122,6 +123,7 @@ export default function SecurityPage() {
               <Field label={t.auth.newPassword}>
                 <TextInput
                   type="password"
+                  autoComplete="new-password"
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                 />
@@ -130,6 +132,7 @@ export default function SecurityPage() {
               <Field label={t.auth.confirmPassword}>
                 <TextInput
                   type="password"
+                  autoComplete="new-password"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                 />

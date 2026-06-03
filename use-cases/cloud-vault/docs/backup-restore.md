@@ -1,291 +1,105 @@
 # Backup and Restore Guide
 
-This guide covers backing up and restoring your Markdown Cloud Vault data.
+This guide documents the backup and restore behavior implemented in the source tree.
 
-## Overview
+## What Is Included
 
-Cloud Vault provides:
-- **Automatic backups**: Scheduled backups with retention
-- **Manual backups**: On-demand backup creation
-- **Restore**: Restore from backup files
-- **Export**: Export data in standard formats
+Manual backups include:
 
-## Automatic Backups
+- `app.db` — SQLite database snapshot created with `VACUUM INTO`
+- `objects/` — local object storage files when `storage.provider = "local"`
+- `manifest.json` — backup metadata and format version
 
-### Configuration
+When `storage.provider = "qiniu"`, backups include database metadata and the manifest. Qiniu bucket objects are not downloaded into the backup zip; use Qiniu's lifecycle, replication, or export tooling for object-level recovery.
 
-```toml
-[backup]
-enabled = true
-schedule = "0 2 * * *"  # Daily at 2 AM
-retention_days = 30
-max_backups = 10
-compression = true
-```
+## Create A Backup
 
-### Backup Location
+Use the web UI: **Settings** -> **Backup** -> **Create Backup**.
 
-Backups are stored in:
-```
-data/backups/
-├── backup-2026-05-30-020000.zip
-├── backup-2026-05-29-020000.zip
-└── ...
-```
+Or call the protected API:
 
-### Disable Automatic Backups
-
-```toml
-[backup]
-enabled = false
-```
-
-## Manual Backups
-
-### Create Backup
-
-**Via Web Interface**:
-1. Navigate to **Settings** → **Backup**
-2. Click **Create Backup**
-3. Wait for backup to complete
-4. Download backup file
-
-**Via CLI**:
 ```bash
-./cloud-vault backup create \
-  --output /path/to/backup.zip \
-  --compress
+curl -X POST http://localhost:8080/api/v1/system/backup \
+  -H "Cookie: session=<your-session-cookie>"
 ```
 
-**Via API**:
+Backups are written to the configured backup directory as:
+
+```text
+backups/cloud-vault-backup-YYYYMMDD-HHMMSS.zip
+```
+
+## List, Download, And Delete
+
 ```bash
-curl -X POST http://localhost:8080/api/v1/backup \
-  -H "Authorization: Bearer $TOKEN"
-```
+curl http://localhost:8080/api/v1/system/backups \
+  -H "Cookie: session=<your-session-cookie>"
 
-### Backup Contents
+curl -O http://localhost:8080/api/v1/system/backups/cloud-vault-backup-20260603-120000.zip/download \
+  -H "Cookie: session=<your-session-cookie>"
 
-Each backup includes:
-- `database.db` - SQLite database
-- `config.toml` - Configuration file
-- `metadata.json` - Backup metadata
-- `documents/` - Document files (if local storage)
-
-### Exclude from Backup
-
-```toml
-[backup]
-exclude_patterns = [
-  "*.tmp",
-  "*.log",
-  "cache/*"
-]
-```
-
-## List Backups
-
-**Via Web Interface**:
-1. Navigate to **Settings** → **Backup**
-2. View backup list with dates and sizes
-
-**Via CLI**:
-```bash
-./cloud-vault backup list
-```
-
-**Via API**:
-```bash
-curl http://localhost:8080/api/v1/backup \
-  -H "Authorization: Bearer $TOKEN"
+curl -X DELETE http://localhost:8080/api/v1/system/backups/cloud-vault-backup-20260603-120000.zip \
+  -H "Cookie: session=<your-session-cookie>"
 ```
 
 ## Restore
 
-### Restore from Backup
+The recommended production restore path is offline:
 
-**Via CLI**:
 ```bash
-./cloud-vault backup restore \
-  --backup /path/to/backup.zip \
-  --data-dir ./data
+# Stop the server first.
+./cloud-vault restore --file backups/cloud-vault-backup-20260603-120000.zip --data-dir ./data
 ```
 
-**Via API**:
+The restore command validates the zip manifest, extracts the database and local objects to temporary paths, then renames them into place. After restore, start the server and run the doctor checks.
+
+The API restore path is available for controlled local use and requires explicit confirmation:
+
 ```bash
-curl -X POST http://localhost:8080/api/v1/backup/restore \
-  -H "Authorization: Bearer $TOKEN" \
+curl -X POST http://localhost:8080/api/v1/system/restore \
   -H "Content-Type: application/json" \
-  -d '{
-    "backup_file": "backup-2026-05-30-020000.zip"
-  }'
+  -H "Cookie: session=<your-session-cookie>" \
+  -d '{"backup_name":"cloud-vault-backup-20260603-120000.zip","confirm":"RESTORE"}'
 ```
 
-### Restore Options
+Do not restore while users or background writers are active. Concurrent writes during restore are undefined.
 
-**Partial restore**:
-```bash
-./cloud-vault backup restore \
-  --backup backup.zip \
-  --only-database
-```
+## Verification
 
-**Dry run** (preview):
-```bash
-./cloud-vault backup restore \
-  --backup backup.zip \
-  --dry-run
-```
-
-## Export Data
-
-### Export Documents
-
-**Via Web Interface**:
-1. Navigate to **Documents** page
-2. Select documents
-3. Click **Export** → **Markdown**
-4. Download ZIP file
-
-**Via CLI**:
-```bash
-./cloud-vault export \
-  --format markdown \
-  --output /path/to/export.zip
-```
-
-### Export Formats
-
-- **Markdown**: Raw Markdown files
-- **JSON**: Structured data with metadata
-- **CSV**: Spreadsheet format
-
-## Backup Best Practices
-
-### 1. Regular Backups
-
-Enable automatic backups:
-```toml
-[backup]
-enabled = true
-schedule = "0 2 * * *"  # Daily
-```
-
-### 2. Offsite Storage
-
-Store backups offsite:
-```bash
-# Sync to remote server
-rsync -av data/backups/ user@backup-server:/backups/
-
-# Upload to cloud storage
-aws s3 sync data/backups/ s3://my-backups/cloud-vault/
-```
-
-### 3. Test Restores
-
-Regularly test restore process:
-```bash
-# Create test environment
-mkdir test-restore
-cd test-restore
-
-# Restore backup
-cloud-vault backup restore \
-  --backup ../backup.zip
-
-# Verify data
-cloud-vault documents list
-```
-
-### 4. Monitor Backup Size
-
-Check backup sizes:
-```bash
-du -sh data/backups/
-```
-
-If backups grow too large:
-- Reduce retention days
-- Exclude large attachments
-- Use incremental backups
-
-### 5. Encrypt Backups
-
-Encrypt sensitive backups:
-```bash
-# Encrypt backup
-gpg -c backup.zip
-
-# Decrypt backup
-gpg backup.zip.gpg
-```
-
-## Backup Verification
-
-### Verify Backup Integrity
+After creating a backup:
 
 ```bash
-./cloud-vault backup verify \
-  --backup backup.zip
+unzip -l backups/cloud-vault-backup-20260603-120000.zip
 ```
 
-### Check Database Integrity
+After restoring:
 
 ```bash
-./cloud-vault doctor check-database
+./cloud-vault --config config.toml
+```
+
+Then open the web UI and run the system doctor checks from Settings.
+
+## Operational Notes
+
+- Backups are full snapshots, not incremental backups.
+- Scheduling and rotation are not built in; use cron, systemd timers, or your platform scheduler.
+- Backup zip files are not encrypted at rest; encrypt them before storing offsite.
+- Qiniu bucket contents need a separate backup strategy.
+- Keep at least one tested backup outside the Cloud Vault data directory.
+
+Encrypt an offsite copy with GPG:
+
+```bash
+gpg -c backups/cloud-vault-backup-20260603-120000.zip
 ```
 
 ## Troubleshooting
 
-### Backup Fails
+`permission denied`: verify the server user can write to the backup directory and the data directory.
 
-**Error**: `Permission denied`
-```bash
-# Check permissions
-ls -la data/
+`no space left on device`: move older backups off the server or delete backups through the UI/API.
 
-# Fix permissions
-chmod 755 data/
-```
+`invalid backup manifest`: the file is not a Cloud Vault backup or is corrupted. Try an earlier backup.
 
-**Error**: `Disk full`
-```bash
-# Check disk space
-df -h
-
-# Clean old backups
-./cloud-vault backup prune --keep 5
-```
-
-### Restore Fails
-
-**Error**: `Database locked`
-```bash
-# Stop Cloud Vault
-sudo systemctl stop cloud-vault
-
-# Restore
-./cloud-vault backup restore --backup backup.zip
-
-# Start Cloud Vault
-sudo systemctl start cloud-vault
-```
-
-**Error**: `Backup corrupted`
-```bash
-# Verify backup
-./cloud-vault backup verify --backup backup.zip
-
-# Try previous backup
-./cloud-vault backup restore --backup backup-previous.zip
-```
-
-## Next Steps
-
-- [Security](./security.md) - Secure your backups
-- [Troubleshooting](./troubleshooting.md) - Common issues
-- [Diagnostics](./diagnostics.md) - Export diagnostic data
-
----
-
-**Last updated**: 2026-05-30
+`restore succeeded but objects are missing`: check whether the original system used Qiniu storage. Qiniu objects are restored with Qiniu tooling, not the Cloud Vault backup zip.

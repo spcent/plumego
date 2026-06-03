@@ -29,7 +29,7 @@ func (a *App) RegisterRoutes() error {
 	// V0.7: Auth endpoints
 	// Setup, Status, and Login are always public
 	v1.post("/auth/setup", http.HandlerFunc(a.Auth.Setup))
-	v1.get("/auth/status", http.HandlerFunc(a.Auth.GetStatus))
+	v1.get("/auth/status", a.optionalAuth(http.HandlerFunc(a.Auth.GetStatus)))
 	v1.post("/auth/login", http.HandlerFunc(a.Auth.Login))
 	// Other auth endpoints require authentication when auth is enabled
 	v1.post("/auth/logout", a.requireAuth(http.HandlerFunc(a.Auth.Logout)))
@@ -46,6 +46,8 @@ func (a *App) RegisterRoutes() error {
 	v1.put("/documents/:id", a.requireAuth(http.HandlerFunc(a.Docs.Update)))
 	v1.delete("/documents/:id", a.requireAuth(http.HandlerFunc(a.Docs.Delete)))
 	v1.get("/documents/:id/versions", a.requireAuth(http.HandlerFunc(a.Docs.GetVersions)))
+	v1.post("/documents/:id/versions", a.requireAuth(http.HandlerFunc(a.Docs.CreateSnapshot)))
+	v1.post("/documents/:id/versions/:version/restore", a.requireAuth(http.HandlerFunc(a.Docs.RestoreVersion)))
 	v1.get("/documents/:id/versions/:version", a.requireAuth(http.HandlerFunc(a.Docs.GetVersion)))
 
 	// Documents — V0.2 management (batch before :id to avoid ambiguity, protected)
@@ -139,8 +141,10 @@ func (a *App) RegisterRoutes() error {
 
 	// V1.0: Diagnostics export (protected).
 	v1.post("/system/diagnostics/export", a.requireAuth(http.HandlerFunc(a.Diagnostics.GenerateBundle)))
+	v1.post("/system/diagnostics/generate", a.requireAuth(http.HandlerFunc(a.Diagnostics.GenerateBundle)))
 	v1.get("/system/diagnostics", a.requireAuth(http.HandlerFunc(a.Diagnostics.ListBundles)))
 	v1.get("/system/diagnostics/:name/download", a.requireAuth(http.HandlerFunc(a.Diagnostics.DownloadBundle)))
+	v1.get("/system/diagnostics/download/:name", a.requireAuth(http.HandlerFunc(a.Diagnostics.DownloadBundle)))
 
 	// V0.8: Backup and restore endpoints (protected).
 	v1.post("/system/backup", a.requireAuth(http.HandlerFunc(a.Backup.CreateBackup)))
@@ -198,6 +202,14 @@ func logWriteErr(logger plumelog.StructuredLogger, err error) {
 func (a *App) requireAuth(h http.Handler) http.Handler {
 	if a.authMiddleware != nil {
 		return a.authMiddleware(h)
+	}
+	return h
+}
+
+// optionalAuth adds current user context when a valid session exists.
+func (a *App) optionalAuth(h http.Handler) http.Handler {
+	if a.authOptional != nil {
+		return a.authOptional(h)
 	}
 	return h
 }

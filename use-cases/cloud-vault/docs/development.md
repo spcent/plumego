@@ -15,8 +15,8 @@ This guide covers setting up a development environment for Markdown Cloud Vault.
 ### Clone Repository
 
 ```bash
-git clone https://github.com/example/cloud-vault.git
-cd cloud-vault
+git clone <your-plumego-repository-url>
+cd plumego/use-cases/cloud-vault
 ```
 
 ### Install Dependencies

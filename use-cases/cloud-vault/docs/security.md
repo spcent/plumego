@@ -122,11 +122,10 @@ openssl rand -hex 32
 
 ### Backup Encryption
 
-Encrypt backups:
-```toml
-[backup]
-encryption = true
-encryption_key = "${BACKUP_ENCRYPTION_KEY}"
+Encrypt backup archives before storing them offsite:
+
+```bash
+gpg -c backups/cloud-vault-backup-20260603-120000.zip
 ```
 
 ### Database Security
@@ -339,7 +338,7 @@ tar -czf incident-$(date +%Y%m%d-%H%M%S).tar.gz \
 
 5. **Restore from backup**:
 ```bash
-./cloud-vault backup restore --backup clean-backup.zip
+./cloud-vault restore --file clean-backup.zip --data-dir /var/lib/cloud-vault/data
 ```
 
 6. **Notify users** (if data compromised)

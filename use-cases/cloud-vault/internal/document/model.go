@@ -25,6 +25,9 @@ const (
 
 	ReviewStatusPending  = "pending"
 	ReviewStatusReviewed = "reviewed"
+
+	VersionKindAuto   = "auto"
+	VersionKindManual = "manual"
 )
 
 // Document is the core document entity.
@@ -65,6 +68,8 @@ type DocumentVersion struct {
 	SizeBytes   int64
 	CreatedAt   time.Time
 	Note        string
+	Kind        string
+	Pinned      bool
 }
 
 // CurrentKey returns the object storage key for the document's latest content.

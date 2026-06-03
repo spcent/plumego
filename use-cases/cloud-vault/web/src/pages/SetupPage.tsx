@@ -15,25 +15,47 @@ export default function SetupPage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
+  function passwordMeetsStrength(value: string) {
+    return value.length >= 10 && /[A-Z]/.test(value) && /[a-z]/.test(value) && /\d/.test(value)
+  }
+
+  function setupErrorMessage(err: unknown) {
+    if (!(err instanceof Error)) return t.setup.setupFailed
+    if (err.message.includes('uppercase') || err.message.includes('strength requirements')) {
+      return t.auth.passwordStrength
+    }
+    if (err.message.includes('already exists')) {
+      return t.setup.alreadyInitialized
+    }
+    return err.message || t.setup.setupFailed
+  }
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
     setError('')
+
+    const trimmedUsername = username.trim()
+    const trimmedEmail = email.trim()
+    if (!trimmedUsername) {
+      setError(t.auth.usernameRequired)
+      return
+    }
 
     if (password !== confirmPassword) {
       setError(t.auth.passwordMismatch)
       return
     }
 
-    if (password.length < 10) {
-      setError(t.auth.passwordTooShort)
+    if (!passwordMeetsStrength(password)) {
+      setError(t.auth.passwordStrength)
       return
     }
 
     setLoading(true)
     try {
-      await setup({ username, email, password })
+      await setup({ username: trimmedUsername, email: trimmedEmail, password })
     } catch (err) {
-      setError(err instanceof Error ? err.message : t.setup.setupFailed)
+      setError(setupErrorMessage(err))
     } finally {
       setLoading(false)
     }
@@ -56,6 +78,7 @@ export default function SetupPage() {
               <TextInput
                 id="username"
                 type="text"
+                autoComplete="username"
                 required
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
@@ -67,16 +90,18 @@ export default function SetupPage() {
               <TextInput
                 id="email"
                 type="email"
+                autoComplete="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 disabled={loading}
               />
             </Field>
 
-            <Field label={t.auth.password} helper={t.auth.passwordTooShort}>
+            <Field label={t.auth.password} helper={t.auth.passwordStrength}>
               <TextInput
                 id="password"
                 type="password"
+                autoComplete="new-password"
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -88,6 +113,7 @@ export default function SetupPage() {
               <TextInput
                 id="confirmPassword"
                 type="password"
+                autoComplete="new-password"
                 required
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}

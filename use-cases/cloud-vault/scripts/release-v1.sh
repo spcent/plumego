@@ -11,6 +11,7 @@ COMMIT=$(git rev-parse --short HEAD)
 BUILD_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 CHANNEL="stable"
 DIST="dist"
+RELEASE_BASE_URL="${RELEASE_BASE_URL:-}"
 
 echo "Building Cloud Vault v${VERSION} (${COMMIT}) at ${BUILD_TIME}..."
 
@@ -59,9 +60,31 @@ cp README.md "$DIST/server/"
 [ -f docs/release-notes.md ] && cp docs/release-notes.md "$DIST/server/"
 
 # Desktop (if Wails available)
-if command -v wails &> /dev/null; then
+WAILS_BIN="$(command -v wails || true)"
+if [ -z "$WAILS_BIN" ]; then
+  GOPATH_BIN="$(go env GOPATH)/bin/wails"
+  if [ -x "$GOPATH_BIN" ]; then
+    WAILS_BIN="$GOPATH_BIN"
+  fi
+fi
+
+if [ -n "$WAILS_BIN" ]; then
+  echo "Using Wails CLI: $WAILS_BIN"
   echo "Building desktop app..."
-  if wails build -o "$DIST/desktop/cloud-vault-desktop"; then
+  mkdir -p build
+  cp internal/desktop/resources/appicon.png build/appicon.png
+  rm -rf build/bin/cloud-vault-desktop build/bin/cloud-vault-desktop.app build/bin/cloud-vault.app
+  if "$WAILS_BIN" build -skipbindings -tags wails -o cloud-vault-desktop; then
+    desktop_app="$(find build/bin -maxdepth 1 -type d -name '*.app' | head -n 1)"
+    if [ -n "$desktop_app" ]; then
+      app_name="$(basename "$desktop_app")"
+      cp -R "$desktop_app" "$DIST/desktop/"
+      if command -v ditto &> /dev/null; then
+        (cd "$DIST/desktop" && ditto -c -k --sequesterRsrc --keepParent "$app_name" cloud-vault-desktop-darwin-arm64.zip)
+      fi
+    elif [ -f "build/bin/cloud-vault-desktop" ]; then
+      cp "build/bin/cloud-vault-desktop" "$DIST/desktop/"
+    fi
     echo "Desktop build successful"
   else
     echo "Warning: Wails build failed, continuing without desktop app"
@@ -80,30 +103,48 @@ cd ..
 
 # Latest.json
 echo "Generating latest.json..."
+server_sha="$(grep './server/markdown-vault' "$DIST/checksums.txt" | awk '{print $1}' || true)"
+desktop_sha="$(grep './desktop/cloud-vault-desktop-darwin-arm64.zip' "$DIST/checksums.txt" | awk '{print $1}' || true)"
+if [ -z "$server_sha" ]; then
+  echo "Error: server checksum missing"
+  exit 1
+fi
+
+notes_url=""
+download_page_url=""
+server_url=""
+desktop_url=""
+if [ -n "$RELEASE_BASE_URL" ]; then
+  notes_url="${RELEASE_BASE_URL%/}/release-notes-v${VERSION}.md"
+  download_page_url="${RELEASE_BASE_URL%/}/"
+  server_url="${RELEASE_BASE_URL%/}/server/markdown-vault"
+  desktop_url="${RELEASE_BASE_URL%/}/desktop/cloud-vault-desktop-darwin-arm64.zip"
+fi
+
+desktop_download=""
+if [ -n "$desktop_sha" ]; then
+  desktop_download="$(cat <<EOF_DESKTOP
+,
+    "darwin_arm64_desktop": {
+      "url": "${desktop_url}",
+      "sha256": "${desktop_sha}"
+    }
+EOF_DESKTOP
+)"
+fi
+
 cat > "$DIST/latest.json" <<EOF
 {
   "version": "${VERSION}",
   "released_at": "${BUILD_TIME}",
-  "notes_url": "https://example.com/releases/v${VERSION}",
-  "download_page_url": "https://example.com/download",
+  "notes_url": "${notes_url}",
+  "download_page_url": "${download_page_url}",
   "critical": false,
   "downloads": {
-    "darwin_arm64": {
-      "url": "https://example.com/downloads/Cloud-Vault-v${VERSION}-macOS-arm64.dmg",
-      "sha256": "$(grep 'darwin_arm64' "$DIST/checksums.txt" | awk '{print $1}' || echo 'placeholder')"
-    },
-    "darwin_amd64": {
-      "url": "https://example.com/downloads/Cloud-Vault-v${VERSION}-macOS-amd64.dmg",
-      "sha256": "$(grep 'darwin_amd64' "$DIST/checksums.txt" | awk '{print $1}' || echo 'placeholder')"
-    },
-    "windows_amd64": {
-      "url": "https://example.com/downloads/Cloud-Vault-v${VERSION}-windows-amd64.exe",
-      "sha256": "$(grep 'windows_amd64' "$DIST/checksums.txt" | awk '{print $1}' || echo 'placeholder')"
-    },
-    "linux_amd64": {
-      "url": "https://example.com/downloads/Cloud-Vault-v${VERSION}-linux-amd64.AppImage",
-      "sha256": "$(grep 'linux_amd64' "$DIST/checksums.txt" | awk '{print $1}' || echo 'placeholder')"
-    }
+    "linux_amd64_server": {
+      "url": "${server_url}",
+      "sha256": "${server_sha}"
+    }${desktop_download}
   }
 }
 EOF

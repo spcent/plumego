@@ -130,8 +130,8 @@ Coming soon!
 
 ## Community Resources
 
-- [GitHub Repository](https://github.com/example/cloud-vault) - Source code and issues
-- [Discussions](https://github.com/example/cloud-vault/discussions) - Community discussions
+- GitHub Repository - use the repository URL for your checked-out `plumego` source tree
+- Discussions - use the community channel configured by the release owner
 - [Discord](https://discord.gg/example) - Real-time chat (if available)
 
 ## Getting Help
@@ -139,14 +139,14 @@ Coming soon!
 ### Before Asking
 
 1. Check the [FAQ](./faq.md) (coming soon)
-2. Search existing [GitHub Issues](https://github.com/example/cloud-vault/issues)
+2. Search existing issues in the release owner's repository
 3. Review [Troubleshooting Guide](./troubleshooting.md)
 
 ### Ask for Help
 
-- **Bug Report**: [GitHub Issues](https://github.com/example/cloud-vault/issues/new?template=bug_report.md)
-- **Feature Request**: [GitHub Issues](https://github.com/example/cloud-vault/issues/new?template=feature_request.md)
-- **Questions**: [GitHub Discussions](https://github.com/example/cloud-vault/discussions)
+- **Bug Report**: open an issue in the release owner's repository
+- **Feature Request**: open an issue in the release owner's repository
+- **Questions**: use the release owner's discussion channel
 
 ### Provide Diagnostic Information
 

@@ -5,7 +5,7 @@ A local-first Markdown knowledge vault for your AI-generated notes.
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Version](https://img.shields.io/badge/version-1.0.0-green.svg)](docs/release-notes.md)
 
-[Download Desktop App](https://vault.birdor.com/download) | [Deploy Server](docs/server-deploy.md) | [Documentation](docs/)
+[Build from Source](#development) | [Deploy Server](docs/server-deploy.md) | [Documentation](docs/)
 
 ---
 
@@ -16,18 +16,17 @@ A local-first Markdown knowledge vault for your AI-generated notes.
 - **Full-text search** — SQLite FTS5 powers instant search across titles, content, and metadata
 - **Smart organization** — Collections, tags, review queue, and AI-powered topic grouping
 - **Optional AI** — Summarize, question, and extract insights (configure your own AI provider)
-- **Backup & restore** — Built-in backup with one-click restore
-- **Desktop & server** — Native desktop app (macOS/Windows/Linux) or self-hosted server
+- **Backup & restore** — Manual backup, download, delete, and confirmed restore flows
+- **Desktop & server** — Desktop build target or self-hosted server
 
 ## Quick Start
 
 ### Desktop App
 
-1. Download the installer for your platform:
-   - [macOS (Apple Silicon)](https://vault.birdor.com/downloads/Cloud-Vault-v1.0.0-macOS-arm64.dmg)
-   - [macOS (Intel)](https://vault.birdor.com/downloads/Cloud-Vault-v1.0.0-macOS-amd64.dmg)
-   - [Windows](https://vault.birdor.com/downloads/Cloud-Vault-v1.0.0-windows-amd64.exe)
-   - [Linux](https://vault.birdor.com/downloads/Cloud-Vault-v1.0.0-linux-amd64.AppImage)
+1. Build a local desktop package:
+   ```bash
+   make desktop-build
+   ```
 
 2. Install and launch the application
 3. On first run, create an admin account
@@ -38,10 +37,10 @@ See [Desktop Guide](docs/desktop.md) for detailed instructions.
 
 ### Server Deployment
 
-1. Download the server binary:
+1. Build or unpack the server binary:
    ```bash
-   curl -L -o cloud-vault https://vault.birdor.com/downloads/cloud-vault-v1.0.0-linux-amd64
-   chmod +x cloud-vault
+   make server-build-v1
+   cp dist/server/markdown-vault ./cloud-vault
    ```
 
 2. Create config file:
@@ -67,7 +66,7 @@ Key options:
 - `server.addr` — HTTP listen address (default: `:8080`)
 - `database.path` — SQLite database path (default: `./data/app.db`)
 - `storage.provider` — `local` or `qiniu` (default: `local`)
-- `auth.enabled` — Enable authentication (default: `false`)
+- `auth.enabled` — Enable authentication (default: `true`)
 - `ai.enabled` — Enable AI features (default: `false`)
 
 See [Configuration Guide](docs/configuration.md) for all options.
@@ -168,8 +167,8 @@ See [Privacy Policy](docs/privacy.md) and [Security Guide](docs/security.md).
 
 ```bash
 # Clone repository
-git clone https://github.com/example/cloud-vault.git
-cd cloud-vault
+git clone <your-plumego-repository-url>
+cd plumego/use-cases/cloud-vault
 
 # Build server
 make build
@@ -204,7 +203,8 @@ See [Development Guide](docs/development.md).
 
 - V1.0 does not support multi-user real-time collaboration
 - V1.0 does not support cloud sync accounts
-- Auto-update check only notifies, does not silently install
+- Public installers and release feed URLs must be supplied by the release owner
+- Auto-update check only notifies, does not download or silently install
 - AI features require user-configured model provider
 - Approximate duplicate and topic detection are suggestions, may not be fully accurate
 - QiniuStorage requires user to manage bucket permissions and backup strategy
@@ -1467,7 +1467,7 @@ curl -X POST http://localhost:8080/api/v1/system/restore \
   -d '{"backup_name":"cloud-vault-backup-20260530-120000.zip","confirm":"RESTORE"}'
 ```
 
-The API refuses if any active sessions exist (returns 409). Stop the server or revoke all sessions first.
+Use the offline CLI restore path for production data. The API restore endpoint requires explicit `confirm=RESTORE`; do not run it while users or background writers are active.
 
 > **Note:** Qiniu mode backups include only the manifest — bucket contents must be restored using Qiniu's own backup tools.
 
@@ -1513,13 +1513,13 @@ All migrations are idempotent — running `db.Migrate()` multiple times is safe.
 Build a production release package:
 
 ```bash
-make release VERSION=1.0.0
+make release-v1 VERSION=1.0.0
 # or
-./scripts/release.sh 1.0.0
+./scripts/release-v1.sh 1.0.0
 ```
 
-Produces `dist/cloud-vault-1.0.0-linux-amd64.tar.gz` containing:
-- `cloud-vault` binary (linux/amd64, statically linked)
+Produces `dist/server/markdown-vault` and release metadata under `dist/` containing:
+- `markdown-vault` server binary (linux/amd64 by default)
 - `config.example.toml`
 - `.env.example`
 - `README.md`

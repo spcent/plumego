@@ -61,8 +61,14 @@ use_https = true
 [app]
 # Maximum upload size in MB
 max_upload_size_mb = 10
-# Version retention policy: "all" (keep all versions) or "limited" (keep last N)
-version_policy = "all"
+# Version retention policy:
+# - "bounded": overwrite current content and keep only recent snapshots
+# - "full": keep every saved snapshot
+# - "overwrite": overwrite current content and create snapshots only on demand
+version_policy = "bounded"
+# Number of recent non-pinned snapshots to keep when version_policy = "bounded".
+# Manually created key versions are pinned and are not pruned.
+version_keep_latest = 5
 
 # =============================================================================
 # Authentication Configuration (V0.7+)
@@ -176,10 +182,12 @@ prompt_extract_enabled = true
 # Auto-Update Configuration (V1.0+)
 # =============================================================================
 [update]
-# Enable automatic update checking
-enabled = true
-# Check for updates on application startup
-check_on_startup = true
+# Enable automatic update checking. Keep disabled until update_url points to your release feed.
+enabled = false
+# Check for updates on application startup.
+check_on_startup = false
+# Latest-release JSON URL. Required when enabled = true.
+update_url = ""
 # Update check interval in minutes (default: 1440 = 24 hours)
 check_interval_minutes = 1440
 # Update channel: "stable", "beta", or "dev"

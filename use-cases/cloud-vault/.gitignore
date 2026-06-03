@@ -13,6 +13,8 @@ config.toml
 
 # JS
 node_modules
+web/wailsjs/
+web/package.json.md5
 
 # Go
 /vendor
@@ -23,6 +25,7 @@ node_modules
 *.db-wal
 
 internal/web/static/assets
+
 # Binary executables
 bench
 bin/

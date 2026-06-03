@@ -24,8 +24,10 @@ type Repository interface {
 	BatchUpdateStatus(ctx context.Context, ids []string, status string) error
 	UpdateReviewStatus(ctx context.Context, id string, reviewStatus string) error
 	CreateVersion(ctx context.Context, v *DocumentVersion) error
+	UpdateVersionMetadata(ctx context.Context, docID string, version int, kind, note string, pinned bool) error
 	GetVersions(ctx context.Context, docID string) ([]*DocumentVersion, error)
 	GetVersion(ctx context.Context, docID string, version int) (*DocumentVersion, error)
+	DeleteVersions(ctx context.Context, docID string, versions []int) error
 }
 
 // SQLiteRepository implements Repository using SQLite.
@@ -244,10 +246,10 @@ func (r *SQLiteRepository) UpdateReviewStatus(ctx context.Context, id string, re
 func (r *SQLiteRepository) CreateVersion(ctx context.Context, v *DocumentVersion) error {
 	_, err := r.db.ExecContext(ctx, `
 		INSERT INTO document_versions
-		  (id, document_id, version, storage_key, content_hash, size_bytes, created_at, note)
-		VALUES (?,?,?,?,?,?,?,?)`,
+		  (id, document_id, version, storage_key, content_hash, size_bytes, created_at, note, kind, pinned)
+		VALUES (?,?,?,?,?,?,?,?,?,?)`,
 		v.ID, v.DocumentID, v.Version, v.StorageKey, v.ContentHash, v.SizeBytes,
-		v.CreatedAt.UTC().Format(time.RFC3339), v.Note,
+		v.CreatedAt.UTC().Format(time.RFC3339), nullableStr(v.Note), normalizeVersionKind(v.Kind), boolToInt(v.Pinned),
 	)
 	if err != nil {
 		return fmt.Errorf("create document version: %w", err)
@@ -255,9 +257,22 @@ func (r *SQLiteRepository) CreateVersion(ctx context.Context, v *DocumentVersion
 	return nil
 }
 
+func (r *SQLiteRepository) UpdateVersionMetadata(ctx context.Context, docID string, version int, kind, note string, pinned bool) error {
+	result, err := r.db.ExecContext(ctx, `
+		UPDATE document_versions
+		SET kind = ?, note = ?, pinned = ?
+		WHERE document_id = ? AND version = ?`,
+		normalizeVersionKind(kind), nullableStr(note), boolToInt(pinned), docID, version,
+	)
+	if err != nil {
+		return fmt.Errorf("update document version metadata: %w", err)
+	}
+	return checkRowsAffected(result)
+}
+
 func (r *SQLiteRepository) GetVersions(ctx context.Context, docID string) ([]*DocumentVersion, error) {
 	rows, err := r.db.QueryContext(ctx, `
-		SELECT id, document_id, version, storage_key, content_hash, size_bytes, created_at, note
+		SELECT id, document_id, version, storage_key, content_hash, size_bytes, created_at, note, kind, pinned
 		FROM document_versions
 		WHERE document_id = ?
 		ORDER BY version DESC`, docID)
@@ -279,7 +294,7 @@ func (r *SQLiteRepository) GetVersions(ctx context.Context, docID string) ([]*Do
 
 func (r *SQLiteRepository) GetVersion(ctx context.Context, docID string, version int) (*DocumentVersion, error) {
 	row := r.db.QueryRowContext(ctx, `
-		SELECT id, document_id, version, storage_key, content_hash, size_bytes, created_at, note
+		SELECT id, document_id, version, storage_key, content_hash, size_bytes, created_at, note, kind, pinned
 		FROM document_versions
 		WHERE document_id = ? AND version = ?`, docID, version)
 
@@ -291,6 +306,26 @@ func (r *SQLiteRepository) GetVersion(ctx context.Context, docID string, version
 		return nil, fmt.Errorf("get version: %w", err)
 	}
 	return v, nil
+}
+
+func (r *SQLiteRepository) DeleteVersions(ctx context.Context, docID string, versions []int) error {
+	if len(versions) == 0 {
+		return nil
+	}
+	placeholders := strings.Repeat("?,", len(versions))
+	placeholders = placeholders[:len(placeholders)-1]
+	args := []any{docID}
+	for _, version := range versions {
+		args = append(args, version)
+	}
+	_, err := r.db.ExecContext(ctx,
+		`DELETE FROM document_versions WHERE document_id = ? AND version IN (`+placeholders+`)`,
+		args...,
+	)
+	if err != nil {
+		return fmt.Errorf("delete document versions: %w", err)
+	}
+	return nil
 }
 
 // --- query helpers ---
@@ -484,28 +519,48 @@ func scanDocumentRow(rows *sql.Rows) (*Document, error) {
 func scanVersionRow(rows *sql.Rows) (*DocumentVersion, error) {
 	var v DocumentVersion
 	var createdAt string
+	var note, kind *string
+	var pinned int
 	err := rows.Scan(
 		&v.ID, &v.DocumentID, &v.Version, &v.StorageKey, &v.ContentHash, &v.SizeBytes,
-		&createdAt, &v.Note,
+		&createdAt, &note, &kind, &pinned,
 	)
 	if err != nil {
 		return nil, err
 	}
 	v.CreatedAt, _ = time.Parse(time.RFC3339, createdAt)
+	if note != nil {
+		v.Note = *note
+	}
+	if kind != nil {
+		v.Kind = *kind
+	}
+	v.Kind = normalizeVersionKind(v.Kind)
+	v.Pinned = pinned != 0
 	return &v, nil
 }
 
 func scanVersionRowSingle(row *sql.Row) (*DocumentVersion, error) {
 	var v DocumentVersion
 	var createdAt string
+	var note, kind *string
+	var pinned int
 	err := row.Scan(
 		&v.ID, &v.DocumentID, &v.Version, &v.StorageKey, &v.ContentHash, &v.SizeBytes,
-		&createdAt, &v.Note,
+		&createdAt, &note, &kind, &pinned,
 	)
 	if err != nil {
 		return nil, err
 	}
 	v.CreatedAt, _ = time.Parse(time.RFC3339, createdAt)
+	if note != nil {
+		v.Note = *note
+	}
+	if kind != nil {
+		v.Kind = *kind
+	}
+	v.Kind = normalizeVersionKind(v.Kind)
+	v.Pinned = pinned != 0
 	return &v, nil
 }
 
@@ -534,4 +589,11 @@ func checkRowsAffected(result sql.Result) error {
 		return ErrNotFound
 	}
 	return nil
+}
+
+func normalizeVersionKind(kind string) string {
+	if kind == VersionKindManual {
+		return VersionKindManual
+	}
+	return VersionKindAuto
 }

@@ -176,6 +176,21 @@ func (h *Handler) GetVersions(w http.ResponseWriter, r *http.Request) {
 	h.writeOK(w, r, http.StatusOK, result)
 }
 
+// CreateSnapshot handles POST /api/v1/documents/:id/versions
+func (h *Handler) CreateSnapshot(w http.ResponseWriter, r *http.Request) {
+	id := router.Param(r, "id")
+	var req CreateSnapshotRequest
+	if !h.decodeJSON(w, r, &req) {
+		return
+	}
+	result, err := h.svc.CreateSnapshot(r.Context(), id, req.Note)
+	if err != nil {
+		h.writeErr(w, r, err)
+		return
+	}
+	h.writeOK(w, r, http.StatusCreated, result)
+}
+
 // GetVersion handles GET /api/v1/documents/:id/versions/:version
 func (h *Handler) GetVersion(w http.ResponseWriter, r *http.Request) {
 	id := router.Param(r, "id")
@@ -191,6 +206,28 @@ func (h *Handler) GetVersion(w http.ResponseWriter, r *http.Request) {
 	}
 
 	result, err := h.svc.GetVersion(r.Context(), id, version)
+	if err != nil {
+		h.writeErr(w, r, err)
+		return
+	}
+	h.writeOK(w, r, http.StatusOK, result)
+}
+
+// RestoreVersion handles POST /api/v1/documents/:id/versions/:version/restore
+func (h *Handler) RestoreVersion(w http.ResponseWriter, r *http.Request) {
+	id := router.Param(r, "id")
+	versionStr := router.Param(r, "version")
+
+	version, err := strconv.Atoi(versionStr)
+	if err != nil {
+		logWriteErr(h.logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+			Type(contract.TypeBadRequest).
+			Message("version must be an integer").
+			Build()))
+		return
+	}
+
+	result, err := h.svc.RestoreVersion(r.Context(), id, version)
 	if err != nil {
 		h.writeErr(w, r, err)
 		return

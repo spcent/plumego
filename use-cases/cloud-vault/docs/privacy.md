@@ -406,11 +406,10 @@ Periodically review stored data:
 
 ### 5. Secure Backups
 
-Encrypt backups:
-```toml
-[backup]
-encryption = true
-encryption_key = "${BACKUP_KEY}"
+Encrypt backup archives before storing them offsite:
+
+```bash
+gpg -c backups/cloud-vault-backup-20260603-120000.zip
 ```
 
 ## Transparency

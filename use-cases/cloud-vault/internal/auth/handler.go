@@ -3,6 +3,8 @@ package auth
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/spcent/plumego/contract"
@@ -47,6 +49,10 @@ func (h *Handler) Setup(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		if err.Error() == "setup already completed: users already exist" {
 			writeError(w, r, http.StatusConflict, err.Error())
+			return
+		}
+		if isSetupValidationError(err) {
+			writeError(w, r, http.StatusBadRequest, setupValidationMessage(err, h.config.PasswordMinLength))
 			return
 		}
 		h.logger.Error("setup failed", plumelog.Fields{"error": err.Error()})
@@ -141,9 +147,13 @@ func (h *Handler) GetStatus(w http.ResponseWriter, r *http.Request) {
 	}
 
 	status := struct {
-		Initialized bool `json:"initialized"`
+		Initialized   bool  `json:"initialized"`
+		Authenticated bool  `json:"authenticated"`
+		User          *User `json:"user,omitempty"`
 	}{
-		Initialized: userCount > 0,
+		Initialized:   userCount > 0,
+		Authenticated: UserFromContext(r.Context()) != nil,
+		User:          UserFromContext(r.Context()),
 	}
 
 	writeJSON(w, http.StatusOK, status)
@@ -379,6 +389,24 @@ func writeError(w http.ResponseWriter, r *http.Request, status int, message stri
 		Build()
 
 	contract.WriteError(w, r, apiErr)
+}
+
+func isSetupValidationError(err error) bool {
+	msg := err.Error()
+	return strings.Contains(msg, "password does not meet strength requirements") ||
+		strings.Contains(msg, "user already exists")
+}
+
+func setupValidationMessage(err error, minLength int) string {
+	msg := err.Error()
+	switch {
+	case strings.Contains(msg, "password does not meet strength requirements"):
+		return "Password must be at least " + strconv.Itoa(minLength) + " characters and include uppercase, lowercase, and a number"
+	case strings.Contains(msg, "user already exists"):
+		return "Username or email already exists"
+	default:
+		return "Invalid setup input"
+	}
 }
 
 func getIPAddress(r *http.Request) string {

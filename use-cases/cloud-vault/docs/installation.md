@@ -95,20 +95,15 @@ paru -S cloud-vault-bin
 
 ### Binary Installation
 
-**Download:**
+**Build from source:**
 ```bash
-# Linux amd64
-wget https://releases.example.com/cloud-vault-v1.0.0-linux-amd64.tar.gz
-tar -xzf cloud-vault-v1.0.0-linux-amd64.tar.gz
-cd cloud-vault
-
-# macOS
-curl -L https://releases.example.com/cloud-vault-v1.0.0-macos-amd64.tar.gz | tar -xz
-cd cloud-vault
-
-# Windows
-# Download and extract cloud-vault-v1.0.0-windows-amd64.zip
+git clone <your-plumego-repository-url>
+cd plumego/use-cases/cloud-vault
+make server-build-v1
+cp dist/server/markdown-vault ./cloud-vault
 ```
+
+Published binary URLs are release-owner specific. Do not use the example source tree as proof that signed desktop installers or public download endpoints already exist.
 
 **Verify Installation:**
 ```bash
@@ -165,7 +160,7 @@ See [Server Deployment](./server-deploy.md) for production Docker setup with TLS
 
 **Clone and Build:**
 ```bash
-git clone https://github.com/example/cloud-vault.git
+git clone <your-plumego-repository-url>
 cd cloud-vault
 
 # Build server binary

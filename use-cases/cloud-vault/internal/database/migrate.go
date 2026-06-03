@@ -19,6 +19,7 @@ var migrations = []migration{
 	{version: 5, up: migrate005},
 	{version: 6, up: migrate006},
 	{version: 7, up: migrate007},
+	{version: 8, up: migrate008},
 }
 
 // Migrate applies all pending migrations in ascending version order.
@@ -581,6 +582,24 @@ ALTER TABLE document_ai_summaries_new RENAME TO document_ai_summaries;
 -- Recreate index
 CREATE INDEX IF NOT EXISTS idx_document_ai_summaries_document_id
   ON document_ai_summaries(document_id);
+`)
+	return err
+}
+
+// migrate008 adds metadata used by bounded document version retention.
+func migrate008(tx *sql.Tx) error {
+	cols := []struct{ name, def string }{
+		{"kind", "TEXT NOT NULL DEFAULT 'auto'"},
+		{"pinned", "INTEGER NOT NULL DEFAULT 0"},
+	}
+	for _, col := range cols {
+		if err := addColumnIfNotExists(tx, "document_versions", col.name, col.def); err != nil {
+			return fmt.Errorf("add document_versions.%s: %w", col.name, err)
+		}
+	}
+	_, err := tx.Exec(`
+CREATE INDEX IF NOT EXISTS idx_document_versions_document_pin
+  ON document_versions(document_id, pinned, version);
 `)
 	return err
 }

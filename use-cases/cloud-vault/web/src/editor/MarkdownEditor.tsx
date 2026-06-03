@@ -1,48 +1,87 @@
-import { useEffect, useRef } from 'react'
+import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react'
 import { EditorView, Decoration, keymap, lineNumbers, highlightActiveLine, ViewPlugin, type DecorationSet } from '@codemirror/view'
 import { EditorState, RangeSetBuilder } from '@codemirror/state'
-import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
+import { defaultKeymap, history, historyKeymap, redo, undo } from '@codemirror/commands'
 import { markdown } from '@codemirror/lang-markdown'
 import { syntaxHighlighting, defaultHighlightStyle } from '@codemirror/language'
+
+export type MarkdownCommand =
+  | 'heading'
+  | 'bold'
+  | 'italic'
+  | 'code'
+  | 'quote'
+  | 'list'
+  | 'orderedList'
+  | 'task'
+  | 'link'
+  | 'image'
+  | 'table'
+  | 'undo'
+  | 'redo'
+
+export interface CursorPosition {
+  line: number
+  column: number
+}
+
+export interface MarkdownEditorHandle {
+  applyCommand: (command: MarkdownCommand) => void
+  focus: () => void
+}
 
 interface MarkdownEditorProps {
   value: string
   onChange: (value: string) => void
   onSave?: () => void
   highlightQuery?: string
+  onCursorChange?: (position: CursorPosition) => void
 }
 
-const lightTheme = EditorView.theme({
+const workspaceTheme = EditorView.theme({
   '&': {
     height: '100%',
-    backgroundColor: '#ffffff',
+    backgroundColor: 'hsl(var(--editor-bg))',
+    color: 'hsl(var(--editor-text))',
   },
   '.cm-content': {
-    padding: '12px 16px',
+    padding: '18px 28px 40px 18px',
     fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
-    fontSize: '14px',
-    lineHeight: '1.6',
+    fontSize: '13px',
+    lineHeight: '1.72',
+    caretColor: 'hsl(var(--editor-caret))',
   },
   '.cm-gutters': {
-    backgroundColor: '#f8f9fa',
-    borderRight: '1px solid #e9ecef',
-    color: '#adb5bd',
+    backgroundColor: 'hsl(var(--editor-bg))',
+    borderRight: '1px solid hsl(var(--workspace-border))',
+    color: 'hsl(var(--editor-gutter))',
+    fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+    fontSize: '13px',
+    paddingLeft: '10px',
   },
   '.cm-activeLineGutter': {
-    backgroundColor: '#e9ecef',
+    backgroundColor: 'hsl(var(--editor-active-line))',
+    color: 'hsl(var(--workspace-text))',
   },
   '.cm-activeLine': {
-    backgroundColor: '#f8f9fa',
+    backgroundColor: 'hsl(var(--editor-active-line))',
   },
   '.cm-cursor': {
-    borderLeftColor: '#1a1a1a',
+    borderLeftColor: 'hsl(var(--editor-caret))',
   },
   '.cm-selectionBackground': {
-    backgroundColor: '#dbeafe !important',
+    backgroundColor: 'hsl(var(--editor-selection)) !important',
   },
   '.cm-search-highlight': {
-    backgroundColor: '#fef08a',
+    backgroundColor: 'hsl(var(--editor-highlight))',
     borderRadius: '2px',
+  },
+  '.cm-line': {
+    paddingLeft: '8px',
+  },
+  '.tok-heading': {
+    color: 'hsl(var(--workspace-accent))',
+    fontWeight: '600',
   },
 })
 
@@ -76,17 +115,122 @@ function buildHighlightPlugin(getQuery: () => string) {
   )
 }
 
-export function MarkdownEditor({ value, onChange, onSave, highlightQuery = '' }: MarkdownEditorProps) {
+function selectionText(view: EditorView) {
+  const selection = view.state.selection.main
+  return view.state.doc.sliceString(selection.from, selection.to)
+}
+
+function replaceSelection(view: EditorView, insert: string, selectFrom?: number, selectTo?: number) {
+  const selection = view.state.selection.main
+  const base = selection.from
+  view.dispatch({
+    changes: { from: selection.from, to: selection.to, insert },
+    selection: selectFrom != null && selectTo != null ? { anchor: base + selectFrom, head: base + selectTo } : { anchor: base + insert.length },
+    scrollIntoView: true,
+  })
+  view.focus()
+}
+
+function prefixCurrentLine(view: EditorView, prefix: string) {
+  const line = view.state.doc.lineAt(view.state.selection.main.head)
+  const current = view.state.doc.sliceString(line.from, line.to)
+  const existingIndent = current.match(/^\s*/)?.[0] ?? ''
+  const insertAt = line.from + existingIndent.length
+  view.dispatch({
+    changes: { from: insertAt, insert: prefix },
+    selection: { anchor: view.state.selection.main.head + prefix.length },
+    scrollIntoView: true,
+  })
+  view.focus()
+}
+
+function applyMarkdownCommand(view: EditorView, command: MarkdownCommand) {
+  const selected = selectionText(view)
+  switch (command) {
+    case 'heading':
+      prefixCurrentLine(view, '# ')
+      return
+    case 'bold': {
+      const text = selected || 'bold text'
+      replaceSelection(view, `**${text}**`, 2, 2 + text.length)
+      return
+    }
+    case 'italic': {
+      const text = selected || 'italic text'
+      replaceSelection(view, `_${text}_`, 1, 1 + text.length)
+      return
+    }
+    case 'code': {
+      const text = selected || 'code'
+      replaceSelection(view, `\`${text}\``, 1, 1 + text.length)
+      return
+    }
+    case 'quote':
+      prefixCurrentLine(view, '> ')
+      return
+    case 'list':
+      prefixCurrentLine(view, '- ')
+      return
+    case 'orderedList':
+      prefixCurrentLine(view, '1. ')
+      return
+    case 'task':
+      prefixCurrentLine(view, '- [ ] ')
+      return
+    case 'link': {
+      const text = selected || 'link text'
+      replaceSelection(view, `[${text}](https://)`, 1, 1 + text.length)
+      return
+    }
+    case 'image':
+      replaceSelection(view, '![alt text](image-url)', 2, 10)
+      return
+    case 'table':
+      replaceSelection(view, '| Column | Value |\n|---|---|\n| Item | Detail |\n')
+      return
+    case 'undo':
+      undo(view)
+      return
+    case 'redo':
+      redo(view)
+      return
+  }
+}
+
+function cursorPosition(view: EditorView): CursorPosition {
+  const head = view.state.selection.main.head
+  const line = view.state.doc.lineAt(head)
+  return { line: line.number, column: head - line.from + 1 }
+}
+
+export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(function MarkdownEditor({
+  value,
+  onChange,
+  onSave,
+  highlightQuery = '',
+  onCursorChange,
+}, ref) {
   const containerRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
   const valueRef = useRef(value)
   const onChangeRef = useRef(onChange)
   const onSaveRef = useRef(onSave)
+  const onCursorChangeRef = useRef(onCursorChange)
   const queryRef = useRef(highlightQuery)
 
   onChangeRef.current = onChange
   onSaveRef.current = onSave
+  onCursorChangeRef.current = onCursorChange
   queryRef.current = highlightQuery
+
+  useImperativeHandle(ref, () => ({
+    applyCommand(command) {
+      if (viewRef.current) applyMarkdownCommand(viewRef.current, command)
+    },
+    focus() {
+      viewRef.current?.focus()
+    },
+  }), [])
 
   useEffect(() => {
     if (!containerRef.current) return
@@ -112,7 +256,7 @@ export function MarkdownEditor({ value, onChange, onSave, highlightQuery = '' }:
         highlightActiveLine(),
         syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
         markdown(),
-        lightTheme,
+        workspaceTheme,
         keymap.of([...defaultKeymap, ...historyKeymap]),
         saveKeymap,
         highlightPlugin,
@@ -122,6 +266,9 @@ export function MarkdownEditor({ value, onChange, onSave, highlightQuery = '' }:
             valueRef.current = newValue
             onChangeRef.current(newValue)
           }
+          if (update.docChanged || update.selectionSet) {
+            onCursorChangeRef.current?.(cursorPosition(update.view))
+          }
         }),
         EditorView.lineWrapping,
       ],
@@ -129,6 +276,7 @@ export function MarkdownEditor({ value, onChange, onSave, highlightQuery = '' }:
 
     const view = new EditorView({ state, parent: containerRef.current })
     viewRef.current = view
+    onCursorChangeRef.current?.(cursorPosition(view))
 
     return () => {
       view.destroy()
@@ -165,4 +313,4 @@ export function MarkdownEditor({ value, onChange, onSave, highlightQuery = '' }:
   }, [highlightQuery])
 
   return <div ref={containerRef} className="h-full w-full overflow-hidden" />
-}
+})

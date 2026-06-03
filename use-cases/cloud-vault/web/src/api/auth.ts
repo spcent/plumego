@@ -35,6 +35,8 @@ export interface SetupResponse {
 
 export interface AuthStatusResponse {
   initialized: boolean
+  authenticated: boolean
+  user?: User
 }
 
 export interface LoginRequest {

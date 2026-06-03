@@ -33,6 +33,15 @@ func setupService(t *testing.T) (*Service, *database.DB, storage.ObjectStorage) 
 	return svc, db, store
 }
 
+func setupServiceWithVersioning(t *testing.T, cfg VersioningConfig) (*Service, *database.DB, storage.ObjectStorage) {
+	t.Helper()
+	db := openTestDB(t)
+	store := storage.NewLocalStorage(t.TempDir())
+	repo := NewSQLiteRepository(db)
+	svc := NewServiceWithVersioning(repo, store, cfg)
+	return svc, db, store
+}
+
 func TestService_Create_Basic(t *testing.T) {
 	svc, _, _ := setupService(t)
 	ctx := context.Background()
@@ -345,5 +354,183 @@ func TestService_GetVersions(t *testing.T) {
 	// Versions should be in descending order
 	if versions.Items[0].Version != 3 {
 		t.Errorf("First version = %d, want 3", versions.Items[0].Version)
+	}
+}
+
+func TestService_BoundedVersionRetention_PrunesOldAutoSnapshots(t *testing.T) {
+	svc, _, store := setupServiceWithVersioning(t, VersioningConfig{Policy: VersionPolicyBounded, KeepLatest: 2})
+	ctx := context.Background()
+
+	created, err := svc.Create(ctx, CreateRequest{Title: "Bounded", Content: "v1"})
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+
+	base := 1
+	for version := 2; version <= 5; version++ {
+		updated, err := svc.Update(ctx, created.ID, UpdateRequest{
+			Title:       "Bounded",
+			Content:     "v" + string(rune('0'+version)),
+			BaseVersion: base,
+		})
+		if err != nil {
+			t.Fatalf("Update v%d: %v", version, err)
+		}
+		base = updated.Version
+	}
+
+	versions, err := svc.GetVersions(ctx, created.ID)
+	if err != nil {
+		t.Fatalf("GetVersions: %v", err)
+	}
+	if len(versions.Items) != 2 {
+		t.Fatalf("Version count = %d, want 2", len(versions.Items))
+	}
+	if versions.Items[0].Version != 5 || versions.Items[1].Version != 4 {
+		t.Fatalf("Kept versions = %#v, want v5 and v4", versions.Items)
+	}
+	if exists, err := store.Exists(ctx, VersionKey(created.ID, 3)); err != nil || exists {
+		t.Fatalf("Version 3 object exists=%v err=%v, want pruned", exists, err)
+	}
+}
+
+func TestService_CreateSnapshot_PinsCurrentVersion(t *testing.T) {
+	svc, _, _ := setupServiceWithVersioning(t, VersioningConfig{Policy: VersionPolicyBounded, KeepLatest: 1})
+	ctx := context.Background()
+
+	created, err := svc.Create(ctx, CreateRequest{Title: "Pinned", Content: "v1"})
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	snapshot, err := svc.CreateSnapshot(ctx, created.ID, "before large edit")
+	if err != nil {
+		t.Fatalf("CreateSnapshot: %v", err)
+	}
+	if !snapshot.Pinned || snapshot.Kind != VersionKindManual || snapshot.Note != "before large edit" {
+		t.Fatalf("Snapshot metadata = %#v", snapshot)
+	}
+
+	updated, err := svc.Update(ctx, created.ID, UpdateRequest{Title: "Pinned", Content: "v2", BaseVersion: 1})
+	if err != nil {
+		t.Fatalf("Update v2: %v", err)
+	}
+	_, err = svc.Update(ctx, created.ID, UpdateRequest{Title: "Pinned", Content: "v3", BaseVersion: updated.Version})
+	if err != nil {
+		t.Fatalf("Update v3: %v", err)
+	}
+
+	versions, err := svc.GetVersions(ctx, created.ID)
+	if err != nil {
+		t.Fatalf("GetVersions: %v", err)
+	}
+	if len(versions.Items) != 2 {
+		t.Fatalf("Version count = %d, want pinned v1 plus latest v3", len(versions.Items))
+	}
+	var sawPinnedV1 bool
+	for _, item := range versions.Items {
+		if item.Version == 1 && item.Pinned {
+			sawPinnedV1 = true
+		}
+	}
+	if !sawPinnedV1 {
+		t.Fatalf("Pinned v1 missing from versions: %#v", versions.Items)
+	}
+}
+
+func TestService_OverwritePolicy_SkipsAutoSnapshots(t *testing.T) {
+	svc, _, _ := setupServiceWithVersioning(t, VersioningConfig{Policy: VersionPolicyOverwrite})
+	ctx := context.Background()
+
+	created, err := svc.Create(ctx, CreateRequest{Title: "Overwrite", Content: "v1"})
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	if _, err := svc.Update(ctx, created.ID, UpdateRequest{Title: "Overwrite", Content: "v2", BaseVersion: 1}); err != nil {
+		t.Fatalf("Update: %v", err)
+	}
+	versions, err := svc.GetVersions(ctx, created.ID)
+	if err != nil {
+		t.Fatalf("GetVersions: %v", err)
+	}
+	if len(versions.Items) != 0 {
+		t.Fatalf("Version count = %d, want 0", len(versions.Items))
+	}
+
+	snapshot, err := svc.CreateSnapshot(ctx, created.ID, "manual")
+	if err != nil {
+		t.Fatalf("CreateSnapshot: %v", err)
+	}
+	if snapshot.Version != 2 || !snapshot.Pinned {
+		t.Fatalf("Snapshot = %#v, want pinned current v2", snapshot)
+	}
+}
+
+func TestService_RestoreVersion_CreatesNewCurrentVersion(t *testing.T) {
+	svc, _, _ := setupServiceWithVersioning(t, VersioningConfig{Policy: VersionPolicyFull})
+	ctx := context.Background()
+
+	created, err := svc.Create(ctx, CreateRequest{Title: "Restore", Content: "# Restore\n\nv1"})
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	updated, err := svc.Update(ctx, created.ID, UpdateRequest{Title: "Restore", Content: "# Restore\n\nv2", BaseVersion: 1})
+	if err != nil {
+		t.Fatalf("Update v2: %v", err)
+	}
+
+	restored, err := svc.RestoreVersion(ctx, created.ID, 1)
+	if err != nil {
+		t.Fatalf("RestoreVersion: %v", err)
+	}
+	if restored.Version != updated.Version+1 {
+		t.Fatalf("Restored version = %d, want %d", restored.Version, updated.Version+1)
+	}
+	detail, err := svc.Get(ctx, created.ID)
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	if detail.Content != "# Restore\n\nv1" {
+		t.Fatalf("Content = %q, want restored v1", detail.Content)
+	}
+	versions, err := svc.GetVersions(ctx, created.ID)
+	if err != nil {
+		t.Fatalf("GetVersions: %v", err)
+	}
+	if versions.Items[0].Version != restored.Version || !versions.Items[0].Pinned {
+		t.Fatalf("Latest snapshot = %#v, want pinned restored version", versions.Items[0])
+	}
+}
+
+func TestService_RestoreVersion_OverwritePolicyPreservesCurrentBeforeRestore(t *testing.T) {
+	svc, _, _ := setupServiceWithVersioning(t, VersioningConfig{Policy: VersionPolicyOverwrite})
+	ctx := context.Background()
+
+	created, err := svc.Create(ctx, CreateRequest{Title: "Overwrite Restore", Content: "# A\n\nv1"})
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	if _, err := svc.CreateSnapshot(ctx, created.ID, "baseline"); err != nil {
+		t.Fatalf("CreateSnapshot: %v", err)
+	}
+	updated, err := svc.Update(ctx, created.ID, UpdateRequest{Title: "Overwrite Restore", Content: "# A\n\nv2", BaseVersion: 1})
+	if err != nil {
+		t.Fatalf("Update: %v", err)
+	}
+	if _, err := svc.RestoreVersion(ctx, created.ID, 1); err != nil {
+		t.Fatalf("RestoreVersion: %v", err)
+	}
+	versions, err := svc.GetVersions(ctx, created.ID)
+	if err != nil {
+		t.Fatalf("GetVersions: %v", err)
+	}
+
+	var sawBeforeRestore bool
+	for _, item := range versions.Items {
+		if item.Version == updated.Version && item.Pinned && item.Note == "before restore to v1" {
+			sawBeforeRestore = true
+		}
+	}
+	if !sawBeforeRestore {
+		t.Fatalf("Missing before-restore snapshot in %#v", versions.Items)
 	}
 }

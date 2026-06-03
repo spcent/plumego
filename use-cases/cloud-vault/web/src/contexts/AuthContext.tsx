@@ -28,11 +28,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const status = await authAPI.getStatus()
       setSetupRequired(!status.initialized)
-
-      if (status.initialized) {
-        const currentUser = await authAPI.getMe()
-        setUser(currentUser)
-      }
+      setUser(status.user ?? null)
     } catch {
       setUser(null)
     } finally {

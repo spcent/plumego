@@ -118,6 +118,9 @@ type VersionSummary struct {
 	Version   int       `json:"version"`
 	SizeBytes int64     `json:"size_bytes"`
 	CreatedAt time.Time `json:"created_at"`
+	Kind      string    `json:"kind"`
+	Pinned    bool      `json:"pinned"`
+	Note      string    `json:"note,omitempty"`
 }
 
 // VersionListResult is the list of versions for a document.
@@ -131,6 +134,17 @@ type VersionDetail struct {
 	Version   int       `json:"version"`
 	Content   string    `json:"content"`
 	CreatedAt time.Time `json:"created_at"`
+	Kind      string    `json:"kind"`
+	Pinned    bool      `json:"pinned"`
+	Note      string    `json:"note,omitempty"`
+}
+
+// RestoreVersionResult is returned after restoring a historical version.
+type RestoreVersionResult = SaveResult
+
+// CreateSnapshotRequest creates or pins a key version for the current content.
+type CreateSnapshotRequest struct {
+	Note string `json:"note"`
 }
 
 func toSummary(d *Document) Summary {

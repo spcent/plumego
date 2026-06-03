@@ -22,12 +22,15 @@ Cloud Vault can be deployed as:
 
 ### Installation
 
-1. **Download binary**:
+1. **Build binary**:
 ```bash
-wget https://releases.example.com/cloud-vault-v1.0.0-linux-amd64.tar.gz
-tar -xzf cloud-vault-v1.0.0-linux-amd64.tar.gz
-cd cloud-vault
+git clone <your-plumego-repository-url>
+cd plumego/use-cases/cloud-vault
+make server-build-v1
+cp dist/server/markdown-vault ./cloud-vault
 ```
+
+If you publish release artifacts, replace this build step with your signed download URL and checksum verification procedure.
 
 2. **Verify installation**:
 ```bash
@@ -69,7 +72,8 @@ bootstrap_admin_email = "admin@example.com"
 bootstrap_admin_password = "ChangeMe123!"
 
 [update]
-enabled = true
+enabled = false
+update_url = ""
 check_interval_minutes = 1440
 ```
 
@@ -488,14 +492,18 @@ Create `/etc/logrotate.d/cloud-vault`:
 }
 ```
 
-### Automated Backups
+### Scheduled Backups
 
-Create `/etc/cron.d/cloud-vault-backup`:
+Cloud Vault does not include a built-in scheduler. Use an external scheduler that calls the protected backup API with a valid session cookie or service-run script.
+
+Example `/etc/cron.d/cloud-vault-backup`:
 
 ```
 # Daily backup at 2 AM
-0 2 * * * cloud-vault /opt/cloud-vault/cloud-vault backup --output /var/lib/cloud-vault/backups/backup-$(date +\%Y\%m\%d).zip
+0 2 * * * cloud-vault /usr/local/bin/cloud-vault-create-backup
 ```
+
+The wrapper script should authenticate, store its session cookie securely, and call `POST /api/v1/system/backup`.
 
 ### Monitoring with Prometheus
 

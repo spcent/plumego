@@ -29,10 +29,11 @@ type Config struct {
 
 // AppConfig holds app-local configuration.
 type AppConfig struct {
-	ConfigFile      string
-	Version         string
-	MaxUploadSizeMB int64
-	VersionPolicy   string
+	ConfigFile        string
+	Version           string
+	MaxUploadSizeMB   int64
+	VersionPolicy     string
+	VersionKeepLatest int
 }
 
 // DesktopConfig holds desktop application configuration.
@@ -50,6 +51,7 @@ type DesktopConfig struct {
 type UpdateConfig struct {
 	Enabled          bool
 	CheckOnStartup   bool
+	UpdateURL        string
 	Channel          string // "stable" | "beta" | "dev"
 	CheckIntervalMin int
 }
@@ -171,8 +173,9 @@ type tomlServer struct {
 }
 
 type tomlApp struct {
-	MaxUploadSizeMB int64  `toml:"max_upload_size_mb"`
-	VersionPolicy   string `toml:"version_policy"`
+	MaxUploadSizeMB   int64  `toml:"max_upload_size_mb"`
+	VersionPolicy     string `toml:"version_policy"`
+	VersionKeepLatest int    `toml:"version_keep_latest"`
 }
 
 type tomlDB struct {
@@ -274,6 +277,7 @@ type tomlDesktop struct {
 type tomlUpdate struct {
 	Enabled          bool   `toml:"enabled"`
 	CheckOnStartup   bool   `toml:"check_on_startup"`
+	UpdateURL        string `toml:"update_url"`
 	CheckIntervalMin int    `toml:"check_interval_minutes"`
 	Channel          string `toml:"channel"`
 }
@@ -285,10 +289,11 @@ func Defaults() Config {
 	return Config{
 		Core: coreCfg,
 		App: AppConfig{
-			ConfigFile:      "config.toml",
-			Version:         "dev",
-			MaxUploadSizeMB: 10,
-			VersionPolicy:   "always",
+			ConfigFile:        "config.toml",
+			Version:           "dev",
+			MaxUploadSizeMB:   10,
+			VersionPolicy:     "bounded",
+			VersionKeepLatest: 5,
 		},
 		DB: DBConfig{
 			Path: "./data/app.db",
@@ -357,8 +362,9 @@ func Defaults() Config {
 			NativeNotifications: true,
 		},
 		Update: UpdateConfig{
-			Enabled:          true,
-			CheckOnStartup:   true,
+			Enabled:          false,
+			CheckOnStartup:   false,
+			UpdateURL:        "",
 			CheckIntervalMin: 1440, // 24 hours
 			Channel:          "stable",
 		},
@@ -445,6 +451,9 @@ func applyTOML(cfg *Config, tc *tomlConfig) {
 	}
 	if tc.App.VersionPolicy != "" {
 		cfg.App.VersionPolicy = tc.App.VersionPolicy
+	}
+	if tc.App.VersionKeepLatest > 0 {
+		cfg.App.VersionKeepLatest = tc.App.VersionKeepLatest
 	}
 
 	// Database
@@ -599,6 +608,9 @@ func applyTOML(cfg *Config, tc *tomlConfig) {
 	// Update
 	cfg.Update.Enabled = tc.Update.Enabled
 	cfg.Update.CheckOnStartup = tc.Update.CheckOnStartup
+	if tc.Update.UpdateURL != "" {
+		cfg.Update.UpdateURL = tc.Update.UpdateURL
+	}
 	if tc.Update.CheckIntervalMin > 0 {
 		cfg.Update.CheckIntervalMin = tc.Update.CheckIntervalMin
 	}
@@ -629,6 +641,14 @@ func Validate(cfg Config) error {
 			return fmt.Errorf("storage.qiniu.domain is required when using qiniu storage")
 		}
 	}
+	switch strings.ToLower(strings.TrimSpace(cfg.App.VersionPolicy)) {
+	case "", "bounded", "limited", "full", "all", "always", "overwrite":
+	default:
+		return fmt.Errorf("app.version_policy must be 'bounded', 'full', or 'overwrite'")
+	}
+	if cfg.App.VersionKeepLatest < 0 {
+		return fmt.Errorf("app.version_keep_latest must be greater than or equal to 0")
+	}
 	if cfg.Auth.Enabled {
 		if cfg.Auth.SessionTTLHours <= 0 {
 			return fmt.Errorf("auth.session_ttl_hours must be greater than 0")
@@ -636,6 +656,9 @@ func Validate(cfg Config) error {
 		if cfg.Auth.PasswordMinLength < 8 {
 			return fmt.Errorf("auth.password_min_length must be at least 8")
 		}
+	}
+	if cfg.Update.Enabled && strings.TrimSpace(cfg.Update.UpdateURL) == "" {
+		return fmt.Errorf("update.update_url is required when update.enabled=true")
 	}
 	return nil
 }
@@ -679,6 +702,7 @@ func applyEnvOverrides(cfg *Config, lookupEnv func(string) (string, bool)) {
 	str("APP_CONFIG_FILE", &cfg.App.ConfigFile)
 	int64f("APP_MAX_UPLOAD_SIZE_MB", &cfg.App.MaxUploadSizeMB)
 	str("APP_VERSION_POLICY", &cfg.App.VersionPolicy)
+	intf("APP_VERSION_KEEP_LATEST", &cfg.App.VersionKeepLatest)
 
 	str("DB_PATH", &cfg.DB.Path)
 
@@ -731,6 +755,7 @@ func applyEnvOverrides(cfg *Config, lookupEnv func(string) (string, bool)) {
 	// Update environment variables
 	boolf("UPDATE_ENABLED", &cfg.Update.Enabled)
 	boolf("UPDATE_CHECK_ON_STARTUP", &cfg.Update.CheckOnStartup)
+	str("UPDATE_URL", &cfg.Update.UpdateURL)
 	intf("UPDATE_CHECK_INTERVAL_MIN", &cfg.Update.CheckIntervalMin)
 	str("UPDATE_CHANNEL", &cfg.Update.Channel)
 }

@@ -8,23 +8,27 @@ set -euo pipefail
 VERSION="${1:-dev}"
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 RELEASE_DIR="${REPO_ROOT}/dist/cloud-vault-${VERSION}"
-BINARY="${RELEASE_DIR}/cloud-vault"
+PACKAGED_BINARY="${REPO_ROOT}/dist/server/markdown-vault"
 PORT=18081
 
 echo "=== Release Smoke Test ==="
 echo "Version: ${VERSION}"
-echo "Binary: ${BINARY}"
+echo "Packaged binary: ${PACKAGED_BINARY}"
 echo ""
 
-if [ ! -x "${BINARY}" ]; then
-    echo "ERROR: Binary not found at ${BINARY}"
-    echo "Run ./scripts/release.sh ${VERSION} first"
+if [ ! -f "${PACKAGED_BINARY}" ] && [ ! -f "${RELEASE_DIR}/cloud-vault" ]; then
+    echo "ERROR: Packaged binary not found at ${PACKAGED_BINARY} or ${RELEASE_DIR}/cloud-vault"
+    echo "Run ./scripts/release-v1.sh ${VERSION} first"
     exit 1
 fi
 
 # Create a temp data directory for the test
 TEST_DIR="$(mktemp -d)"
 trap 'echo "Cleaning up test dir: ${TEST_DIR}"; rm -rf "${TEST_DIR}"' EXIT
+
+BINARY="${TEST_DIR}/markdown-vault-smoke"
+echo "Building host smoke binary: ${BINARY}"
+(cd "${REPO_ROOT}" && go build -ldflags="-X cloud-vault/internal/version.Version=${VERSION}" -o "${BINARY}" ./cmd/server)
 
 # Create minimal config
 cat > "${TEST_DIR}/config.toml" <<EOF
@@ -42,7 +46,8 @@ root = "${TEST_DIR}/data/objects"
 
 [app]
 max_upload_size_mb = 10
-version_policy = "all"
+version_policy = "bounded"
+version_keep_latest = 5
 
 [auth]
 enabled = false

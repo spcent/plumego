@@ -176,23 +176,7 @@ IMPORT_DUPLICATE_DETECTION=true
 
 ### Backup Configuration
 
-```toml
-[backup]
-enabled = true                   # Enable automatic backups
-schedule = "0 2 * * *"           # Cron schedule (default: 2 AM daily)
-retention_days = 30              # Keep backups for N days
-max_backups = 10                 # Max number of backups
-compression = true               # Compress backups
-encryption = false               # Encrypt backups
-encryption_key = ""              # Encryption key (if encryption enabled)
-```
-
-**Environment variables**:
-```bash
-BACKUP_ENABLED=true
-BACKUP_SCHEDULE="0 2 * * *"
-BACKUP_RETENTION_DAYS=30
-```
+Backups are managed by the System API and UI. There is no built-in scheduler, rotation, or encryption-at-rest setting in the current release. Use cron, systemd timers, or your platform scheduler to call `POST /api/v1/system/backup`, and encrypt archives before storing them offsite.
 
 ### Logging Configuration
 
@@ -220,18 +204,20 @@ LOGGING_OUTPUT="stdout"
 
 ```toml
 [update]
-enabled = true                   # Enable update checking
-check_on_startup = true          # Check on app startup
-check_interval = 86400           # Check interval (seconds, default: 24 hours)
-update_url = "https://releases.cloud-vault.com/latest.json"
-auto_download = false            # Auto-download updates
-auto_install = false             # Auto-install updates (desktop only)
+enabled = false                  # Enable update checking only after setting update_url
+check_on_startup = false         # Check on app startup
+check_interval_minutes = 1440    # Check interval in minutes
+update_url = ""                  # Release feed URL, supplied by your release owner
+channel = "stable"               # stable, beta, or dev
 ```
 
 **Environment variables**:
 ```bash
-UPDATE_ENABLED=true
-UPDATE_CHECK_ON_STARTUP=true
+UPDATE_ENABLED=false
+UPDATE_CHECK_ON_STARTUP=false
+UPDATE_URL=
+UPDATE_CHECK_INTERVAL_MIN=1440
+UPDATE_CHANNEL=stable
 ```
 
 ### Diagnostics Configuration
@@ -355,11 +341,6 @@ api_key = "${OPENAI_API_KEY}"
 [search]
 enabled = true
 index_on_save = true
-
-[backup]
-enabled = true
-schedule = "0 2 * * *"
-retention_days = 30
 
 [logging]
 level = "info"

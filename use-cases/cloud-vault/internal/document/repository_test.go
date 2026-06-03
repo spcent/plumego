@@ -525,6 +525,44 @@ func TestSQLiteRepository_CreateVersion_GetVersions_GetVersion(t *testing.T) {
 	}
 }
 
+func TestSQLiteRepository_UpdateAndDeleteVersions(t *testing.T) {
+	db := openTestDB(t)
+	repo := NewSQLiteRepository(db)
+	ctx := context.Background()
+
+	doc := newTestDoc("doc-version-meta", "Version Metadata", "hash-v1")
+	if err := repo.Create(ctx, doc); err != nil {
+		t.Fatalf("Create doc: %v", err)
+	}
+	for v := 1; v <= 3; v++ {
+		if err := repo.CreateVersion(ctx, newTestVersion("ver-meta-"+string(rune('0'+v)), doc.ID, v)); err != nil {
+			t.Fatalf("CreateVersion %d: %v", v, err)
+		}
+	}
+
+	if err := repo.UpdateVersionMetadata(ctx, doc.ID, 2, VersionKindManual, "release candidate", true); err != nil {
+		t.Fatalf("UpdateVersionMetadata: %v", err)
+	}
+	ver2, err := repo.GetVersion(ctx, doc.ID, 2)
+	if err != nil {
+		t.Fatalf("GetVersion 2: %v", err)
+	}
+	if ver2.Kind != VersionKindManual || !ver2.Pinned || ver2.Note != "release candidate" {
+		t.Fatalf("Version 2 metadata = %#v", ver2)
+	}
+
+	if err := repo.DeleteVersions(ctx, doc.ID, []int{1, 3}); err != nil {
+		t.Fatalf("DeleteVersions: %v", err)
+	}
+	versions, err := repo.GetVersions(ctx, doc.ID)
+	if err != nil {
+		t.Fatalf("GetVersions: %v", err)
+	}
+	if len(versions) != 1 || versions[0].Version != 2 {
+		t.Fatalf("Versions after delete = %#v, want only v2", versions)
+	}
+}
+
 // TestSQLiteRepository_GetVersion_NotFound verifies ErrNotFound for missing version.
 func TestSQLiteRepository_GetVersion_NotFound(t *testing.T) {
 	db := openTestDB(t)

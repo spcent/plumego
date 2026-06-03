@@ -43,6 +43,9 @@ export interface VersionSummary {
   version: number
   size_bytes: number
   created_at: string
+  kind: string
+  pinned: boolean
+  note?: string
 }
 
 export interface VersionListResult {
@@ -54,6 +57,9 @@ export interface VersionDetail {
   version: number
   content: string
   created_at: string
+  kind: string
+  pinned: boolean
+  note?: string
 }
 
 export interface CreateDocumentRequest {
@@ -135,6 +141,14 @@ export const documentsAPI = {
 
   listVersions(id: string): Promise<VersionListResult> {
     return client.get<VersionListResult>(`${BASE}/documents/${id}/versions`)
+  },
+
+  createSnapshot(id: string, note?: string): Promise<VersionSummary> {
+    return client.post<VersionSummary>(`${BASE}/documents/${id}/versions`, { note: note ?? '' })
+  },
+
+  restoreVersion(id: string, version: number): Promise<SaveResult> {
+    return client.post<SaveResult>(`${BASE}/documents/${id}/versions/${version}/restore`, {})
   },
 
   getVersion(id: string, version: number): Promise<VersionDetail> {

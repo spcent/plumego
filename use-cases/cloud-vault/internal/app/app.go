@@ -58,6 +58,7 @@ type App struct {
 	updateService  *update.Service
 	authService    *auth.Service
 	authMiddleware func(http.Handler) http.Handler
+	authOptional   func(http.Handler) http.Handler
 	indexer        *search.Indexer
 	aiWorkers      []*ai.Worker
 }
@@ -113,7 +114,10 @@ func New(cfg config.Config) (*App, error) {
 
 	// Document handler.
 	docRepo := document.NewSQLiteRepository(db)
-	docSvc := document.NewService(docRepo, store)
+	docSvc := document.NewServiceWithVersioning(docRepo, store, document.VersioningConfig{
+		Policy:     cfg.App.VersionPolicy,
+		KeepLatest: cfg.App.VersionKeepLatest,
+	})
 	docs := document.NewHandler(docSvc, app.Logger())
 
 	// Tag handler.
@@ -208,8 +212,10 @@ func New(cfg config.Config) (*App, error) {
 
 	// Auth middleware.
 	var authMiddleware func(http.Handler) http.Handler
+	var authOptional func(http.Handler) http.Handler
 	if cfg.Auth.Enabled {
 		authMiddleware = auth.RequireAuth(authService, cfg.Auth.CookieName)
+		authOptional = auth.OptionalAuth(authService, cfg.Auth.CookieName)
 	}
 
 	// Backup handler (V0.8).
@@ -225,11 +231,11 @@ func New(cfg config.Config) (*App, error) {
 		BuildTime: version.BuildTime,
 		Channel:   version.Channel,
 	}
-	updateChecker := update.NewChecker(versionInfo, "")
+	updateChecker := update.NewChecker(versionInfo, cfg.Update.UpdateURL)
 	updateSvcConfig := &update.Config{
 		Enabled:          cfg.Update.Enabled,
 		CheckOnStartup:   cfg.Update.CheckOnStartup,
-		UpdateURL:        "",
+		UpdateURL:        cfg.Update.UpdateURL,
 		CheckIntervalMin: cfg.Update.CheckIntervalMin,
 		Channel:          cfg.Update.Channel,
 	}
@@ -260,6 +266,7 @@ func New(cfg config.Config) (*App, error) {
 		updateService:  updateSvc,
 		authService:    authService,
 		authMiddleware: authMiddleware,
+		authOptional:   authOptional,
 		indexer:        indexer,
 		aiWorkers:      aiWorkers,
 	}, nil

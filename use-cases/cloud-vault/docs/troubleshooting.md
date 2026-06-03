@@ -108,8 +108,8 @@ sudo systemctl start cloud-vault
 # Check database integrity
 sqlite3 /var/lib/cloud-vault/data/app.db "PRAGMA integrity_check;"
 
-# If corrupted, restore from backup
-./cloud-vault backup restore --backup backup.zip
+# If corrupted, stop the server and restore from backup
+./cloud-vault restore --file backup.zip --data-dir /var/lib/cloud-vault/data
 
 # Or rebuild database
 ./cloud-vault database rebuild
@@ -167,8 +167,7 @@ cp /var/lib/cloud-vault/data/app.db.backup /var/lib/cloud-vault/data/app.db
 # Check disk space
 df -h /var/lib/cloud-vault/data
 
-# Clean old backups
-./cloud-vault backup prune --keep 5
+# Clean old backups through the UI or DELETE /api/v1/system/backups/:name
 
 # Remove orphaned files
 ./cloud-vault storage cleanup
@@ -549,7 +548,7 @@ tar -czf recovery-backup-$(date +%Y%m%d).tar.gz \
 
 3. **Restore from backup**:
 ```bash
-./cloud-vault backup restore --backup backup.zip
+./cloud-vault restore --file backup.zip --data-dir /var/lib/cloud-vault/data
 ```
 
 4. **Rebuild indexes**:

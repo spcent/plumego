@@ -611,8 +611,8 @@ Watch import logs:
 Create backup before large imports:
 
 ```bash
-./cloud-vault backup create \
-  --description "Before bulk import"
+curl -X POST http://localhost:8080/api/v1/system/backup \
+  -H "Cookie: session=<your-session-cookie>"
 ```
 
 ## Troubleshooting Import

@@ -124,17 +124,18 @@ export default function SettingsPage() {
             <div className="divide-y divide-border">
               {updateStatus && (
                 <>
-                  <SettingRow label="Current Version" value={updateStatus.current_version} />
-                  <SettingRow label="Latest Version" value={updateStatus.latest_version} />
+                  <SettingRow label="Status" value={updateStatus.check_enabled ? 'Enabled' : 'Disabled'} highlight={updateStatus.check_enabled ? 'ok' : 'warn'} />
+                  <SettingRow label="Current Version" value={updateStatus.current_version.version} />
+                  <SettingRow label="Latest Version" value={updateStatus.latest_release?.version || '-'} />
                   <SettingRow label="Update Available" value={updateStatus.update_available ? 'Yes' : 'No'} highlight={updateStatus.update_available ? 'warn' : 'ok'} />
-                  {updateStatus.checked_at && <SettingRow label="Last Checked" value={new Date(updateStatus.checked_at).toLocaleString()} />}
+                  {updateStatus.last_check && <SettingRow label="Last Checked" value={new Date(updateStatus.last_check).toLocaleString()} />}
                 </>
               )}
             </div>
             {updateStatus?.update_available && (
               <div className="flex gap-2 border-t border-border p-3">
-                {updateStatus.download_url && <AppLink href={updateStatus.download_url}>Download Update</AppLink>}
-                {updateStatus.release_notes_url && <AppLink href={updateStatus.release_notes_url}>Release Notes</AppLink>}
+                {updateStatus.latest_release?.download_url && <AppLink href={updateStatus.latest_release.download_url}>Download Update</AppLink>}
+                {updateStatus.latest_release?.release_url && <AppLink href={updateStatus.latest_release.release_url}>Release Notes</AppLink>}
               </div>
             )}
           </Panel>

@@ -2,12 +2,15 @@ package backup
 
 import (
 	"archive/zip"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"time"
+
+	_ "modernc.org/sqlite"
 )
 
 // ArchiveOptions configures backup archive creation.
@@ -111,13 +114,24 @@ func createDatabaseSnapshot(dbPath string) (string, error) {
 	tmpPath := tmpFile.Name()
 	tmpFile.Close()
 
-	// Use VACUUM INTO to create a consistent snapshot
-	// This requires opening the database in read-only mode
-	// For simplicity, we'll just copy the file for now
-	// A more robust implementation would use SQLite's backup API
-	if err := copyFile(dbPath, tmpPath); err != nil {
+	db, err := sql.Open("sqlite", dbPath)
+	if err != nil {
 		os.Remove(tmpPath)
-		return "", fmt.Errorf("copy database: %w", err)
+		return "", fmt.Errorf("open database for backup: %w", err)
+	}
+	defer db.Close()
+
+	if _, err := db.Exec("PRAGMA schema_version"); err != nil {
+		if copyErr := copyFile(dbPath, tmpPath); copyErr != nil {
+			os.Remove(tmpPath)
+			return "", fmt.Errorf("snapshot database: %w; fallback copy: %w", err, copyErr)
+		}
+		return tmpPath, nil
+	}
+
+	if _, err := db.Exec("VACUUM INTO ?", tmpPath); err != nil {
+		os.Remove(tmpPath)
+		return "", fmt.Errorf("vacuum database snapshot: %w", err)
 	}
 
 	return tmpPath, nil

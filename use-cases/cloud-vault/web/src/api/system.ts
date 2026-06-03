@@ -89,12 +89,21 @@ export interface VersionInfo {
 }
 
 export interface UpdateStatus {
-  current_version: string
-  latest_version: string
+  current_version: VersionInfo
+  latest_release?: {
+    version: string
+    commit: string
+    build_time: string
+    channel: string
+    release_date: string
+    release_url: string
+    download_url: string
+    changelog: string
+  }
   update_available: boolean
-  download_url: string
-  release_notes_url: string
-  checked_at: string
+  last_check?: string
+  next_check?: string
+  check_enabled: boolean
 }
 
 export interface DiagnosticBundle {
@@ -157,7 +166,7 @@ export async function checkForUpdates(): Promise<UpdateStatus> {
 }
 
 export async function generateDiagnostics(): Promise<DiagnosticBundle> {
-  return client.post('/api/v1/system/diagnostics/generate', {})
+  return client.post('/api/v1/system/diagnostics/export', {})
 }
 
 export async function listDiagnostics(): Promise<{ bundles: DiagnosticBundle[] }> {
@@ -165,5 +174,5 @@ export async function listDiagnostics(): Promise<{ bundles: DiagnosticBundle[] }
 }
 
 export function getDiagnosticDownloadUrl(filename: string): string {
-  return `/api/v1/system/diagnostics/download/${encodeURIComponent(filename)}`
+  return `/api/v1/system/diagnostics/${encodeURIComponent(filename)}/download`
 }

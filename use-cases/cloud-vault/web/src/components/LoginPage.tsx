@@ -49,6 +49,7 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
                 id="username"
                 name="username"
                 type="text"
+                autoComplete="username"
                 required
                 placeholder={t.auth.username}
                 value={username}
@@ -61,6 +62,7 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
                 id="password"
                 name="password"
                 type="password"
+                autoComplete="current-password"
                 required
                 placeholder={t.auth.password}
                 value={password}

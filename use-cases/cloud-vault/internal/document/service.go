@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -31,16 +32,34 @@ type IndexEvent struct {
 // It must not block the caller; implementations should handle errors internally.
 type IndexHookFn func(ctx context.Context, event IndexEvent)
 
+const (
+	VersionPolicyBounded   = "bounded"
+	VersionPolicyFull      = "full"
+	VersionPolicyOverwrite = "overwrite"
+)
+
+// VersioningConfig controls how object-storage snapshots are retained.
+type VersioningConfig struct {
+	Policy     string
+	KeepLatest int
+}
+
 // Service orchestrates document creation, retrieval, and versioning.
 type Service struct {
-	repo      Repository
-	storage   storage.ObjectStorage
-	indexHook IndexHookFn
+	repo       Repository
+	storage    storage.ObjectStorage
+	versioning VersioningConfig
+	indexHook  IndexHookFn
 }
 
 // NewService constructs a Service with the given repository and storage backend.
 func NewService(repo Repository, store storage.ObjectStorage) *Service {
-	return &Service{repo: repo, storage: store}
+	return NewServiceWithVersioning(repo, store, VersioningConfig{})
+}
+
+// NewServiceWithVersioning constructs a Service with explicit version retention.
+func NewServiceWithVersioning(repo Repository, store storage.ObjectStorage, versioning VersioningConfig) *Service {
+	return &Service{repo: repo, storage: store, versioning: normalizeVersioningConfig(versioning)}
 }
 
 // SetIndexHook registers a callback invoked after every document mutation.
@@ -69,17 +88,12 @@ func (s *Service) Create(ctx context.Context, req CreateRequest) (*SaveResult, e
 	hash := sha256Content(content)
 	now := time.Now().UTC()
 	docID := idgen.New()
-	versionID := idgen.New()
 
 	currentKey := CurrentKey(docID)
-	versionKey := VersionKey(docID, 1)
 
 	contentBytes := []byte(content)
 	size := int64(len(contentBytes))
 
-	if err := s.storage.Put(ctx, versionKey, bytes.NewReader(contentBytes), size, "text/markdown"); err != nil {
-		return nil, fmt.Errorf("upload version 1: %w", err)
-	}
 	if err := s.storage.Put(ctx, currentKey, bytes.NewReader(contentBytes), size, "text/markdown"); err != nil {
 		return nil, fmt.Errorf("upload current: %w", err)
 	}
@@ -105,21 +119,13 @@ func (s *Service) Create(ctx context.Context, req CreateRequest) (*SaveResult, e
 		UploadedAt:     &uploadedAt,
 	}
 
-	ver := &DocumentVersion{
-		ID:          versionID,
-		DocumentID:  docID,
-		Version:     1,
-		StorageKey:  versionKey,
-		ContentHash: hash,
-		SizeBytes:   size,
-		CreatedAt:   now,
-	}
-
 	if err := s.repo.Create(ctx, doc); err != nil {
 		return nil, fmt.Errorf("persist document: %w", err)
 	}
-	if err := s.repo.CreateVersion(ctx, ver); err != nil {
-		return nil, fmt.Errorf("persist version: %w", err)
+	if s.shouldCreateAutoSnapshot() {
+		if _, err := s.createVersionSnapshot(ctx, doc, contentBytes, now, VersionKindAuto, "", false); err != nil {
+			return nil, err
+		}
 	}
 
 	s.fireIndexHook(ctx, IndexEvent{
@@ -150,17 +156,12 @@ func (s *Service) CreateFromImport(ctx context.Context, req CreateFromImportRequ
 	hash := sha256Content(content)
 	now := time.Now().UTC()
 	docID := idgen.New()
-	versionID := idgen.New()
 
 	currentKey := CurrentKey(docID)
-	versionKey := VersionKey(docID, 1)
 
 	contentBytes := []byte(content)
 	size := int64(len(contentBytes))
 
-	if err := s.storage.Put(ctx, versionKey, bytes.NewReader(contentBytes), size, "text/markdown"); err != nil {
-		return nil, fmt.Errorf("upload version 1: %w", err)
-	}
 	if err := s.storage.Put(ctx, currentKey, bytes.NewReader(contentBytes), size, "text/markdown"); err != nil {
 		return nil, fmt.Errorf("upload current: %w", err)
 	}
@@ -190,21 +191,13 @@ func (s *Service) CreateFromImport(ctx context.Context, req CreateFromImportRequ
 		ImportedAt:     &importedAt,
 	}
 
-	ver := &DocumentVersion{
-		ID:          versionID,
-		DocumentID:  docID,
-		Version:     1,
-		StorageKey:  versionKey,
-		ContentHash: hash,
-		SizeBytes:   size,
-		CreatedAt:   now,
-	}
-
 	if err := s.repo.Create(ctx, doc); err != nil {
 		return nil, fmt.Errorf("persist document: %w", err)
 	}
-	if err := s.repo.CreateVersion(ctx, ver); err != nil {
-		return nil, fmt.Errorf("persist version: %w", err)
+	if s.shouldCreateAutoSnapshot() {
+		if _, err := s.createVersionSnapshot(ctx, doc, contentBytes, now, VersionKindAuto, "", false); err != nil {
+			return nil, err
+		}
 	}
 
 	s.fireIndexHook(ctx, IndexEvent{
@@ -273,18 +266,13 @@ func (s *Service) Update(ctx context.Context, id string, req UpdateRequest) (*Sa
 
 	newVersion := doc.CurrentVersion + 1
 	now := time.Now().UTC()
-	versionID := idgen.New()
 
 	contentBytes := []byte(content)
 	size := int64(len(contentBytes))
 	meta := markdown.Parse(content)
 
 	currentKey := CurrentKey(id)
-	versionKey := VersionKey(id, newVersion)
 
-	if err := s.storage.Put(ctx, versionKey, bytes.NewReader(contentBytes), size, "text/markdown"); err != nil {
-		return nil, fmt.Errorf("upload version %d: %w", newVersion, err)
-	}
 	if err := s.storage.Put(ctx, currentKey, bytes.NewReader(contentBytes), size, "text/markdown"); err != nil {
 		return nil, fmt.Errorf("upload current: %w", err)
 	}
@@ -307,17 +295,13 @@ func (s *Service) Update(ctx context.Context, id string, req UpdateRequest) (*Sa
 		return nil, fmt.Errorf("persist update: %w", err)
 	}
 
-	ver := &DocumentVersion{
-		ID:          versionID,
-		DocumentID:  id,
-		Version:     newVersion,
-		StorageKey:  versionKey,
-		ContentHash: hash,
-		SizeBytes:   size,
-		CreatedAt:   now,
-	}
-	if err := s.repo.CreateVersion(ctx, ver); err != nil {
-		return nil, fmt.Errorf("persist version: %w", err)
+	if s.shouldCreateAutoSnapshot() {
+		if _, err := s.createVersionSnapshot(ctx, doc, contentBytes, now, VersionKindAuto, "", false); err != nil {
+			return nil, err
+		}
+		if err := s.pruneVersions(ctx, id); err != nil {
+			return nil, err
+		}
 	}
 
 	s.fireIndexHook(ctx, IndexEvent{
@@ -422,6 +406,9 @@ func (s *Service) GetVersions(ctx context.Context, docID string) (*VersionListRe
 			Version:   v.Version,
 			SizeBytes: v.SizeBytes,
 			CreatedAt: v.CreatedAt,
+			Kind:      v.Kind,
+			Pinned:    v.Pinned,
+			Note:      v.Note,
 		})
 	}
 	return &VersionListResult{Items: items}, nil
@@ -454,6 +441,136 @@ func (s *Service) GetVersion(ctx context.Context, docID string, version int) (*V
 		Version:   ver.Version,
 		Content:   string(raw),
 		CreatedAt: ver.CreatedAt,
+		Kind:      ver.Kind,
+		Pinned:    ver.Pinned,
+		Note:      ver.Note,
+	}, nil
+}
+
+// CreateSnapshot pins the current document content as a key version.
+func (s *Service) CreateSnapshot(ctx context.Context, docID, note string) (*VersionSummary, error) {
+	doc, err := s.repo.GetByID(ctx, docID)
+	if err != nil {
+		return nil, err
+	}
+
+	if ver, err := s.repo.GetVersion(ctx, docID, doc.CurrentVersion); err == nil {
+		if err := s.repo.UpdateVersionMetadata(ctx, docID, doc.CurrentVersion, VersionKindManual, strings.TrimSpace(note), true); err != nil {
+			return nil, err
+		}
+		ver.Kind = VersionKindManual
+		ver.Note = strings.TrimSpace(note)
+		ver.Pinned = true
+		return versionSummary(ver), nil
+	} else if !errors.Is(err, ErrNotFound) {
+		return nil, err
+	}
+
+	rc, err := s.storage.Get(ctx, doc.StorageKey)
+	if err != nil {
+		return nil, fmt.Errorf("fetch current content: %w", err)
+	}
+	defer rc.Close()
+
+	raw, err := io.ReadAll(rc)
+	if err != nil {
+		return nil, fmt.Errorf("read current content: %w", err)
+	}
+
+	ver, err := s.createVersionSnapshot(ctx, doc, raw, time.Now().UTC(), VersionKindManual, strings.TrimSpace(note), true)
+	if err != nil {
+		return nil, err
+	}
+	return versionSummary(ver), nil
+}
+
+// RestoreVersion restores a historical snapshot as a new current document version.
+func (s *Service) RestoreVersion(ctx context.Context, docID string, version int) (*SaveResult, error) {
+	doc, err := s.repo.GetByID(ctx, docID)
+	if err != nil {
+		return nil, err
+	}
+	if version == doc.CurrentVersion {
+		return &SaveResult{
+			ID:        doc.ID,
+			Title:     doc.Title,
+			Version:   doc.CurrentVersion,
+			Changed:   false,
+			UpdatedAt: doc.UpdatedAt,
+		}, nil
+	}
+
+	target, err := s.repo.GetVersion(ctx, docID, version)
+	if err != nil {
+		return nil, err
+	}
+
+	rc, err := s.storage.Get(ctx, target.StorageKey)
+	if err != nil {
+		return nil, fmt.Errorf("fetch version content: %w", err)
+	}
+	targetBytes, err := io.ReadAll(rc)
+	closeErr := rc.Close()
+	if err != nil {
+		return nil, fmt.Errorf("read version content: %w", err)
+	}
+	if closeErr != nil {
+		return nil, fmt.Errorf("close version content: %w", closeErr)
+	}
+
+	if err := s.ensureCurrentSnapshot(ctx, doc, version); err != nil {
+		return nil, err
+	}
+
+	newVersion := doc.CurrentVersion + 1
+	now := time.Now().UTC()
+	content := string(targetBytes)
+	hash := sha256Content(content)
+	meta := markdown.Parse(content)
+	title := markdown.ExtractTitle(content)
+	if title == "" {
+		title = doc.Title
+	}
+
+	currentKey := CurrentKey(docID)
+	if err := s.storage.Put(ctx, currentKey, bytes.NewReader(targetBytes), int64(len(targetBytes)), "text/markdown"); err != nil {
+		return nil, fmt.Errorf("upload restored current: %w", err)
+	}
+
+	uploadedAt := now
+	doc.Title = title
+	doc.StorageKey = currentKey
+	doc.CurrentVersion = newVersion
+	doc.ContentHash = hash
+	doc.SizeBytes = int64(len(targetBytes))
+	doc.WordCount = meta.WordCount
+	doc.LineCount = meta.LineCount
+	doc.SyncStatus = SyncStatusSynced
+	doc.Summary = meta.Summary
+	doc.HeadingText = meta.HeadingText
+	doc.UpdatedAt = now
+	doc.UploadedAt = &uploadedAt
+
+	if err := s.repo.Update(ctx, doc); err != nil {
+		return nil, fmt.Errorf("persist restored document: %w", err)
+	}
+	if _, err := s.createVersionSnapshot(ctx, doc, targetBytes, now, VersionKindManual, fmt.Sprintf("restored from v%d", version), true); err != nil {
+		return nil, err
+	}
+	if err := s.pruneVersions(ctx, docID); err != nil {
+		return nil, err
+	}
+
+	s.fireIndexHook(ctx, IndexEvent{
+		DocID: docID, Content: content, Version: newVersion, Hash: hash, IsImport: false,
+	})
+
+	return &SaveResult{
+		ID:        docID,
+		Title:     title,
+		Version:   newVersion,
+		Changed:   true,
+		UpdatedAt: now,
 	}, nil
 }
 
@@ -466,4 +583,121 @@ func HashContent(content string) string {
 func sha256Content(content string) string {
 	h := sha256.Sum256([]byte(content))
 	return hex.EncodeToString(h[:])
+}
+
+func (s *Service) shouldCreateAutoSnapshot() bool {
+	return s.versioning.Policy == VersionPolicyFull || s.versioning.Policy == VersionPolicyBounded
+}
+
+func (s *Service) createVersionSnapshot(ctx context.Context, doc *Document, contentBytes []byte, createdAt time.Time, kind, note string, pinned bool) (*DocumentVersion, error) {
+	versionKey := VersionKey(doc.ID, doc.CurrentVersion)
+	if err := s.storage.Put(ctx, versionKey, bytes.NewReader(contentBytes), int64(len(contentBytes)), "text/markdown"); err != nil {
+		return nil, fmt.Errorf("upload version %d: %w", doc.CurrentVersion, err)
+	}
+	ver := &DocumentVersion{
+		ID:          idgen.New(),
+		DocumentID:  doc.ID,
+		Version:     doc.CurrentVersion,
+		StorageKey:  versionKey,
+		ContentHash: doc.ContentHash,
+		SizeBytes:   int64(len(contentBytes)),
+		CreatedAt:   createdAt,
+		Note:        note,
+		Kind:        kind,
+		Pinned:      pinned,
+	}
+	if err := s.repo.CreateVersion(ctx, ver); err != nil {
+		return nil, fmt.Errorf("persist version: %w", err)
+	}
+	return ver, nil
+}
+
+func (s *Service) ensureCurrentSnapshot(ctx context.Context, doc *Document, targetVersion int) error {
+	if _, err := s.repo.GetVersion(ctx, doc.ID, doc.CurrentVersion); err == nil {
+		return nil
+	} else if !errors.Is(err, ErrNotFound) {
+		return err
+	}
+
+	rc, err := s.storage.Get(ctx, doc.StorageKey)
+	if err != nil {
+		return fmt.Errorf("fetch current content before restore: %w", err)
+	}
+	currentBytes, err := io.ReadAll(rc)
+	closeErr := rc.Close()
+	if err != nil {
+		return fmt.Errorf("read current content before restore: %w", err)
+	}
+	if closeErr != nil {
+		return fmt.Errorf("close current content before restore: %w", closeErr)
+	}
+	_, err = s.createVersionSnapshot(ctx, doc, currentBytes, time.Now().UTC(), VersionKindManual, fmt.Sprintf("before restore to v%d", targetVersion), true)
+	return err
+}
+
+func (s *Service) pruneVersions(ctx context.Context, docID string) error {
+	if s.versioning.Policy != VersionPolicyBounded {
+		return nil
+	}
+
+	versions, err := s.repo.GetVersions(ctx, docID)
+	if err != nil {
+		return err
+	}
+
+	keepLatest := s.versioning.KeepLatest
+	var kept int
+	var prune []*DocumentVersion
+	for _, ver := range versions {
+		if ver.Pinned {
+			continue
+		}
+		if kept < keepLatest {
+			kept++
+			continue
+		}
+		prune = append(prune, ver)
+	}
+	if len(prune) == 0 {
+		return nil
+	}
+
+	prunedVersions := make([]int, 0, len(prune))
+	for _, ver := range prune {
+		if err := s.storage.Delete(ctx, ver.StorageKey); err != nil {
+			return fmt.Errorf("prune version %d: %w", ver.Version, err)
+		}
+		prunedVersions = append(prunedVersions, ver.Version)
+	}
+	return s.repo.DeleteVersions(ctx, docID, prunedVersions)
+}
+
+func normalizeVersioningConfig(cfg VersioningConfig) VersioningConfig {
+	policy := strings.ToLower(strings.TrimSpace(cfg.Policy))
+	switch policy {
+	case "", "bounded", "limited":
+		policy = VersionPolicyBounded
+	case "full", "all", "always":
+		policy = VersionPolicyFull
+	case "overwrite":
+		policy = VersionPolicyOverwrite
+	default:
+		policy = VersionPolicyBounded
+	}
+	keepLatest := cfg.KeepLatest
+	if keepLatest <= 0 {
+		keepLatest = 5
+	}
+	return VersioningConfig{Policy: policy, KeepLatest: keepLatest}
+}
+
+func versionSummary(v *DocumentVersion) *VersionSummary {
+	return &VersionSummary{
+		Version:   v.Version,
+		SizeBytes: v.SizeBytes,
+		CreatedAt: v.CreatedAt,
+		Kind:      v.Kind,
+		Pinned:    v.Pinned,
+		Note:      v.Note,
+	}
 }

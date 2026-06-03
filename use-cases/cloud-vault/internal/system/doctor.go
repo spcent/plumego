@@ -107,14 +107,15 @@ func checkStorageObjects(ctx context.Context, db *sql.DB, store storage.ObjectSt
 func checkDocumentVersions(ctx context.Context, db *sql.DB) CheckResult {
 	r := CheckResult{Name: "document_versions", Status: StatusOK}
 
-	// Check current_version matches max version in document_versions.
+	// Check stored snapshots do not point beyond the document's current version.
+	// Bounded/overwrite retention may intentionally keep no current snapshot.
 	rows, err := db.QueryContext(ctx, `
 		SELECT d.id, d.current_version, COALESCE(MAX(dv.version), 0) as max_v
 		FROM documents d
 		LEFT JOIN document_versions dv ON dv.document_id = d.id
 		WHERE d.status != 'deleted'
 		GROUP BY d.id
-		HAVING d.current_version != max_v
+		HAVING max_v > d.current_version
 		LIMIT 1000`)
 	if err != nil {
 		r.Status = StatusError
@@ -134,7 +135,7 @@ func checkDocumentVersions(ctx context.Context, db *sql.DB) CheckResult {
 		if len(r.Items) < defaultMaxItems {
 			r.Items = append(r.Items, IssueItem{
 				DocumentID: docID,
-				Issue:      "version_mismatch",
+				Issue:      "snapshot_ahead_of_document",
 				Detail:     fmt.Sprintf("current_version=%d max_version=%d", cur, maxV),
 			})
 		}

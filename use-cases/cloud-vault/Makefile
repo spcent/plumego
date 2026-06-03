@@ -1,4 +1,6 @@
-.PHONY: dev web-dev web-build server-build server-build-v1 desktop-dev desktop-build desktop-package desktop-clean build run clean tidy test test-go test-web test-e2e doctor bench release release-v1 release-v1-test restore backup
+WAILS_BIN ?= $(shell command -v wails 2>/dev/null || printf "%s/bin/wails" "$$(go env GOPATH)")
+
+.PHONY: dev web-dev web-build server-build server-build-v1 desktop-assets desktop-dev desktop-build desktop-package desktop-clean build run clean tidy test test-go test-web test-e2e doctor bench release release-v1 release-v1-test restore backup
 
 # Run the frontend Vite dev server (proxies API to :8080)
 dev:
@@ -14,25 +16,29 @@ web-build:
 
 # Build the Go server binary
 server-build:
-	go build -o bin/markdown-vault ./cmd/server
+	go build -o dist/server/markdown-vault ./cmd/server
 
 # Build the Go server binary with V1.0 version injection
 server-build-v1:
-	go build -ldflags "-X cloud-vault/internal/version.Version=1.0.0 -X cloud-vault/internal/version.Commit=$(shell git rev-parse --short HEAD) -X cloud-vault/internal/version.BuildTime=$(shell date -u +%Y-%m-%dT%H:%M:%SZ) -X cloud-vault/internal/version.Channel=stable" -o bin/markdown-vault ./cmd/server
+	go build -ldflags "-X cloud-vault/internal/version.Version=1.0.0 -X cloud-vault/internal/version.Commit=$(shell git rev-parse --short HEAD) -X cloud-vault/internal/version.BuildTime=$(shell date -u +%Y-%m-%dT%H:%M:%SZ) -X cloud-vault/internal/version.Channel=stable" -o dist/server/markdown-vault ./cmd/server
 
 # Run the desktop app in dev mode (hot reload)
-desktop-dev:
-	wails dev
+desktop-assets:
+	mkdir -p build
+	cp internal/desktop/resources/appicon.png build/appicon.png
+
+desktop-dev: desktop-assets
+	$(WAILS_BIN) dev
 
 # Build the desktop app
-desktop-build:
-	wails build
+desktop-build: desktop-assets
+	$(WAILS_BIN) build -skipbindings -tags wails
 
 # Package the desktop app for distribution
-desktop-package:
-	wails build -nsis -platform windows/amd64
-	wails build -platform darwin/universal
-	wails build -platform linux/amd64
+desktop-package: desktop-assets
+	$(WAILS_BIN) build -skipbindings -tags wails -nsis -platform windows/amd64
+	$(WAILS_BIN) build -skipbindings -tags wails -platform darwin/universal
+	$(WAILS_BIN) build -skipbindings -tags wails -platform linux/amd64
 
 # Clean desktop build artifacts
 desktop-clean:

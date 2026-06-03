@@ -16,6 +16,7 @@ addr = ":9090"
 [app]
 max_upload_size_mb = 25
 version_policy = "limited"
+version_keep_latest = 3
 
 [database]
 path = "./data/test.db"
@@ -62,6 +63,9 @@ email = "test@example.com"
 	}
 	if cfg.App.VersionPolicy != "limited" {
 		t.Errorf("expected version_policy limited, got %s", cfg.App.VersionPolicy)
+	}
+	if cfg.App.VersionKeepLatest != 3 {
+		t.Errorf("expected version_keep_latest 3, got %d", cfg.App.VersionKeepLatest)
 	}
 	if cfg.DB.Path != "./data/test.db" {
 		t.Errorf("expected db path ./data/test.db, got %s", cfg.DB.Path)

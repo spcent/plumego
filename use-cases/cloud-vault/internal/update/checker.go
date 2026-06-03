@@ -12,8 +12,8 @@ import (
 const (
 	// DefaultCheckInterval is the default interval between update checks (in minutes).
 	DefaultCheckInterval = 60 * 24 // 24 hours
-	// DefaultUpdateURL is the default URL for checking updates.
-	DefaultUpdateURL = "https://releases.example.com/cloud-vault/latest.json"
+	// DefaultUpdateURL is intentionally empty so release builds do not call placeholder hosts.
+	DefaultUpdateURL = ""
 )
 
 // Checker handles checking for application updates.
@@ -40,6 +40,9 @@ func NewChecker(currentVersion VersionInfo, updateURL string) *Checker {
 
 // CheckForUpdate checks if a newer version is available.
 func (c *Checker) CheckForUpdate(ctx context.Context) (*LatestRelease, error) {
+	if c.updateURL == "" {
+		return nil, fmt.Errorf("update URL is not configured")
+	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.updateURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("create request: %w", err)
