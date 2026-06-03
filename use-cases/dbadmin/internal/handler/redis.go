@@ -812,6 +812,8 @@ func (h RedisHandler) Command(w http.ResponseWriter, r *http.Request) {
 		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeForbidden).
 			Message(fmt.Sprintf("%s is not allowed — use SCAN instead of KEYS", verb)).
+			Detail("code", "FORBIDDEN_REDIS_COMMAND").
+			Detail("command", verb).
 			Build()))
 		return
 	}

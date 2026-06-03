@@ -81,7 +81,10 @@ func (h MongoDBHandler) badRequest(w http.ResponseWriter, r *http.Request, msg s
 
 func (h MongoDBHandler) readonly(w http.ResponseWriter, r *http.Request) {
 	logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
-		Type(contract.TypeForbidden).Message("connection is read-only").Build()))
+		Type(contract.TypeForbidden).
+		Message("connection is read-only").
+		Detail("code", "READONLY_VIOLATION").
+		Build()))
 }
 
 func (h MongoDBHandler) timeout(ctx context.Context) (context.Context, context.CancelFunc) {

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { api, type ResourceNode, type DangerousStatement, ApiError } from '../api'
+import { api, type ResourceNode, type DangerousStatement, ApiError, errorMessage } from '../api'
 import ConfirmDialog from '../components/ConfirmDialog'
 import WorkbenchHeader from '../components/WorkbenchHeader'
 import { useToast } from '../components/toastContext'
@@ -35,7 +35,7 @@ export default function TablesPage() {
     try {
       setTables(await api.resources(connId, dbName))
     } catch (e) {
-      const message = e instanceof Error ? e.message : t('resource.error')
+      const message = errorMessage(e, t('resource.error'))
       setLoadError(message)
       showToast(message)
     } finally {
@@ -55,7 +55,7 @@ export default function TablesPage() {
       setTables(ts => ts.filter(x => x.name !== dropTarget))
       setDropTarget(null)
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Drop failed')
+      showToast(errorMessage(e, 'Drop failed'))
     }
   }
 
@@ -67,7 +67,7 @@ export default function TablesPage() {
       await navigator.clipboard.writeText(r.markdown)
       showToast(t('tables.copy_schema.success'), 'success')
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Copy failed')
+      showToast(errorMessage(e, 'Copy failed'))
     } finally {
       setCopyingSchema(false)
     }
@@ -86,7 +86,7 @@ export default function TablesPage() {
       if (e instanceof ApiError && e.details?.confirm_required) {
         setImportConfirm({ dangerous: e.details.dangerous_statements as DangerousStatement[] })
       } else {
-        showToast(e instanceof Error ? e.message : 'Import failed')
+        showToast(errorMessage(e, 'Import failed'))
       }
     } finally {
       setImporting(false)

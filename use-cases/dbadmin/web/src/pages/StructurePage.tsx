@@ -1,6 +1,6 @@
 import { useEffect, useState, type CSSProperties } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
-import { api, type TableStructure } from '../api'
+import { api, errorMessage, type TableStructure } from '../api'
 import WorkbenchHeader from '../components/WorkbenchHeader'
 import { useToast } from '../components/toastContext'
 import { useI18n } from '../i18nContext'
@@ -47,7 +47,7 @@ export default function StructurePage() {
     if (!connId || !dbName || !tableName) return
     api.tableStructure(connId, dbName, tableName)
       .then(setStructure)
-      .catch(e => showToast(e.message))
+      .catch(e => showToast(errorMessage(e)))
   }, [connId, dbName, tableName, showToast])
 
   function copyText(text: string) {

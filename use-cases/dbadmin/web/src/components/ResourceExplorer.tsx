@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import { useNavigate, useParams, useLocation } from 'react-router-dom'
-import { api, type Connection, type ResourceNode, type ResourceNodeType } from '../api'
+import { api, errorMessage, type Connection, type ResourceNode, type ResourceNodeType } from '../api'
 import { useI18n } from '../i18nContext'
 import { useToast } from './toastContext'
 import {
@@ -422,7 +422,7 @@ export default function ResourceExplorer({ connections, onRefresh }: Props) {
       const nodes = await api.resources(connId)
       setResourceCache(c => ({ ...c, [connId]: nodes }))
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err)
+      const msg = errorMessage(err, 'Failed to load resources')
       setConnErrors(prev => ({ ...prev, [connId]: msg }))
     } finally {
       setLoadingConns(prev => {

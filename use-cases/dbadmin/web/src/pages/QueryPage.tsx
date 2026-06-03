@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import Editor from '@monaco-editor/react'
-import { api, ApiError, type QueryResult } from '../api'
+import { api, ApiError, errorMessage, type QueryResult } from '../api'
 import ConfirmDialog from '../components/ConfirmDialog'
 import { useToast } from '../components/toastContext'
 import { useI18n } from '../i18nContext'
@@ -86,7 +86,7 @@ export default function QueryPage() {
     if (!connId) return
     api.resources(connId)
       .then(nodes => setDatabases(nodes.filter(n => n.type === 'sql_database').map(n => n.name)))
-      .catch(e => showToast(e.message))
+      .catch(e => showToast(errorMessage(e)))
   }, [connId, showToast])
 
   const handleRun = useCallback(async (confirmDangerous = false) => {
@@ -129,7 +129,7 @@ export default function QueryPage() {
       if (e instanceof ApiError && e.details?.confirm_required) {
         setConfirmState({ reason: String(e.details.reason ?? 'dangerous operation') })
       } else {
-        const msg = e instanceof Error ? e.message : 'Query failed'
+        const msg = errorMessage(e, 'Query failed')
         setError(msg)
         // Record failed query to history
         sqlHistory.add({
@@ -184,7 +184,7 @@ export default function QueryPage() {
       await api.cancelQuery(activeQueryId)
       showToast(t('query.cancelled'), 'success')
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Cancel failed', 'error')
+      showToast(errorMessage(e, 'Cancel failed'), 'error')
     }
   }
 

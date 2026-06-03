@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { getApiErrorInfo } from '../api'
 import { AlertIcon, EmptyIcon, XIcon } from './Icons'
 
 export function PageShell({ children }: { children: ReactNode }) {
@@ -126,21 +127,29 @@ export function EmptyStatePanel({
 export function ErrorStatePanel({
   title,
   message,
+  error,
   action,
   compact = false,
 }: {
   title?: ReactNode
-  message: ReactNode
+  message?: ReactNode
+  error?: unknown
   action?: ReactNode
   compact?: boolean
 }) {
+  const info = error ? getApiErrorInfo(error) : null
+  const displayTitle = title ?? info?.title
+  const displayMessage = message ?? info?.message
+  const detail = info?.detail
+
   return (
     <div className={`flex flex-col items-center justify-center px-6 text-center ${compact ? 'py-6' : 'py-14'}`}>
       <div className="mb-3 grid h-10 w-10 place-items-center rounded-xl" style={{ background: 'var(--danger-soft)', color: 'var(--danger)' }}>
         <AlertIcon className="h-5 w-5" />
       </div>
-      <div className="text-sm font-semibold" style={{ color: 'var(--danger)' }}>{title}</div>
-      <div className="mt-1 max-w-md text-xs leading-relaxed" style={{ color: 'var(--text-muted)' }}>{message}</div>
+      {displayTitle && <div className="text-sm font-semibold" style={{ color: 'var(--danger)' }}>{displayTitle}</div>}
+      {displayMessage && <div className="mt-1 max-w-md text-xs leading-relaxed" style={{ color: 'var(--text-muted)' }}>{displayMessage}</div>}
+      {detail && <div className="mt-1 max-w-md font-mono text-[11px]" style={{ color: 'var(--text-subtle)' }}>{detail}</div>}
       {action && <div className="mt-4">{action}</div>}
     </div>
   )

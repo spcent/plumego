@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { useI18n } from '../i18nContext'
 import { sqlHistorySettings } from '../hooks/useSqlHistory'
-import { api, type ActiveOperation, type AuditEvent, type Connection, type PoolStats } from '../api'
+import { api, errorMessage, type ActiveOperation, type AuditEvent, type Connection, type PoolStats } from '../api'
 import { useToast } from '../components/toastContext'
 import { EmptyStatePanel, ErrorStatePanel, LoadingState, PageBody, PageShell, PageStatusBar, PageToolbar } from '../components/workbench'
 
@@ -32,7 +32,7 @@ export default function SettingsPage() {
     try {
       setOperations(await api.listActiveOperations())
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to load operations'
+      const message = errorMessage(err, 'Failed to load operations')
       setOperationsError(message)
       toast.showToast(message, 'error')
     } finally {
@@ -51,7 +51,7 @@ export default function SettingsPage() {
       setConnections(conns)
       setPoolStats(stats)
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to load runtime state'
+      const message = errorMessage(err, 'Failed to load runtime state')
       setRuntimeError(message)
       toast.showToast(message, 'error')
     } finally {
@@ -70,7 +70,7 @@ export default function SettingsPage() {
       setMe(profile)
       setAuditEvents(events)
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to load audit events'
+      const message = errorMessage(err, 'Failed to load audit events')
       setAuditError(message)
       toast.showToast(message, 'error')
     } finally {
@@ -95,7 +95,7 @@ export default function SettingsPage() {
       await api.cancelOperation(operationId)
       await loadOperations()
     } catch (err) {
-      toast.showToast(err instanceof Error ? err.message : 'Failed to cancel operation', 'error')
+      toast.showToast(errorMessage(err, 'Failed to cancel operation'), 'error')
     }
   }
 
@@ -104,7 +104,7 @@ export default function SettingsPage() {
       await api.closeConnectionRuntime(connId)
       await loadRuntime()
     } catch (err) {
-      toast.showToast(err instanceof Error ? err.message : 'Failed to close connection runtime', 'error')
+      toast.showToast(errorMessage(err, 'Failed to close connection runtime'), 'error')
     }
   }
 

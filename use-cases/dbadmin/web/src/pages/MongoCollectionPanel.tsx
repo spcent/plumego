@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useParams } from 'react-router-dom'
 import { useI18n } from '../i18nContext'
 import { useToast } from '../components/toastContext'
-import { api } from '../api'
+import { api, errorMessage } from '../api'
 import type {
   MongoDocQuery,
   MongoDocsResponse,
@@ -119,7 +119,7 @@ export default function MongoCollectionPanel() {
         result_count: result.documents?.length ?? 0,
       })
     } catch (err) {
-      setAggError(err instanceof Error ? err.message : 'Aggregation failed')
+      setAggError(errorMessage(err, 'Aggregation failed'))
     } finally {
       setAggLoading(false)
     }
@@ -136,7 +136,7 @@ export default function MongoCollectionPanel() {
       const result = await api.mongoSchema(connectionId, database, collection, 100)
       setSchema(result)
     } catch (err) {
-      setSchemaError(err instanceof Error ? err.message : 'Schema analysis failed')
+      setSchemaError(errorMessage(err, 'Schema analysis failed'))
     } finally {
       setSchemaLoading(false)
     }
@@ -153,7 +153,7 @@ export default function MongoCollectionPanel() {
       const result = await api.mongoStats(connectionId, database, collection)
       setStats(result)
     } catch (err) {
-      setStatsError(err instanceof Error ? err.message : 'Failed to load stats')
+      setStatsError(errorMessage(err, 'Failed to load stats'))
     } finally {
       setStatsLoading(false)
     }
@@ -165,7 +165,7 @@ export default function MongoCollectionPanel() {
       const result = await api.mongoParseObjectId(objectId)
       setObjectIdInfo(result)
     } catch (err) {
-      showToast(err instanceof Error ? err.message : 'Failed to parse ObjectId', 'error')
+      showToast(errorMessage(err, 'Failed to parse ObjectId'), 'error')
     }
   }, [showToast])
 
@@ -190,7 +190,7 @@ export default function MongoCollectionPanel() {
       const data = await api.mongoQueryDocuments(connectionId, query)
       setResults(data)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Query failed')
+      setError(errorMessage(err, 'Query failed'))
     } finally {
       setLoading(false)
     }
@@ -206,7 +206,7 @@ export default function MongoCollectionPanel() {
       setShowInsertModal(false)
       executeQuery()
     } catch (err) {
-      showToast(err instanceof Error ? err.message : t('mongodb.document.insert_error'), 'error')
+      showToast(errorMessage(err, t('mongodb.document.insert_error')), 'error')
     }
   }
 
@@ -221,7 +221,7 @@ export default function MongoCollectionPanel() {
       setSelectedDoc(null)
       executeQuery()
     } catch (err) {
-      showToast(err instanceof Error ? err.message : t('mongodb.document.save_error'), 'error')
+      showToast(errorMessage(err, t('mongodb.document.save_error')), 'error')
     }
   }
 
@@ -236,7 +236,7 @@ export default function MongoCollectionPanel() {
       setDocToDelete(null)
       executeQuery()
     } catch (err) {
-      showToast(err instanceof Error ? err.message : t('mongodb.document.delete_error'), 'error')
+      showToast(errorMessage(err, t('mongodb.document.delete_error')), 'error')
     }
   }
 
@@ -1213,7 +1213,7 @@ function ImportModal(props: {
       showToast(t('mongodb.p1.import.success', { count: result.inserted_count }), 'success')
       onSuccess()
     } catch (err) {
-      showToast(err instanceof Error ? err.message : t('mongodb.p1.import.error'), 'error')
+      showToast(errorMessage(err, t('mongodb.p1.import.error')), 'error')
     } finally {
       setLoading(false)
     }
@@ -1648,7 +1648,7 @@ function IndexesModal({
         const response = await api.mongoListIndexes(connectionId, database, collection)
         setIndexes(response.indexes)
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load indexes')
+        setError(errorMessage(err, 'Failed to load indexes'))
       } finally {
         setLoading(false)
       }

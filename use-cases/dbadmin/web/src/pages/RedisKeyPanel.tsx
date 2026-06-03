@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useParams } from 'react-router-dom'
 import { useI18n } from '../i18nContext'
 import { useCurrentConn } from '../context/connections'
-import { api, type RedisKeyEntry, type RedisKeyDetail } from '../api'
+import { api, errorMessage, type RedisKeyEntry, type RedisKeyDetail } from '../api'
 import { useToast } from '../components/toastContext'
 import WorkbenchHeader from '../components/WorkbenchHeader'
 import ConfirmDialog from '../components/ConfirmDialog'
@@ -37,10 +37,6 @@ function loadFavorites(): PatternFavorite[] {
 
 function saveFavorites(favorites: PatternFavorite[]) {
   localStorage.setItem(FAVORITES_KEY, JSON.stringify(favorites))
-}
-
-function errorMessage(err: unknown, fallback: string): string {
-  return err instanceof Error ? err.message : fallback
 }
 
 type Translate = (key: string, vars?: Record<string, string | number>) => string

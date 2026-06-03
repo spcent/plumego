@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { useParams } from 'react-router-dom'
-import { api, type RowsResponse, type TableStructure, type FilterCondition, type FilterOperator } from '../api'
+import { api, errorMessage, type RowsResponse, type TableStructure, type FilterCondition, type FilterOperator } from '../api'
 import CellRenderer from '../components/CellRenderer'
 import CellViewer from '../components/CellViewer'
 import ConfirmDialog from '../components/ConfirmDialog'
@@ -113,7 +113,7 @@ export default function DataPage() {
       setData(r)
       setSelectedRows(new Set())
     } catch (e) {
-      const message = e instanceof Error ? e.message : t('data.load_failed')
+      const message = errorMessage(e, t('data.load_failed'))
       setLoadError(message)
       showToast(message)
     } finally {
@@ -211,7 +211,7 @@ export default function DataPage() {
       load()
       showToast(drawerMode === 'insert' ? t('data.insert.success') : t('data.edit.success'), 'success')
     } catch (e) {
-      showToast(e instanceof Error ? e.message : t('data.save_failed'))
+      showToast(errorMessage(e, t('data.save_failed')))
     } finally {
       setSaving(false)
     }
@@ -582,7 +582,7 @@ export default function DataPage() {
                                 await api.deleteRow(connId!, dbName!, tableName!, primaryKey)
                                 load()
                               } catch (e) {
-                                showToast(e instanceof Error ? e.message : t('data.delete_failed'))
+                                showToast(errorMessage(e, t('data.delete_failed')))
                               }
                             },
                           })

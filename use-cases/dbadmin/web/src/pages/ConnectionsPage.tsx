@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { api, type Connection } from '../api'
+import { api, errorMessage, type Connection } from '../api'
 import { useToast } from '../components/toastContext'
 import { useI18n } from '../i18nContext'
 import { DatabaseIcon } from '../components/Icons'
@@ -30,7 +30,7 @@ export default function ConnectionsPage() {
   const { t } = useI18n()
 
   const reload = useCallback(() => {
-    api.listConnections().then(setConns).catch(e => showToast(e.message))
+    api.listConnections().then(setConns).catch(e => showToast(errorMessage(e)))
   }, [showToast])
 
   useEffect(() => {
@@ -49,7 +49,7 @@ export default function ConnectionsPage() {
       setEditing(null)
       reload()
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Save failed')
+      showToast(errorMessage(e, 'Save failed'))
     }
   }
 
@@ -65,7 +65,7 @@ export default function ConnectionsPage() {
       setDeleteTarget(null)
       reload()
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Delete failed')
+      showToast(errorMessage(e, 'Delete failed'))
     }
   }
 
@@ -75,7 +75,7 @@ export default function ConnectionsPage() {
       const r = await api.testConnection(id)
       setTesting(p => ({ ...p, [id]: r.ok ? { state: 'ok', message: 'Connected' } : { state: 'error', message: r.error || 'Connection failed' } }))
     } catch (e) {
-      setTesting(p => ({ ...p, [id]: { state: 'error', message: e instanceof Error ? e.message : 'failed' } }))
+      setTesting(p => ({ ...p, [id]: { state: 'error', message: errorMessage(e, 'Connection test failed') } }))
     }
   }
 
@@ -87,7 +87,7 @@ export default function ConnectionsPage() {
       await api.createConnection({ ...rest, name: `${name} (copy)` })
       reload()
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Duplicate failed')
+      showToast(errorMessage(e, 'Duplicate failed'))
     }
   }
 
@@ -320,7 +320,7 @@ function ConnectionForm({ conn, onChange }: { conn: Partial<Connection>; onChang
       const result = await api.uploadSQLite(file, setUploadProgress)
       onChange({ ...conn, file_path: result.file_path, uploaded_file: true, original_filename: result.original_name })
     } catch (err) {
-      showToast(err instanceof Error ? err.message : t('sqlite.upload_failed'))
+      showToast(errorMessage(err, t('sqlite.upload_failed')))
     } finally {
       setUploading(false)
       setUploadProgress(0)

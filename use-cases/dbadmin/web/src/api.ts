@@ -1,26 +1,163 @@
 const BASE = '/api'
 
+export interface ApiErrorOptions {
+  status?: number
+  code?: string
+  category?: string
+  type?: string
+  details?: Record<string, unknown>
+  requestId?: string
+  retryable?: boolean
+}
+
 export class ApiError extends Error {
   readonly details?: Record<string, unknown>
-  constructor(message: string, details?: Record<string, unknown>) {
-    super(message)
-    this.details = details
+  readonly status?: number
+  readonly code?: string
+  readonly category?: string
+  readonly type?: string
+  readonly requestId?: string
+  readonly retryable: boolean
+
+  constructor(message: string, options: ApiErrorOptions = {}) {
+    super(redactSensitive(message))
+    this.name = 'ApiError'
+    this.details = sanitizeDetails(options.details)
+    this.status = options.status
+    this.code = options.code
+    this.category = options.category
+    this.type = options.type
+    this.requestId = options.requestId
+    this.retryable = options.retryable ?? isRetryableStatus(options.status, options.category)
   }
 }
 
-async function req<T>(method: string, path: string, body?: unknown): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, {
-    method,
-    credentials: 'include',
-    headers: body ? { 'Content-Type': 'application/json' } : {},
-    body: body ? JSON.stringify(body) : undefined,
+export interface ApiErrorInfo {
+  title: string
+  message: string
+  detail?: string
+  status?: number
+  code?: string
+  requestId?: string
+  retryable: boolean
+}
+
+function isRetryableStatus(status?: number, category?: string): boolean {
+  if (category === 'timeout_error' || category === 'rate_limit_error') return true
+  if (!status) return false
+  return status === 408 || status === 409 || status === 429 || status >= 500
+}
+
+export function redactSensitive(input: unknown): string {
+  const raw = input == null ? '' : String(input)
+  return raw
+    .replace(/:\/\/([^:/\s]+):([^@\s]+)@/g, '://***:***@')
+    .replace(/\b(password|passwd|pwd|token|api[_-]?key|secret|authorization)=([^&\s]+)/gi, '$1=***')
+    .replace(/\b(Bearer|Basic)\s+[A-Za-z0-9._~+/=-]+/gi, '$1 ***')
+    .slice(0, 800)
+}
+
+function sanitizeDetails(details?: Record<string, unknown>): Record<string, unknown> | undefined {
+  if (!details) return undefined
+  const clean: Record<string, unknown> = {}
+  for (const [key, value] of Object.entries(details)) {
+    if (/password|passwd|pwd|token|api[_-]?key|secret|authorization/i.test(key)) {
+      clean[key] = '***'
+    } else if (typeof value === 'string') {
+      clean[key] = redactSensitive(value)
+    } else {
+      clean[key] = value
+    }
+  }
+  return clean
+}
+
+function parseErrorBody(body: unknown, status: number, statusText: string): ApiError {
+  const envelope = body as {
+    error?: {
+      message?: unknown
+      details?: Record<string, unknown>
+      code?: unknown
+      category?: unknown
+      type?: unknown
+    }
+    request_id?: unknown
+  }
+  const err = envelope?.error ?? {}
+  return new ApiError(
+    typeof err.message === 'string' && err.message ? err.message : statusText,
+    {
+      status,
+      code: typeof err.code === 'string' ? err.code : undefined,
+      category: typeof err.category === 'string' ? err.category : undefined,
+      type: typeof err.type === 'string' ? err.type : undefined,
+      details: err.details,
+      requestId: typeof envelope?.request_id === 'string' ? envelope.request_id : undefined,
+    },
+  )
+}
+
+function networkError(err: unknown): ApiError {
+  return new ApiError(err instanceof Error && err.message ? err.message : 'Network request failed', {
+    code: 'NETWORK_ERROR',
+    category: 'network_error',
+    retryable: true,
   })
+}
+
+export function getApiErrorInfo(err: unknown, fallback = 'Operation failed'): ApiErrorInfo {
+  if (err instanceof ApiError) {
+    let title = 'Operation failed'
+    if (err.category === 'network_error') title = 'Network error'
+    else if (err.status === 401) title = 'Authentication required'
+    else if (err.status === 403) title = 'Permission denied'
+    else if (err.status === 404) title = 'Not found'
+    else if (err.status === 408 || err.category === 'timeout_error') title = 'Request timed out'
+    else if (err.status === 413) title = 'Payload too large'
+    else if (err.status === 429) title = 'Too many requests'
+    else if (err.status && err.status >= 500) title = 'Service error'
+    else if (err.category === 'validation_error' || err.type === 'bad_request') title = 'Check request'
+
+    const detailParts = [
+      err.code ? `code: ${err.code}` : '',
+      err.requestId ? `request: ${err.requestId}` : '',
+    ].filter(Boolean)
+    return {
+      title,
+      message: err.message || fallback,
+      detail: detailParts.length ? detailParts.join(' · ') : undefined,
+      status: err.status,
+      code: err.code,
+      requestId: err.requestId,
+      retryable: err.retryable,
+    }
+  }
+  if (err instanceof Error) {
+    return { title: 'Operation failed', message: redactSensitive(err.message || fallback), retryable: false }
+  }
+  return { title: 'Operation failed', message: fallback, retryable: false }
+}
+
+export function errorMessage(err: unknown, fallback = 'Operation failed'): string {
+  const info = getApiErrorInfo(err, fallback)
+  return info.detail ? `${info.message} (${info.detail})` : info.message
+}
+
+async function req<T>(method: string, path: string, body?: unknown): Promise<T> {
+  let res: Response
+  try {
+    res = await fetch(`${BASE}${path}`, {
+      method,
+      credentials: 'include',
+      headers: body ? { 'Content-Type': 'application/json' } : {},
+      body: body ? JSON.stringify(body) : undefined,
+    })
+  } catch (err) {
+    throw networkError(err)
+  }
   if (!res.ok) {
     const errBody = await res.json().catch(() => ({ error: { message: res.statusText } }))
-    throw new ApiError(
-      errBody?.error?.message || res.statusText,
-      errBody?.error?.details,
-    )
+    throw parseErrorBody(errBody, res.status, res.statusText)
   }
   if (res.status === 204) return undefined as T
   const json = await res.json()
@@ -124,18 +261,18 @@ export const api = {
             const json = JSON.parse(xhr.responseText)
             resolve(json.data !== undefined ? json.data : json)
           } catch {
-            reject(new ApiError('Invalid response'))
+            reject(new ApiError('Invalid response', { code: 'INVALID_RESPONSE' }))
           }
         } else {
           try {
             const errBody = JSON.parse(xhr.responseText)
-            reject(new ApiError(errBody?.error?.message || xhr.statusText, errBody?.error?.details))
+            reject(parseErrorBody(errBody, xhr.status, xhr.statusText))
           } catch {
-            reject(new ApiError(xhr.statusText))
+            reject(new ApiError(xhr.statusText, { status: xhr.status }))
           }
         }
       }
-      xhr.onerror = () => reject(new ApiError('Upload failed'))
+      xhr.onerror = () => reject(new ApiError('Upload failed', { code: 'NETWORK_ERROR', category: 'network_error', retryable: true }))
       xhr.send(form)
     })
   },

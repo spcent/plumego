@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { api } from '../api'
+import { api, errorMessage } from '../api'
 import { useI18n } from '../i18nContext'
 import { DatabaseIcon } from '../components/Icons'
 
@@ -20,7 +20,7 @@ export default function LoginPage() {
       await api.login(username, password)
       navigate('/')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Login failed')
+      setError(errorMessage(err, 'Login failed'))
     } finally {
       setLoading(false)
     }

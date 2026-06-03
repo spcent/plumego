@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import type { ColumnInfo } from '../api'
+import { errorMessage, type ColumnInfo } from '../api'
 import { useI18n } from '../i18nContext'
 import { XIcon } from './Icons'
 
@@ -109,7 +109,7 @@ export default function RowDrawer({ columns, pkCols, mode, initialValues, saving
     try {
       await onSave(values)
     } catch (e) {
-      setError(e instanceof Error ? e.message : t('data.save_failed'))
+      setError(errorMessage(e, t('data.save_failed')))
     }
   }
 
