@@ -1231,6 +1231,9 @@ function ImportModal(props: {
     try {
       const result = await api.mongoImport(connectionId, database, collection, data, format)
       showToast(t('mongodb.p1.import.success', { count: result.inserted_count }), 'success')
+      if (result.errors > 0) {
+        showToast(t('mongodb.p1.import.partial_error', { count: result.errors }), 'error')
+      }
       onSuccess()
     } catch (err) {
       showToast(errorMessage(err, t('mongodb.p1.import.error')), 'error')

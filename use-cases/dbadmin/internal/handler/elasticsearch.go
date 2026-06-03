@@ -792,16 +792,30 @@ func (h ElasticsearchHandler) ImportDocuments(w http.ResponseWriter, r *http.Req
 		return
 	}
 	errorsCount := 0
-	for _, item := range result.Items {
+	errorsDetail := make([]importErrorDetail, 0)
+	for i, item := range result.Items {
 		for _, op := range item {
 			if op.Status >= 300 || op.Error != nil {
 				errorsCount++
+				errMsg := "bulk item failed"
+				if op.Error != nil {
+					if reason, ok := op.Error["reason"].(string); ok {
+						errMsg = reason
+					} else if typ, ok := op.Error["type"].(string); ok {
+						errMsg = typ
+					}
+				}
+				errorsDetail = append(errorsDetail, importErrorDetail{
+					Index: i + 1,
+					Error: errMsg,
+				})
 			}
 		}
 	}
 	logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusOK, map[string]any{
 		"imported_count": len(req.Documents) - errorsCount,
 		"errors":         errorsCount,
+		"errors_detail":  errorsDetail,
 	}, nil))
 }
 

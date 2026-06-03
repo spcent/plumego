@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useParams } from 'react-router-dom'
 import { useI18n } from '../i18nContext'
 import { useCurrentConn } from '../context/connections'
-import { api, errorMessage, type RedisKeyEntry, type RedisKeyDetail } from '../api'
+import { api, errorMessage, type RedisExportPayload, type RedisKeyEntry, type RedisKeyDetail } from '../api'
 import { useToast } from '../components/toastContext'
 import WorkbenchHeader from '../components/WorkbenchHeader'
 import ConfirmDialog from '../components/ConfirmDialog'
@@ -64,6 +64,9 @@ export default function RedisKeyPanel() {
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set())
   const [showBatchPreview, setShowBatchPreview] = useState(false)
   const [previewKeys, setPreviewKeys] = useState<RedisKeyEntry[]>([])
+  const [showImportModal, setShowImportModal] = useState(false)
+  const [importData, setImportData] = useState('')
+  const [importing, setImporting] = useState(false)
 
   // Pattern favorites
   const [favorites, setFavorites] = useState<PatternFavorite[]>(loadFavorites())
@@ -210,6 +213,41 @@ export default function RedisKeyPanel() {
     })
   }, [connId, dbIndex, previewKeys, isReadonly, fetchKeys, t, toast])
 
+  const handleExport = useCallback(() => {
+    if (!connId) return
+    window.location.href = api.redisExportURL(connId, dbIndex, pattern, 1000)
+  }, [connId, dbIndex, pattern])
+
+  const handleImport = useCallback(async () => {
+    if (!connId || !importData.trim()) return
+    let payload: RedisExportPayload
+    try {
+      payload = JSON.parse(importData) as RedisExportPayload
+      if (!Array.isArray(payload.items)) {
+        toast.showToast(t('redis.import.invalid'), 'error')
+        return
+      }
+    } catch {
+      toast.showToast(t('redis.import.invalid'), 'error')
+      return
+    }
+    setImporting(true)
+    try {
+      const result = await api.redisImport(connId, dbIndex, payload.items, true)
+      toast.showToast(t('redis.import.success', { count: result.imported_count }), 'success')
+      if (result.errors > 0) {
+        toast.showToast(t('redis.import.partial_error', { count: result.errors }), 'error')
+      }
+      setShowImportModal(false)
+      setImportData('')
+      await fetchKeys(0, false)
+    } catch (err) {
+      toast.showToast(errorMessage(err, t('redis.import.error')), 'error')
+    } finally {
+      setImporting(false)
+    }
+  }, [connId, dbIndex, fetchKeys, importData, t, toast])
+
   const toggleKeySelection = (key: string) => {
     setSelectedKeys(prev => {
       const next = new Set(prev)
@@ -339,6 +377,32 @@ export default function RedisKeyPanel() {
                   }}
                 >
                   {batchMode ? t('redis.batch.cancel') : t('redis.batch.select_keys')}
+                </button>
+              )}
+            </div>
+            <div className="flex gap-2 mb-2">
+              <button
+                onClick={handleExport}
+                className="flex-1 px-2 py-1 text-xs rounded border"
+                style={{
+                  background: 'var(--bg-surface)',
+                  color: 'var(--text-default)',
+                  borderColor: 'var(--border-subtle)',
+                }}
+              >
+                {t('redis.export')}
+              </button>
+              {!isReadonly && (
+                <button
+                  onClick={() => setShowImportModal(true)}
+                  className="flex-1 px-2 py-1 text-xs rounded border"
+                  style={{
+                    background: 'var(--bg-surface)',
+                    color: 'var(--text-default)',
+                    borderColor: 'var(--border-subtle)',
+                  }}
+                >
+                  {t('redis.import')}
                 </button>
               )}
             </div>
@@ -704,6 +768,44 @@ export default function RedisKeyPanel() {
                 className="btn btn-danger flex-1 justify-center"
               >
                 {t('redis.batch.delete')} ({previewKeys.length})
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showImportModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="panel max-w-2xl w-full mx-4 max-h-[80vh] flex flex-col">
+            <div className="border-b px-6 py-4" style={{ borderColor: 'var(--border-subtle)' }}>
+              <h3 className="text-lg font-semibold" style={{ color: 'var(--text-strong)' }}>
+                {t('redis.import')}
+              </h3>
+              <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>
+                {t('redis.import_hint')}
+              </p>
+            </div>
+            <div className="flex-1 p-6">
+              <textarea
+                value={importData}
+                onChange={e => setImportData(e.target.value)}
+                className="textarea h-72 font-mono text-sm"
+                placeholder='{"version":"dbadmin.redis.v1","items":[]}'
+              />
+            </div>
+            <div className="flex gap-3 border-t px-6 py-4" style={{ borderColor: 'var(--border-subtle)' }}>
+              <button
+                onClick={() => setShowImportModal(false)}
+                className="btn btn-ghost flex-1 justify-center"
+              >
+                {t('common.cancel')}
+              </button>
+              <button
+                onClick={handleImport}
+                disabled={importing || !importData.trim()}
+                className="btn btn-primary flex-1 justify-center disabled:opacity-50"
+              >
+                {importing ? t('redis.importing') : t('redis.import')}
               </button>
             </div>
           </div>

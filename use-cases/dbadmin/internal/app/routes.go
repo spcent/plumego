@@ -242,6 +242,8 @@ func (a *App) RegisterRoutes() error {
 	protected.post("/api/conn/:id/redis/:dbIndex/command", guard(http.HandlerFunc(redisH.Command)))
 	protected.post("/api/conn/:id/redis/:dbIndex/batch-preview", guard(http.HandlerFunc(redisH.BatchPreview)))
 	protected.post("/api/conn/:id/redis/:dbIndex/batch-delete", guard(http.HandlerFunc(redisH.BatchDelete)))
+	protected.get("/api/conn/:id/redis/:dbIndex/export", guard(http.HandlerFunc(redisH.ExportKeys)))
+	protected.post("/api/conn/:id/redis/:dbIndex/import", guard(http.HandlerFunc(redisH.ImportKeys)))
 	protected.get("/api/conn/:id/redis/history", guard(http.HandlerFunc(redisH.ListHistory)))
 	protected.delete("/api/conn/:id/redis/history", guard(http.HandlerFunc(redisH.ClearHistory)))
 	protected.delete("/api/conn/:id/redis/history/:entryId", guard(http.HandlerFunc(redisH.DeleteHistoryEntry)))

@@ -191,6 +191,9 @@ export default function ElasticsearchIndexPanel() {
     try {
       const result = await api.esImport(connId, esIndex, documents, true)
       showToast(t('elasticsearch.import_success').replace('{count}', String(result.imported_count)), 'success')
+      if (result.errors > 0) {
+        showToast(t('elasticsearch.import_partial_error', { count: result.errors }), 'error')
+      }
       setShowImportModal(false)
       await loadOverview()
     } catch (err) {

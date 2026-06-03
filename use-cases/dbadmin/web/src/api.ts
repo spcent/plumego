@@ -313,6 +313,12 @@ export const api = {
       keys,
       confirm,
     }),
+  redisExportURL: (id: string, dbIndex: number, pattern: string, limit = 1000) => {
+    const params = new URLSearchParams({ pattern, limit: String(limit) })
+    return `${BASE}/conn/${id}/redis/${dbIndex}/export?${params.toString()}`
+  },
+  redisImport: (id: string, dbIndex: number, items: RedisExportItem[], confirm: boolean) =>
+    req<RedisImportResponse>('POST', `/conn/${id}/redis/${dbIndex}/import`, { items, confirm }),
 
   // ── MongoDB API ─────────────────────────────────────────────────────────────
   mongoListDatabases: (connId: string) =>
@@ -357,7 +363,7 @@ export const api = {
   },
 
   mongoImport: (connId: string, database: string, collection: string, data: string, format: 'json' | 'ndjson' = 'json') =>
-    req<MongoImportResponse>('POST', `/connections/${connId}/mongo/import`, { database, collection, data, format }),
+    req<MongoImportResponse>('POST', `/connections/${connId}/mongo/import`, { database, collection, data, format, confirm: true }),
 
   mongoParseObjectId: (objectId: string) =>
     req<MongoObjectIdInfo>('GET', `/mongo/objectid/${objectId}/parse`),
@@ -711,6 +717,28 @@ export interface RedisBatchPreviewResponse {
   truncated: boolean
 }
 
+export interface RedisExportItem {
+  key: string
+  type: string
+  ttl: number
+  value: unknown
+}
+
+export interface RedisExportPayload {
+  version: string
+  db: number
+  pattern: string
+  items: RedisExportItem[]
+  limit: number
+  truncated: boolean
+}
+
+export interface RedisImportResponse {
+  imported_count: number
+  errors: number
+  errors_detail: ImportErrorDetail[]
+}
+
 // ── MongoDB types (placeholder — P0 not yet implemented) ─────────────────
 
 export interface MongoDatabaseInfo {
@@ -783,6 +811,8 @@ export interface MongoStatsResponse {
 
 export interface MongoImportResponse {
   inserted_count: number
+  errors: number
+  errors_detail: ImportErrorDetail[]
 }
 
 export interface MongoObjectIdInfo {
@@ -849,6 +879,7 @@ export interface ESDocument {
 export interface ESImportResponse {
   imported_count: number
   errors: number
+  errors_detail: ImportErrorDetail[]
 }
 
 export interface ESHistoryEntry {

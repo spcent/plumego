@@ -20,6 +20,9 @@ const (
 	MaxMongoQueryLimit        = 500
 	MaxESSearchSize           = 500
 	MaxBulkImportDocuments    = 10_000
+	DefaultRedisExportKeys    = 1_000
+	MaxRedisExportKeys        = 10_000
+	MaxRedisContainerEntries  = 10_000
 )
 
 func decodeJSONLimited(w http.ResponseWriter, r *http.Request, logger plumelog.StructuredLogger, dst any) bool {

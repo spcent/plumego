@@ -45,3 +45,34 @@ func TestDecodeJSONLimitedRejectsLargeBody(t *testing.T) {
 		t.Fatalf("body = %s, want payload_too_large", rec.Body.String())
 	}
 }
+
+func TestParseMongoImportData(t *testing.T) {
+	docs, errs := parseMongoImportData(`[{"name":"a"},{"name":"b"}]`, "json")
+	if len(errs) != 0 {
+		t.Fatalf("parse errors = %v, want none", errs)
+	}
+	if len(docs) != 2 {
+		t.Fatalf("docs = %d, want 2", len(docs))
+	}
+
+	docs, errs = parseMongoImportData("{\"name\":\"a\"}\nnot-json\n{\"name\":\"b\"}", "ndjson")
+	if len(docs) != 2 {
+		t.Fatalf("ndjson docs = %d, want 2", len(docs))
+	}
+	if len(errs) != 1 || errs[0].Index != 2 {
+		t.Fatalf("ndjson errors = %#v, want line 2 error", errs)
+	}
+}
+
+func TestZSetMembers(t *testing.T) {
+	members, err := zsetMembers([]any{
+		map[string]any{"member": "a", "score": 1.5},
+		map[string]any{"member": "b", "score": 2.0},
+	})
+	if err != nil {
+		t.Fatalf("zsetMembers error = %v", err)
+	}
+	if len(members) != 2 || members[0].Member != "a" || members[0].Score != 1.5 {
+		t.Fatalf("members = %#v", members)
+	}
+}

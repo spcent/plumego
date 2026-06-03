@@ -4,10 +4,12 @@ import (
 	"context"
 	"encoding/csv"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/spcent/plumego/contract"
@@ -1650,6 +1652,8 @@ func (h MongoDBHandler) ImportDocuments(w http.ResponseWriter, r *http.Request) 
 		Database   string `json:"database"`
 		Collection string `json:"collection"`
 		Documents  []any  `json:"documents"`
+		Data       string `json:"data"`
+		Format     string `json:"format"`
 		Confirm    bool   `json:"confirm"`
 	}
 
@@ -1665,6 +1669,27 @@ func (h MongoDBHandler) ImportDocuments(w http.ResponseWriter, r *http.Request) 
 	if err := validateName(req.Collection); err != nil {
 		h.badRequest(w, r, "invalid collection name: "+err.Error())
 		return
+	}
+
+	if req.Format == "" {
+		req.Format = "json"
+	}
+	if req.Format != "json" && req.Format != "ndjson" {
+		h.badRequest(w, r, "format must be json or ndjson")
+		return
+	}
+
+	if len(req.Documents) == 0 && strings.TrimSpace(req.Data) != "" {
+		docs, parseErrors := parseMongoImportData(req.Data, req.Format)
+		if len(parseErrors) > 0 {
+			logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+				Type(contract.TypeBadRequest).
+				Message("import data contains invalid documents").
+				Detail("errors_detail", parseErrors).
+				Build()))
+			return
+		}
+		req.Documents = docs
 	}
 
 	if !req.Confirm {
@@ -1728,21 +1753,72 @@ func (h MongoDBHandler) ImportDocuments(w http.ResponseWriter, r *http.Request) 
 		}
 	}
 
-	result, err := client.Database(req.Database).Collection(req.Collection).InsertMany(ctx, docs)
+	result, err := client.Database(req.Database).Collection(req.Collection).InsertMany(ctx, docs, options.InsertMany().SetOrdered(false))
+	errorsDetail := mongoImportErrors(err)
 	if err != nil {
-		h.Logger.Error("import documents failed", plumelog.Fields{
+		h.Logger.Warn("import documents completed with errors", plumelog.Fields{
 			"connection_id": connID,
 			"database":      req.Database,
 			"collection":    req.Collection,
 			"error":         err.Error(),
 		})
-		h.internalErr(w, r, err)
-		return
 	}
 
+	insertedCount := 0
+	if result != nil {
+		insertedCount = len(result.InsertedIDs)
+	}
 	logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusOK, map[string]any{
-		"inserted_count": len(result.InsertedIDs),
+		"inserted_count": insertedCount,
+		"errors":         len(errorsDetail),
+		"errors_detail":  errorsDetail,
 	}, nil))
+}
+
+func parseMongoImportData(data, format string) ([]any, []importErrorDetail) {
+	switch format {
+	case "ndjson":
+		lines := strings.Split(data, "\n")
+		docs := make([]any, 0, len(lines))
+		var errs []importErrorDetail
+		for i, line := range lines {
+			line = strings.TrimSpace(line)
+			if line == "" {
+				continue
+			}
+			var doc map[string]any
+			if err := json.Unmarshal([]byte(line), &doc); err != nil {
+				errs = append(errs, importErrorDetail{Index: i + 1, Snippet: truncate(line, 120), Error: err.Error()})
+				continue
+			}
+			docs = append(docs, doc)
+		}
+		return docs, errs
+	default:
+		var docs []any
+		if err := json.Unmarshal([]byte(data), &docs); err != nil {
+			return nil, []importErrorDetail{{Index: 1, Snippet: truncate(data, 120), Error: err.Error()}}
+		}
+		return docs, nil
+	}
+}
+
+func mongoImportErrors(err error) []importErrorDetail {
+	if err == nil {
+		return nil
+	}
+	var bwe mongo.BulkWriteException
+	if errors.As(err, &bwe) {
+		details := make([]importErrorDetail, 0, len(bwe.WriteErrors))
+		for _, writeErr := range bwe.WriteErrors {
+			details = append(details, importErrorDetail{
+				Index: writeErr.Index + 1,
+				Error: writeErr.Message,
+			})
+		}
+		return details
+	}
+	return []importErrorDetail{{Index: 0, Error: err.Error()}}
 }
 
 // ParseObjectId parses an ObjectId and returns its components.
