@@ -19,7 +19,7 @@ canonical_authority:
   quality:
     - docs/operations/agent-code-quality-rules.md
   architecture:
-    - docs/concepts/agent-first-repo-blueprint.md
+    - AGENTS.md
   maturity:
     - docs/concepts/extension-maturity.md
     - specs/extension-maturity.yaml

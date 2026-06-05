@@ -135,7 +135,7 @@ under `internal/checks/` enforce the most important boundaries locally and in
 CI, so automated changes produce reviewable evidence instead of relying on
 implicit convention. See [`docs/concepts/agent-first.md`](./docs/concepts/agent-first.md) for the
 external model and adoption path, and
-[`docs/operations/agent-first-operating-reference.md`](./docs/operations/agent-first-operating-reference.md)
+[`AGENTS.md`](./AGENTS.md)
 for the detailed internal operating reference.
 
 ## Getting Help

@@ -61,17 +61,14 @@ Use the smallest context package that can safely complete the task.
 - `control-plane`: workflow, architecture, quality, or spec changes
 
 See `docs/operations/agent-context-budget.md` for package contents, split thresholds, and
-resume discipline.
+resume discipline. Use `specs/stop-condition-handlers.yaml` for deterministic
+resolution when hitting stop conditions.
 
 Split work before implementation when the expected scope spans more than one
 primary module, more than five files, more than three validation commands, or
 unclear API, dependency, security, or boundary impact.
 
-## 5. Stop Conditions
-
-Stop conditions are in `AGENTS.md §4`. Use `specs/stop-condition-handlers.yaml` for the deterministic resolution path.
-
-## 6. Recipes
+## 5. Recipes
 
 Before writing a bespoke workflow, check whether one of these recipes already
 matches the task:
@@ -92,7 +89,7 @@ matches the task:
 - `specs/change-recipes/add-ai-tool.yaml`
 - `specs/change-recipes/add-grpc-method.yaml`
 
-## 7. Prompt Shapes
+## 6. Prompt Shapes
 
 ### Analysis
 

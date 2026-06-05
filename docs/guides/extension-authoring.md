@@ -42,7 +42,7 @@ as forbidden.
 
 ```yaml
 name: rpc
-module_path: github.com/spcent/plumego/x/rpc
+module_path: github.com/acme/plumego-rpc
 status: experimental
 handler_shape: "func(http.ResponseWriter, *http.Request)"
 test_commands:

@@ -121,48 +121,10 @@ family status as applying to all subpackages.
 
 ## Maturity Ladder
 
-All `x/*` packages start as `experimental`. Promotion is explicit and requires
-meeting the criteria in `docs/reference/extension-stability-policy.md`.
-
-| Status | Meaning | Adoption guidance |
-|---|---|---|
-| `experimental` | API shape may change; no compatibility expectation | Use for evaluation, prototyping, or when you own the upgrade risk |
-| `beta` | API stable within current major version; breaking changes require deprecation | Acceptable for production use in clearly scoped scenarios |
-| `ga` | Full v1 compatibility promise; follows `docs/reference/deprecation.md` | Default production choice |
+All `x/*` packages start as `experimental`. For status definitions, promotion
+criteria, and compatibility policy, see `docs/reference/extension-stability-policy.md`.
 
 Current status of all families: `docs/concepts/extension-maturity.md`.
-
----
-
-## Promotion Criteria Summary
-
-### `experimental` → `beta`
-
-All of the following must be true:
-
-1. No exported symbol changes for at least two consecutive minor releases.
-2. Passes `go run ./internal/checks/dependency-rules` with no violations.
-3. Unit tests cover all documented public behavior paths including negative paths,
-   and run cleanly with `go test -race ./...`.
-4. `module.yaml` is complete and schema-valid.
-5. A primer document exists in `docs/modules/<family>/README.md`.
-6. A beta evidence document exists in `docs/evidence/extension/<family>.md`.
-7. Owner sign-off is recorded in `specs/extension-beta-evidence.yaml`.
-
-### `beta` → `ga`
-
-All of the following must be true:
-
-1. `beta` status has been held across at least two minor releases with no
-   exported API changes.
-2. Multiple concrete reference uses exist (reference apps or real production
-   use).
-3. No outstanding known bugs that affect documented behavior.
-4. Full compatibility and deprecation policy aligned with `docs/reference/deprecation.md`.
-5. Security, concurrency, and boundary tests are comprehensive.
-
-Promotion is recorded in a dedicated promotion card in `tasks/cards/`. It is
-never done inline with feature work.
 
 ---
 

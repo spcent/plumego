@@ -80,7 +80,7 @@ func annotateDepRules(v string) annotation {
 			return annotation{
 				fix:   "Library packages must not import reference apps. Reference apps are application wiring examples, not library dependencies.",
 				rule:  "specs/dependency-rules.yaml — library_must_not_depend_on_reference",
-				guide: "docs/concepts/agent-first-repo-blueprint.md",
+				guide: "AGENTS.md",
 			}
 		}
 		if imp == "github.com/spcent/plumego" {
@@ -197,7 +197,7 @@ func annotateAgentWorkflow(v string) annotation {
 		return annotation{
 			fix:   fmt.Sprintf("Add %q to the paths list under layers.extension in specs/repo.yaml, OR remove the directory if it was created by mistake.", pkg),
 			rule:  "specs/repo.yaml — layers.extension.paths",
-			guide: "docs/concepts/agent-first-repo-blueprint.md",
+			guide: "AGENTS.md",
 		}
 	}
 	if strings.Contains(v, "references missing start_with path") {
@@ -225,7 +225,7 @@ func annotateAgentWorkflow(v string) annotation {
 		return annotation{
 			fix:   "Remove the empty directory, or add real package contents (at minimum a doc.go or a .go source file).",
 			rule:  "AGENTS.md",
-			guide: "docs/concepts/agent-first-repo-blueprint.md",
+			guide: "AGENTS.md",
 		}
 	}
 	if strings.Contains(v, "primary family must declare subordinate_families") {
@@ -247,7 +247,7 @@ func annotateReferenceLayout(v string) annotation {
 		return annotation{
 			fix:   fmt.Sprintf("Remove the import of %q from reference/standard-service. The canonical reference app must depend only on stable roots and stdlib. Move this usage to a scenario reference app (reference/with-*) or to the owning x/* package.", imp),
 			rule:  "specs/dependency-rules.yaml — library_must_not_depend_on_reference / reference app purity",
-			guide: "docs/concepts/agent-first-repo-blueprint.md",
+			guide: "AGENTS.md",
 		}
 	}
 	if strings.Contains(v, "missing required path") {
@@ -255,7 +255,7 @@ func annotateReferenceLayout(v string) annotation {
 		return annotation{
 			fix:   fmt.Sprintf("Create the required file or directory: %s", path),
 			rule:  "internal/checks/reference-layout",
-			guide: "docs/concepts/agent-first-repo-blueprint.md",
+			guide: "AGENTS.md",
 		}
 	}
 	if strings.Contains(v, "x/* taxonomy") {

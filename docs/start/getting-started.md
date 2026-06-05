@@ -237,7 +237,7 @@ Read these next, in order:
 2. `reference/standard-service`
 3. `docs/README.md`
 4. `docs/reference/canonical-style-guide.md`
-5. `docs/concepts/agent-first-repo-blueprint.md`
+5. `AGENTS.md` (repository structure and agent operating model)
 6. `specs/task-routing.yaml`
 7. the target module's `module.yaml`
 
