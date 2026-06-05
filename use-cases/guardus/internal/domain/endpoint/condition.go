@@ -226,7 +226,7 @@ func prettifyNumericalParameters(parameters []string, resolvedParameters []int64
 			resolvedStrings[i] = formatDuration(duration)
 		} else {
 			// Format as integer
-			resolvedStrings[i] = strconv.Itoa(int(resolvedParameters[i]))
+			resolvedStrings[i] = strconv.FormatInt(resolvedParameters[i], 10)
 		}
 	}
 	return prettify(parameters, resolvedStrings, operator)

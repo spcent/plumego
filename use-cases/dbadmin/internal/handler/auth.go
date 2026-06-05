@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/json"
 	"net"
@@ -138,9 +137,7 @@ func (h AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 }
 
 func secureEqual(a, b string) bool {
-	ha := sha256.Sum256([]byte(a))
-	hb := sha256.Sum256([]byte(b))
-	return subtle.ConstantTimeCompare(ha[:], hb[:]) == 1
+	return subtle.ConstantTimeCompare([]byte(a), []byte(b)) == 1
 }
 
 func secureCookie(r *http.Request) bool {
