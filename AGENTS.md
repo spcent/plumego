@@ -10,7 +10,7 @@ Conflict order: (1) security/boundary rules here → (2) `docs/reference/canonic
 
 Companion docs: `docs/operations/codex-workflow.md` (workflow), `docs/operations/agent-context-budget.md` (context packages), `docs/operations/agent-code-quality-rules.md` (quality + gate profiles), `docs/reference/canonical-style-guide.md` (style), `docs/concepts/extension-maturity.md` (maturity), `docs/concepts/` (boundary docs).
 
-Machine-readable specs: `task-routing.yaml`, `checks.yaml`, `dependency-rules.yaml`, `extension-taxonomy.yaml`, `module-manifest.schema.yaml`, `stop-condition-handlers.yaml`, `agent-quality-rules.yaml`, `change-recipes/`.
+Machine-readable specs: `specs/task-routing.yaml`, `specs/checks.yaml`, `specs/dependency-rules.yaml`, `specs/extension-taxonomy.yaml`, `specs/module-manifest.schema.yaml`, `specs/stop-condition-handlers.yaml`, `specs/agent-quality-rules.yaml`, `specs/change-recipes/`.
 
 CLI: `go run ./cmd/plumego --help`. Bundles: `make bundle TASK=<recipe> MODULE=<path>`.
 
