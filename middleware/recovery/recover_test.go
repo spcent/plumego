@@ -1,9 +1,11 @@
 package recovery
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"errors"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"sync"
@@ -388,6 +390,217 @@ func TestRecoveryResponseWriterUnwrap(t *testing.T) {
 }
 
 // Benchmarks remain to ensure middleware overhead stays bounded.
+// --- NEW COVERAGE TESTS ---
+
+// flusherResponseRecorder is an httptest.ResponseRecorder that also implements http.Flusher.
+type flusherResponseRecorder struct {
+	*httptest.ResponseRecorder
+	flushed int
+}
+
+func (f *flusherResponseRecorder) Flush() {
+	f.flushed++
+	f.ResponseRecorder.Flush()
+}
+
+// hijackerResponseRecorder is an http.ResponseWriter that also implements http.Hijacker.
+type hijackerResponseRecorder struct {
+	*httptest.ResponseRecorder
+	hijacked bool
+}
+
+func (h *hijackerResponseRecorder) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	h.hijacked = true
+	server, client := net.Pipe()
+	_ = client.Close()
+	rw := bufio.NewReadWriter(bufio.NewReader(server), bufio.NewWriter(server))
+	return server, rw, nil
+}
+
+// TestRecoveryResponseWriterFlush verifies that Flush is forwarded to the underlying
+// writer when it implements http.Flusher, and that wrote is set to true first.
+func TestRecoveryResponseWriterFlush(t *testing.T) {
+	logger := log.NewLogger(log.LoggerConfig{Format: log.LoggerFormatDiscard})
+	flushed := false
+	handler := mustRecovery(t, logger)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Flush before any write: triggers WriteHeader(200) + flush.
+		if f, ok := w.(http.Flusher); ok {
+			f.Flush()
+			flushed = true
+		} else {
+			t.Error("expected Flusher interface on recovery writer")
+		}
+		_, _ = w.Write([]byte("ok"))
+	}))
+
+	underlying := &flusherResponseRecorder{ResponseRecorder: httptest.NewRecorder()}
+	req := httptest.NewRequest(http.MethodGet, "/flush", nil)
+	handler.ServeHTTP(underlying, req)
+
+	if !flushed {
+		t.Fatal("handler did not flush")
+	}
+	if underlying.flushed == 0 {
+		t.Fatal("Flush was not forwarded to underlying writer")
+	}
+	if underlying.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", underlying.Code)
+	}
+}
+
+// TestRecoveryResponseWriterFlushAfterWrite verifies Flush after a Write does not
+// call WriteHeader again.
+func TestRecoveryResponseWriterFlushAfterWrite(t *testing.T) {
+	logger := log.NewLogger(log.LoggerConfig{Format: log.LoggerFormatDiscard})
+	handler := mustRecovery(t, logger)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte("data"))
+		if f, ok := w.(http.Flusher); ok {
+			f.Flush()
+		}
+	}))
+
+	underlying := &flusherResponseRecorder{ResponseRecorder: httptest.NewRecorder()}
+	req := httptest.NewRequest(http.MethodGet, "/flush2", nil)
+	handler.ServeHTTP(underlying, req)
+
+	if underlying.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", underlying.Code)
+	}
+	if underlying.flushed == 0 {
+		t.Fatal("Flush was not forwarded to underlying writer after write")
+	}
+}
+
+// TestRecoveryResponseWriterHijack verifies that Hijack is forwarded through the
+// recovery writer and that wrote is set to true afterward.
+func TestRecoveryResponseWriterHijack(t *testing.T) {
+	logger := log.NewLogger(log.LoggerConfig{Format: log.LoggerFormatDiscard})
+	hijacked := false
+	handler := mustRecovery(t, logger)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hj, ok := w.(http.Hijacker)
+		if !ok {
+			t.Error("expected Hijacker interface on recovery writer")
+			return
+		}
+		conn, _, err := hj.Hijack()
+		if err != nil {
+			t.Errorf("Hijack failed: %v", err)
+			return
+		}
+		hijacked = true
+		_ = conn.Close()
+	}))
+
+	underlying := &hijackerResponseRecorder{ResponseRecorder: httptest.NewRecorder()}
+	req := httptest.NewRequest(http.MethodGet, "/hijack", nil)
+	handler.ServeHTTP(underlying, req)
+
+	if !hijacked {
+		t.Fatal("handler did not successfully hijack")
+	}
+	if !underlying.hijacked {
+		t.Fatal("Hijack was not forwarded to underlying writer")
+	}
+}
+
+// TestRecoveryResponseWriterHijackNotSupported verifies that Hijack returns an error
+// when the underlying writer does not implement http.Hijacker.
+func TestRecoveryResponseWriterHijackNotSupported(t *testing.T) {
+	w := &recoveryResponseWriter{ResponseWriter: httptest.NewRecorder()}
+	_, _, err := w.Hijack()
+	if err == nil {
+		t.Fatal("expected error when underlying writer does not support Hijack")
+	}
+}
+
+// TestRecoveryResponseWriterWriteHeader_Idempotent verifies that calling WriteHeader
+// twice only writes the first status code.
+func TestRecoveryResponseWriterWriteHeader_Idempotent(t *testing.T) {
+	underlying := httptest.NewRecorder()
+	w := &recoveryResponseWriter{ResponseWriter: underlying}
+
+	w.WriteHeader(http.StatusCreated)
+	w.WriteHeader(http.StatusNotFound) // second call should be ignored
+
+	if underlying.Code != http.StatusCreated {
+		t.Fatalf("status = %d, want %d", underlying.Code, http.StatusCreated)
+	}
+}
+
+// TestRecoveryResponseWriterWrite_SetsWrote verifies that Write triggers WriteHeader(200)
+// when no status has been set yet.
+func TestRecoveryResponseWriterWrite_SetsWrote(t *testing.T) {
+	underlying := httptest.NewRecorder()
+	w := &recoveryResponseWriter{ResponseWriter: underlying}
+
+	n, err := w.Write([]byte("hello"))
+	if err != nil {
+		t.Fatalf("Write error: %v", err)
+	}
+	if n != 5 {
+		t.Fatalf("Write n = %d, want 5", n)
+	}
+	if underlying.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", underlying.Code)
+	}
+	if !w.wrote {
+		t.Fatal("wrote flag should be true after Write")
+	}
+}
+
+// TestPanicTypeNil verifies panicType("unknown") when rec is nil.
+// Note: recover() on a nil panic returns nil in Go, but we test panicType directly.
+func TestPanicTypeNil(t *testing.T) {
+	if got := panicType(nil); got != "unknown" {
+		t.Fatalf("panicType(nil) = %q, want %q", got, "unknown")
+	}
+}
+
+// TestPanicTypeString verifies panicType reports the correct type for a string value.
+func TestPanicTypeString(t *testing.T) {
+	if got := panicType("boom"); got != "string" {
+		t.Fatalf("panicType(string) = %q, want string", got)
+	}
+}
+
+// TestPanicTypeError verifies panicType reports the correct type for an error value.
+func TestPanicTypeError(t *testing.T) {
+	if got := panicType(errors.New("err")); got != "*errors.errorString" {
+		t.Fatalf("panicType(error) = %q, want *errors.errorString", got)
+	}
+}
+
+// TestPanicTypeStruct verifies panicType reports the type for an arbitrary struct.
+func TestPanicTypeStruct(t *testing.T) {
+	type myStruct struct{ v int }
+	got := panicType(myStruct{})
+	if got != "recovery.myStruct" {
+		t.Fatalf("panicType(struct) = %q, want recovery.myStruct", got)
+	}
+}
+
+// TestRecoveryPanicNil tests that a nil panic is recovered and a 500 is returned.
+// Note: panic(nil) in Go returns nil from recover(), so panicType returns "unknown".
+func TestRecoveryPanicNil(t *testing.T) {
+	logger := &recordingLogger{}
+	handler := mustRecovery(t, logger)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		//nolint:staticcheck // SA1012: intentional nil panic to exercise panicType
+		panic((*int)(nil)) // typed nil - recover() sees a non-nil value
+	}))
+
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", nil))
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want 500", rec.Code)
+	}
+	logger.mu.Lock()
+	defer logger.mu.Unlock()
+	if logger.errCount != 1 {
+		t.Fatalf("errCount = %d, want 1", logger.errCount)
+	}
+}
+
 func BenchmarkRecoveryMiddleware_NoPanic(b *testing.B) {
 	logger := log.NewLogger(log.LoggerConfig{Format: log.LoggerFormatDiscard})
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

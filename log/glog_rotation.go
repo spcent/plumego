@@ -94,35 +94,40 @@ func (l *gLogger) fileLevelsForLog(level Level) []Level {
 	return levels
 }
 
-// checkLogRotation checks if the log file needs rotation based on size
+// checkLogRotation checks if the log file needs rotation based on size.
 func (l *gLogger) checkLogRotation(level Level, logSize int64) error {
-	l.mu.Lock()
-	config := l.rotationConfig
-	if config.MaxSize <= 0 {
-		l.mu.Unlock()
-		return nil
-	}
-
-	l.currentSize[level] += logSize
-	if l.currentSize[level] < int64(config.MaxSize)*1024*1024 {
-		l.mu.Unlock()
-		return nil
-	}
-
-	// Reset current size and rotate log file
-	l.currentSize[level] = 0
-	err := l.rotateLogFile(level)
-	logDir := l.logDir
-	program := l.program
-	current := currentLogFiles(l.logFiles)
-	l.mu.Unlock()
-
-	if err != nil {
+	logDir, program, config, current, rotated, err := l.rotateIfNeeded(level, logSize)
+	if err != nil || !rotated {
 		return err
 	}
-
 	cleanupOldLogs(logDir, program, config, current)
 	return nil
+}
+
+// rotateIfNeeded checks rotation under a single deferred lock and reports
+// whether a rotation actually happened (rotated=true) along with the data
+// needed to run cleanupOldLogs outside the lock.
+func (l *gLogger) rotateIfNeeded(level Level, logSize int64) (logDir, program string, config rotationConfig, current map[string]struct{}, rotated bool, err error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	config = l.rotationConfig
+	if config.MaxSize <= 0 {
+		return
+	}
+	l.currentSize[level] += logSize
+	if l.currentSize[level] < int64(config.MaxSize)*1024*1024 {
+		return
+	}
+	l.currentSize[level] = 0
+	if err = l.rotateLogFile(level); err != nil {
+		return
+	}
+	logDir = l.logDir
+	program = l.program
+	current = currentLogFiles(l.logFiles)
+	rotated = true
+	return
 }
 
 // rotateLogFile rotates the log file for the given level
@@ -244,7 +249,9 @@ func cleanupOldLogs(logDir, program string, config rotationConfig, current map[s
 		if config.MaxAge > 0 {
 			maxAge := time.Duration(config.MaxAge) * 24 * time.Hour
 			if now.Sub(info.ModTime()) > maxAge {
-				_ = os.Remove(filepath.Join(logDir, name))
+				if err := os.Remove(filepath.Join(logDir, name)); err != nil && !os.IsNotExist(err) {
+					fmt.Fprintf(os.Stderr, "log: failed to remove aged log %s: %v\n", name, err)
+				}
 				continue
 			}
 		}
@@ -267,7 +274,9 @@ func cleanupOldLogs(logDir, program string, config rotationConfig, current map[s
 			return files[i].modTime.After(files[j].modTime)
 		})
 		for i := config.MaxBackups; i < len(files); i++ {
-			_ = os.Remove(files[i].path)
+			if err := os.Remove(files[i].path); err != nil && !os.IsNotExist(err) {
+				fmt.Fprintf(os.Stderr, "log: failed to remove excess log %s: %v\n", files[i].name, err)
+			}
 		}
 	}
 }

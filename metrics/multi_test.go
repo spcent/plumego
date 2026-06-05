@@ -244,8 +244,12 @@ func TestMultiCollectorClear(t *testing.T) {
 
 func TestMultiCollectorEmpty(t *testing.T) {
 	multi := NewMultiCollector()
-	if multi != nil {
-		t.Fatalf("expected nil multi collector for empty input")
+	if multi == nil {
+		t.Fatalf("expected no-op collector for empty input, got nil")
+	}
+	multi.Record(t.Context(), MetricRecord{Name: "x"})
+	if multi.GetStats().TotalRecords != 0 {
+		t.Fatalf("expected no-op collector to record nothing, got %d", multi.GetStats().TotalRecords)
 	}
 }
 

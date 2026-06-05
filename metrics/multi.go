@@ -11,7 +11,7 @@ type MultiCollector struct {
 }
 
 // NewMultiCollector creates a new multi-collector that forwards to all provided collectors.
-// It returns nil if no non-nil collectors are provided.
+// It returns a no-op collector if no non-nil collectors are provided.
 func NewMultiCollector(collectors ...AggregateCollector) AggregateCollector {
 	filtered := make([]AggregateCollector, 0, len(collectors))
 	for _, collector := range collectors {
@@ -20,7 +20,7 @@ func NewMultiCollector(collectors ...AggregateCollector) AggregateCollector {
 		}
 	}
 	if len(filtered) == 0 {
-		return nil
+		return NewNoopCollector()
 	}
 	if len(filtered) == 1 {
 		return filtered[0]

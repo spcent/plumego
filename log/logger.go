@@ -138,31 +138,28 @@ func (l *defaultLogger) Fatal(msg string, fields ...Fields) {
 
 // DebugCtx logs at DEBUG level with context.
 // When RespectVerbosity is enabled, debug logging is gated on V(1).
-func (l *defaultLogger) DebugCtx(ctx context.Context, msg string, fields ...Fields) {
-	_ = ctx
+// Context is accepted for interface compatibility; this backend does not extract
+// transport metadata from ctx (see StructuredLogger contract).
+func (l *defaultLogger) DebugCtx(_ context.Context, msg string, fields ...Fields) {
 	if l.respectVerbosity && !l.getBackend().vAt(1, 2) {
 		return
 	}
 	l.logWithLevel(DEBUG, msg, mergeFieldArgs(fields))
 }
 
-func (l *defaultLogger) InfoCtx(ctx context.Context, msg string, fields ...Fields) {
-	_ = ctx
+func (l *defaultLogger) InfoCtx(_ context.Context, msg string, fields ...Fields) {
 	l.logWithLevel(INFO, msg, mergeFieldArgs(fields))
 }
 
-func (l *defaultLogger) WarnCtx(ctx context.Context, msg string, fields ...Fields) {
-	_ = ctx
+func (l *defaultLogger) WarnCtx(_ context.Context, msg string, fields ...Fields) {
 	l.logWithLevel(WARNING, msg, mergeFieldArgs(fields))
 }
 
-func (l *defaultLogger) ErrorCtx(ctx context.Context, msg string, fields ...Fields) {
-	_ = ctx
+func (l *defaultLogger) ErrorCtx(_ context.Context, msg string, fields ...Fields) {
 	l.logWithLevel(ERROR, msg, mergeFieldArgs(fields))
 }
 
-func (l *defaultLogger) FatalCtx(ctx context.Context, msg string, fields ...Fields) {
-	_ = ctx
+func (l *defaultLogger) FatalCtx(_ context.Context, msg string, fields ...Fields) {
 	l.logWithLevel(FATAL, msg, mergeFieldArgs(fields))
 }
 

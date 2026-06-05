@@ -168,3 +168,25 @@ func TestMiddlewareContinuesWhenTracerStartPanics(t *testing.T) {
 		t.Fatalf("span id header = %q, want empty", got)
 	}
 }
+
+// TestMiddlewareNilTracerPassthrough exercises the nil-tracer branch in
+// Middleware that returns the next handler directly without wrapping.
+func TestMiddlewareNilTracerPassthrough(t *testing.T) {
+	called := false
+	inner := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		called = true
+		w.WriteHeader(http.StatusNoContent)
+	})
+	handler := Middleware(nil)(inner)
+
+	req := httptest.NewRequest(http.MethodGet, "/passthrough", nil)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if !called {
+		t.Fatal("expected inner handler to be called when tracer is nil")
+	}
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusNoContent)
+	}
+}

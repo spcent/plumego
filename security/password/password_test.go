@@ -91,3 +91,52 @@ func TestPasswordHashAcceptsMaxLengthPassword(t *testing.T) {
 		t.Fatalf("CheckPassword max length: %v", err)
 	}
 }
+
+// TestHashPasswordWithCostInvalidCostTooLow exercises the ErrInvalidCost path
+// when cost is below MinimumCost.
+func TestHashPasswordWithCostInvalidCostTooLow(t *testing.T) {
+	_, err := HashPasswordWithCost("password", MinimumCost-1)
+	if !errors.Is(err, ErrInvalidCost) {
+		t.Fatalf("error = %v, want ErrInvalidCost", err)
+	}
+}
+
+// TestHashPasswordWithCostInvalidCostTooHigh exercises the ErrInvalidCost path
+// when cost is above MaximumCost.
+func TestHashPasswordWithCostInvalidCostTooHigh(t *testing.T) {
+	_, err := HashPasswordWithCost("password", MaximumCost+1)
+	if !errors.Is(err, ErrInvalidCost) {
+		t.Fatalf("error = %v, want ErrInvalidCost", err)
+	}
+}
+
+// TestCheckPasswordInvalidHashFormats covers the various ErrInvalidHash paths
+// in CheckPassword (not enough segments, non-numeric cost, cost out of range,
+// bad salt base64, wrong salt length, bad hash base64, wrong hash length).
+func TestCheckPasswordInvalidHashFormats(t *testing.T) {
+	cases := []struct {
+		name   string
+		hashed string
+	}{
+		{"too few segments", "noCost$onlyTwo"},
+		{"non-numeric cost", "notanint$c2FsdA==$aGFzaA=="},
+		{"cost too low", "99999$c2FsdA==$aGFzaA=="},
+		{"cost too high", "2000001$c2FsdA==$aGFzaA=="},
+		{"bad salt base64", "100000$not!base64$aGFzaA=="},
+		// Valid base64 but wrong decoded length (not 16 bytes).
+		{"wrong salt length", "100000$dGVzdA==$aGFzaA=="},
+		// Valid cost + valid 16-byte salt + bad hash base64.
+		{"bad hash base64", "100000$AAAAAAAAAAAAAAAAAAAAAA==$not!base64"},
+		// Valid cost + valid 16-byte salt + valid base64 but wrong hash length (not 32 bytes).
+		{"wrong hash length", "100000$AAAAAAAAAAAAAAAAAAAAAA==$aGFzaA=="},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := CheckPassword(tc.hashed, "password")
+			if !errors.Is(err, ErrInvalidHash) {
+				t.Fatalf("CheckPassword(%q) error = %v, want ErrInvalidHash", tc.hashed, err)
+			}
+		})
+	}
+}
