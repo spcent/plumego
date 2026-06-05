@@ -174,90 +174,11 @@ If any box is unchecked, start in `x/*` or `reference/` instead.
 
 ---
 
-## Wiring Patterns
-
-### Constructor injection — required
-
-```go
-// Correct: caller constructs, caller owns
-logger := plog.NewLogger(cfg.Log)
-db := sql.Open("postgres", cfg.DB.DSN)
-app := core.New(cfg.Core, core.AppDependencies{
-    Logger: logger,
-})
-```
-
-```go
-// Incorrect: hidden global, caller loses control
-core.SetGlobalLogger(logger)
-app := core.Default()
-```
-
-### Caller-owned lifecycle — required
-
-```go
-// Correct: shutdown is explicit, context is caller-controlled
-ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
-defer cancel()
-if err := app.Shutdown(ctx); err != nil {
-    log.Printf("shutdown: %v", err)
-}
-```
-
-```go
-// Incorrect: framework owns the process
-framework.Run(":8080") // hides signal handling, TLS config, shutdown
-```
-
-### Explicit extension mounting — required
-
-```go
-// Correct: caller decides what is exposed and under which path
-debugHandler := devtools.NewHandler(cfg.Debug)
-app.Mount("/_debug", authMiddleware(debugHandler))
-```
-
-```go
-// Incorrect: extension self-registers
-devtools.Enable() // unknown path, unknown auth, hidden behavior
-```
-
-### App-local configuration — required
-
-```go
-// Correct: caller controls all parameters
-cfg := core.DefaultConfig()
-cfg.Addr = ":8080"
-cfg.ReadTimeout = 5 * time.Second
-cfg.WriteTimeout = 10 * time.Second
-```
-
-```go
-// Incorrect: framework reads environment without caller involvement
-core.AutoConfig() // opaque, untestable, hard to override
-```
-
----
-
 ## What Belongs in `x/*` Instead
 
 When a capability does not meet the checklist above, it belongs in an `x/*`
-extension family. Common examples:
-
-| Capability | Correct location | Reason |
-|---|---|---|
-| Redis cache | `x/data/cache` or `x/data` | External dependency |
-| Tenant resolution and policy | `x/tenant` | Business topology |
-| WebSocket hub | `x/websocket` | Not universal transport need |
-| Admin and ops routes | `x/observability/ops` | Requires explicit auth boundary |
-| OpenTelemetry exporters | `x/observability` | Ecosystem-specific |
-| REST resource controllers | `x/rest` | Convention layer, not HTTP kernel |
-| Circuit breaker | `x/resilience` | Optional reliability primitive |
-| Message queue integration | `x/messaging` / `x/messaging/mq` | External system dependency |
-
-The test: if removing the capability from `x/*` leaves the stable root intact
-and all service code still compiles against the stable root, the separation is
-correct.
+extension family. For wiring patterns (constructor injection, lifecycle,
+mounting, configuration), see `docs/reference/canonical-style-guide.md`.
 
 ---
 

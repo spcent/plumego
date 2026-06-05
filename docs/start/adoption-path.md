@@ -71,15 +71,14 @@ capability family is added.
 
 Read:
 
-1. `AGENTS.md`
+1. `AGENTS.md` (repository structure and agent operating model)
 2. `docs/operations/agent-context-budget.md`
 3. `docs/operations/codex-workflow.md`
 4. `docs/reference/canonical-style-guide.md`
-5. `AGENTS.md` (repository structure and agent operating model)
-6. `specs/task-routing.yaml`
-7. `specs/repo.yaml`
-8. `specs/dependency-rules.yaml`
-9. the target module's `module.yaml`
+5. `specs/task-routing.yaml`
+6. `specs/repo.yaml`
+7. `specs/dependency-rules.yaml`
+8. the target module's `module.yaml`
 
 Done when a developer or agent can answer:
 

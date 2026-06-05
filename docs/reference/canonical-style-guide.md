@@ -309,63 +309,20 @@ Rules:
 
 ---
 
-## 14. Prompt Contracts for AI Agents
+## 14. Agent Workflow and Repo Rules
 
-High-quality agent tasks should specify:
+For agent task contracts, working modes, anti-patterns, and repo rules, see
+`AGENTS.md` §2 (Non-Negotiables), §4 (Working Contract), §5 (Change Rules),
+and §9 (Anti-Patterns).
 
-- goal
-- in-scope paths
-- out-of-scope paths
-- owning module or entrypoint
-- public API and dependency policy
-- required tests
-- validation commands
-- done definition
+Style-guide-specific additions:
 
-When the request is ambiguous or broad:
-
-- first run an analysis-only pass
-- split large work into small reversible cards
-- delay code edits until module ownership and scope are explicit
-
-When the task changes or removes an exported symbol:
-
-- enumerate callers first with `rg`
-- update every caller in the same change
-- verify zero residual references before handoff
-
-Review requests are different from implementation requests:
-
-- findings first
-- no code changes unless explicitly requested
-- prioritize boundaries, regressions, concurrency, and missing tests
-
-## 15. Rules for AI Agents
-
-Default behavior:
-- Prefer stdlib-shaped solutions
-- Follow this guide over package convenience APIs when both are possible
-- Preserve existing canonical patterns when editing nearby files
-- Treat broad bucket names (`utils`, `validator`, `rest`, `pubsub`, `tenant`) as migration debt, not expansion targets
-
-## 16. Agent-First Repo Rules
-
-- Start app-structure work from `reference/standard-service`
-- Keep each change centered on one primary module when possible
-- Prefer adding a new focused extension package over widening a stable root
-- Do not introduce new catch-all middleware buckets or protocol family roots
-- Keep scaffolds, docs, and the reference app synchronized
-- Avoid hidden context-based dependency flow
-- Avoid new wrapper abstractions unless justified
-
-Do not introduce:
-- New response helper families
-- New handler signatures
-- New route registration idioms
-- New service locator patterns
-- New implicit DTO flow through middleware
-- New business logic inside middleware
-- New package roles that blur core boundaries
+- Follow this guide over package convenience APIs when both are possible.
+- Preserve existing canonical patterns when editing nearby files.
+- Keep scaffolds, docs, and the reference app synchronized.
+- Review requests differ from implementation: findings-first, no code changes
+  unless explicitly requested, prioritize boundaries, regressions, concurrency,
+  and missing tests.
 
 ---
 
