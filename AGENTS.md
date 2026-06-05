@@ -1,62 +1,59 @@
 # AGENTS.md - plumego
 
-Operational guide for AI coding agents working in `github.com/spcent/plumego`.
-
-Go module: `github.com/spcent/plumego` | Go 1.26+ | Main module: stdlib only unless approved
+Operational guide for AI coding agents in `github.com/spcent/plumego`. Go 1.26+. Main module: stdlib only unless approved.
 
 ## 1. Authority
 
-Default read path: `AGENTS.md` → matching `specs/task-routing.yaml` entry → its `start_with` files → target `<module>/module.yaml` → extra docs only when preflight identifies a concrete need.
+Read path: `AGENTS.md` → matching `specs/task-routing.yaml` entry → its `start_with` files → target `<module>/module.yaml` → extra docs only when preflight identifies a concrete need.
 
-Companion docs: `docs/operations/codex-workflow.md` (workflow), `docs/operations/agent-context-budget.md` (context packages), `docs/operations/agent-code-quality-rules.md` (quality + gate profiles), `docs/reference/canonical-style-guide.md` (style), `docs/concepts/extension-maturity.md` (maturity), `docs/concepts/` (boundary docs).
+Companion docs: `docs/operations/codex-workflow.md` (workflow), `docs/operations/agent-context-budget.md` (context packages), `docs/operations/agent-code-quality-rules.md` (quality + gate profiles), `docs/reference/canonical-style-guide.md` (style), `docs/concepts/extension-maturity.md` (maturity), `docs/concepts/` (boundaries).
 
-Machine-readable: `specs/task-routing.yaml`, `specs/checks.yaml`, `specs/dependency-rules.yaml`, `specs/extension-taxonomy.yaml`, `specs/module-manifest.schema.yaml`, `specs/stop-condition-handlers.yaml`, `specs/agent-quality-rules.yaml`, `specs/change-recipes/`. Canonical wiring: `reference/standard-service`.
+Machine-readable specs under `specs/`: `task-routing.yaml`, `checks.yaml`, `dependency-rules.yaml`, `extension-taxonomy.yaml`, `module-manifest.schema.yaml`, `stop-condition-handlers.yaml`, `specs/agent-quality-rules.yaml`, `change-recipes/`. Canonical wiring: `reference/standard-service`.
 
-CLI tool: `cmd/plumego` provides agent-assist commands, validation runners, code generation, dev server, scaffold, and task bundling. Run `go run ./cmd/plumego --help` to explore subcommands; `make bundle TASK=<recipe> MODULE=<path>` generates task execution bundles.
+CLI `cmd/plumego`: agent-assist, validation runners, codegen, dev server, scaffold, task bundling. `go run ./cmd/plumego --help`; `make bundle TASK=<recipe> MODULE=<path>` builds task bundles.
 
-Conflict order: (1) security/boundary rules here → (2) `docs/reference/canonical-style-guide.md` → (3) machine-readable specs → (4) existing local patterns.
+Conflict order: (1) security/boundary rules here → (2) `canonical-style-guide.md` → (3) machine-readable specs → (4) existing local patterns.
 
 ## 2. Non-Negotiables
 
 - Preserve `net/http` compatibility.
-- Keep the main module dependency-free beyond the standard library unless explicitly approved.
-- Do not add `go.mod` anywhere under `x/**`; extension packages remain part of the main module.
-- Reference apps under `reference/` MAY have an independent `go.mod` for external deps; use a `replace` directive and document the rationale. Use-case apps under `use-cases/` follow the same rule (e.g. `use-cases/workerfleet` for MongoDB, `use-cases/cloud-vault` for multi-feature service wiring, `use-cases/dbadmin` for admin tooling, `use-cases/guardus` for security-focused services).
+- Main module stays dependency-free beyond stdlib unless explicitly approved.
+- No `go.mod` under `x/**`; extensions stay part of the main module.
+- Reference apps (`reference/`) and use-case apps (`use-cases/`) MAY have an independent `go.mod` for external deps via a `replace` directive with documented rationale (e.g. `workerfleet`=MongoDB, `cloud-vault`=multi-feature wiring, `dbadmin`=admin tooling, `guardus`=security services).
 - Stable roots must not import `x/*`.
-- Do not introduce hidden globals, `init()` registration, or context service-locator patterns.
+- No hidden globals, `init()` registration, or context service-locator patterns.
 - Never log secrets, tokens, signatures, or private keys.
-- Fail closed on auth, verification, and policy errors.
-- Use timing-safe comparison for secret checks.
-- Context accessors use `With{Type}` plus `{Type}FromContext`; key types are unexported zero-value structs inlined at the call site.
-- `contract` owns transport primitives only (response/error helpers, metadata, accessors, binding); one canonical success-response and error-construction path per layer.
-- Deprecated symbols must be removed in the same PR that replaces their last caller. Do not leave dead wrappers behind.
+- Fail closed on auth, verification, and policy errors. Use timing-safe comparison for secret checks.
+- Context accessors: `With{Type}` + `{Type}FromContext`; key types are unexported zero-value structs inlined at the call site.
+- `contract` owns transport primitives only (response/error helpers, metadata, accessors, binding); one canonical success-response and error path per layer.
+- Remove deprecated symbols in the same PR that replaces their last caller; leave no dead wrappers.
 
 ## 3. Where To Work
 
-Stable roots: `core`, `router`, `contract`, `middleware`, `security`, `store`, `health`, `log`, `metrics`
+Stable roots: `core`, `router`, `contract`, `middleware`, `security`, `store`, `health`, `log`, `metrics`.
 
-Extension roots: `x/ai`, `x/data`, `x/fileapi`, `x/frontend`, `x/gateway`, `x/messaging`, `x/observability`, `x/openapi`, `x/resilience`, `x/rest`, `x/rpc`, `x/tenant`, `x/validate`, `x/websocket`
+Extension roots (`x/`): `ai`, `data`, `fileapi`, `frontend`, `gateway`, `messaging`, `observability`, `openapi`, `resilience`, `rest`, `rpc`, `tenant`, `validate`, `websocket`.
 
-Default landing zones: kernel/lifecycle/transport/auth/storage → stable root; product capability/protocol/features → `x/*`; app wiring/DI/bootstrap → `reference/standard-service`; workflow/specs/quality → `docs/` or `specs/`; plans/sequencing → `tasks/`.
+Landing zones: kernel/lifecycle/transport/auth/storage → stable root; product capability/protocol/features → `x/*`; app wiring/DI/bootstrap → `reference/standard-service`; workflow/specs/quality → `docs/` or `specs/`; plans/sequencing → `tasks/`.
 
-Extension maturity: **beta** (production-ready with caveats) → `x/frontend`, `x/gateway`, `x/messaging`, `x/observability`, `x/rest`, `x/tenant`, `x/websocket`; **experimental** (APIs may change) → `x/ai`, `x/data`, `x/fileapi`, `x/openapi`, `x/resilience`, `x/rpc`, `x/validate`. Full dashboard: `docs/concepts/extension-maturity.md` and `specs/extension-maturity.yaml`.
+Maturity: **beta** (production-ready, caveats) = `frontend`, `gateway`, `messaging`, `observability`, `rest`, `tenant`, `websocket`; **experimental** (APIs may change) = `ai`, `data`, `fileapi`, `openapi`, `resilience`, `rpc`, `validate`. Dashboard: `docs/concepts/extension-maturity.md`, `specs/extension-maturity.yaml`.
 
-Reference starting points: plain JSON API → `reference/standard-service`; hardened production (auth, tracing, metrics, tenant) → `reference/production-service`; REST CRUD → `reference/with-rest`; multi-tenant → `reference/with-tenant`; LLM/AI → `reference/with-ai`; WebSocket → `reference/with-websocket`; gRPC → `reference/with-rpc`; event-driven pubsub architecture → `reference/with-events`; messaging feature integration into existing service → `reference/with-messaging`; inbound webhooks → `reference/with-webhook`; reverse proxy → `reference/with-gateway`; embedded static assets → `reference/with-frontend`; health/metrics routes → `reference/with-ops`; observability stack (tracing, metrics export) → `reference/with-observability`; tenant administration console → `reference/with-tenant-admin`; benchmarking → `reference/benchmark`.
+Reference starting points: JSON API → `standard-service`; hardened prod (auth/tracing/metrics/tenant) → `production-service`; REST CRUD → `with-rest`; multi-tenant → `with-tenant`; LLM/AI → `with-ai`; WebSocket → `with-websocket`; gRPC → `with-rpc`; event/pubsub → `with-events`; messaging integration → `with-messaging`; webhooks → `with-webhook`; reverse proxy → `with-gateway`; embedded assets → `with-frontend`; health/metrics → `with-ops`; observability stack → `with-observability`; tenant admin console → `with-tenant-admin`; benchmarking → `benchmark` (all under `reference/`).
 
-Boundary reminders:
+Boundaries:
 
-- `middleware` stays transport-only; no service injection, business DTO assembly, or domain-policy branching.
-- Tenant logic and session lifecycle belong in `x/tenant`; not in `middleware`, `store`, or `contract`.
-- Observability wiring (tracing, metrics export) belongs in `x/observability`, not `contract`.
-- New library code must live under a stable root or `x/*`; avoid new broad top-level roots such as `ai`, `tenant`, `net`, `pubsub`, `rest`, `validator`, `utils`, or `frontend`.
+- `middleware` is transport-only; no service injection, DTO assembly, or domain-policy branching.
+- Tenant logic and session lifecycle live in `x/tenant`, not `middleware`/`store`/`contract`.
+- Observability wiring (tracing, metrics export) lives in `x/observability`, not `contract`.
+- New library code lives under a stable root or `x/*`; no new broad top-level roots (`ai`, `tenant`, `net`, `pubsub`, `rest`, `validator`, `utils`, `frontend`).
 
 ## 4. Working Contract
 
-Default assumptions: one primary module, no stable API changes, no new dependencies, focused tests, docs sync only for behavior/API/config/security/lifecycle/boundary changes.
+Default assumptions: one primary module, no stable API changes, no new deps, focused tests, docs sync only for behavior/API/config/security/lifecycle/boundary changes.
 
-Use analysis mode (no edits) when ownership is unclear, an unstated API change or new dependency is needed, the task lacks acceptance criteria, or a spec/manifest/pattern conflict exists. Use `specs/stop-condition-handlers.yaml` for stop-condition resolution.
+Use analysis mode (no edits) when: ownership is unclear, an unstated API change or new dependency is needed, the task lacks acceptance criteria, or a spec/manifest/pattern conflict exists. Resolve stops via `specs/stop-condition-handlers.yaml`.
 
-Before editing, complete this preflight:
+Preflight before editing:
 
 ```text
 Context package:
@@ -74,23 +71,20 @@ Validation plan:
 
 ## 5. Change Rules
 
-- Keep changes minimal and scoped to one primary module when possible.
+- Keep changes minimal, scoped to one primary module when possible.
 - Read the target manifest before editing module behavior.
-- Preserve stable public APIs unless explicitly asked to change them.
-- If a breaking change is unavoidable, include migration notes.
-- Prefer standard-library solutions and existing local patterns.
-- Add or update tests next to changed behavior.
+- Preserve stable public APIs unless explicitly asked to change them; include migration notes for unavoidable breaks.
+- Prefer stdlib solutions and existing local patterns. Add/update tests next to changed behavior.
 - Do not refactor unrelated files opportunistically.
-
-Exported symbol changes: enumerate callers (`rg -n --glob '*.go' 'SymbolName' .`), migrate all in the same change, re-run search to confirm old name is gone, update tests, `go build ./...`. No caller may silently discard a newly returning error.
+- Exported symbol changes: enumerate callers (`rg -n --glob '*.go' 'SymbolName' .`), migrate all in the same change, re-search to confirm the old name is gone, update tests, `go build ./...`. No caller may silently discard a newly returning error.
 
 ## 6. Validation
 
-Quick gate for current diff: `make validate-diff` (auto-selects minimal profile based on changed paths). Full CI: `make gates`.
+Quick diff gate: `make validate-diff` (auto-selects minimal profile). Full CI: `make gates`.
 
-Run: (1) target module checks from `<module>/module.yaml`, (2) boundary checks, (3) repo-wide gates only when gate profile requires.
+Run: (1) target module checks from `<module>/module.yaml`, (2) boundary checks, (3) repo-wide gates only when the gate profile requires.
 
-Baseline boundary and manifest checks:
+Baseline boundary/manifest checks:
 
 ```bash
 go run ./internal/checks/dependency-rules
@@ -101,43 +95,34 @@ go run ./internal/checks/reference-layout
 go run ./internal/checks/public-entrypoints-sync
 ```
 
-Add `extension-maturity`, `extension-beta-evidence`, `deprecation-inventory -strict` per gate profile (`docs/operations/agent-code-quality-rules.md §6`). Full Go gates: `make gates` (runs above + `go vet ./...`, format, race tests, coverage, and the `website/src/generated` staleness check; run `gofmt -w` first). Website content/API checks and the static site build run separately via `make website-gates` (slow; also run as dedicated CI steps). Docs-only: skip Go gates unless code/config/generated/examples changed.
+Add `extension-maturity`, `extension-beta-evidence`, `deprecation-inventory -strict` per gate profile (`docs/operations/agent-code-quality-rules.md §6`). `make gates` = above + `go vet ./...`, format, race tests, coverage, and `website/src/generated` staleness check (run `gofmt -w` first). Website content/API checks + static build run separately via `make website-gates` (slow). Docs-only: skip Go gates unless code/config/generated/examples changed.
 
 Summarize validation as: command, status, key failure, next step.
 
 ## 7. Docs Sync
 
-Update docs only for behavior, API, config, security, lifecycle, or boundary changes. Typical targets: `README.md`, `README_CN.md`, `AGENTS.md`, `docs/operations/agent-context-budget.md`, `env.example`, affected `docs/modules/` primers, `docs/concepts/extension-maturity.md`, `docs/release/roadmap.md`, `docs/evidence/stable-api/`. Document implemented behavior only.
+Update docs only for behavior/API/config/security/lifecycle/boundary changes; document implemented behavior only. Typical targets: `README.md`, `README_CN.md`, `AGENTS.md`, `docs/operations/agent-context-budget.md`, `env.example`, affected `docs/modules/` primers, `docs/concepts/extension-maturity.md`, `docs/release/roadmap.md`, `docs/evidence/stable-api/`.
 
-`docs/modules/` naming: stable roots use bare names (`core/`, `contract/`); extensions mirror import paths (`x/ai/`, `x/data/cache/`). See `docs/modules/INDEX.md`. Run `make website-sync` after editing sources below; include generated files in the same commit.
+`docs/modules/` naming: stable roots bare (`core/`); extensions mirror import paths (`x/ai/`, `x/data/cache/`). See `docs/modules/INDEX.md`. Run `make website-sync` after editing the sources below; commit generated files together.
 
-| Source file | Generated file |
+| Source | Generated |
 |---|---|
 | `docs/release/roadmap.md` | `website/src/generated/roadmap.ts` |
 | `docs/modules/*/README.md` | `website/src/generated/modules.ts` |
 | `specs/task-routing.yaml` | `website/src/generated/routing.ts` |
 | `README.md` / `specs/task-routing.yaml` | `website/src/generated/releases.ts` |
-| any `website/src/content/docs/**/*.mdx` (en or zh) | `website/src/generated/translation-lag.ts` |
+| `website/src/content/docs/**/*.mdx` (en/zh) | `website/src/generated/translation-lag.ts` |
 
-`translation-lag.ts` is from git timestamps; regenerate after every `.mdx` commit.
+`translation-lag.ts` derives from git timestamps; regenerate after every `.mdx` commit.
 
 ## 8. Milestones
 
-Milestones: `tasks/milestones/active/M-NNN-short-name/M-NNN.md`. When executing: read Context files first, stay inside Affected Modules, follow Tasks in order, use spec branch, record blockers, run full acceptance criteria, package PR with `docs/assets/github-workflows/milestone-pr-template.md`.
+Milestones: `tasks/milestones/active/M-NNN-short-name/M-NNN.md`. Executing: read Context files first, stay inside Affected Modules, follow Tasks in order, use the spec branch, record blockers, run full acceptance criteria, package the PR with `docs/assets/github-workflows/milestone-pr-template.md`.
 
-Scaffold: `make new-milestone`, `make new-plan`, `make new-card`, `make new-verify`, `make run-card C=active/NNNN-slug`, `make milestone-status M=active/M-NNN`.
+Task cards: `tasks/cards/active/NNNN-slug.md` — narrower than milestones, for focused single-module changes (`done/` when complete).
 
-Task cards: `tasks/cards/active/NNNN-slug.md`. Cards are narrower than milestones — use them for focused, time-boxed changes within a single module. Execute: `make run-card C=active/NNNN-slug` (validates, bundles, and runs via codex). Active cards live in `tasks/cards/active/`; completed in `tasks/cards/done/`.
+Scaffold: `make new-milestone`, `new-plan`, `new-card`, `new-verify`, `run-card C=active/NNNN-slug` (validates, bundles, runs via codex), `milestone-status M=active/M-NNN`.
 
 ## 9. Anti-Patterns
 
-Do not introduce:
-
-- New dependencies without approval
-- Route auto-discovery or reflection-based wiring
-- Middleware that builds business DTOs or injects services
-- Ad hoc JSON response helpers or per-feature error envelopes
-- New handler signatures
-- New panic-only constructors for fallible behavior
-- Generic `utils` packages
-- Compatibility wrappers without a removal plan
+Do not introduce: new deps without approval; route auto-discovery or reflection-based wiring; middleware that builds DTOs or injects services; ad hoc JSON response helpers or per-feature error envelopes; new handler signatures; new panic-only constructors for fallible behavior; generic `utils` packages; compatibility wrappers without a removal plan.
