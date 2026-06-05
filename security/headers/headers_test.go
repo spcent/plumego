@@ -486,3 +486,130 @@ func containsDirective(csp, directive string) bool {
 	}
 	return false
 }
+
+// ---------------------------------------------------------------------------
+// Additional targeted coverage tests
+// ---------------------------------------------------------------------------
+
+// TestApplyCheckedSuccessPath exercises the happy path of ApplyChecked (which
+// was previously at 50% because only the error branch was covered).
+func TestApplyCheckedSuccessPath(t *testing.T) {
+	policy := DefaultPolicy()
+	req := httptest.NewRequest(http.MethodGet, "http://example.com", nil)
+	w := httptest.NewRecorder()
+
+	if err := policy.ApplyChecked(w, req); err != nil {
+		t.Fatalf("ApplyChecked unexpected error: %v", err)
+	}
+	if got := w.Header().Get("X-Content-Type-Options"); got != "nosniff" {
+		t.Fatalf("X-Content-Type-Options = %q, want nosniff", got)
+	}
+}
+
+// TestCSPBuilderReportTo exercises the ReportTo builder method (0% covered).
+func TestCSPBuilderReportTo(t *testing.T) {
+	csp := NewCSPBuilder().
+		DefaultSrc("'self'").
+		ReportTo("csp-endpoint").
+		Build()
+	if !containsDirective(csp, "report-to csp-endpoint") {
+		t.Fatalf("CSP = %q, expected report-to directive", csp)
+	}
+}
+
+// TestCSPBuilderBlockAllMixedContent exercises the BlockAllMixedContent method
+// (0% covered).
+func TestCSPBuilderBlockAllMixedContent(t *testing.T) {
+	csp := NewCSPBuilder().
+		DefaultSrc("'self'").
+		BlockAllMixedContent().
+		Build()
+	if !containsDirective(csp, "block-all-mixed-content") {
+		t.Fatalf("CSP = %q, expected block-all-mixed-content directive", csp)
+	}
+}
+
+// TestEnsureMapsNilMaps exercises the nil-map branch inside ensureMaps by
+// creating a CSPBuilder with nil internal maps via zero value and calling a
+// builder method that triggers ensureMaps.
+func TestEnsureMapsNilMaps(t *testing.T) {
+	// A zero-value CSPBuilder has nil directives and invalid maps.
+	var b CSPBuilder
+	// setDirective calls ensureMaps; must not panic.
+	b.DefaultSrc("'self'")
+	csp := b.Build()
+	if csp == "" {
+		t.Fatal("expected non-empty CSP from zero-value builder after setDirective")
+	}
+}
+
+// TestSetEnumHeaderEmptyValue exercises the empty-value early-return guard in
+// setEnumHeader by setting an empty FrameOptions.
+func TestSetEnumHeaderEmptyValue(t *testing.T) {
+	policy := Policy{
+		ContentTypeOptions: "nosniff",
+		// FrameOptions is empty → setEnumHeader must skip it entirely.
+	}
+	req := httptest.NewRequest(http.MethodGet, "http://example.com", nil)
+	w := httptest.NewRecorder()
+	policy.Apply(w, req)
+
+	if got := w.Header().Get("X-Frame-Options"); got != "" {
+		t.Fatalf("X-Frame-Options = %q, want empty for empty policy field", got)
+	}
+	if got := w.Header().Get("X-Content-Type-Options"); got != "nosniff" {
+		t.Fatalf("X-Content-Type-Options = %q, want nosniff", got)
+	}
+}
+
+// TestSetHeaderInvalidValue exercises the IsHeaderValue guard inside setHeader
+// by supplying a ContentSecurityPolicy containing a control character that
+// passes Validate (we bypass validation by testing apply internals via a valid
+// policy that had been mutated post-validation). We test the setHeader guard
+// directly.
+func TestSetHeaderInvalidValueSkipped(t *testing.T) {
+	h := make(http.Header)
+	setHeader(h, "X-Test", "")
+	if h.Get("X-Test") != "" {
+		t.Fatal("expected empty value to be skipped")
+	}
+	setHeader(h, "X-Test", "bad\nvalue")
+	if h.Get("X-Test") != "" {
+		t.Fatal("expected invalid value to be skipped")
+	}
+	setHeader(h, "X-Test", "safe")
+	if h.Get("X-Test") != "safe" {
+		t.Fatal("expected safe value to be set")
+	}
+}
+
+// TestFormatHSTSNegativeMaxAge exercises the maxAge<0 clamping branch.
+func TestFormatHSTSNegativeMaxAge(t *testing.T) {
+	opts := HSTSOptions{
+		MaxAge:            -1 * time.Second,
+		IncludeSubDomains: false,
+		Preload:           false,
+	}
+	got := formatHSTS(opts)
+	if got != "max-age=0" {
+		t.Fatalf("formatHSTS negative = %q, want max-age=0", got)
+	}
+}
+
+// TestIsHTTPSRequestNil exercises the nil-request guard in isHTTPSRequest.
+func TestIsHTTPSRequestNil(t *testing.T) {
+	if isHTTPSRequest(nil) {
+		t.Fatal("expected false for nil request")
+	}
+}
+
+// TestSetFlagDirectiveNilBuilder exercises the nil-receiver guard in
+// setFlagDirective (indirect via BlockAllMixedContent on nil builder).
+func TestSetFlagDirectiveNilBuilder(t *testing.T) {
+	var b *CSPBuilder
+	// Must not panic; returns nil.
+	result := b.BlockAllMixedContent()
+	if result != nil {
+		t.Fatal("expected nil from nil-receiver setFlagDirective")
+	}
+}

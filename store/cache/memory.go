@@ -34,11 +34,13 @@ type cacheItem struct {
 	expiration time.Time
 }
 
-// NewMemoryCache creates an empty MemoryCache instance.
+// NewMemoryCache creates an empty MemoryCache instance with the default configuration.
+// It panics if the default configuration is invalid, which indicates a programming error
+// (DefaultConfig must always return a valid Config).
 func NewMemoryCache() *MemoryCache {
 	cache, err := NewMemoryCacheWithConfig(DefaultConfig())
 	if err != nil {
-		return nil
+		panic(fmt.Sprintf("cache: NewMemoryCache with default config: %v", err))
 	}
 	return cache
 }
@@ -523,14 +525,6 @@ func decodeInt64(data []byte) (int64, error) {
 
 func encodeInt64(num int64) ([]byte, error) {
 	return strconv.AppendInt(nil, num, 10), nil
-}
-
-func encodeGobInt64(num int64) ([]byte, error) {
-	var buf bytes.Buffer
-	if err := gob.NewEncoder(&buf).Encode(num); err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
 }
 
 func addInt64(value, delta int64) (int64, error) {

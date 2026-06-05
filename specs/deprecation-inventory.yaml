@@ -261,3 +261,13 @@ entries:
     replacement: x/resilience/ratelimit.TokenBucket
     paths:
       - x/messaging/ratelimit.go
+
+  - id: store-kv-options-to-config-backward-compatibility
+    category: public_alias
+    status: keep
+    owner: persistence
+    decision: Options and DefaultOptions are type/function aliases for Config and DefaultConfig, kept so existing callers (e.g. use-cases/dbadmin) continue to compile after the stable-root rename. Remove in a future major release once all callers migrate.
+    replacement: store/kv.Config and store/kv.DefaultConfig
+    paths:
+      - store/kv/options.go
+      - store/kv/config_test.go

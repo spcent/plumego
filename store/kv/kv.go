@@ -61,8 +61,8 @@ type Stats struct {
 // DataDir must be explicitly configured so callers choose where filesystem
 // state is created.
 func NewKVStore(opts Options) (*KVStore, error) {
-	setDefaults(&opts)
-	if err := validateOptions(opts); err != nil {
+	setConfigDefaults(&opts)
+	if err := validateConfig(opts); err != nil {
 		return nil, err
 	}
 	if err := os.MkdirAll(opts.DataDir, 0755); err != nil {

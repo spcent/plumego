@@ -44,6 +44,15 @@
 //		return err
 //	}
 //	app.Use(authMw)
+//
+// # Lifecycle
+//
+// JWTManager is safe for concurrent use by multiple goroutines. Key rotation
+// happens lazily during GenerateTokenPair when RotationInterval has elapsed;
+// there is no background goroutine. The manager itself does not require
+// explicit cleanup. If the KeyStore holds external resources (e.g. a database
+// connection), the caller is responsible for closing those resources after the
+// JWTManager is no longer used.
 package jwt
 
 import (
@@ -146,20 +155,10 @@ func (m *JWTManager) GenerateTokenPair(ctx context.Context, identity IdentityCla
 		return TokenPair{}, ErrMissingSubject
 	}
 
-	m.mu.Lock()
-	// ensureRotationUnsafe ensures the key cache is up-to-date before issuing tokens.
-	if err := m.ensureRotationUnsafe(ctx); err != nil {
-		m.mu.Unlock()
+	activeKey, err := m.activeKeyForGeneration(ctx)
+	if err != nil {
 		return TokenPair{}, err
 	}
-
-	activeKey, ok := m.keyCache[m.active]
-	if !ok {
-		m.mu.Unlock()
-		return TokenPair{}, ErrUnknownKey
-	}
-	activeKey = cloneSigningKey(activeKey)
-	m.mu.Unlock()
 
 	if err := contextErr(ctx); err != nil {
 		return TokenPair{}, err
@@ -181,6 +180,35 @@ func (m *JWTManager) GenerateTokenPair(ctx context.Context, identity IdentityCla
 		ExpiresIn:    int64(m.config.AccessExpiration.Seconds()),
 		TokenType:    "Bearer",
 	}, nil
+}
+
+// activeKeyForGeneration returns a clone of the active signing key.
+// It uses a read lock for the common (no-rotation) path to avoid serialising
+// concurrent GenerateTokenPair calls. When rotation is due it upgrades to a
+// write lock and double-checks before executing the store I/O.
+func (m *JWTManager) activeKeyForGeneration(ctx context.Context) (JWTSigningKey, error) {
+	m.mu.RLock()
+	activeKey, ok := m.keyCache[m.active]
+	needsRotation := ok && m.config.RotationInterval > 0 &&
+		m.currentTime().Sub(activeKey.CreatedAt) >= m.config.RotationInterval
+	if ok && !needsRotation {
+		cloned := cloneSigningKey(activeKey)
+		m.mu.RUnlock()
+		return cloned, nil
+	}
+	m.mu.RUnlock()
+
+	// Rotation path or missing key: take write lock and double-check.
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if err := m.ensureRotationUnsafe(ctx); err != nil {
+		return JWTSigningKey{}, err
+	}
+	activeKey, ok = m.keyCache[m.active]
+	if !ok {
+		return JWTSigningKey{}, ErrUnknownKey
+	}
+	return cloneSigningKey(activeKey), nil
 }
 
 func (m *JWTManager) buildToken(key JWTSigningKey, tokenType TokenType, identity IdentityClaims, authz AuthorizationClaims, now time.Time, ttl time.Duration) (string, error) {

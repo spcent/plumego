@@ -1,7 +1,9 @@
 package cache
 
 import (
+	"bytes"
 	"context"
+	"encoding/gob"
 	"errors"
 	"fmt"
 	"sync"
@@ -919,6 +921,16 @@ func TestMemoryCacheIncrAcceptsTextInteger(t *testing.T) {
 	}
 }
 
+// encodeGobInt64 encodes n in the legacy gob format used by older cache versions.
+// Keep in sync with the gob decode path in decodeInt64.
+func encodeGobInt64(n int64) ([]byte, error) {
+	var buf bytes.Buffer
+	if err := gob.NewEncoder(&buf).Encode(n); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
 func TestMemoryCacheIncrReadsLegacyGobInteger(t *testing.T) {
 	cache := NewMemoryCache()
 	defer cache.Close()
@@ -1090,6 +1102,360 @@ func TestMemoryCacheNonExpiredReadsDoNotWaitForWriteBoundary(t *testing.T) {
 		case <-time.After(200 * time.Millisecond):
 			t.Fatal("non-expired read waited for write boundary")
 		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Additional coverage tests
+// ---------------------------------------------------------------------------
+
+// TestClosedErrOnClosedCache exercises the closedErr method on a closed cache.
+func TestClosedErrOnClosedCache(t *testing.T) {
+	cache := NewMemoryCache()
+	if err := cache.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+	// closedErr delegates to operationErr(nil), which checks mc.closed.
+	if err := cache.closedErr(); !errors.Is(err, ErrCacheClosed) {
+		t.Fatalf("closedErr on closed cache = %v, want ErrCacheClosed", err)
+	}
+}
+
+// TestClosedErrOnOpenCache verifies closedErr returns nil on a live cache.
+func TestClosedErrOnOpenCache(t *testing.T) {
+	cache := NewMemoryCache()
+	defer cache.Close()
+	if err := cache.closedErr(); err != nil {
+		t.Fatalf("closedErr on open cache = %v, want nil", err)
+	}
+}
+
+// TestAddInt64NegativeDeltaOverflow exercises the negative-delta overflow branch in addInt64.
+func TestAddInt64NegativeDeltaOverflow(t *testing.T) {
+	// minInt64 + (-1) would overflow; delta = -1, value = minInt64
+	_, err := addInt64(minInt64, -1)
+	if err == nil {
+		t.Fatal("expected overflow error")
+	}
+	if !errors.Is(err, ErrNotInteger) {
+		t.Fatalf("expected ErrNotInteger, got %v", err)
+	}
+}
+
+// TestAddInt64PositiveDeltaOverflow exercises the positive-delta overflow branch.
+func TestAddInt64PositiveDeltaOverflow(t *testing.T) {
+	_, err := addInt64(maxInt64, 1)
+	if err == nil {
+		t.Fatal("expected overflow error")
+	}
+	if !errors.Is(err, ErrNotInteger) {
+		t.Fatalf("expected ErrNotInteger, got %v", err)
+	}
+}
+
+// TestAddInt64NegativeDeltaNoOverflow verifies normal subtraction works.
+func TestAddInt64NegativeDeltaNoOverflow(t *testing.T) {
+	got, err := addInt64(10, -3)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got != 7 {
+		t.Fatalf("expected 7, got %d", got)
+	}
+}
+
+// TestLockWriteOperationClosedCache exercises the closed-cache branch in lockWriteOperation.
+func TestLockWriteOperationClosedCache(t *testing.T) {
+	cache := NewMemoryCache()
+	if err := cache.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+	// Set reaches lockWriteOperation; on a closed cache it should return ErrCacheClosed.
+	if err := cache.Set(t.Context(), "k", []byte("v"), 0); !errors.Is(err, ErrCacheClosed) {
+		t.Fatalf("Set on closed cache = %v, want ErrCacheClosed", err)
+	}
+}
+
+// TestDecrBasic exercises Decr on a new key and an existing key.
+func TestDecrBasic(t *testing.T) {
+	cache := NewMemoryCache()
+	defer cache.Close()
+
+	val, err := cache.Decr(t.Context(), "ctr", 3)
+	if err != nil {
+		t.Fatalf("Decr new key: %v", err)
+	}
+	if val != -3 {
+		t.Fatalf("Decr new key = %d, want -3", val)
+	}
+
+	val, err = cache.Decr(t.Context(), "ctr", 2)
+	if err != nil {
+		t.Fatalf("Decr existing key: %v", err)
+	}
+	if val != -5 {
+		t.Fatalf("Decr existing key = %d, want -5", val)
+	}
+}
+
+// TestDecrMinInt64GuardTriggered verifies that Decr rejects minInt64 delta.
+func TestDecrMinInt64GuardTriggered(t *testing.T) {
+	cache := NewMemoryCache()
+	defer cache.Close()
+
+	_, err := cache.Decr(t.Context(), "k", minInt64)
+	if err == nil {
+		t.Fatal("expected error for minInt64 delta")
+	}
+	if !errors.Is(err, ErrNotInteger) {
+		t.Fatalf("expected ErrNotInteger, got %v", err)
+	}
+}
+
+// TestDecrClosedCache exercises the ErrCacheClosed path in Decr.
+func TestDecrClosedCache(t *testing.T) {
+	cache := NewMemoryCache()
+	if err := cache.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+	if _, err := cache.Decr(t.Context(), "k", 1); !errors.Is(err, ErrCacheClosed) {
+		t.Fatalf("Decr on closed cache = %v, want ErrCacheClosed", err)
+	}
+}
+
+// TestRemoveExpiredItemLockedItemChanged verifies that removeExpiredItemLocked
+// does nothing when the stored item has changed since the snapshot.
+func TestRemoveExpiredItemLockedItemChanged(t *testing.T) {
+	cache := NewMemoryCache()
+	defer cache.Close()
+
+	shortTTL := 20 * time.Millisecond
+	if err := cache.Set(t.Context(), "key", []byte("original"), shortTTL); err != nil {
+		t.Fatalf("Set: %v", err)
+	}
+
+	// Wait for the item to expire.
+	time.Sleep(40 * time.Millisecond)
+
+	// Replace the item with a fresh one before cleanup runs.
+	if err := cache.Set(t.Context(), "key", []byte("updated"), time.Minute); err != nil {
+		t.Fatalf("Set updated: %v", err)
+	}
+
+	// Manually trigger cleanupExpired; the original snapshot is stale, so
+	// removeExpiredItemLocked should leave the updated item in place.
+	cache.cleanupExpired()
+
+	val, err := cache.Get(t.Context(), "key")
+	if err != nil {
+		t.Fatalf("Get after cleanup: %v", err)
+	}
+	if string(val) != "updated" {
+		t.Fatalf("expected 'updated', got %q", val)
+	}
+}
+
+// TestRemoveExpiredItemLockedExpiredAndPresent ensures an expired item that
+// is still the current entry gets removed during cleanup.
+func TestRemoveExpiredItemLockedExpiredAndPresent(t *testing.T) {
+	config := Config{
+		MaxKeyLength:    256,
+		CleanupInterval: 0, // no background cleanup
+		DefaultTTL:      0,
+	}
+	cache := mustNewMemoryCacheWithConfig(t, config)
+	defer cache.Close()
+
+	if err := cache.Set(t.Context(), "exp", []byte("bye"), 10*time.Millisecond); err != nil {
+		t.Fatalf("Set: %v", err)
+	}
+
+	// Wait for expiry then trigger cleanup.
+	time.Sleep(30 * time.Millisecond)
+	cache.cleanupExpired()
+
+	if _, err := cache.Get(t.Context(), "exp"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("expected ErrNotFound after cleanup, got %v", err)
+	}
+}
+
+// TestNewMemoryCacheWithConfigInvalidConfig verifies that NewMemoryCacheWithConfig
+// returns an error for invalid config (covering the error branch that NewMemoryCache skips).
+func TestNewMemoryCacheWithConfigInvalidConfig(t *testing.T) {
+	_, err := NewMemoryCacheWithConfig(Config{MaxKeyLength: -1})
+	if err == nil || !errors.Is(err, ErrInvalidConfig) {
+		t.Fatalf("expected ErrInvalidConfig, got %v", err)
+	}
+}
+
+// TestAdjustStoredValueNegativeClampsToZero exercises the memory underflow guard.
+func TestAdjustStoredValueNegativeClampsToZero(t *testing.T) {
+	cache := NewMemoryCache()
+	defer cache.Close()
+
+	// Reduce memory below zero (which should be clamped).
+	cache.adjustStoredValue(0, -9999)
+	cache.stateMu.RLock()
+	mem := cache.memory
+	cache.stateMu.RUnlock()
+	if mem != 0 {
+		t.Fatalf("expected memory clamped to 0, got %d", mem)
+	}
+}
+
+// TestCleanupExpiredOnClosedCache exercises the early-return in cleanupExpired
+// when the cache is closed (line 118-120).
+func TestCleanupExpiredOnClosedCache(t *testing.T) {
+	cache := NewMemoryCache()
+	if err := cache.Set(t.Context(), "key", []byte("val"), 10*time.Millisecond); err != nil {
+		t.Fatalf("Set: %v", err)
+	}
+	if err := cache.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+	// Should return immediately without panicking.
+	cache.cleanupExpired()
+}
+
+// TestRemoveExpiredItemLockedKeyNotInStore exercises the !ok path (line 103-104)
+// where the key has already been deleted from the store before the locked remove runs.
+func TestRemoveExpiredItemLockedKeyNotInStore(t *testing.T) {
+	cache := NewMemoryCache()
+	defer cache.Close()
+
+	expiredAt := time.Now().Add(-time.Second)
+	staleItem := cacheItem{
+		value:      []byte("gone"),
+		expiration: expiredAt,
+	}
+	// Call removeExpiredItemLocked directly with a key that was never stored.
+	cache.writeMu.Lock()
+	removed := cache.removeExpiredItemLocked("nonexistent-key", staleItem)
+	cache.writeMu.Unlock()
+	if removed {
+		t.Fatal("expected false for key not in store")
+	}
+}
+
+// TestIncrOnExpiredKey exercises the path in Incr where the key exists but
+// is already expired (lines 336-338), so it gets treated as a fresh key.
+func TestIncrOnExpiredKey(t *testing.T) {
+	config := DefaultConfig()
+	config.DefaultTTL = 0
+	cache := mustNewMemoryCacheWithConfig(t, config)
+	defer cache.Close()
+
+	// Insert an item that is already expired.
+	expiredAt := time.Now().Add(-time.Second)
+	cache.writeMu.Lock()
+	if err := cache.setLockedWithExpiration("counter", []byte("5"), expiredAt); err != nil {
+		cache.writeMu.Unlock()
+		t.Fatalf("setLockedWithExpiration: %v", err)
+	}
+	cache.writeMu.Unlock()
+
+	// Incr should treat the expired key as missing and start from 0.
+	got, err := cache.Incr(t.Context(), "counter", 3)
+	if err != nil {
+		t.Fatalf("Incr on expired key: %v", err)
+	}
+	if got != 3 {
+		t.Fatalf("Incr on expired key = %d, want 3", got)
+	}
+}
+
+// TestLockWriteOperationContextCancelledAfterLock exercises the closed-cache
+// branch inside lockWriteOperation while holding writeMu externally.
+// We use Set, which calls lockWriteOperation internally.
+func TestLockWriteOperationContextCancelledWhileWaiting(t *testing.T) {
+	cache := NewMemoryCache()
+	defer cache.Close()
+
+	// Hold writeMu so Set blocks inside lockWriteOperation.
+	cache.writeMu.Lock()
+
+	ctx, cancel := context.WithCancel(t.Context())
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- cache.Set(ctx, "k", []byte("v"), 0)
+	}()
+
+	time.Sleep(20 * time.Millisecond)
+	// Close the cache while the goroutine is blocked waiting for writeMu.
+	// Do it from a separate goroutine because Close itself needs writeMu.
+	closeDone := make(chan struct{})
+	go func() {
+		defer close(closeDone)
+		// First cancel the context so the Set goroutine sees it on lock acquire.
+		cancel()
+	}()
+	<-closeDone
+
+	// Release the lock; Set will re-check operationErr and see context.Canceled.
+	cache.writeMu.Unlock()
+
+	select {
+	case err := <-errCh:
+		if err == nil {
+			t.Fatal("expected error, got nil")
+		}
+		// Accept context.Canceled or ErrCacheClosed — either is correct.
+		if !errors.Is(err, context.Canceled) && !errors.Is(err, ErrCacheClosed) {
+			t.Fatalf("unexpected error = %v", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("Set did not return")
+	}
+}
+
+// TestDeleteClosedCache covers the lockWriteOperation-closed path inside Delete.
+func TestDeleteClosedCache(t *testing.T) {
+	cache := NewMemoryCache()
+	if err := cache.Set(t.Context(), "k", []byte("v"), 0); err != nil {
+		t.Fatalf("Set: %v", err)
+	}
+	if err := cache.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+	if err := cache.Delete(t.Context(), "k"); !errors.Is(err, ErrCacheClosed) {
+		t.Fatalf("Delete on closed cache = %v, want ErrCacheClosed", err)
+	}
+}
+
+// TestExistsClosedCache covers the operationErr path inside Exists.
+func TestExistsClosedCache(t *testing.T) {
+	cache := NewMemoryCache()
+	if err := cache.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+	if _, err := cache.Exists(t.Context(), "k"); !errors.Is(err, ErrCacheClosed) {
+		t.Fatalf("Exists on closed cache = %v, want ErrCacheClosed", err)
+	}
+}
+
+// TestAppendClosedCache covers the lockWriteOperation-closed path inside Append.
+func TestAppendClosedCache(t *testing.T) {
+	cache := NewMemoryCache()
+	if err := cache.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+	if err := cache.Append(t.Context(), "k", []byte("data")); !errors.Is(err, ErrCacheClosed) {
+		t.Fatalf("Append on closed cache = %v, want ErrCacheClosed", err)
+	}
+}
+
+// TestIncrOverflowViaCache drives the addInt64 overflow through Incr.
+func TestIncrOverflowViaCache(t *testing.T) {
+	cache := NewMemoryCache()
+	defer cache.Close()
+
+	// Set counter to maxInt64.
+	if err := cache.Set(t.Context(), "big", mustEncodeInt64(t, maxInt64), time.Minute); err != nil {
+		t.Fatalf("Set: %v", err)
+	}
+	_, err := cache.Incr(t.Context(), "big", 1)
+	if err == nil || !errors.Is(err, ErrNotInteger) {
+		t.Fatalf("expected ErrNotInteger overflow, got %v", err)
 	}
 }
 

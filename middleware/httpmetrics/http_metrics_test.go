@@ -109,3 +109,25 @@ func TestMiddlewarePreservesDownstreamPanicWhenCollectorPanics(t *testing.T) {
 	}()
 	handler.ServeHTTP(rec, req)
 }
+
+// TestMiddlewareNilCollectorPassthrough exercises the nil-collector branch that
+// returns the next handler directly without wrapping.
+func TestMiddlewareNilCollectorPassthrough(t *testing.T) {
+	called := false
+	inner := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		called = true
+		w.WriteHeader(http.StatusNoContent)
+	})
+	handler := Middleware(nil)(inner)
+
+	req := httptest.NewRequest(http.MethodGet, "/passthrough", nil)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if !called {
+		t.Fatal("expected inner handler to be called when collector is nil")
+	}
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusNoContent)
+	}
+}

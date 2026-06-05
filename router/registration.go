@@ -80,7 +80,7 @@ func (r *Router) AddRoute(method, path string, handler http.Handler, opts ...Rou
 		return fmt.Errorf("router add_route %s %s: %w", method, path, err)
 	}
 	if handler == nil {
-		return fmt.Errorf("router add_route %s %s: %w", method, path, errors.New("nil handler"))
+		return fmt.Errorf("router add_route %s %s: nil handler", method, path)
 	}
 	if err := validateRoutePath(path); err != nil {
 		return fmt.Errorf("router add_route %s %s: %w", method, path, err)

@@ -390,3 +390,90 @@ func TestTrimWhitespace(t *testing.T) {
 		})
 	}
 }
+
+// ---------------------------------------------------------------------------
+// Targeted coverage additions
+// ---------------------------------------------------------------------------
+
+// TestIsHeaderName exercises IsHeaderName which delegates to IsToken (was 0%).
+func TestIsHeaderName(t *testing.T) {
+	cases := []struct {
+		value string
+		ok    bool
+	}{
+		{"X-Custom-Header", true},
+		{"Content-Type", true},
+		{"", false},
+		{"Bad Header", false},
+		{"bad:value", false},
+	}
+	for _, tc := range cases {
+		if got := IsHeaderName(tc.value); got != tc.ok {
+			t.Fatalf("IsHeaderName(%q) = %v, want %v", tc.value, got, tc.ok)
+		}
+	}
+}
+
+// TestHasStrictDecimalURLPortIPv6 exercises the IPv6 bracket-host paths in
+// hasStrictDecimalURLPort which were only 68.8% covered.
+func TestHasStrictDecimalURLPortIPv6(t *testing.T) {
+	cases := []struct {
+		host string
+		ok   bool
+		name string
+	}{
+		{"[2001:db8::1]", true, "bare IPv6 no port"},
+		{"[2001:db8::1]:8080", true, "IPv6 with valid port"},
+		{"[2001:db8::1]:65535", true, "IPv6 with max port"},
+		{"[2001:db8::1]:65536", false, "IPv6 with port above max"},
+		{"[2001:db8::1]:https", false, "IPv6 with non-numeric port"},
+		{"[2001:db8::1]garbage", false, "IPv6 with non-colon suffix"},
+		// malformed bracket — no closing bracket
+		{"[2001:db8::1", false, "IPv6 missing closing bracket"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := hasStrictDecimalURLPort(tc.host); got != tc.ok {
+				t.Fatalf("hasStrictDecimalURLPort(%q) = %v, want %v", tc.host, got, tc.ok)
+			}
+		})
+	}
+}
+
+// TestValidatePhoneExtraBranches covers the ValidatePhone branches for
+// plus-sign not at position 0 and for invalid UTF-8.
+func TestValidatePhoneExtraBranches(t *testing.T) {
+	// Plus sign at non-zero position must be rejected.
+	if ValidatePhone("123+4567890") {
+		t.Fatal("expected false for + not at position 0")
+	}
+	// Invalid UTF-8 must be rejected.
+	if ValidatePhone(string([]byte{0xff, 0xfe, '1', '2', '3', '4', '5', '6', '7'})) {
+		t.Fatal("expected false for invalid UTF-8 phone")
+	}
+}
+
+// TestValidateEmailNullByteAndInvalidUTF8 covers the null-byte and
+// invalid-UTF-8 guards in ValidateEmail.
+func TestValidateEmailNullByteAndInvalidUTF8(t *testing.T) {
+	// Null byte must be rejected.
+	if ValidateEmail("user\x00@example.com") {
+		t.Fatal("expected false for null byte in email")
+	}
+	// Invalid UTF-8 must be rejected.
+	if ValidateEmail(string([]byte{'u', 's', 'e', 'r', '@', 'e', 0xff, '.', 'c', 'o', 'm'})) {
+		t.Fatal("expected false for invalid UTF-8 email")
+	}
+}
+
+// TestHasStrictDecimalURLPortDoubleColonHost covers the branch where a non-IPv6
+// host has multiple colons (raw IPv6 literal without brackets), which should
+// be rejected.
+func TestHasStrictDecimalURLPortDoubleColonHost(t *testing.T) {
+	// A host with multiple colons that is NOT bracket-prefixed is treated as
+	// bare IPv6 — the colon-before-last-colon check returns false.
+	got := hasStrictDecimalURLPort("2001:db8::1")
+	if got {
+		t.Fatal("expected false for bare IPv6 without brackets")
+	}
+}

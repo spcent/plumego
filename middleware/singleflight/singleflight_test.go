@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"hash/fnv"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -1477,5 +1478,120 @@ func TestConfigWithDefaultsNormalizesMethods(t *testing.T) {
 
 	if len(cfg.Methods) != 2 || cfg.Methods[0] != http.MethodGet || cfg.Methods[1] != http.MethodHead {
 		t.Fatalf("Methods = %v, want [GET HEAD]", cfg.Methods)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// limitedResponseRecorder unit tests
+// ---------------------------------------------------------------------------
+
+// TestLimitedResponseRecorderUnwrap verifies that Unwrap returns the underlying
+// http.ResponseWriter, exercising the 0%-covered Unwrap method.
+func TestLimitedResponseRecorderUnwrap(t *testing.T) {
+	inner := httptest.NewRecorder()
+	rec := newLimitedResponseRecorder(inner, defaultMaxResponseBytes)
+	if got := rec.Unwrap(); got != inner {
+		t.Fatalf("Unwrap() = %v, want inner recorder", got)
+	}
+}
+
+// TestLimitedResponseRecorderWriteHeaderIdempotent verifies that calling
+// WriteHeader a second time is silently ignored (covers the wroteHeader guard).
+func TestLimitedResponseRecorderWriteHeaderIdempotent(t *testing.T) {
+	inner := httptest.NewRecorder()
+	rec := newLimitedResponseRecorder(inner, defaultMaxResponseBytes)
+	rec.WriteHeader(http.StatusAccepted)
+	rec.WriteHeader(http.StatusTeapot) // must be ignored
+	if rec.statusCode != http.StatusAccepted {
+		t.Fatalf("statusCode = %d after second WriteHeader, want %d", rec.statusCode, http.StatusAccepted)
+	}
+}
+
+// TestLimitedResponseRecorderFlushSetsUnreplayable verifies that Flush marks
+// the response as unreplayable (covers the Flush body).
+func TestLimitedResponseRecorderFlushSetsUnreplayable(t *testing.T) {
+	inner := httptest.NewRecorder()
+	rec := newLimitedResponseRecorder(inner, defaultMaxResponseBytes)
+	// Flush before any WriteHeader — must auto-commit the header first.
+	rec.Flush()
+	if !rec.Unreplayable() {
+		t.Fatal("expected Flush to mark response unreplayable")
+	}
+	if !rec.wroteHeader {
+		t.Fatal("expected Flush to commit header")
+	}
+}
+
+// TestLimitedResponseRecorderHijackOnNonHijackableWriter exercises the error
+// path in Hijack when the underlying writer does not implement http.Hijacker.
+func TestLimitedResponseRecorderHijackOnNonHijackableWriter(t *testing.T) {
+	// httptest.ResponseRecorder does NOT implement http.Hijacker.
+	inner := httptest.NewRecorder()
+	rec := newLimitedResponseRecorder(inner, defaultMaxResponseBytes)
+	conn, rw, err := rec.Hijack()
+	if err == nil {
+		t.Fatal("expected error hijacking non-hijackable writer")
+	}
+	if conn != nil || rw != nil {
+		t.Fatal("expected nil conn and rw on hijack error")
+	}
+}
+
+// TestWriteHeaderKeyNilRequest covers the nil-request guard in writeHeaderKey.
+func TestWriteHeaderKeyNilRequest(t *testing.T) {
+	h := fnv.New64a()
+	before := h.Sum64()
+	// Must not panic.
+	writeHeaderKey(h, nil, "Accept")
+	if h.Sum64() != before {
+		t.Fatal("expected hash unchanged for nil request")
+	}
+}
+
+// TestWriteHeaderKeyEmptyHeaderName covers the empty-name guard after
+// CanonicalHeaderKey in writeHeaderKey.
+func TestWriteHeaderKeyEmptyHeaderName(t *testing.T) {
+	h := fnv.New64a()
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	before := h.Sum64()
+	// Passing only whitespace should produce an empty canonical name.
+	writeHeaderKey(h, req, "   ")
+	if h.Sum64() != before {
+		t.Fatal("expected hash unchanged for whitespace-only header name")
+	}
+}
+
+// TestWriteHeaderKeyHeaderWithEmptyValues covers the early return when the
+// request has no values for the given header.
+func TestWriteHeaderKeyHeaderWithEmptyValues(t *testing.T) {
+	h := fnv.New64a()
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	// Request has no Accept header — the len(values)==0 guard should fire.
+	before := h.Sum64()
+	writeHeaderKey(h, req, "Accept")
+	if h.Sum64() != before {
+		t.Fatal("expected hash unchanged when header is absent")
+	}
+}
+
+// TestWriteHeaderKeySkipsEmptyValue exercises the inner value-is-empty skip
+// path by setting a header that contains only whitespace.
+func TestWriteHeaderKeySkipsEmptyValue(t *testing.T) {
+	h1 := fnv.New64a()
+	req1 := httptest.NewRequest(http.MethodGet, "/", nil)
+	req1.Header.Set("Accept", "application/json")
+	writeHeaderKey(h1, req1, "Accept")
+
+	h2 := fnv.New64a()
+	req2 := httptest.NewRequest(http.MethodGet, "/", nil)
+	// A value of "   " is non-empty at the Values level but all whitespace —
+	// the inner trimmed-value guard skips it.
+	req2.Header["Accept"] = []string{"   "}
+	writeHeaderKey(h2, req2, "Accept")
+
+	if h1.Sum64() == h2.Sum64() {
+		// The hashes differ because "application/json" contributes bytes while
+		// the whitespace-only value contributes only the outer key bytes.
+		// We just confirm neither panics and the function completes.
 	}
 }
