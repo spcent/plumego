@@ -14,12 +14,7 @@ func main() {
 		failf("resolve working directory: %v", err)
 	}
 
-	baseline, err := checkutil.ReadBaseline(filepath.Join(repoRoot, "specs", "check-baseline", "reference-layout-legacy-roots.txt"))
-	if err != nil {
-		failf("read reference layout baseline: %v", err)
-	}
-
-	violations, err := checkutil.FindUnexpectedTopLevelDirs(repoRoot, checkutil.AllowedTopLevelDirs(), baseline)
+	violations, err := checkutil.FindUnexpectedTopLevelDirs(repoRoot, checkutil.AllowedTopLevelDirs())
 	if err != nil {
 		failf("check top-level layout: %v", err)
 	}

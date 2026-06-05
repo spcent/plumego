@@ -317,12 +317,41 @@ func releaseRefViolations(repoRoot string, cand candidate) []string {
 		if ref == "" {
 			continue
 		}
-		cmd := exec.Command("git", "-C", repoRoot, "rev-parse", "--verify", ref+"^{commit}")
-		if err := cmd.Run(); err != nil {
-			violations = append(violations, fmt.Sprintf("%s release_ref does not resolve to a commit: %s", cand.Label(), ref))
+		if commitResolves(repoRoot, ref) {
+			continue
 		}
+		// On a shallow checkout (CI, remote execution) the older baseline ref
+		// may sit outside the fetched history. Attempt a best-effort, depth-1
+		// fetch of just this commit before declaring it unresolved, so the gate
+		// stays meaningful on shallow clones without being weakened: a full
+		// clone resolves immediately and never reaches this path.
+		if isShallowRepo(repoRoot) {
+			fetchCommit(repoRoot, ref)
+			if commitResolves(repoRoot, ref) {
+				continue
+			}
+		}
+		violations = append(violations, fmt.Sprintf("%s release_ref does not resolve to a commit: %s", cand.Label(), ref))
 	}
 	return violations
+}
+
+// commitResolves reports whether ref names a commit object in the local repo.
+func commitResolves(repoRoot, ref string) bool {
+	return exec.Command("git", "-C", repoRoot, "rev-parse", "--verify", "--quiet", ref+"^{commit}").Run() == nil
+}
+
+// isShallowRepo reports whether the repository is a shallow clone.
+func isShallowRepo(repoRoot string) bool {
+	out, err := exec.Command("git", "-C", repoRoot, "rev-parse", "--is-shallow-repository").Output()
+	return err == nil && strings.TrimSpace(string(out)) == "true"
+}
+
+// fetchCommit best-effort fetches a single commit by SHA from origin. Errors
+// (offline, ref absent on origin) are ignored; the caller re-verifies and
+// reports a violation if the commit is still missing afterwards.
+func fetchCommit(repoRoot, ref string) {
+	_ = exec.Command("git", "-C", repoRoot, "fetch", "--depth=1", "origin", ref).Run()
 }
 
 func apiSnapshotViolations(repoRoot string, cand candidate) []string {

@@ -6,6 +6,7 @@ symbol	github.com/spcent/plumego/core	const	PreparationStateMutable	const Prepar
 symbol	github.com/spcent/plumego/core	const	PreparationStateServerPrepared	const PreparationStateServerPrepared PreparationState = "server_prepared"
 symbol	github.com/spcent/plumego/core	func	DefaultConfig	func DefaultConfigfunc() AppConfig
 symbol	github.com/spcent/plumego/core	func	New	func Newfunc(cfg AppConfig, dependencies AppDependencies) *App
+symbol	github.com/spcent/plumego/core	func	NewLifecycleGroup	func NewLifecycleGroupfunc() *LifecycleGroup
 symbol	github.com/spcent/plumego/core	method	App.AddRoute	func (App) AddRoutefunc(method, path string, handler http.Handler, opts ...router.RouteOption) error
 symbol	github.com/spcent/plumego/core	method	App.Any	func (App) Anyfunc(path string, handler http.Handler, opts ...router.RouteOption) error
 symbol	github.com/spcent/plumego/core	method	App.Delete	func (App) Deletefunc(path string, handler http.Handler) error
@@ -24,6 +25,13 @@ symbol	github.com/spcent/plumego/core	method	App.Server	func (App) Serverfunc() 
 symbol	github.com/spcent/plumego/core	method	App.Shutdown	func (App) Shutdownfunc(ctx context.Context) error
 symbol	github.com/spcent/plumego/core	method	App.URL	func (App) URLfunc(name string, params ...string) string
 symbol	github.com/spcent/plumego/core	method	App.Use	func (App) Usefunc(middlewares ...middleware.Middleware) error
+symbol	github.com/spcent/plumego/core	method	Component.Ready	func (Component) Readyfunc(ctx context.Context) error
+symbol	github.com/spcent/plumego/core	method	Component.Start	func (Component) Startfunc(ctx context.Context) error
+symbol	github.com/spcent/plumego/core	method	Component.Stop	func (Component) Stopfunc(ctx context.Context) error
+symbol	github.com/spcent/plumego/core	method	LifecycleGroup.Add	func (LifecycleGroup) Addfunc(name string, c Lifecycle) *LifecycleGroup
+symbol	github.com/spcent/plumego/core	method	LifecycleGroup.Ready	func (LifecycleGroup) Readyfunc(ctx context.Context) error
+symbol	github.com/spcent/plumego/core	method	LifecycleGroup.Start	func (LifecycleGroup) Startfunc(ctx context.Context) error
+symbol	github.com/spcent/plumego/core	method	LifecycleGroup.Stop	func (LifecycleGroup) Stopfunc(ctx context.Context) error
 symbol	github.com/spcent/plumego/core	method	RouteGroup.AddRoute	func (RouteGroup) AddRoutefunc(method, path string, handler http.Handler, opts ...router.RouteOption) error
 symbol	github.com/spcent/plumego/core	method	RouteGroup.Delete	func (RouteGroup) Deletefunc(path string, handler http.Handler) error
 symbol	github.com/spcent/plumego/core	method	RouteGroup.Get	func (RouteGroup) Getfunc(path string, handler http.Handler) error
@@ -34,7 +42,13 @@ symbol	github.com/spcent/plumego/core	method	RouteGroup.Put	func (RouteGroup) Pu
 symbol	github.com/spcent/plumego/core	type	App	type App struct { }
 symbol	github.com/spcent/plumego/core	type	AppConfig	type AppConfig struct { Addr string TLS TLSConfig Router RouterConfig ReadTimeout time.Duration ReadHeaderTimeout time.Duration WriteTimeout time.Duration IdleTimeout time.Duration MaxHeaderBytes int HTTP2Enabled bool DrainInterval time.Duration }
 symbol	github.com/spcent/plumego/core	type	AppDependencies	type AppDependencies struct { Logger log.StructuredLogger }
+symbol	github.com/spcent/plumego/core	type	Component	type Component struct { Name string OnStart func(ctx context.Context) error OnStop func(ctx context.Context) error OnReady func(ctx context.Context) error }
+symbol	github.com/spcent/plumego/core	type	Lifecycle	type Lifecycle interface { Start(ctx context.Context) error Stop(ctx context.Context) error Ready(ctx context.Context) error }
+symbol	github.com/spcent/plumego/core	type	LifecycleGroup	type LifecycleGroup struct { }
 symbol	github.com/spcent/plumego/core	type	PreparationState	type PreparationState string
+symbol	github.com/spcent/plumego/core	type	ReadyChecker	type ReadyChecker interface { Ready(ctx context.Context) error }
 symbol	github.com/spcent/plumego/core	type	RouteGroup	type RouteGroup struct { }
 symbol	github.com/spcent/plumego/core	type	RouterConfig	type RouterConfig struct { MethodNotAllowed bool }
+symbol	github.com/spcent/plumego/core	type	Starter	type Starter interface { Start(ctx context.Context) error }
+symbol	github.com/spcent/plumego/core	type	Stopper	type Stopper interface { Stop(ctx context.Context) error }
 symbol	github.com/spcent/plumego/core	type	TLSConfig	type TLSConfig struct { Enabled bool CertFile string KeyFile string }
