@@ -370,79 +370,37 @@ func (s *aiDocumentSaver) SaveAIDocument(ctx context.Context, title, content, _ 
 	return result.ID, nil
 }
 
-// routeReg is a helper that collects route registration errors.
+// routeAdder is the minimal interface shared by *core.App and *core.RouteGroup,
+// allowing routeReg to register on either without a type switch.
+type routeAdder interface {
+	Get(path string, h http.Handler) error
+	Post(path string, h http.Handler) error
+	Put(path string, h http.Handler) error
+	Delete(path string, h http.Handler) error
+}
+
+// routeReg wraps a routeAdder and retains the first registration error so the
+// route table stays one method + one path + one handler per line. This is the
+// canonical error-accumulating registration pattern documented in the root
+// style guide §5; reference/standard-service/internal/app/routes.go is the
+// reference implementation.
 type routeReg struct {
-	core *core.App
-	err  error
-}
-
-func newRouteReg(c *core.App) *routeReg {
-	return &routeReg{core: c}
-}
-
-func (rr *routeReg) get(path string, h http.Handler) {
-	if rr.err != nil {
-		return
-	}
-	rr.err = rr.core.Get(path, h)
-}
-
-func (rr *routeReg) post(path string, h http.Handler) {
-	if rr.err != nil {
-		return
-	}
-	rr.err = rr.core.Post(path, h)
-}
-
-func (rr *routeReg) put(path string, h http.Handler) {
-	if rr.err != nil {
-		return
-	}
-	rr.err = rr.core.Put(path, h)
-}
-
-func (rr *routeReg) delete(path string, h http.Handler) {
-	if rr.err != nil {
-		return
-	}
-	rr.err = rr.core.Delete(path, h)
-}
-
-type groupRouteReg struct {
-	group *core.RouteGroup
+	adder routeAdder
 	err   error
 }
 
-func newGroupRouteReg(g *core.RouteGroup) *groupRouteReg {
-	return &groupRouteReg{group: g}
-}
+func newRouteReg(adder routeAdder) *routeReg { return &routeReg{adder: adder} }
 
-func (rr *groupRouteReg) get(path string, h http.Handler) {
-	if rr.err != nil {
-		return
-	}
-	rr.err = rr.group.Get(path, h)
-}
+func (r *routeReg) get(path string, h http.Handler)    { r.record(r.adder.Get(path, h)) }
+func (r *routeReg) post(path string, h http.Handler)   { r.record(r.adder.Post(path, h)) }
+func (r *routeReg) put(path string, h http.Handler)    { r.record(r.adder.Put(path, h)) }
+func (r *routeReg) delete(path string, h http.Handler) { r.record(r.adder.Delete(path, h)) }
 
-func (rr *groupRouteReg) post(path string, h http.Handler) {
-	if rr.err != nil {
-		return
+// record stores the first non-nil error; subsequent errors are dropped.
+func (r *routeReg) record(err error) {
+	if r.err == nil {
+		r.err = err
 	}
-	rr.err = rr.group.Post(path, h)
-}
-
-func (rr *groupRouteReg) put(path string, h http.Handler) {
-	if rr.err != nil {
-		return
-	}
-	rr.err = rr.group.Put(path, h)
-}
-
-func (rr *groupRouteReg) delete(path string, h http.Handler) {
-	if rr.err != nil {
-		return
-	}
-	rr.err = rr.group.Delete(path, h)
 }
 
 // HTTPHandler returns the HTTP handler for the application.

@@ -117,6 +117,25 @@ func registerRoutes(app *core.App) error {
 - 必须保持 grep 友好——路径和处理函数可通过搜索发现
 - 分组：仅用于路径前缀和共享中间件
 
+### 累积错误的路由注册
+
+内联的 `if err != nil` 形式适用于路由很少的小型路由表。当服务的路由超过寥寥数条时，
+用一个小的累积器包装 `routeAdder`，只保留首个错误，让路由表保持每条路由一行：
+
+```go
+func (a *App) RegisterRoutes() error {
+    v1 := newRouteReg(a.Core.Group("/api/v1"))
+    v1.get("/items", http.HandlerFunc(items.List))
+    v1.post("/items", writeGuard(http.HandlerFunc(items.Create)))
+    v1.get("/items/:id", http.HandlerFunc(items.GetByID))
+    return v1.err // 首个注册错误，或 nil
+}
+```
+
+这是被认可的规范模式，而非被禁止的路由注册习语：它保持每行一个方法 + 一个路径 +
+一个处理函数，将首个错误返回给调用方，且不引入反射、发现机制或隐藏策略。
+`reference/standard-service`（`internal/app/routes.go`）是规范实现。
+
 ## 处理函数风格
 
 规范签名：

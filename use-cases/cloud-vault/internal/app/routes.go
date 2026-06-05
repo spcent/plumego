@@ -21,7 +21,7 @@ func (a *App) RegisterRoutes() error {
 	}
 
 	// API v1
-	v1 := newGroupRouteReg(a.Core.Group("/api/v1"))
+	v1 := newRouteReg(a.Core.Group("/api/v1"))
 
 	// Health (public)
 	v1.get("/health", http.HandlerFunc(a.healthLive))

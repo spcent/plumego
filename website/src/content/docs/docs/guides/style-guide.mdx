@@ -117,6 +117,28 @@ func registerRoutes(app *core.App) error {
 - Must remain grep-friendly — path and handler discoverable by search
 - Groups: path prefix and shared middleware only
 
+### Error-accumulating registration
+
+The inline `if err != nil` form is canonical for very small route tables. Once a
+service has more than a few routes, wrap a `routeAdder` in a small accumulator
+that retains the first error, so the route map stays one line per route:
+
+```go
+func (a *App) RegisterRoutes() error {
+    v1 := newRouteReg(a.Core.Group("/api/v1"))
+    v1.get("/items", http.HandlerFunc(items.List))
+    v1.post("/items", writeGuard(http.HandlerFunc(items.Create)))
+    v1.get("/items/:id", http.HandlerFunc(items.GetByID))
+    return v1.err // first registration error, or nil
+}
+```
+
+This is a sanctioned canonical pattern, not a forbidden registration idiom: it
+keeps one method + one path + one handler per line, returns the first error to
+the caller, and adds no reflection, discovery, or hidden policy.
+`reference/standard-service` (`internal/app/routes.go`) is the canonical
+implementation.
+
 ## Handler style
 
 Canonical signature:

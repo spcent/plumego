@@ -130,6 +130,69 @@ func registerRoutes(app *core.App) error {
 - Must remain grep-friendly — path and handler discoverable by search
 - Groups: path prefix and shared middleware only; not for hidden policy or service injection
 
+### Error-accumulating registration (canonical for multi-route tables)
+
+The inline `if err := app.Get(...); err != nil { return err }` form above is
+canonical for very small route tables. Once a service has more than a few
+routes, the per-line error checks dominate the file and bury the route map. The
+canonical way to keep the table visually flat while still returning the first
+registration error is a small local accumulator wrapper:
+
+```go
+// routeAdder is the minimal interface shared by *core.App and *core.RouteGroup.
+type routeAdder interface {
+    Get(path string, h http.Handler) error
+    Post(path string, h http.Handler) error
+    Put(path string, h http.Handler) error
+    Patch(path string, h http.Handler) error
+    Delete(path string, h http.Handler) error
+}
+
+// routeReg wraps a routeAdder and retains the first registration error.
+type routeReg struct {
+    adder routeAdder
+    err   error
+}
+
+func newRouteReg(adder routeAdder) *routeReg { return &routeReg{adder: adder} }
+
+func (r *routeReg) get(path string, h http.Handler)  { r.record(r.adder.Get(path, h)) }
+func (r *routeReg) post(path string, h http.Handler) { r.record(r.adder.Post(path, h)) }
+// … put / patch / delete follow the same one-line shape …
+
+func (r *routeReg) record(err error) {
+    if r.err == nil {
+        r.err = err
+    }
+}
+```
+
+```go
+func (a *App) RegisterRoutes() error {
+    root := newRouteReg(a.Core)
+    root.get("/healthz", http.HandlerFunc(health.Live))
+    root.get("/readyz", http.HandlerFunc(health.Ready))
+    if root.err != nil {
+        return root.err
+    }
+
+    v1 := newRouteReg(a.Core.Group("/api/v1"))
+    v1.get("/items", http.HandlerFunc(items.List))
+    v1.post("/items", writeGuard(http.HandlerFunc(items.Create)))
+    v1.get("/items/:id", http.HandlerFunc(items.GetByID))
+    return v1.err
+}
+```
+
+This is a **sanctioned canonical pattern**, not a forbidden "new registration
+idiom". It preserves one method + one path + one handler per line, returns the
+first error to the caller, stays grep-friendly, and adds no reflection,
+discovery, annotation routing, or hidden policy. Retaining only the first error
+is correct: route-registration failures (duplicate path, nil handler) are
+programming mistakes that surface one at a time. `reference/standard-service`
+(`internal/app/routes.go`) is the canonical implementation — copy that wrapper
+rather than inventing a per-app variant.
+
 ---
 
 ## 6. Handler Style
@@ -361,7 +424,7 @@ Default behavior:
 Do not introduce:
 - New response helper families
 - New handler signatures
-- New route registration idioms
+- New route registration idioms beyond the sanctioned accumulator wrapper (§5) — no reflection, annotation, or discovery routing
 - New service locator patterns
 - New implicit DTO flow through middleware
 - New business logic inside middleware
