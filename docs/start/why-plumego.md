@@ -3,10 +3,6 @@
 Plumego is not a Gin replacement. It is not a faster Echo. It does not compete
 on request throughput benchmarks or middleware count.
 
-Release benchmark evidence is recorded separately in
-`docs/evidence/benchmarks/results-v1.1.0.md`; those numbers are for regression context,
-not the adoption claim.
-
 Plumego is a toolkit for teams that need their Go services to remain
 understandable and auditable after the first hundred pull requests — and for
 codebases where both human engineers and AI coding agents share maintenance
@@ -51,19 +47,8 @@ change is expected and the compatibility promise is correspondingly lighter.
 ## Stable Root Boundaries
 
 Each stable root has a narrow, explicit scope. These boundaries are enforced by
-`internal/checks/dependency-rules`.
-
-| Package | Owns | Does not own |
-|---|---|---|
-| `core` | App lifecycle, server assembly, graceful shutdown, middleware attachment | DI containers, config loading, ORM, task scheduling |
-| `router` | Route matching, path params, group nesting, reverse routing | Controller scanning, annotation routing, response formatting |
-| `contract` | Transport-level response/error helpers, request metadata, context accessors, request binding | Business DTOs, domain error types, service injection |
-| `middleware` | Transport-level cross-cutting: logging, recovery, timeout, CORS, auth adapters, rate-limiting | Business authorization, tenant policy, domain logic, service lookups |
-| `security` | JWT, password utilities, security header policies, input safety, abuse-guard primitives | Full account systems, OAuth platforms, session storage |
-| `store` | Storage contracts and idempotency records | ORM, query builders, migration runners, connection pooling |
-| `health` | Health and readiness check models, check registration | HTTP handler ownership, external orchestration, service-mesh sidecar policy |
-| `log` | Structured logging contracts and default logger | Log aggregation backends, log shipping, cloud-provider logging SDKs |
-| `metrics` | Metrics contracts and basic collectors | Prometheus/OpenTelemetry exporters, dashboards, alert rules |
+`internal/checks/dependency-rules`. For detailed ownership tables, see
+`docs/concepts/core-boundary.md`.
 
 Before adding anything to a stable root, ask three questions:
 
@@ -162,8 +147,8 @@ for specific capability families, using the same explicit wiring pattern:
 `main.run` owns process signals, `app.Start(ctx)` owns server runtime, and
 business examples live under `internal/domain/<name>`.
 
-See `docs/concepts/agent-first-repo-blueprint.md` for how the reference
-layer fits into the overall repository structure.
+See `AGENTS.md §3` for how the reference layer fits into the overall
+repository structure.
 
 ---
 
@@ -177,7 +162,7 @@ Plumego ships release evidence alongside every tagged release:
 - extension maturity check output
 
 This means the compatibility claim is verifiable, not assumed. See
-`docs/release/PRE_V1_RELEASE_CHECKLIST.md` for the full evidence model.
+`docs/release/v1.0.0.md` and `docs/release/v1.1.0.md` for the release evidence.
 
 ---
 
@@ -188,8 +173,8 @@ in maintenance alongside human engineers. Machine-readable specs, per-module
 manifests, standardized check commands, and scoped task cards give agents a
 clear operating model.
 
-See `docs/operations/agent-first-operating-reference.md` for the full agent-first design rationale and
-mechanism reference.
+See `AGENTS.md` for the full agent-first design rationale and mechanism
+reference.
 
 ---
 

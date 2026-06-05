@@ -10,7 +10,7 @@ summary: WebSocket extension surface for hub primitives, explicit route registra
 entrypoint_reads:
   - AGENTS.md
   - docs/reference/canonical-style-guide.md
-  - docs/concepts/agent-first-repo-blueprint.md
+  - AGENTS.md
   - specs/repo.yaml
   - specs/task-routing.yaml
   - specs/dependency-rules.yaml

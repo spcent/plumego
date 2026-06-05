@@ -75,7 +75,7 @@ Read:
 2. `docs/operations/agent-context-budget.md`
 3. `docs/operations/codex-workflow.md`
 4. `docs/reference/canonical-style-guide.md`
-5. `docs/concepts/agent-first-repo-blueprint.md`
+5. `AGENTS.md` (repository structure and agent operating model)
 6. `specs/task-routing.yaml`
 7. `specs/repo.yaml`
 8. `specs/dependency-rules.yaml`

@@ -8,7 +8,7 @@ export const ROADMAP_FACTS = {
     "repo-wide quality gates in `Makefile` and `.github/workflows/quality-gates.yml`",
     "stable-root compatibility policy in `docs/reference/deprecation.md`",
     "stable-root exported API baseline snapshots under `docs/evidence/stable-api/snapshots`",
-    "release evidence checklist under `docs/release/PRE_V1_RELEASE_CHECKLIST.md`",
+    "release evidence for each tagged version under `docs/release/v<tag>.md`",
     "beta promotion checklist and card template under `docs/release/PROMOTION_CARD_TEMPLATE.md`",
     "`x/rest`, `x/websocket`, `x/gateway`, and `x/observability` promoted to `beta`",
     "`v1.0.0` tagged on May 15, 2026; release notes and evidence in `docs/release/v1.0.0.md`"

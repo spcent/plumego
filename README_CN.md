@@ -129,7 +129,7 @@ Plumego 使用 agent-first 控制面维护仓库：`docs/` 解释架构，`specs
 展示规范装配方式。`internal/checks/` 下的检查会在本地和 CI 中执行关键边界验证，
 让自动化修改带着可审查证据进入 review，而不是依赖隐含约定。完整模型和采用路径见
 [`docs/concepts/agent-first.md`](./docs/concepts/agent-first.md)，详细内部操作参考见
-[`docs/operations/agent-first-operating-reference.md`](./docs/operations/agent-first-operating-reference.md)。
+[`AGENTS.md`](./AGENTS.md)。
 
 ## 获取帮助
 

@@ -66,17 +66,24 @@ Related execution surfaces live outside `docs/`:
 
 ## Reference Apps
 
-- `../reference/standard-service/README.md` — canonical application layout and the default first read
-- `../reference/production-service/README.md` — production-oriented explicit wiring beyond the minimal canonical path
-- `../reference/with-rest/README.md` — explicit `x/rest` mounting pattern
-- `../reference/with-tenant/README.md` — explicit `x/tenant` mounting pattern
-- `../reference/with-gateway/README.md` — explicit `x/gateway` mounting pattern
-- `../reference/with-websocket/README.md` — explicit `x/websocket` mounting pattern
-- `../reference/with-ai/README.md` — explicit stable-tier `x/ai` mounting pattern
-- `../reference/with-ops/README.md` — explicit observability and protected admin surface mounting pattern
-- `../reference/with-messaging/README.md` — explicit app-facing messaging mounting pattern
-- `../reference/with-webhook/README.md` — explicit webhook ingress and outbound delivery mounting pattern
-- `../use-cases/workerfleet/README.md` — worker-fleet monitoring use-case, not part of the canonical web-service path
+**Canonical layout:**
+- `../reference/standard-service/README.md` — canonical application layout (default first read)
+- `../reference/production-service/README.md` — production-oriented explicit wiring
+
+**Extension patterns:**
+- `../reference/with-rest/README.md` — `x/rest` mounting
+- `../reference/with-tenant/README.md` — `x/tenant` mounting
+- `../reference/with-gateway/README.md` — `x/gateway` mounting
+- `../reference/with-websocket/README.md` — `x/websocket` mounting
+- `../reference/with-ai/README.md` — `x/ai` mounting
+- `../reference/with-ops/README.md` — observability and protected admin surface
+- `../reference/with-messaging/README.md` — app-facing messaging
+- `../reference/with-webhook/README.md` — webhook ingress and outbound delivery
+
+**Use cases** (not part of canonical web-service path):
+- `../use-cases/cloud-vault/README.md` — cloud vault service
+- `../use-cases/dbadmin/README.md` — database administration tooling
+- `../use-cases/workerfleet/README.md` — worker-fleet monitoring
 
 ## Authority Order
 

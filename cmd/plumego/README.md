@@ -73,7 +73,7 @@ the supported install path is building from a checked-out Plumego repository.
 
 Before release notes can advertise `go install
 github.com/spcent/plumego/cmd/plumego@<tag>`, maintainers must run the tagged
-install smoke test from `docs/release/PRE_V1_RELEASE_CHECKLIST.md` against the
+install smoke test from `docs/release/v1.0.0.md` against the
 actual release tag and record the result.
 
 ### Verify Installation

@@ -124,5 +124,5 @@ Canonical next reads after this reference:
 
 1. `docs/README.md`
 2. `docs/reference/canonical-style-guide.md`
-3. `docs/concepts/agent-first-repo-blueprint.md`
+3. `AGENTS.md`
 4. `specs/task-routing.yaml`

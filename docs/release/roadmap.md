@@ -16,7 +16,7 @@ Plumego already has the following in place:
 - repo-wide quality gates in `Makefile` and `.github/workflows/quality-gates.yml`
 - stable-root compatibility policy in `docs/reference/deprecation.md`
 - stable-root exported API baseline snapshots under `docs/evidence/stable-api/snapshots`
-- release evidence checklist under `docs/release/PRE_V1_RELEASE_CHECKLIST.md`
+- release evidence for each tagged version under `docs/release/v<tag>.md`
 - beta promotion checklist and card template under `docs/release/PROMOTION_CARD_TEMPLATE.md`
 - `x/rest`, `x/websocket`, `x/gateway`, and `x/observability` promoted to `beta`
   at v0.1.0–v0.2.0 with release-backed API snapshots and owner sign-off on record
@@ -181,8 +181,8 @@ Work completed:
   multi-tenant API, edge gateway, realtime, AI, and observability work without
   treating `x/*` packages as application bootstrap paths
 - `docs/concepts/agent-first.md` added as external-facing agent-first design overview
-- `docs/README.md` updated to distinguish `agent-first.md` (internal operating reference)
-  from `AGENT_FIRST.md` (external design overview)
+- `docs/README.md` updated to distinguish `agent-first.md` (external design overview)
+  from `AGENTS.md` (internal operating reference)
 - website module primers added for `x/rpc`, `x/openapi`, and `x/validate`
 - `x/tenant` and `x/frontend` stability labels corrected to Beta across website and sidebar
 
@@ -308,8 +308,8 @@ Non-goals:
 
 - keep `docs/evidence/stable-api/README.md` and checked-in snapshots aligned with stable
   root API surface; compare against the previous release before each new release
-- use `docs/release/PRE_V1_RELEASE_CHECKLIST.md` as the base evidence checklist
-  before tagging any release candidate
+- follow the evidence shape in `docs/release/v1.0.0.md` and
+  `docs/release/PROMOTION_CARD_TEMPLATE.md` before tagging any release candidate
 - keep extension beta blockers in `specs/extension-beta-evidence.yaml` until
   two concrete release refs, matching snapshots, and owner sign-off exist
 

@@ -166,7 +166,7 @@ None at v1.0.
 
 - `docs/release/roadmap.md` — phased development plan
 - `docs/evidence/stable-api/README.md` — stable-root exported API baseline and snapshot regeneration
-- `docs/release/PRE_V1_RELEASE_CHECKLIST.md` — release gate evidence checklist
+- `docs/release/v<tag>.md` — release notes and evidence per tagged version
 - `docs/reference/extension-stability-policy.md` — criteria for promoting `x/*` modules from experimental to beta or ga
 - `<module>/module.yaml` — module owners, risk levels, and default validation
 - `docs/reference/canonical-style-guide.md` — coding standards

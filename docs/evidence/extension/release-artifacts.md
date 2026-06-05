@@ -4,8 +4,8 @@ This note defines how checked-in release evidence artifacts are recorded for
 `x/*` `beta` candidates.
 
 Stable-root API baseline artifacts live separately under
-`docs/evidence/stable-api/snapshots/`. Use `docs/release/POST_V1_EVIDENCE.md` as the
-first release evidence read after `v1.0.0`.
+`docs/evidence/stable-api/snapshots/`. Release evidence for each tagged version
+is recorded in `docs/release/v<tag>.md`.
 
 ## Current Release Ref State
 

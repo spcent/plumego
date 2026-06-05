@@ -8,7 +8,7 @@ Read this before making any change to `core`, `router`, `contract`, `middleware`
 `security`, `store`, `health`, `log`, or `metrics`.
 
 For machine-readable boundary rules, see `specs/dependency-rules.yaml`.
-For the full repository shape, see `docs/concepts/agent-first-repo-blueprint.md`.
+For the full repository shape, see `AGENTS.md §3`.
 
 ---
 
