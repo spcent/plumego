@@ -1,25 +1,17 @@
 # CLAUDE.md
 
-Entry point for all agent types (Claude Code, Codex, Cursor, …). It delegates to
-AGENTS.md via the @-import below. **AGENTS.md is authoritative — edit it, not this file.**
+Entry point for all agent types (Claude Code, Codex, Cursor, …); delegates to AGENTS.md via the @-import below. **AGENTS.md is authoritative — edit it, not this file.**
 
 ---
 
-## Codebase Snapshot (v1.1.0 · Go 1.26+ · single module)
+## Snapshot (v1.1.0 · Go 1.26+ · single module)
 
-`github.com/spcent/plumego` — a stdlib web toolkit for Go. Stable roots have zero
-runtime deps; `x/*` extensions may use external deps.
+`github.com/spcent/plumego` — a stdlib web toolkit for Go. Stable roots have zero runtime deps; `x/*` extensions may use external deps.
 
-| Layer | Packages | Notes |
-|---|---|---|
-| Stable roots (GA) | `core` `router` `contract` `middleware` `security` `store` `health` `log` `metrics` | stdlib-only; no `x/*` imports |
-| Extensions (beta) | `x/frontend` `x/gateway` `x/messaging` `x/observability` `x/rest` `x/tenant` `x/websocket` | production-ready, caveats |
-| Extensions (experimental) | `x/ai` `x/data` `x/fileapi` `x/openapi` `x/resilience` `x/rpc` `x/validate` | APIs may change |
-| Reference apps | `reference/*` (16) | each has own `go.mod` |
-| Use-case apps | `use-cases/{workerfleet,cloud-vault,dbadmin,guardus}` | each has own `go.mod` |
-| CLI | `cmd/plumego` | agent-assist, codegen, validation, scaffold |
-| Validation | `internal/checks/` (11 programs) | via `make gates` |
-| Docs site | `website/` | Astro; `make website-sync` |
+- **Stable roots (GA):** `core router contract middleware security store health log metrics` — stdlib-only, no `x/*` imports
+- **Extensions:** 14 `x/*` (beta + experimental) — see AGENTS §3
+- **Reference apps:** `reference/*` (16, own `go.mod`); **use-cases:** `workerfleet cloud-vault dbadmin guardus` (own `go.mod`)
+- **CLI:** `cmd/plumego` · **Validation:** `internal/checks/` (11 programs, via `make gates`) · **Docs site:** `website/` (Astro, `make website-sync`)
 
 ### Key commands
 
