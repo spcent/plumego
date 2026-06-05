@@ -113,6 +113,17 @@ func TestValidateEngine_invalid(t *testing.T) {
 	}
 }
 
+func TestValidateDDLIdentifier(t *testing.T) {
+	if err := validateDDLIdentifier("table name", "users"); err != nil {
+		t.Fatalf("validateDDLIdentifier valid name: %v", err)
+	}
+	for _, name := range []string{"", strings.Repeat("x", 65), "bad\x00name"} {
+		if err := validateDDLIdentifier("table name", name); err == nil {
+			t.Errorf("validateDDLIdentifier(%q) = nil, want error", name)
+		}
+	}
+}
+
 // --- buildAlterTable rename ---
 
 func TestBuildAlterTable_renameMySQL(t *testing.T) {
@@ -150,6 +161,19 @@ func TestBuildAlterTable_renameWithBacktick(t *testing.T) {
 	}
 	if !strings.Contains(stmts[0], "new``name") {
 		t.Errorf("expected escaped backtick in rename stmt: %q", stmts[0])
+	}
+}
+
+func TestBuildAlterTable_quotesExistingTable(t *testing.T) {
+	stmts := buildAlterTable("my`db", "user`data", alterTableRequest{
+		AddColumns: []ColumnDef{{Name: "age", Type: "INT"}},
+	}, connection.DriverMySQL)
+	if len(stmts) != 1 {
+		t.Fatalf("len(stmts) = %d, want 1", len(stmts))
+	}
+	want := "ALTER TABLE `my``db`.`user``data` ADD COLUMN `age` INT"
+	if stmts[0] != want {
+		t.Errorf("got  %q\nwant %q", stmts[0], want)
 	}
 }
 

@@ -246,6 +246,8 @@ func (h QueryHandler) Execute(w http.ResponseWriter, r *http.Request) {
 				Type(contract.TypeBadRequest).Message("invalid database name: "+err.Error()).Build()))
 			return
 		}
+		// codeql[go/sql-injection]: database is validated as a single Mongo/SQL
+		// identifier segment and quoted with MySQL identifier escaping.
 		if _, err := db.ExecContext(ctx, "USE "+quoteIdent(req.Database, connection.DriverMySQL)); err != nil {
 			logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
 				Type(contract.TypeInternal).Message("failed to select database").Build()))
@@ -261,6 +263,10 @@ func (h QueryHandler) Execute(w http.ResponseWriter, r *http.Request) {
 			truncated = true
 		}
 
+		// codeql[go/sql-injection]: this endpoint is an explicit DB admin SQL
+		// console. Backend guardrails above enforce single-statement SQL,
+		// readonly connection blocking, dangerous-operation confirmation, and
+		// bounded SELECT result size before executing the requested statement.
 		rows, err := db.QueryContext(ctx, sqlStr)
 		if err != nil {
 			durationMs := time.Since(start).Milliseconds()
@@ -320,6 +326,9 @@ func (h QueryHandler) Execute(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Non-SELECT: use Exec.
+	// codeql[go/sql-injection]: this endpoint is an explicit DB admin SQL
+	// console. Mutating statements pass the same single-statement and dangerous
+	// SQL checks above, and readonly connections are blocked server-side.
 	res, err := db.ExecContext(ctx, sqlStr)
 	if err != nil {
 		durationMs := time.Since(start).Milliseconds()

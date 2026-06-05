@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"encoding/json"
 	"testing"
 
 	"go.mongodb.org/mongo-driver/bson"
@@ -251,9 +250,9 @@ func TestDetectDangerousAggregation_safe(t *testing.T) {
 
 func TestParseJSONFilter_valid(t *testing.T) {
 	filterStr := `{"status": "active", "age": {"$gt": 18}}`
-	var filter bson.M
-	if err := json.Unmarshal([]byte(filterStr), &filter); err != nil {
-		t.Fatalf("json.Unmarshal error=%v", err)
+	filter, err := parseMongoFilterJSON(filterStr)
+	if err != nil {
+		t.Fatalf("parseMongoFilterJSON error=%v", err)
 	}
 	if filter["status"] != "active" {
 		t.Errorf("filter[status]=%v, want active", filter["status"])
@@ -262,9 +261,59 @@ func TestParseJSONFilter_valid(t *testing.T) {
 
 func TestParseJSONFilter_invalid(t *testing.T) {
 	filterStr := `{invalid json`
-	var filter bson.M
-	if err := json.Unmarshal([]byte(filterStr), &filter); err == nil {
-		t.Errorf("json.Unmarshal should error for invalid JSON")
+	if _, err := parseMongoFilterJSON(filterStr); err == nil {
+		t.Errorf("parseMongoFilterJSON should error for invalid JSON")
+	}
+}
+
+func TestParseMongoFilterJSON_rejectsServerSideCode(t *testing.T) {
+	cases := []string{
+		`{"$where":"this.secret == true"}`,
+		`{"status":{"$function":{"body":"function(){return true}","args":[],"lang":"js"}}}`,
+		`{"$expr":{"$accumulator":{"init":"function(){}"}}}`,
+		`{"items":{"$elemMatch":{"$expr":{"$gt":["$a","$b"]}}}}`,
+	}
+	for _, raw := range cases {
+		if _, err := parseMongoFilterJSON(raw); err == nil {
+			t.Errorf("parseMongoFilterJSON(%s) = nil, want error", raw)
+		}
+	}
+}
+
+func TestParseMongoProjectionJSON_rejectsOperators(t *testing.T) {
+	if _, err := parseMongoProjectionJSON(`{"name":1,"_id":0}`); err != nil {
+		t.Fatalf("valid projection rejected: %v", err)
+	}
+	if _, err := parseMongoProjectionJSON(`{"$where":1}`); err == nil {
+		t.Fatal("expected projection operator to be rejected")
+	}
+}
+
+func TestParseMongoSortJSON_rejectsInvalidDirection(t *testing.T) {
+	if _, err := parseMongoSortJSON(`{"created_at":-1,"name":"asc"}`); err != nil {
+		t.Fatalf("valid sort rejected: %v", err)
+	}
+	if _, err := parseMongoSortJSON(`{"name":2}`); err == nil {
+		t.Fatal("expected invalid sort direction to be rejected")
+	}
+}
+
+func TestParseMongoPipelineJSON_rejectsUnsupportedStage(t *testing.T) {
+	if _, _, err := parseMongoPipelineJSON(`[{"$match":{"status":"active"}},{"$limit":10}]`); err != nil {
+		t.Fatalf("valid pipeline rejected: %v", err)
+	}
+	if _, _, err := parseMongoPipelineJSON(`[{"$where":"this.secret"}]`); err == nil {
+		t.Fatal("expected unsupported pipeline stage to be rejected")
+	}
+}
+
+func TestParseMongoPipelineJSON_detectsDangerousWriteStage(t *testing.T) {
+	_, dangerous, err := parseMongoPipelineJSON(`[{"$match":{"status":"active"}},{"$merge":{"into":"archive"}}]`)
+	if err != nil {
+		t.Fatalf("parseMongoPipelineJSON returned error: %v", err)
+	}
+	if !dangerous {
+		t.Fatal("expected $merge to be detected as dangerous")
 	}
 }
 

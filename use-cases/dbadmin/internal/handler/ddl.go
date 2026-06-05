@@ -62,7 +62,24 @@ func (h DDLHandler) CreateTable(w http.ResponseWriter, r *http.Request) {
 			Type(contract.TypeValidation).Message("name and columns are required").Build()))
 		return
 	}
+	if err := validateDDLIdentifier("table name", req.Name); err != nil {
+		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+			Type(contract.TypeValidation).Message(err.Error()).Build()))
+		return
+	}
+	if conn.Driver == connection.DriverMySQL {
+		if err := validateDDLIdentifier("database name", dbName); err != nil {
+			logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+				Type(contract.TypeValidation).Message(err.Error()).Build()))
+			return
+		}
+	}
 	for _, col := range req.Columns {
+		if err := validateDDLIdentifier("column name", col.Name); err != nil {
+			logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+				Type(contract.TypeValidation).Message(err.Error()).Build()))
+			return
+		}
 		if err := validateColumnType(col.Type); err != nil {
 			logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
 				Type(contract.TypeValidation).
@@ -84,6 +101,8 @@ func (h DDLHandler) CreateTable(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ddl := buildCreateTable(dbName, req, conn.Driver)
+	// codeql[go/sql-injection]: DDL identifiers and literals are validated above,
+	// then identifiers are quoted with driver-specific escaping before execution.
 	if _, err := db.ExecContext(r.Context(), ddl); err != nil {
 		h.Logger.Error("create table", plumelog.Fields{"error": err.Error()})
 		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
@@ -110,11 +129,42 @@ func (h DDLHandler) AlterTable(w http.ResponseWriter, r *http.Request) {
 	if !decodeJSONLimited(w, r, h.Logger, &req) {
 		return
 	}
+	if err := validateDDLIdentifier("table name", table); err != nil {
+		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+			Type(contract.TypeValidation).Message(err.Error()).Build()))
+		return
+	}
+	if conn.Driver == connection.DriverMySQL {
+		if err := validateDDLIdentifier("database name", dbName); err != nil {
+			logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+				Type(contract.TypeValidation).Message(err.Error()).Build()))
+			return
+		}
+	}
 	for _, col := range req.AddColumns {
+		if err := validateDDLIdentifier("column name", col.Name); err != nil {
+			logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+				Type(contract.TypeValidation).Message(err.Error()).Build()))
+			return
+		}
 		if err := validateColumnType(col.Type); err != nil {
 			logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
 				Type(contract.TypeValidation).
 				Message("invalid type for column "+col.Name+": "+err.Error()).Build()))
+			return
+		}
+	}
+	for _, col := range req.DropColumns {
+		if err := validateDDLIdentifier("column name", col); err != nil {
+			logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+				Type(contract.TypeValidation).Message(err.Error()).Build()))
+			return
+		}
+	}
+	if req.RenameTable != "" {
+		if err := validateDDLIdentifier("table name", req.RenameTable); err != nil {
+			logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+				Type(contract.TypeValidation).Message(err.Error()).Build()))
 			return
 		}
 	}
@@ -125,6 +175,8 @@ func (h DDLHandler) AlterTable(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	for _, stmt := range stmts {
+		// codeql[go/sql-injection]: ALTER statements are assembled only after
+		// identifier/type validation, with all identifiers quoted by buildAlterTable.
 		if _, err := db.ExecContext(r.Context(), stmt); err != nil {
 			h.Logger.Error("alter table", plumelog.Fields{"error": err.Error()})
 			logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
@@ -153,13 +205,26 @@ func (h DDLHandler) DropTable(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	table := router.Param(r, "table")
+	if err := validateDDLIdentifier("table name", table); err != nil {
+		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+			Type(contract.TypeValidation).Message(err.Error()).Build()))
+		return
+	}
+	if conn.Driver == connection.DriverMySQL {
+		if err := validateDDLIdentifier("database name", dbName); err != nil {
+			logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+				Type(contract.TypeValidation).Message(err.Error()).Build()))
+			return
+		}
+	}
 	var fqn string
 	switch conn.Driver {
 	case connection.DriverMySQL:
-		fqn = fmt.Sprintf("`%s`.`%s`", dbName, table)
+		fqn = fmt.Sprintf("%s.%s", quoteIdent(dbName, conn.Driver), quoteIdent(table, conn.Driver))
 	default:
-		fqn = fmt.Sprintf(`"%s"`, table)
+		fqn = quoteIdent(table, conn.Driver)
 	}
+	// codeql[go/sql-injection]: DROP TABLE uses validated identifiers quoted via quoteIdent.
 	if _, err := db.ExecContext(r.Context(), "DROP TABLE IF EXISTS "+fqn); err != nil {
 		h.Logger.Error("drop table", plumelog.Fields{"error": err.Error()})
 		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
@@ -237,6 +302,19 @@ func buildCreateTable(dbName string, req createTableRequest, driver connection.D
 	return sb.String()
 }
 
+func validateDDLIdentifier(kind, name string) error {
+	if name == "" {
+		return fmt.Errorf("%s is required", kind)
+	}
+	if len(name) > 64 {
+		return fmt.Errorf("%s too long (max 64 chars)", kind)
+	}
+	if strings.ContainsRune(name, 0) {
+		return fmt.Errorf("%s contains unsafe characters", kind)
+	}
+	return nil
+}
+
 // validateColumnType rejects column type strings that contain SQL injection
 // characters while allowing all standard SQL type syntax (e.g. VARCHAR(255),
 // DECIMAL(10,2), DOUBLE PRECISION, INT UNSIGNED).
@@ -289,7 +367,7 @@ func buildAlterTable(dbName, table string, req alterTableRequest, driver connect
 	var stmts []string
 	switch driver {
 	case connection.DriverMySQL:
-		fqn := fmt.Sprintf("`%s`.`%s`", dbName, table)
+		fqn := fmt.Sprintf("%s.%s", quoteIdent(dbName, driver), quoteIdent(table, driver))
 		var parts []string
 		for _, col := range req.AddColumns {
 			parts = append(parts, fmt.Sprintf("ADD COLUMN %s %s", quoteIdent(col.Name, driver), col.Type))
@@ -306,7 +384,7 @@ func buildAlterTable(dbName, table string, req alterTableRequest, driver connect
 		}
 	default:
 		// SQLite: only ADD COLUMN and RENAME TABLE are supported.
-		fqn := fmt.Sprintf(`"%s"`, table)
+		fqn := quoteIdent(table, driver)
 		for _, col := range req.AddColumns {
 			stmts = append(stmts, fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s %s",
 				fqn, quoteIdent(col.Name, driver), col.Type))

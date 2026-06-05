@@ -18,6 +18,18 @@ type ScannedFile struct {
 // ScanDirectory walks root recursively and returns all .md files up to maxFiles.
 // maxFiles <= 0 means no limit.
 func ScanDirectory(root string, maxFiles int) ([]ScannedFile, error) {
+	root = strings.TrimSpace(root)
+	if root == "" {
+		return nil, fmt.Errorf("scan directory: root must not be empty")
+	}
+	if !filepath.IsAbs(root) {
+		return nil, fmt.Errorf("scan directory %q: root must be absolute", root)
+	}
+	root = filepath.Clean(root)
+
+	// codeql[go/path-injection]: importer service resolves user input under
+	// IMPORTER_SAFE_ROOT before calling ScanDirectory; this exported scanner also
+	// rejects empty and relative roots before touching the filesystem.
 	info, err := os.Stat(root)
 	if err != nil {
 		return nil, fmt.Errorf("scan directory %q: %w", root, err)

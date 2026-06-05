@@ -113,6 +113,256 @@ func validateName(name string) error {
 	return nil
 }
 
+var allowedMongoQueryOperators = map[string]bool{
+	"$all":       true,
+	"$and":       true,
+	"$elemMatch": true,
+	"$eq":        true,
+	"$exists":    true,
+	"$gt":        true,
+	"$gte":       true,
+	"$in":        true,
+	"$lt":        true,
+	"$lte":       true,
+	"$ne":        true,
+	"$nin":       true,
+	"$nor":       true,
+	"$not":       true,
+	"$options":   true,
+	"$or":        true,
+	"$regex":     true,
+	"$size":      true,
+	"$type":      true,
+}
+
+var dangerousMongoExpressionOperators = map[string]bool{
+	"$accumulator": true,
+	"$function":    true,
+	"$where":       true,
+}
+
+var allowedAggregationStages = map[string]bool{
+	"$addFields":   true,
+	"$bucket":      true,
+	"$bucketAuto":  true,
+	"$count":       true,
+	"$facet":       true,
+	"$group":       true,
+	"$limit":       true,
+	"$lookup":      true,
+	"$match":       true,
+	"$merge":       true,
+	"$out":         true,
+	"$project":     true,
+	"$replaceRoot": true,
+	"$replaceWith": true,
+	"$sample":      true,
+	"$set":         true,
+	"$skip":        true,
+	"$sort":        true,
+	"$sortByCount": true,
+	"$unset":       true,
+	"$unwind":      true,
+}
+
+func parseMongoFilterJSON(raw string) (bson.M, error) {
+	if strings.TrimSpace(raw) == "" {
+		return bson.M{}, nil
+	}
+	var filter bson.M
+	if err := json.Unmarshal([]byte(raw), &filter); err != nil {
+		return nil, err
+	}
+	if err := validateMongoFilterDocument(filter); err != nil {
+		return nil, err
+	}
+	return filter, nil
+}
+
+func parseMongoProjectionJSON(raw string) (bson.M, error) {
+	if strings.TrimSpace(raw) == "" {
+		return nil, nil
+	}
+	var projection bson.M
+	if err := json.Unmarshal([]byte(raw), &projection); err != nil {
+		return nil, err
+	}
+	for key, value := range projection {
+		if err := validateMongoFieldKey(key); err != nil {
+			return nil, fmt.Errorf("projection %s", err)
+		}
+		switch v := value.(type) {
+		case bool:
+		case float64:
+			if v != 0 && v != 1 {
+				return nil, fmt.Errorf("projection value for %q must be 0 or 1", key)
+			}
+		default:
+			return nil, fmt.Errorf("projection value for %q must be 0, 1, or boolean", key)
+		}
+	}
+	return projection, nil
+}
+
+func parseMongoSortJSON(raw string) (bson.M, error) {
+	if strings.TrimSpace(raw) == "" {
+		return nil, nil
+	}
+	var sortDoc bson.M
+	if err := json.Unmarshal([]byte(raw), &sortDoc); err != nil {
+		return nil, err
+	}
+	for key, value := range sortDoc {
+		if err := validateMongoFieldKey(key); err != nil {
+			return nil, fmt.Errorf("sort %s", err)
+		}
+		switch v := value.(type) {
+		case float64:
+			if v != 1 && v != -1 {
+				return nil, fmt.Errorf("sort value for %q must be 1 or -1", key)
+			}
+		case string:
+			if v != "asc" && v != "desc" {
+				return nil, fmt.Errorf("sort value for %q must be asc or desc", key)
+			}
+		default:
+			return nil, fmt.Errorf("sort value for %q must be 1, -1, asc, or desc", key)
+		}
+	}
+	return sortDoc, nil
+}
+
+func parseMongoPipelineJSON(raw string) ([]any, bool, error) {
+	var pipeline []any
+	if err := json.Unmarshal([]byte(raw), &pipeline); err != nil {
+		return nil, false, err
+	}
+	hasDangerousWriteStage := false
+	for i, stage := range pipeline {
+		stageMap, ok := stage.(map[string]any)
+		if !ok {
+			return nil, false, fmt.Errorf("pipeline stage %d must be an object", i)
+		}
+		if len(stageMap) != 1 {
+			return nil, false, fmt.Errorf("pipeline stage %d must contain exactly one stage operator", i)
+		}
+		for stageName, value := range stageMap {
+			if !allowedAggregationStages[stageName] {
+				return nil, false, fmt.Errorf("unsupported aggregation stage %q", stageName)
+			}
+			if stageName == "$out" || stageName == "$merge" {
+				hasDangerousWriteStage = true
+			}
+			if stageName == "$match" {
+				if filter, ok := value.(map[string]any); ok {
+					if err := validateMongoFilterDocument(filter); err != nil {
+						return nil, false, err
+					}
+					continue
+				}
+			}
+			if err := validateNoDangerousMongoExpressions(value); err != nil {
+				return nil, false, err
+			}
+		}
+	}
+	return pipeline, hasDangerousWriteStage, nil
+}
+
+func validateMongoFilterDocument(doc map[string]any) error {
+	for key, value := range doc {
+		if err := validateMongoFilterKey(key); err != nil {
+			return err
+		}
+		if err := validateNoDangerousMongoExpressions(value); err != nil {
+			return err
+		}
+		if strings.HasPrefix(key, "$") {
+			switch key {
+			case "$and", "$or", "$nor":
+				items, ok := value.([]any)
+				if !ok {
+					return fmt.Errorf("%s value must be an array", key)
+				}
+				for _, item := range items {
+					nested, ok := item.(map[string]any)
+					if !ok {
+						return fmt.Errorf("%s entries must be objects", key)
+					}
+					if err := validateMongoFilterDocument(nested); err != nil {
+						return err
+					}
+				}
+			case "$not":
+				nested, ok := value.(map[string]any)
+				if !ok {
+					return fmt.Errorf("$not value must be an object")
+				}
+				if err := validateMongoFilterDocument(nested); err != nil {
+					return err
+				}
+			default:
+				if nested, ok := value.(map[string]any); ok {
+					if err := validateMongoFilterDocument(nested); err != nil {
+						return err
+					}
+				}
+			}
+			continue
+		}
+		if nested, ok := value.(map[string]any); ok {
+			if err := validateMongoFilterDocument(nested); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func validateMongoFilterKey(key string) error {
+	if key == "" || strings.ContainsRune(key, 0) {
+		return fmt.Errorf("query key contains unsafe characters")
+	}
+	if dangerousMongoExpressionOperators[key] {
+		return fmt.Errorf("query operator %q is not allowed", key)
+	}
+	if strings.HasPrefix(key, "$") && !allowedMongoQueryOperators[key] {
+		return fmt.Errorf("query operator %q is not supported", key)
+	}
+	return nil
+}
+
+func validateMongoFieldKey(key string) error {
+	if key == "" || strings.ContainsRune(key, 0) || strings.HasPrefix(key, "$") {
+		return fmt.Errorf("field name %q is not allowed", key)
+	}
+	return nil
+}
+
+func validateNoDangerousMongoExpressions(value any) error {
+	switch v := value.(type) {
+	case map[string]any:
+		for key, nested := range v {
+			if dangerousMongoExpressionOperators[key] {
+				return fmt.Errorf("operator %q is not allowed", key)
+			}
+			if strings.ContainsRune(key, 0) {
+				return fmt.Errorf("query key contains unsafe characters")
+			}
+			if err := validateNoDangerousMongoExpressions(nested); err != nil {
+				return err
+			}
+		}
+	case []any:
+		for _, item := range v {
+			if err := validateNoDangerousMongoExpressions(item); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
 // parseID accepts only ObjectID hex strings or plain string IDs.
 // This prevents user-controlled JSON values from being interpreted as other BSON scalar types.
 func parseID(idStr string) (any, error) {
@@ -408,30 +658,22 @@ func (h MongoDBHandler) QueryDocuments(w http.ResponseWriter, r *http.Request) {
 	operationID := h.registerOperation(cancel, "query", connID, req.Database+"."+req.Collection, "find documents")
 	defer h.unregisterOperation(operationID)
 
-	var filter bson.M
-	if req.Filter != "" {
-		if err := json.Unmarshal([]byte(req.Filter), &filter); err != nil {
-			h.badRequest(w, r, "invalid filter JSON: "+err.Error())
-			return
-		}
-	} else {
-		filter = bson.M{}
+	filter, err := parseMongoFilterJSON(req.Filter)
+	if err != nil {
+		h.badRequest(w, r, "invalid filter JSON: "+err.Error())
+		return
 	}
 
-	var projection bson.M
-	if req.Projection != "" {
-		if err := json.Unmarshal([]byte(req.Projection), &projection); err != nil {
-			h.badRequest(w, r, "invalid projection JSON: "+err.Error())
-			return
-		}
+	projection, err := parseMongoProjectionJSON(req.Projection)
+	if err != nil {
+		h.badRequest(w, r, "invalid projection JSON: "+err.Error())
+		return
 	}
 
-	var sort bson.M
-	if req.Sort != "" {
-		if err := json.Unmarshal([]byte(req.Sort), &sort); err != nil {
-			h.badRequest(w, r, "invalid sort JSON: "+err.Error())
-			return
-		}
+	sort, err := parseMongoSortJSON(req.Sort)
+	if err != nil {
+		h.badRequest(w, r, "invalid sort JSON: "+err.Error())
+		return
 	}
 
 	opts := options.Find().
@@ -446,6 +688,9 @@ func (h MongoDBHandler) QueryDocuments(w http.ResponseWriter, r *http.Request) {
 	}
 
 	start := time.Now()
+	// codeql[go/sql-injection]: this endpoint is an explicit MongoDB admin
+	// query surface. Database and collection names are validated, and filter,
+	// projection, and sort JSON are parsed through allowlisted structural checks.
 	cursor, err := client.Database(req.Database).Collection(req.Collection).Find(ctx, filter, opts)
 	if err != nil {
 		h.Logger.Error("query documents failed", plumelog.Fields{
@@ -478,6 +723,8 @@ func (h MongoDBHandler) QueryDocuments(w http.ResponseWriter, r *http.Request) {
 	durationMs := time.Since(start).Milliseconds()
 	h.logSlowQuery(connID, req.Database, req.Collection, "Find", req.Filter, durationMs)
 
+	// codeql[go/sql-injection]: CountDocuments uses the same validated MongoDB
+	// filter object as the Find call above.
 	total, err := client.Database(req.Database).Collection(req.Collection).CountDocuments(ctx, filter)
 	if err != nil {
 		h.Logger.Error("count documents failed", plumelog.Fields{
@@ -724,6 +971,9 @@ func (h MongoDBHandler) UpdateDocument(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// codeql[go/sql-injection]: update targets only the validated database and
+	// collection names, with _id parsed as ObjectID or plain string and the
+	// client document wrapped inside a fixed $set update document.
 	result, err := client.Database(req.Database).Collection(req.Collection).UpdateOne(
 		ctx,
 		bson.M{"_id": filterID},
@@ -819,6 +1069,8 @@ func (h MongoDBHandler) DeleteDocument(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// codeql[go/sql-injection]: delete targets only the validated database and
+	// collection names, with a fixed _id equality filter parsed by parseID.
 	result, err := client.Database(req.Database).Collection(req.Collection).DeleteOne(
 		ctx,
 		bson.M{"_id": filterID},
@@ -895,26 +1147,11 @@ func (h MongoDBHandler) Aggregate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Parse pipeline JSON array
-	var pipelineArray []any
-	if err := json.Unmarshal([]byte(req.Pipeline), &pipelineArray); err != nil {
+	// Parse pipeline JSON array and validate supported stage shape.
+	pipelineArray, hasDangerous, err := parseMongoPipelineJSON(req.Pipeline)
+	if err != nil {
 		h.badRequest(w, r, "invalid pipeline JSON: "+err.Error())
 		return
-	}
-
-	// Check for dangerous stages ($out, $merge)
-	hasDangerous := false
-	for _, stage := range pipelineArray {
-		if stageMap, ok := stage.(map[string]any); ok {
-			if _, hasOut := stageMap["$out"]; hasOut {
-				hasDangerous = true
-				break
-			}
-			if _, hasMerge := stageMap["$merge"]; hasMerge {
-				hasDangerous = true
-				break
-			}
-		}
 	}
 
 	// Block dangerous operations in readonly mode
@@ -941,6 +1178,9 @@ func (h MongoDBHandler) Aggregate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	startTime := time.Now()
+	// codeql[go/sql-injection]: aggregation pipeline JSON is restricted to
+	// supported stage operators; server-side JS operators are blocked, and $out
+	// or $merge require backend readonly/confirmation checks above.
 	cursor, err := client.Database(req.Database).Collection(req.Collection).Aggregate(ctx, pipeline)
 	if err != nil {
 		h.Logger.Error("aggregate failed", plumelog.Fields{
@@ -1487,15 +1727,15 @@ func (h MongoDBHandler) ExportDocuments(w http.ResponseWriter, r *http.Request) 
 	operationID := h.registerOperation(cancel, "export", connID, dbName+"."+collName, format+" export")
 	defer h.unregisterOperation(operationID)
 
-	filter := bson.M{}
-	if filterStr != "" {
-		if err := json.Unmarshal([]byte(filterStr), &filter); err != nil {
-			h.badRequest(w, r, "invalid filter JSON: "+err.Error())
-			return
-		}
+	filter, err := parseMongoFilterJSON(filterStr)
+	if err != nil {
+		h.badRequest(w, r, "invalid filter JSON: "+err.Error())
+		return
 	}
 
 	opts := options.Find().SetLimit(int64(limit + 1))
+	// codeql[go/sql-injection]: export is an explicit MongoDB admin query
+	// surface. Names and filter JSON are validated before this bounded Find.
 	cursor, err := client.Database(dbName).Collection(collName).Find(ctx, filter, opts)
 	if err != nil {
 		h.Logger.Error("export documents failed", plumelog.Fields{

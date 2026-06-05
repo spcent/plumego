@@ -13,6 +13,13 @@ func TestScanDirectory_notExist(t *testing.T) {
 	}
 }
 
+func TestScanDirectory_rejectsRelativeRoot(t *testing.T) {
+	_, err := ScanDirectory("relative/path", 0)
+	if err == nil {
+		t.Fatal("expected error for relative root")
+	}
+}
+
 func TestScanDirectory_notDir(t *testing.T) {
 	f, err := os.CreateTemp("", "*.md")
 	if err != nil {
