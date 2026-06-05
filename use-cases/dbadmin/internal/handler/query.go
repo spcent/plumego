@@ -241,6 +241,11 @@ func (h QueryHandler) Execute(w http.ResponseWriter, r *http.Request) {
 
 	// For MySQL, USE the selected database first.
 	if conn.Driver == connection.DriverMySQL && req.Database != "" {
+		if err := validateName(req.Database); err != nil {
+			logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+				Type(contract.TypeBadRequest).Message("invalid database name: "+err.Error()).Build()))
+			return
+		}
 		if _, err := db.ExecContext(ctx, "USE "+quoteIdent(req.Database, connection.DriverMySQL)); err != nil {
 			logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
 				Type(contract.TypeInternal).Message("failed to select database").Build()))

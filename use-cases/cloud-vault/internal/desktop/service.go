@@ -103,11 +103,8 @@ func (s *Service) ScanPreview(ctx context.Context, req *ScanPreviewRequest) (*Sc
 	if err != nil {
 		return nil, fmt.Errorf("get safe root path: %w", err)
 	}
-	safeRootWithSep := safeRoot
-	if !strings.HasSuffix(safeRootWithSep, string(os.PathSeparator)) {
-		safeRootWithSep += string(os.PathSeparator)
-	}
-	if absPath != safeRoot && !strings.HasPrefix(absPath, safeRootWithSep) {
+	rel, err := filepath.Rel(safeRoot, absPath)
+	if err != nil || strings.HasPrefix(rel, "..") {
 		return nil, fmt.Errorf("source_dir is outside allowed directory")
 	}
 
