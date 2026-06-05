@@ -67,6 +67,17 @@ public_entrypoints:
   - (*RouteGroup).Delete
   - (*RouteGroup).Patch
   - (*RouteGroup).AddRoute
+  - Lifecycle
+  - Starter
+  - Stopper
+  - ReadyChecker
+  - Component
+  - LifecycleGroup
+  - NewLifecycleGroup
+  - (*LifecycleGroup).Add
+  - (*LifecycleGroup).Start
+  - (*LifecycleGroup).Stop
+  - (*LifecycleGroup).Ready
 
 allowed_imports:
   - contract
