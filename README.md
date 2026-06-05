@@ -4,8 +4,8 @@
 [![Status](https://img.shields.io/badge/status-v1.1.0-blue)](https://github.com/spcent/plumego/releases/tag/v1.1.0)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-Plumego is a small Go HTTP toolkit built on the standard library. It keeps
-`net/http` compatibility at the center: handlers are ordinary
+Plumego is a small Go HTTP toolkit built on the standard library, keeping
+`net/http` compatibility at its center: handlers are ordinary
 `func(http.ResponseWriter, *http.Request)`, middleware wraps `http.Handler`,
 and application wiring stays explicit in your own `main` package.
 
@@ -15,7 +15,7 @@ The stable surface is intentionally narrow. Start with `core`, `router`,
 
 ## Quick Start
 
-Create `main.go`:
+`main.go`:
 
 ```go
 package main
@@ -48,7 +48,7 @@ func main() {
 }
 ```
 
-Run it:
+Run:
 
 ```bash
 go mod init example.com/hello
@@ -56,15 +56,10 @@ go get github.com/spcent/plumego@latest
 go run main.go
 ```
 
-Open `http://localhost:8080/ping`.
-
-For the production-style application layout, read
-[`reference/standard-service`](./reference/standard-service) after this
-example.
+Open `http://localhost:8080/ping`. For a production-style layout, read
+[`reference/standard-service`](./reference/standard-service) next.
 
 ## Choose Your Starting Point
-
-Pick the scenario that matches your project:
 
 | I want to build... | Start here |
 | --- | --- |
@@ -79,77 +74,71 @@ Pick the scenario that matches your project:
 | Observability (Prometheus / OpenTelemetry) | `reference/with-observability` → `x/observability` |
 | A tenant administration console | `reference/with-tenant-admin` → `x/tenant` |
 
-All paths keep `reference/standard-service` as the base layout. Extensions are
+All paths keep `reference/standard-service` as the base layout; extensions are
 explicit additions, not alternate bootstraps.
 
 ## Why plumego
 
-Plumego is for Go services that need more structure than raw `http.ServeMux`
-without taking on a large framework model.
+For Go services that need more structure than raw `http.ServeMux` without
+taking on a large framework model.
 
 | Principle | How plumego applies it |
 | --- | --- |
-| Standard library first | Uses ordinary handlers, middleware, requests, response writers, and `*http.Server` values. |
+| Standard library first | Ordinary handlers, middleware, requests, response writers, and `*http.Server`. |
 | Explicit wiring | Routes, middleware, dependencies, and lifecycle are visible at construction sites. |
-| Small stable surface | Stable roots have narrow ownership and avoid feature catalogs. |
-| Agent-friendly maintenance | `specs/`, `tasks/`, and per-module `module.yaml` files make scope and validation discoverable. |
+| Small stable surface | Stable roots have narrow ownership, not feature catalogs. |
+| Agent-friendly maintenance | `specs/`, `tasks/`, and per-module `module.yaml` make scope and validation discoverable. |
 | Optional capabilities | Product features and protocol adapters live outside the stable learning path. |
 
 ## stdlib comparison
 
 | Feature | `http.ServeMux` | plumego |
 | --- | --- | --- |
-| Basic routing | Method handling is caller-owned. | Method helpers such as `Get`, `Post`, and `AddRoute` register one method, one path, one handler. |
-| `{param}` path extraction | Caller parses path segments manually. | Route params are matched by the router and read from the request context. |
-| Route groups | Caller repeats prefixes manually. | Groups apply a prefix to related route registrations. |
-| Per-group middleware | Caller composes handlers manually per subtree. | Groups can carry shared middleware while preserving `http.Handler` shape. |
-| Named routes + reverse URL | Caller builds URLs manually. | Named routes support reverse URL generation through the app/router API. |
-| Route freeze after preparation | Routes can be changed whenever caller mutates wiring. | `Prepare` freezes route mutation before serving. |
-| Structured error responses | Caller defines every response shape. | `contract.WriteError` provides the canonical structured error path. |
-| Request ID context carriage | Caller chooses and propagates a convention. | Request ID helpers use explicit context accessors and middleware support. |
-| Graceful lifecycle | Caller builds server setup and shutdown policy. | `Prepare`, `Server`, and `Shutdown` keep lifecycle explicit and reusable. |
+| Basic routing | Method handling is caller-owned. | `Get`/`Post`/`AddRoute` register one method, path, handler. |
+| `{param}` extraction | Caller parses path segments manually. | Router matches params; read from request context. |
+| Route groups | Caller repeats prefixes manually. | Groups apply a shared prefix. |
+| Per-group middleware | Caller composes handlers per subtree. | Groups carry shared middleware, keeping `http.Handler` shape. |
+| Named routes + reverse URL | Caller builds URLs manually. | Reverse URL generation via the app/router API. |
+| Route freeze | Routes mutable whenever wiring changes. | `Prepare` freezes routes before serving. |
+| Structured errors | Caller defines every response shape. | `contract.WriteError` is the canonical error path. |
+| Request ID carriage | Caller picks and propagates a convention. | Explicit context accessors + middleware support. |
+| Graceful lifecycle | Caller builds setup and shutdown policy. | `Prepare`, `Server`, `Shutdown` keep it explicit and reusable. |
 
 ## Package overview
 
 | Package | Role |
 | --- | --- |
-| `core` | App construction, route registration entry points, middleware attachment, and server lifecycle. |
-| `router` | Route matching, path params, groups, route metadata, and reverse URL generation. |
-| `contract` | Canonical response writers, structured error builders, request metadata, and transport binding helpers. |
-| `middleware` | Transport-only middleware composition and first-party middleware packages. |
-| `security` | Authentication, JWT, password, security header, input-safety, and abuse guard primitives. |
-| `store` | Stable storage contracts and in-memory primitives for cache, KV, file, DB, and idempotency use. |
-| `health` | Health and readiness models for application and dependency status. |
-| `log` | Minimal logging interfaces and default logger implementation. |
-| `metrics` | Minimal metrics contracts for counters, gauges, timings, and collectors. |
+| `core` | App construction, route registration, middleware attachment, server lifecycle. |
+| `router` | Route matching, path params, groups, metadata, reverse URL generation. |
+| `contract` | Response writers, structured error builders, request metadata, transport binding. |
+| `middleware` | Transport-only middleware composition and first-party packages. |
+| `security` | Auth, JWT, password, security headers, input-safety, abuse guards. |
+| `store` | Stable storage contracts and in-memory primitives (cache, KV, file, DB, idempotency). |
+| `health` | Health/readiness models for app and dependency status. |
+| `log` | Minimal logging interfaces and a default logger. |
+| `metrics` | Minimal metrics contracts (counters, gauges, timings, collectors). |
 
-Optional capability families live under `x/*`. Treat them as additions to the
-stable root path, not as alternate application layouts.
+Optional capability families live under `x/*` — additions to the stable root
+path, not alternate layouts.
 
 ## Agent-First Design
 
 Plumego is maintained with an agent-first control plane: `docs/` explains the
 architecture, `specs/` records machine-checkable boundaries, `tasks/` defines
-reviewable execution units, and `reference/` shows canonical wiring. The checks
-under `internal/checks/` enforce the most important boundaries locally and in
-CI, so automated changes produce reviewable evidence instead of relying on
-implicit convention. See [`docs/concepts/agent-first.md`](./docs/concepts/agent-first.md) for the
-external model and adoption path, and
+reviewable execution units, and `reference/` shows canonical wiring. Checks
+under `internal/checks/` enforce key boundaries locally and in CI, so automated
+changes produce reviewable evidence instead of implicit convention. See
+[`docs/concepts/agent-first.md`](./docs/concepts/agent-first.md) for the model
+and adoption path, and
 [`docs/operations/agent-first-operating-reference.md`](./docs/operations/agent-first-operating-reference.md)
-for the detailed internal operating reference.
+for the internal operating reference.
 
 ## Getting Help
 
-- Start with [`docs/start/getting-started.md`](./docs/start/getting-started.md) for the
-  smallest runnable walkthrough.
-- Use [`reference/standard-service`](./reference/standard-service) as the
-  canonical app layout.
-- Read [`docs/reference/canonical-style-guide.md`](./docs/reference/canonical-style-guide.md) for
-  handler, middleware, routing, and dependency-injection conventions.
-- Browse [`docs/modules`](./docs/modules) for package-specific primers.
-- Check [`docs/start/adoption-path.md`](./docs/start/adoption-path.md) for the 5-minute,
-  30-minute, and 1-day adoption path.
-- See [`docs/start/troubleshooting.md`](./docs/start/troubleshooting.md) for common
-  problems: route freeze, middleware order, JWT errors, and lifecycle issues.
-- See [`docs/evidence/benchmarks/README.md`](./docs/evidence/benchmarks/README.md) for
-  performance comparisons with Chi, Gin, and Echo.
+- [`docs/start/getting-started.md`](./docs/start/getting-started.md) — smallest runnable walkthrough.
+- [`reference/standard-service`](./reference/standard-service) — canonical app layout.
+- [`docs/reference/canonical-style-guide.md`](./docs/reference/canonical-style-guide.md) — handler, middleware, routing, DI conventions.
+- [`docs/modules`](./docs/modules) — package-specific primers.
+- [`docs/start/adoption-path.md`](./docs/start/adoption-path.md) — 5-minute, 30-minute, 1-day adoption path.
+- [`docs/start/troubleshooting.md`](./docs/start/troubleshooting.md) — route freeze, middleware order, JWT errors, lifecycle issues.
+- [`docs/evidence/benchmarks/README.md`](./docs/evidence/benchmarks/README.md) — performance vs Chi, Gin, Echo.
