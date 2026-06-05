@@ -167,9 +167,9 @@ _ = app.Delete("/users/{id}", deleteUserHandler)
 ```go
 import "github.com/spcent/plumego/router"
 
-app.Get("/users/{id}", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+app.Get("/users/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
     id := router.Param(r, "id")
-    // id 现在是路径中 {id} 的实际值
+    // id 现在是路径中 :id 的实际值
 }))
 ```
 

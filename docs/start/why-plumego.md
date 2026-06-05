@@ -101,9 +101,20 @@ app.Get("/ping",  handlers.Ping)
 app.Post("/users", handlers.CreateUser)
 
 // Caller-owned lifecycle — explicit
+if err := app.Prepare(); err != nil {
+    log.Fatal(err)
+}
+srv, err := app.Server()
+if err != nil {
+    log.Fatal(err)
+}
 ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 defer stop()
-if err := app.Start(ctx); err != nil {
+go func() {
+    <-ctx.Done()
+    _ = app.Shutdown(context.Background())
+}()
+if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
     log.Printf("server stopped: %v", err)
 }
 ```
@@ -144,8 +155,8 @@ and architecture decision points back to it.
 Additional reference applications (`reference/with-rest`, `reference/with-gateway`,
 `reference/with-websocket`, etc.) demonstrate how to extend the standard shape
 for specific capability families, using the same explicit wiring pattern:
-`main.run` owns process signals, `app.Start(ctx)` owns server runtime, and
-business examples live under `internal/domain/<name>`.
+`run()` owns process signals and server lifecycle, `app.Prepare()` freezes
+routes, and business examples live under `internal/domain/<name>`.
 
 See `AGENTS.md §3` for how the reference layer fits into the overall
 repository structure.

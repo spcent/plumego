@@ -5,10 +5,11 @@ centers most request work on `echo.Context`; Plumego keeps request state in
 `*http.Request`, response writes on `http.ResponseWriter`, and dependencies in
 constructors.
 
-Use the standard-service project shape while migrating: `main.run` creates the
-process signal context and calls `app.Start(ctx)`, routes stay in
-`internal/app/routes.go`, handlers stay in `internal/handler`, and business
-models/repositories live under `internal/domain/<name>`.
+Use the standard-service project shape while migrating: `run()` owns the
+process signal context and server lifecycle (`app.Prepare`, `app.Server`,
+`srv.ListenAndServe`), routes stay in `internal/app/routes.go`, handlers stay
+in `internal/handler`, and business models/repositories live under
+`internal/domain/<name>`.
 
 ## Concept Mapping
 

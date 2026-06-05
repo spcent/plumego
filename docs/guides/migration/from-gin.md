@@ -5,10 +5,11 @@ It is a translation guide, not a compatibility layer. Start from
 `reference/standard-service` and keep handlers in the canonical
 `func(http.ResponseWriter, *http.Request)` shape.
 
-Use the standard-service project shape while migrating: `main.run` creates the
-process signal context and calls `app.Start(ctx)`, routes stay in
-`internal/app/routes.go`, handlers stay in `internal/handler`, and business
-models/repositories live under `internal/domain/<name>`.
+Use the standard-service project shape while migrating: `run()` owns the
+process signal context and server lifecycle (`app.Prepare`, `app.Server`,
+`srv.ListenAndServe`), routes stay in `internal/app/routes.go`, handlers stay
+in `internal/handler`, and business models/repositories live under
+`internal/domain/<name>`.
 
 ## Concept Mapping
 

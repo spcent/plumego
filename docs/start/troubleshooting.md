@@ -37,9 +37,9 @@ srv.ListenAndServe()
 2. **Trailing slash.** `/users` and `/users/` are distinct routes. Register
    both if you need both, or redirect in a middleware.
 
-3. **Param syntax.** Path parameters use `{param}` notation in some contexts
-   and `:param` in others — confirm which syntax your router version accepts
-   by checking `docs/modules/router/README.md`.
+3. **Param syntax.** Path parameters use `:param` notation (e.g. `/users/:id`).
+   Confirm the parameter name matches between the route pattern and the
+   `router.Param(r, "id")` call.
 
 4. **Group prefix collision.** A group registered with `/api/v1` and a route
    registered with `/api/v1/users` both produce `/api/v1/api/v1/users` if
