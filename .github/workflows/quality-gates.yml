@@ -21,7 +21,10 @@ permissions:
 jobs:
   go-quality-gates:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      pull-requests: write
 
     steps:
       - name: Checkout
@@ -128,7 +131,7 @@ jobs:
       - name: Enforce stable-module coverage baseline
         run: |
           set -euo pipefail
-          go test -coverprofile=/tmp/plumego-stable.cover ./core ./router ./middleware/... ./contract ./security/... ./store/... >/tmp/stable-cover.log
+          go test -coverprofile=/tmp/plumego-stable.cover ./core ./router ./middleware/... ./contract ./security/... ./store/... ./health ./log ./metrics >/tmp/stable-cover.log
           total="$(go tool cover -func=/tmp/plumego-stable.cover | awk '/^total:/ {gsub("%","",$3); print $3}')"
           echo "Stable-module total coverage: ${total}%"
           min=70.0
@@ -138,6 +141,101 @@ jobs:
             tail -n 50 /tmp/stable-cover.log || true
             exit 1
           }
+
+      - name: Code coverage analysis
+        id: coverage
+        run: |
+          set -euo pipefail
+
+          go test -coverprofile=/tmp/plumego-full.cover -covermode=atomic -timeout 120s ./...
+          go tool cover -func=/tmp/plumego-full.cover | tee /tmp/coverage-func.txt
+          go tool cover -html=/tmp/plumego-full.cover -o /tmp/coverage.html
+
+          total="$(awk '/^total:/ {print $NF}' /tmp/coverage-func.txt)"
+          echo "total_coverage=${total}" >> "$GITHUB_OUTPUT"
+
+          cat > /tmp/gen-coverage-comment.py << 'PYEOF'
+          import re
+
+          with open('/tmp/coverage-func.txt') as f:
+              lines = f.read().strip().splitlines()
+
+          total_line = next(l for l in lines if l.startswith('total:'))
+          total = total_line.split()[-1]
+          total_num = float(total.rstrip('%'))
+          badge = '✅' if total_num >= 70.0 else '⚠️'
+
+          pkg_lines = [l for l in lines if not l.startswith('total:')]
+
+          def pct(line):
+              m = re.search(r'([\d.]+)%', line)
+              return float(m.group(1)) if m else 999.0
+
+          lowest = sorted(pkg_lines, key=pct)[:15]
+
+          print(f'## Code Coverage Report {badge}')
+          print()
+          print(f'**Total coverage: {total}** (gate: ≥70%)')
+          print()
+          print('<details>')
+          print('<summary>15 packages with lowest coverage</summary>')
+          print()
+          print('```')
+          for l in lowest:
+              print(l)
+          print('```')
+          print()
+          print('</details>')
+          print()
+          print('> Full HTML report available as the `coverage-report` workflow artifact (30-day retention).')
+          PYEOF
+
+          python3 /tmp/gen-coverage-comment.py > /tmp/coverage-comment.md
+          cat /tmp/coverage-comment.md
+
+      - name: Upload coverage artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: |
+            /tmp/coverage-func.txt
+            /tmp/coverage.html
+          retention-days: 30
+
+      - name: Comment coverage summary on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const body = fs.readFileSync('/tmp/coverage-comment.md', 'utf8');
+            const marker = '## Code Coverage Report';
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const existing = comments.find(
+              c => c.user.login === 'github-actions[bot]' && c.body.includes(marker)
+            );
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
 
   go-submodule-quality-gates:
     runs-on: ubuntu-latest
