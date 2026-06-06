@@ -45,70 +45,34 @@ func setupService(t *testing.T) (*Service, string) {
 	return svc, safeRoot
 }
 
-// --- resolveAndValidateSourcePath tests ---
+// --- source directory catalog tests ---
 
-func TestResolveAndValidateSourcePath_empty(t *testing.T) {
-	root := t.TempDir()
-	t.Setenv(importerSafeRootEnv, root)
-
-	_, err := resolveAndValidateSourcePath("")
-	if err == nil {
-		t.Fatal("expected error for empty path")
+func TestService_ListSources(t *testing.T) {
+	svc, safeRoot := setupService(t)
+	for _, name := range []string{"docs", "notes"} {
+		if err := os.Mkdir(filepath.Join(safeRoot, name), 0o755); err != nil {
+			t.Fatal(err)
+		}
 	}
-}
-
-func TestResolveAndValidateSourcePath_whitespaceOnly(t *testing.T) {
-	root := t.TempDir()
-	t.Setenv(importerSafeRootEnv, root)
-
-	_, err := resolveAndValidateSourcePath("   ")
-	if err == nil {
-		t.Fatal("expected error for whitespace-only path")
-	}
-}
-
-func TestResolveAndValidateSourcePath_valid(t *testing.T) {
-	root := t.TempDir()
-	t.Setenv(importerSafeRootEnv, root)
-
-	// Create a subdirectory inside the safe root.
-	sub := filepath.Join(root, "subdir")
-	if err := os.Mkdir(sub, 0o755); err != nil {
+	if err := os.Mkdir(filepath.Join(safeRoot, ".hidden"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 
-	resolved, err := resolveAndValidateSourcePath("subdir")
+	result, err := svc.ListSources()
 	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+		t.Fatalf("ListSources: %v", err)
 	}
-	if resolved != sub {
-		t.Errorf("want %q, got %q", sub, resolved)
+	ids := map[string]bool{}
+	for _, source := range result.Items {
+		ids[source.ID] = true
+		if source.RelPath == ".hidden" {
+			t.Fatal("hidden directory should not be listed")
+		}
 	}
-}
-
-func TestResolveAndValidateSourcePath_traversal(t *testing.T) {
-	root := t.TempDir()
-	t.Setenv(importerSafeRootEnv, root)
-
-	_, err := resolveAndValidateSourcePath("../../etc/passwd")
-	if err == nil {
-		t.Fatal("expected error for path traversal")
-	}
-}
-
-func TestResolveAndValidateSourcePath_rootItself(t *testing.T) {
-	root := t.TempDir()
-	t.Setenv(importerSafeRootEnv, root)
-
-	// Joining root with "." resolves to root itself, which should be allowed.
-	resolved, err := resolveAndValidateSourcePath(".")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	// resolved should equal root
-	rootAbs, _ := filepath.Abs(root)
-	if resolved != rootAbs {
-		t.Errorf("want %q, got %q", rootAbs, resolved)
+	for _, want := range []string{rootSourceID, sourceIDForRelPath("docs"), sourceIDForRelPath("notes")} {
+		if !ids[want] {
+			t.Fatalf("source id %q missing from %v", want, ids)
+		}
 	}
 }
 
@@ -129,7 +93,7 @@ func TestService_CreateJob_valid(t *testing.T) {
 		}
 	}
 
-	resp, err := svc.CreateJob(ctx, CreateJobRequest{SourcePath: "docs"})
+	resp, err := svc.CreateJob(ctx, CreateJobRequest{SourceID: sourceIDForRelPath("docs")})
 	if err != nil {
 		t.Fatalf("CreateJob: %v", err)
 	}
@@ -148,19 +112,19 @@ func TestService_CreateJob_invalidPath(t *testing.T) {
 	ctx := context.Background()
 	svc, _ := setupService(t)
 
-	_, err := svc.CreateJob(ctx, CreateJobRequest{SourcePath: ""})
-	if err == nil {
-		t.Fatal("expected error for empty source_path")
+	_, err := svc.CreateJob(ctx, CreateJobRequest{SourceID: ""})
+	if !errors.Is(err, ErrInvalidSource) {
+		t.Fatalf("expected ErrInvalidSource for empty source_id, got %v", err)
 	}
 }
 
-func TestService_CreateJob_traversal(t *testing.T) {
+func TestService_CreateJob_unknownSourceID(t *testing.T) {
 	ctx := context.Background()
 	svc, _ := setupService(t)
 
-	_, err := svc.CreateJob(ctx, CreateJobRequest{SourcePath: "../../somewhere"})
-	if err == nil {
-		t.Fatal("expected error for path traversal")
+	_, err := svc.CreateJob(ctx, CreateJobRequest{SourceID: "dir_unknown"})
+	if !errors.Is(err, ErrInvalidSource) {
+		t.Fatalf("expected ErrInvalidSource for unknown source_id, got %v", err)
 	}
 }
 
@@ -173,7 +137,7 @@ func TestService_CreateJob_noMdFiles(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	resp, err := svc.CreateJob(ctx, CreateJobRequest{SourcePath: "empty"})
+	resp, err := svc.CreateJob(ctx, CreateJobRequest{SourceID: sourceIDForRelPath("empty")})
 	if err != nil {
 		t.Fatalf("CreateJob: %v", err)
 	}
@@ -182,18 +146,18 @@ func TestService_CreateJob_noMdFiles(t *testing.T) {
 	}
 }
 
-func TestService_CreateJob_nameDefaultsToSourcePath(t *testing.T) {
+func TestService_CreateJob_nameDefaultsToSourceLabel(t *testing.T) {
 	ctx := context.Background()
 	svc, safeRoot := setupService(t)
 
 	srcDir := filepath.Join(safeRoot, "mydir")
 	os.Mkdir(srcDir, 0o755)
 
-	resp, err := svc.CreateJob(ctx, CreateJobRequest{SourcePath: "mydir"})
+	resp, err := svc.CreateJob(ctx, CreateJobRequest{SourceID: sourceIDForRelPath("mydir")})
 	if err != nil {
 		t.Fatalf("CreateJob: %v", err)
 	}
-	// Name defaults to SourcePath when not provided.
+	// Name defaults to the server-side source label when not provided.
 	if resp.Name == "" {
 		t.Error("Name should not be empty")
 	}
@@ -208,7 +172,7 @@ func TestService_GetJob(t *testing.T) {
 	srcDir := filepath.Join(safeRoot, "getjob")
 	os.Mkdir(srcDir, 0o755)
 
-	created, err := svc.CreateJob(ctx, CreateJobRequest{Name: "get-test", SourcePath: "getjob"})
+	created, err := svc.CreateJob(ctx, CreateJobRequest{Name: "get-test", SourceID: sourceIDForRelPath("getjob")})
 	if err != nil {
 		t.Fatalf("CreateJob: %v", err)
 	}
@@ -241,7 +205,7 @@ func TestService_ListJobs(t *testing.T) {
 	for _, name := range []string{"j1", "j2", "j3"} {
 		d := filepath.Join(safeRoot, name)
 		os.Mkdir(d, 0o755)
-		svc.CreateJob(ctx, CreateJobRequest{Name: name, SourcePath: name})
+		svc.CreateJob(ctx, CreateJobRequest{Name: name, SourceID: sourceIDForRelPath(name)})
 	}
 
 	result, err := svc.ListJobs(ctx, 10, 0)
@@ -290,7 +254,7 @@ func TestService_PauseJob(t *testing.T) {
 
 	d := filepath.Join(safeRoot, "pause")
 	os.Mkdir(d, 0o755)
-	created, _ := svc.CreateJob(ctx, CreateJobRequest{Name: "pausable", SourcePath: "pause"})
+	created, _ := svc.CreateJob(ctx, CreateJobRequest{Name: "pausable", SourceID: sourceIDForRelPath("pause")})
 
 	if err := svc.PauseJob(ctx, created.ID); err != nil {
 		t.Fatalf("PauseJob: %v", err)
@@ -311,7 +275,7 @@ func TestService_PauseJob_notPausable(t *testing.T) {
 
 	d := filepath.Join(safeRoot, "done")
 	os.Mkdir(d, 0o755)
-	created, _ := svc.CreateJob(ctx, CreateJobRequest{Name: "done-job", SourcePath: "done"})
+	created, _ := svc.CreateJob(ctx, CreateJobRequest{Name: "done-job", SourceID: sourceIDForRelPath("done")})
 
 	// Manually set status to done via cancel (which sets to cancelled) then test
 	svc.CancelJob(ctx, created.ID)
@@ -330,7 +294,7 @@ func TestService_CancelJob(t *testing.T) {
 
 	d := filepath.Join(safeRoot, "cancel")
 	os.Mkdir(d, 0o755)
-	created, _ := svc.CreateJob(ctx, CreateJobRequest{Name: "cancellable", SourcePath: "cancel"})
+	created, _ := svc.CreateJob(ctx, CreateJobRequest{Name: "cancellable", SourceID: sourceIDForRelPath("cancel")})
 
 	if err := svc.CancelJob(ctx, created.ID); err != nil {
 		t.Fatalf("CancelJob: %v", err)
@@ -357,7 +321,7 @@ func TestService_ListItems(t *testing.T) {
 		os.WriteFile(filepath.Join(d, name), []byte("# "+name), 0o644)
 	}
 
-	created, _ := svc.CreateJob(ctx, CreateJobRequest{Name: "items-job", SourcePath: "items"})
+	created, _ := svc.CreateJob(ctx, CreateJobRequest{Name: "items-job", SourceID: sourceIDForRelPath("items")})
 
 	result, err := svc.ListItems(ctx, created.ID, "", 10, 0)
 	if err != nil {
@@ -379,7 +343,7 @@ func TestService_ListItems_statusFilter(t *testing.T) {
 	os.Mkdir(d, 0o755)
 	os.WriteFile(filepath.Join(d, "a.md"), []byte("# A"), 0o644)
 
-	created, _ := svc.CreateJob(ctx, CreateJobRequest{Name: "filter-job", SourcePath: "filter"})
+	created, _ := svc.CreateJob(ctx, CreateJobRequest{Name: "filter-job", SourceID: sourceIDForRelPath("filter")})
 
 	// Filter for "success" — should return 0 since job hasn't run.
 	result, err := svc.ListItems(ctx, created.ID, "success", 10, 0)

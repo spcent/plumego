@@ -4,8 +4,20 @@ import "time"
 
 // CreateJobRequest creates a new import job.
 type CreateJobRequest struct {
-	Name       string `json:"name"`
-	SourcePath string `json:"source_path"`
+	Name     string `json:"name"`
+	SourceID string `json:"source_id"`
+}
+
+// SourceDirectory is a server-discovered import directory.
+type SourceDirectory struct {
+	ID      string `json:"id"`
+	Label   string `json:"label"`
+	RelPath string `json:"rel_path"`
+}
+
+// ListSourcesResponse lists directories that can be imported.
+type ListSourcesResponse struct {
+	Items []SourceDirectory `json:"items"`
 }
 
 // JobResponse is the API representation of an import job.

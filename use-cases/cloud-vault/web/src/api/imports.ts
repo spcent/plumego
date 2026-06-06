@@ -24,6 +24,16 @@ export interface ImportJobListResult {
   offset: number
 }
 
+export interface ImportSourceDirectory {
+  id: string
+  label: string
+  rel_path: string
+}
+
+export interface ImportSourceListResult {
+  items: ImportSourceDirectory[]
+}
+
 export interface ImportJobItem {
   id: string
   job_id: string
@@ -53,8 +63,12 @@ export const importsAPI = {
     return client.get<ImportJob>(`${BASE}/imports/${id}`)
   },
 
-  create(name: string, sourcePath: string): Promise<ImportJob> {
-    return client.post<ImportJob>(`${BASE}/imports`, { name, source_path: sourcePath })
+  listSources(): Promise<ImportSourceListResult> {
+    return client.get<ImportSourceListResult>(`${BASE}/imports/sources`)
+  },
+
+  create(name: string, sourceId: string): Promise<ImportJob> {
+    return client.post<ImportJob>(`${BASE}/imports`, { name, source_id: sourceId })
   },
 
   start(id: string): Promise<void> {

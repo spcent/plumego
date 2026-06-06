@@ -27,9 +27,6 @@ func ScanDirectory(root string, maxFiles int) ([]ScannedFile, error) {
 	}
 	root = filepath.Clean(root)
 
-	// codeql[go/path-injection]: importer service resolves user input under
-	// IMPORTER_SAFE_ROOT before calling ScanDirectory; this exported scanner also
-	// rejects empty and relative roots before touching the filesystem.
 	info, err := os.Stat(root)
 	if err != nil {
 		return nil, fmt.Errorf("scan directory %q: %w", root, err)

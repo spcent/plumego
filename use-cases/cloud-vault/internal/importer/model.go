@@ -6,6 +6,7 @@ import (
 )
 
 var ErrNotFound = errors.New("import job not found")
+var ErrInvalidSource = errors.New("invalid import source")
 
 // Job status constants.
 const (

@@ -74,7 +74,7 @@ See [Configuration Guide](docs/configuration.md) for all options.
 ## Importing Markdown
 
 1. Navigate to System → Import
-2. Select a directory containing Markdown files
+2. Select a server-discovered directory under `IMPORTER_SAFE_ROOT`
 3. Review scan preview (file count, size, duplicates)
 4. Click "Start Import"
 5. Monitor progress and retry failures

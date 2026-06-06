@@ -35,6 +35,16 @@ func (h *Handler) CreateJob(w http.ResponseWriter, r *http.Request) {
 	h.writeOK(w, r, http.StatusCreated, result)
 }
 
+// ListSources handles GET /api/v1/imports/sources.
+func (h *Handler) ListSources(w http.ResponseWriter, r *http.Request) {
+	result, err := h.svc.ListSources()
+	if err != nil {
+		h.writeErr(w, r, err)
+		return
+	}
+	h.writeOK(w, r, http.StatusOK, result)
+}
+
 // ListJobs handles GET /api/v1/imports
 func (h *Handler) ListJobs(w http.ResponseWriter, r *http.Request) {
 	limit := parseIntParam(r, "limit", 20, 100)
@@ -140,6 +150,11 @@ func (h *Handler) writeErr(w http.ResponseWriter, r *http.Request, err error) {
 		logWriteErr(h.logger, contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeNotFound).
 			Message("import job not found").
+			Build()))
+	case errors.Is(err, ErrInvalidSource):
+		logWriteErr(h.logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+			Type(contract.TypeBadRequest).
+			Message(err.Error()).
 			Build()))
 	default:
 		h.logger.Error("importer handler error", plumelog.Fields{"error": err.Error()})

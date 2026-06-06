@@ -15,18 +15,15 @@ Cloud Vault supports importing:
 
 ### 1. Directory Import (Recommended)
 
-Import an entire directory of Markdown files:
+Import an entire server-configured directory of Markdown files. The web and API
+flows do not accept arbitrary filesystem paths; they list directories under
+`IMPORTER_SAFE_ROOT` and submit the selected opaque `source_id`.
 
 **Via Web Interface**:
 1. Navigate to **Import** page
-2. Click **Import Directory**
-3. Select directory containing Markdown files
-4. Configure import options:
-   - **Recursive**: Import subdirectories
-   - **Auto-tag**: Generate tags from filenames/paths
-   - **Extract metadata**: Parse frontmatter
-   - **Detect duplicates**: Skip duplicate files
-5. Click **Start Import**
+2. Select one of the available source directories
+3. Enter an optional job name
+4. Click **Start Import**
 
 **Via CLI**:
 ```bash
@@ -39,14 +36,15 @@ Import an entire directory of Markdown files:
 
 **Via API**:
 ```bash
-curl -X POST http://localhost:8080/api/v1/import/directory \
+curl http://localhost:8080/api/v1/imports/sources \
+  -H "Authorization: Bearer $TOKEN"
+
+curl -X POST http://localhost:8080/api/v1/imports \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
-    "path": "/path/to/markdown/files",
-    "recursive": true,
-    "auto_tag": true,
-    "extract_metadata": true
+    "name": "Knowledge base import",
+    "source_id": "root"
   }'
 ```
 
@@ -307,26 +305,28 @@ Importing files... [=====>    ] 45% (450/1000)
 **Via API**:
 ```bash
 # List all import jobs
-curl http://localhost:8080/api/v1/import/jobs \
+curl http://localhost:8080/api/v1/imports \
   -H "Authorization: Bearer $TOKEN"
 
 # Get specific job
-curl http://localhost:8080/api/v1/import/jobs/123 \
+curl http://localhost:8080/api/v1/imports/job_123 \
   -H "Authorization: Bearer $TOKEN"
 ```
 
 Response:
 ```json
 {
-  "id": 123,
+  "id": "job_123",
   "status": "running",
-  "source": "/path/to/files",
-  "total_files": 1000,
-  "imported": 450,
-  "skipped": 3,
-  "failed": 0,
+  "source_path": ".",
+  "total_count": 1000,
+  "processed_count": 453,
+  "success_count": 450,
+  "skipped_count": 3,
+  "failed_count": 0,
   "started_at": "2026-01-15T10:00:00Z",
-  "progress": 45.0
+  "created_at": "2026-01-15T09:59:50Z",
+  "updated_at": "2026-01-15T10:00:10Z"
 }
 ```
 

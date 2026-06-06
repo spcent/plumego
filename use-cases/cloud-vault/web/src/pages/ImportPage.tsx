@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
-import { importsAPI, type ImportJob, type ImportJobItem } from '../api/imports'
-import { Badge, Button, EmptyState, Field, Panel, ProgressLine, SegmentedControl, SkeletonRows, StatusBanner, TextInput, cn } from '../components/ui'
+import { importsAPI, type ImportJob, type ImportJobItem, type ImportSourceDirectory } from '../api/imports'
+import { Badge, Button, EmptyState, Field, Panel, ProgressLine, SegmentedControl, SelectInput, SkeletonRows, StatusBanner, TextInput, cn } from '../components/ui'
 
 const ITEM_FILTERS = [
   { value: '', label: 'All' },
@@ -34,15 +34,17 @@ export default function ImportPage() {
   const [items, setItems] = useState<ImportJobItem[]>([])
   const [itemsLoading, setItemsLoading] = useState(false)
   const [itemFilter, setItemFilter] = useState('')
+  const [sources, setSources] = useState<ImportSourceDirectory[]>([])
 
   const [showForm, setShowForm] = useState(false)
   const [formName, setFormName] = useState('')
-  const [formPath, setFormPath] = useState('')
+  const [selectedSourceID, setSelectedSourceID] = useState('')
   const [creating, setCreating] = useState(false)
   const [createError, setCreateError] = useState('')
 
   useEffect(() => {
     loadJobs()
+    loadSources()
   }, [])
 
   useEffect(() => {
@@ -64,6 +66,17 @@ export default function ImportPage() {
       // Keep the current list visible if refresh fails.
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function loadSources() {
+    try {
+      const result = await importsAPI.listSources()
+      setSources(result.items)
+      setSelectedSourceID(current => current || result.items[0]?.id || '')
+    } catch (err) {
+      setSources([])
+      setCreateError(err instanceof Error ? err.message : 'Failed to load import directories')
     }
   }
 
@@ -100,14 +113,15 @@ export default function ImportPage() {
 
   async function handleCreate(e: FormEvent) {
     e.preventDefault()
-    if (!formPath.trim()) return
+    if (!selectedSourceID) return
     setCreating(true)
     setCreateError('')
     try {
-      const job = await importsAPI.create(formName || formPath, formPath.trim())
+      const source = sources.find(item => item.id === selectedSourceID)
+      const job = await importsAPI.create(formName || source?.label || selectedSourceID, selectedSourceID)
       setJobs(prev => [job, ...prev])
       setFormName('')
-      setFormPath('')
+      setSelectedSourceID(sources[0]?.id || '')
       setShowForm(false)
       await handleSelectJob(job)
     } catch (err) {
@@ -149,10 +163,14 @@ export default function ImportPage() {
                 <TextInput value={formName} onChange={e => setFormName(e.target.value)} placeholder="Research notes" />
               </Field>
               <Field label="Source directory" error={createError}>
-                <TextInput value={formPath} onChange={e => setFormPath(e.target.value)} placeholder="/Users/me/docs" required />
+                <SelectInput value={selectedSourceID} onChange={e => setSelectedSourceID(e.target.value)} required>
+                  {sources.map(source => (
+                    <option key={source.id} value={source.id}>{source.label}</option>
+                  ))}
+                </SelectInput>
               </Field>
               <div className="flex gap-2">
-                <Button type="submit" variant="primary" disabled={creating || !formPath.trim()}>
+                <Button type="submit" variant="primary" disabled={creating || !selectedSourceID}>
                   {creating ? 'Scanning...' : 'Create'}
                 </Button>
                 <Button variant="ghost" onClick={() => setShowForm(false)}>Cancel</Button>

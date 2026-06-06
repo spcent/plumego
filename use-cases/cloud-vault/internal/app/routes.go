@@ -77,6 +77,7 @@ func (a *App) RegisterRoutes() error {
 	// Import jobs (protected)
 	v1.get("/imports", a.requireAuth(http.HandlerFunc(a.Importer.ListJobs)))
 	v1.post("/imports", a.requireAuth(http.HandlerFunc(a.Importer.CreateJob)))
+	v1.get("/imports/sources", a.requireAuth(http.HandlerFunc(a.Importer.ListSources)))
 	v1.get("/imports/:id", a.requireAuth(http.HandlerFunc(a.Importer.GetJob)))
 	v1.post("/imports/:id/start", a.requireAuth(http.HandlerFunc(a.Importer.StartJob)))
 	v1.post("/imports/:id/pause", a.requireAuth(http.HandlerFunc(a.Importer.PauseJob)))
