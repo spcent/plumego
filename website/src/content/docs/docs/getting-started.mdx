@@ -8,6 +8,10 @@ sidebar:
 
 # Getting Started
 
+:::note[Prerequisites]
+Go 1.26 or later. Run `go version` to check. No other dependencies required for the quickest path — Plumego's stable roots are stdlib-only.
+:::
+
 ## Try it without installing anything
 
 Open the reference service directly in a browser-based dev environment — no local Go install needed:
@@ -69,9 +73,13 @@ Run and verify:
 
 ```bash
 go run .
+# 2026/06/06 00:00:00 server listening on :8080
+
 curl http://localhost:8080/ping
-# {"data":{"status":"ok"}}
+# {"data":{"status":"ok"},"request_id":""}
 ```
+
+The `data` wrapper and `request_id` field are part of the [contract response envelope](/docs/modules/contract). Add `middleware/requestid` before `app.Run()` to populate the request ID on every response.
 
 > **Two lifecycle patterns:** `app.Run()` is the combined path — prepare, wire, and start in one
 > call. If you need to inspect or wrap the `*http.Server` before it starts (custom TLS,

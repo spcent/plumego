@@ -66,6 +66,66 @@ main.go
   -> Start()
 ```
 
+## Key patterns from each file
+
+### `main.go` — load, build, start
+
+```go
+func main() {
+    cfg := config.Load()            // env → struct, explicit, no global
+    app := app.New(cfg)             // wire deps through constructors
+    app.RegisterRoutes()            // all routes in one place
+    app.Start()                     // Prepare → ListenAndServe with signal handling
+}
+```
+
+### `internal/app/app.go` — explicit wiring
+
+```go
+type App struct {
+    Core    *core.App
+    Handler *handler.APIHandler
+}
+
+func New(cfg *config.Config) *App {
+    logger := plog.NewLogger()
+    coreApp := core.New(core.DefaultConfig(), core.AppDependencies{Logger: logger})
+    return &App{
+        Core:    coreApp,
+        Handler: handler.New(logger),
+    }
+}
+```
+
+### `internal/app/routes.go` — one method, one path, one handler
+
+```go
+func (a *App) RegisterRoutes() {
+    a.Core.Get("/healthz",            http.HandlerFunc(a.Handler.Health.Live))
+    a.Core.Get("/readyz",             http.HandlerFunc(a.Handler.Health.Ready))
+    a.Core.Get("/api/v1/greet",       http.HandlerFunc(a.Handler.API.Greet))
+}
+```
+
+### `internal/handler/api.go` — stdlib-compatible handler
+
+```go
+type APIHandler struct{ Logger log.Logger }
+
+func (h APIHandler) Greet(w http.ResponseWriter, r *http.Request) {
+    name := r.URL.Query().Get("name")
+    if name == "" {
+        _ = contract.WriteError(w, r, contract.NewErrorBuilder().
+            Type(contract.TypeRequired).Detail("field", "name").Build())
+        return
+    }
+    _ = contract.WriteResponse(w, r, http.StatusOK,
+        map[string]string{"message": "hello, " + name}, nil)
+}
+```
+
+---
+
 ## Copy or do not infer
 
 | Safe to copy | Do not infer |

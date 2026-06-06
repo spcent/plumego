@@ -8,27 +8,44 @@ sidebar:
 
 # FAQ
 
+Common questions organized by topic. Jump to a section or scan the table below for the shortest path to the answer.
+
+| I want to know… | Jump to |
+| --- | --- |
+| Whether Plumego fits my project | [Fit check](#is-plumego-the-right-fit-for-my-team) |
+| How to build a REST API | [REST API](#how-do-i-build-a-rest-api-with-plumego) |
+| How to add authentication | [JWT Auth](#how-do-i-add-authentication-to-my-routes) |
+| How to connect a database | [Database](#how-do-i-connect-a-database) |
+| How Plumego compares to Gin/Echo/Chi | [Comparison](#how-do-plumego-and-gin--echo--chi-compare) |
+| Whether I can use it in production now | [Production readiness](#can-i-use-plumego-in-production-right-now) |
+| Router performance overhead | [Benchmarks](#what-is-the-routers-performance-overhead-vs-stdlib) |
+| Stable root vs x/* decision | [Module decision](#how-do-i-decide-between-a-stable-root-and-x) |
+| Custom error format | [Custom errors](#how-do-i-customize-the-error-response-format) |
+| Explicit DI rationale | [DI rationale](#why-does-plumego-use-explicit-di-instead-of-a-service-locator) |
+
+---
+
 ## Getting Started
 
-## Is Plumego the right fit for my team?
+### Is Plumego the right fit for my team?
 
 Read [When Not to Use Plumego](/docs/when-not-to-use) before committing to technical evaluation. That page lists the trade-offs Plumego makes deliberately — and the conditions under which a different tool is the better choice. The honest answer matters more than the feature list.
 
-## How do I build a REST API with Plumego?
+### How do I build a REST API with Plumego?
 
 Start with the four-step bootstrap from [Getting Started](/docs/getting-started), then register your routes using `app.Get`, `app.Post`, `app.Put`, and `app.Delete`. Use `contract.WriteResponse` for success responses and `contract.NewErrorBuilder` for error responses. The [Handle Errors guide](/docs/guides/handle-errors) and [Reference App](/docs/reference-app) show complete handler examples.
 
-## How do I add authentication to my routes?
+### How do I add authentication to my routes?
 
 Use `security/jwt` to issue and verify tokens, then protect routes with `middleware/auth`. The [Add JWT Auth guide](/docs/guides/add-jwt-auth) walks through the complete wiring in three steps.
 
-## How do I connect a database?
+### How do I connect a database?
 
 Import `github.com/spcent/plumego/store/db`, open a `*sql.DB` with `db.Open`, inject it through your application’s dependency struct, and pass it to handlers explicitly. The [Connect Database guide](/docs/guides/connect-database) covers connection pooling and context-based helpers.
 
 ## Framework Comparison
 
-## How do Plumego and Gin / Echo / Chi compare?
+### How do Plumego and Gin / Echo / Chi compare?
 
 All four are Go HTTP toolkits built on `net/http`. The key difference is philosophy:
 
@@ -38,25 +55,25 @@ All four are Go HTTP toolkits built on `net/http`. The key difference is philoso
 
 If you have existing Go HTTP handlers, they work in Plumego without modification.
 
-## Can I use Plumego for GraphQL?
+### Can I use Plumego for GraphQL?
 
 Yes. Plumego has no opinion about the HTTP body format — it transports JSON by default but any handler can write any content type. Mount a GraphQL handler (e.g. from `graph-gophers/graphql-go` or `99designs/gqlgen`) as a standard `http.Handler` on any route.
 
 ## Auth, Security, and Production
 
-## What is the recommended production configuration?
+### What is the recommended production configuration?
 
 Set `ReadHeaderTimeout` to `5s` (or less) to block slowloris attacks, tune `WriteTimeout` to match your longest handler path plus a margin, and set `IdleTimeout` below your load balancer’s idle timeout. See the [Configuration Model](/docs/concepts/configuration-model) for the full field reference.
 
-## How do I update routes without restarting?
+### How do I update routes without restarting?
 
 Plumego freezes the route table at `app.Prepare()` time. Dynamic routing (runtime route add/remove) is not a goal of the stable routing surface. For feature-flag routing, implement the branching logic inside a single handler rather than registering multiple routes.
 
-## What is Plumego trying to optimize for?
+### What is Plumego trying to optimize for?
 
 Plumego optimizes for explicit HTTP services built on the standard-library model. It prefers visible route wiring, visible bootstrap code, narrow stable roots, and a repository structure that agents can classify reliably.
 
-## Is Plumego a full-stack web framework?
+### Is Plumego a full-stack web framework?
 
 No. Plumego is a Go HTTP toolkit with strong opinions about explicit service structure. It does not try to hide application wiring behind framework magic.
 
@@ -64,13 +81,13 @@ The distinction matters in practice: Plumego keeps the standard `func(http.Respo
 
 What Plumego adds on top of the stdlib is: a trie-based router, an explicit middleware chain, a structured response and error contract, security helpers, and a lifecycle (`Prepare` → `Server` → `Shutdown`). It does not generate code, hide initialization in `init()`, or own global state. The wiring you write in main.go and internal/app is the full picture — there is no framework-owned bootstrap running in the background.
 
-## Why keep saying “stdlib-first”?
+### Why keep saying “stdlib-first”?
 
 Because the request and handler shape should stay close to `net/http`. Plumego wants services to remain legible to people who already understand the Go standard library.
 
 ## Module Stability
 
-## Can I use Plumego in production right now?
+### Can I use Plumego in production right now?
 
 Yes — with one caveat per tier:
 
@@ -80,7 +97,7 @@ Yes — with one caveat per tier:
 
 See [Stability](/stability) for the four-tier overview and [Releases](/releases) for the full module-by-module support matrix.
 
-## What is the router's performance overhead vs stdlib?
+### What is the router's performance overhead vs stdlib?
 
 Measured against Go 1.22+ `http.ServeMux` with `PathValue()` parameter extraction (the closest stdlib equivalent):
 
@@ -93,7 +110,7 @@ Measured against Go 1.22+ `http.ServeMux` with `PathValue()` parameter extractio
 
 The overhead covers per-request context injection (480 B, 5 allocs), parameter map construction, and middleware chain wiring. For typical handlers spending 1 ms–100 ms on I/O, router cost is 0.001%–0.1% of total request time. See the [full benchmark table on Releases](/releases) for all nine scenarios and methodology.
 
-## Where should I start?
+### Where should I start?
 
 Start from [Docs Home](/docs) if you still need help choosing the right first implementation page. From there, take one of these narrower paths:
 
@@ -104,47 +121,172 @@ Start from [Docs Home](/docs) if you still need help choosing the right first im
 
 That sequence is safer than scanning packages or concept pages at random.
 
-## How do I decide between a stable root and `x/*`?
+### How do I decide between a stable root and `x/*`?
 
 Use stable roots for long-lived transport and kernel primitives. Use `x/*` when the work is capability-specific, faster-moving, tenant-aware, protocol-specific, or likely to expand beyond the default learning path.
 
-## Does every package already carry a v1 stability promise?
+### Does every package already carry a v1 stability promise?
 
 No. Read [Release Posture](/docs/release-posture) and the public [Releases](/releases) page before assuming long-term compatibility.
 
-## Why is there a reference app?
+### Why is there a reference app?
 
 `reference/standard-service` provides one canonical application path. It shows how Plumego expects bootstrap, wiring, routing, and handlers to stay visible in code, but it does not replace the repository-boundary explanation on [Architecture](/architecture).
 
-## Is the repository control plane part of the product?
+### Is the repository control plane part of the product?
 
 It is part of how Plumego is meant to be used and maintained. Docs, specs, and task cards help contributors and agents classify work consistently, which is especially important for a repository with stable roots and multiple extension families.
 
-## Can I use `x/*` experimental packages in production?
+### Can I use `x/*` experimental packages in production?
 
 You can, but you accept the risk of API changes without a deprecation period. The `x/ai` stability tier table in [x/ai Primer](/docs/modules/x-ai) is the current model for how experimental subpackages are classified. Before depending on an experimental package in a stable service path, check `module.yaml` for the package's declared tier and consider wrapping the dependency behind an interface in your application so that upgrades remain local.
 
-## Can stable roots import from `x/*`?
+### Can stable roots import from `x/*`?
 
 No. This is a hard boundary. Stable roots (`core`, `router`, `contract`, `middleware`, `security`, `store`, `health`, `log`, `metrics`) must never depend on extension packages. Extension packages may depend on stable roots. Violating this boundary is a stop condition. Verify with the dependency boundary check: `go run ./internal/checks/dependency-rules`.
 
 ## Advanced Patterns
 
-## How do I customize the error response format?
+### How do I customize the error response format?
 
 Use `contract.NewErrorBuilder()` to construct errors with the canonical type, message, and optional details. If your service needs a different wire format for errors, implement a custom `contract.WriteError`-equivalent in your application and keep it consistent across all handlers. Do not inline custom error formatting in individual handlers.
 
-## How do I do simple multi-tenancy without `x/tenant`?
+### How do I do simple multi-tenancy without `x/tenant`?
 
 If you only need to extract a tenant identifier from a header and pass it to storage queries, do it explicitly in your handler or a thin application middleware using `r.Header.Get("X-Tenant-ID")` and pass it through the call chain. Reach for `x/tenant` when you need enforced policy evaluation, per-tenant quota, JWT-backed session state, or tenant-aware store adapters at scale.
 
-## What is the difference between `middleware` and `x/resilience`?
+### What is the difference between `middleware` and `x/resilience`?
 
 `middleware` handles transport-layer concerns for inbound requests: access logging, request IDs, CORS, timeout enforcement, rate limiting of incoming traffic, and recovery. `x/resilience` handles outbound call protection: circuit breakers and rate limiters that wrap calls made from your service to external dependencies. If you are protecting an inbound route, start from `middleware`. If you are wrapping an outbound call to a database or upstream API, start from `x/resilience`.
 
-## Why does Plumego use explicit DI instead of a service locator?
+### Why does Plumego use explicit DI instead of a service locator?
 
 Explicit constructor injection keeps dependencies visible at the call site and in grep. Hidden service locators (global registries, `context.Value` as a service bag) make it impossible to know at a glance what a handler depends on. Plumego treats this as a first-class constraint: no hidden globals and no context-based service location.
+
+### How do I read path parameters in a handler?
+
+Use `router.Param(r, "name")` to read named path parameters set by the router:
+
+```go
+import "github.com/spcent/plumego/router"
+
+// Route registered as: app.Get("/users/:id", ...)
+func (h *Handler) GetUser(w http.ResponseWriter, r *http.Request) {
+    id := router.Param(r, "id")
+    if id == "" {
+        _ = contract.WriteError(w, r, contract.NewErrorBuilder().
+            Type(contract.TypeRequired).
+            Detail("param", "id").
+            Build())
+        return
+    }
+    // use id...
+}
+```
+
+For wildcard routes registered with `*name`, the same `router.Param(r, "name")` call returns everything after the matched prefix.
+
+### How do I return paginated results?
+
+Pass pagination metadata in the `meta` argument of `contract.WriteResponse`:
+
+```go
+func (h *Handler) ListItems(w http.ResponseWriter, r *http.Request) {
+    page, _ := strconv.Atoi(r.URL.Query().Get("page"))
+    if page < 1 {
+        page = 1
+    }
+    items, total := h.Repo.List(r.Context(), page, 20)
+
+    _ = contract.WriteResponse(w, r, http.StatusOK, items, map[string]any{
+        "total": total,
+        "page":  page,
+        "limit": 20,
+    })
+}
+```
+
+The response envelope becomes:
+
+```json
+{
+  "data": [...],
+  "meta": { "total": 142, "page": 2, "limit": 20 },
+  "request_id": "req-abc-123"
+}
+```
+
+### How do I group routes under a common prefix?
+
+Use `app.Group(prefix)` to create a route group. All routes registered on the group inherit the prefix:
+
+```go
+v1 := app.Group("/api/v1")
+v1.Get("/users",       http.HandlerFunc(handler.ListUsers))
+v1.Post("/users",      http.HandlerFunc(handler.CreateUser))
+v1.Get("/users/:id",   http.HandlerFunc(handler.GetUser))
+v1.Delete("/users/:id", http.HandlerFunc(handler.DeleteUser))
+```
+
+Groups only affect URL prefix — middleware must still be registered via `app.Use`.
+
+### How do I serve static files?
+
+Use `app.Router().Static(prefix, dir)` to serve files from a directory:
+
+```go
+app.Router().Static("/assets", "./public")
+// GET /assets/logo.png → ./public/logo.png
+```
+
+Or embed files with `go:embed` and use `StaticFS`:
+
+```go
+//go:embed public
+var publicFS embed.FS
+
+app.Router().StaticFS("/assets", http.FS(publicFS))
+```
+
+### How do I handle file uploads?
+
+Use `x/fileapi` for file upload and download endpoints. For basic cases where you only need to read a multipart body, use the standard library directly:
+
+```go
+func (h *Handler) Upload(w http.ResponseWriter, r *http.Request) {
+    if err := r.ParseMultipartForm(10 << 20); err != nil { // 10 MB
+        _ = contract.WriteError(w, r, contract.NewErrorBuilder().
+            Type(contract.TypeInvalidFormat).
+            Message("invalid multipart form").
+            Build())
+        return
+    }
+    file, _, err := r.FormFile("file")
+    if err != nil {
+        _ = contract.WriteError(w, r, contract.NewErrorBuilder().
+            Type(contract.TypeRequired).
+            Detail("field", "file").
+            Build())
+        return
+    }
+    defer file.Close()
+    // process file...
+}
+```
+
+Reach for `x/fileapi` when you need signed URL generation, chunked uploads, download resumption, or storage abstraction across backends.
+
+### How do I set response headers?
+
+Set headers on the `http.ResponseWriter` before calling `WriteResponse` or `WriteError`:
+
+```go
+w.Header().Set("X-Custom-Header", "value")
+w.Header().Set("Cache-Control", "max-age=300, public")
+_ = contract.WriteResponse(w, r, http.StatusOK, data, nil)
+```
+
+For security headers (`Content-Security-Policy`, `X-Frame-Options`, HSTS), use `middleware/security` so the policy applies consistently across all routes.
 
 ---
 

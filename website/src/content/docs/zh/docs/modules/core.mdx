@@ -126,26 +126,43 @@ app.Use(requestid.Middleware(), recoveryMw, accesslogMw)
 
 ### 启动服务器
 
-```go
-ctx := context.Background()
+**合并路径** — 适合大多数服务：
 
+```go
+app.Run() // Prepare + ListenAndServe 一次完成；出错时记录日志并退出
+```
+
+**显式路径** — 当你需要在启动前检查或包装 server（TLS、连接追踪、OS 信号处理的优雅退出）：
+
+```go
 if err := app.Prepare(); err != nil {
     log.Fatalf("prepare: %v", err)
 }
 srv, err := app.Server()
 if err != nil {
-    log.Fatalf("server: %v", err)
+    log.Fatalf("获取 server: %v", err)
 }
-defer app.Shutdown(ctx)
 
-if cfg.TLS.Enabled {
-    log.Fatal(srv.ListenAndServeTLS("", ""))
-} else {
-    log.Fatal(srv.ListenAndServe())
+// 监听 OS 信号以实现优雅退出
+ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
+defer stop()
+
+serverErr := make(chan error, 1)
+go func() { serverErr <- srv.ListenAndServe() }()
+
+select {
+case err := <-serverErr:
+    log.Fatalf("server 停止: %v", err)
+case <-ctx.Done():
+    // 收到信号——开始优雅排空
 }
+
+shutdownCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+defer cancel()
+_ = app.Shutdown(shutdownCtx)
 ```
 
-`Prepare` 冻结路由表并构建处理链。`Server` 返回 `*http.Server`。`Shutdown` 等待在途连接完成后退出。
+`Prepare` 冻结路由表并构建处理链。`Server` 返回 `*http.Server`。`Shutdown` 等待在途连接完成并遵守 context deadline。完整模式（含资源清理）见[优雅退出](/zh/docs/guides/graceful-shutdown)。
 
 ## 为什么单独写这一页
 

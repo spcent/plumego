@@ -115,6 +115,44 @@ func (h *ItemHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 Handler 负责转换；领域层保持干净。
 
+## 第 5 步 — 包装多种领域错误类型
+
+对于需要处理多种错误情况的 handler，用一个辅助函数将转换逻辑集中在一处：
+
+```go
+func writeRepoError(w http.ResponseWriter, r *http.Request, err error, resourceName string) {
+    switch {
+    case errors.Is(err, repo.ErrNotFound):
+        _ = contract.WriteError(w, r, contract.NewErrorBuilder().
+            Type(contract.TypeNotFound).
+            Message(resourceName + " not found").
+            Build())
+    case errors.Is(err, repo.ErrDuplicate):
+        _ = contract.WriteError(w, r, contract.NewErrorBuilder().
+            Type(contract.TypeAlreadyExists).
+            Message(resourceName + " already exists").
+            Build())
+    default:
+        _ = contract.WriteError(w, r, contract.NewErrorBuilder().
+            Type(contract.TypeInternal).
+            Message("could not load " + resourceName).
+            Build())
+    }
+}
+
+// 在 handler 中使用：
+func (h *Handler) GetUser(w http.ResponseWriter, r *http.Request) {
+    user, err := h.Repo.Find(r.Context(), id)
+    if err != nil {
+        writeRepoError(w, r, err, "user")
+        return
+    }
+    _ = contract.WriteResponse(w, r, http.StatusOK, user, nil)
+}
+```
+
+将转换函数放在应用代码中，而不是共享库里——每个服务的领域错误是各自独有的。
+
 ## 这种模式带来什么
 
 - 系统中每个错误只有一条序列化路径 — 没有每个 handler 各自的错误信封变体。

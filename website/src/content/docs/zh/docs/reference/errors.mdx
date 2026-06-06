@@ -14,6 +14,28 @@ sidebar:
 
 完整 API 见 [contract API 参考](/zh/docs/reference/api-contract)；错误处理模式见 [错误处理指南](/zh/docs/guides/handle-errors)。
 
+## 快速参考
+
+| 常量 | HTTP | 分类 | 使用场景 |
+| --- | --- | --- | --- |
+| `TypeRequired` | 400 | validation | 必填字段或参数缺失 |
+| `TypeValidation` | 400 | validation | 字段存在但未通过校验规则 |
+| `TypeInvalidFormat` | 400 | validation | 格式错误（UUID、邮箱、日期） |
+| `TypeOutOfRange` | 400 | validation | 数值或日期超出允许范围 |
+| `TypeDuplicate` | 400 | validation | 值必须唯一但已存在 |
+| `TypeUnauthorized` | 401 | auth | 凭证缺失或格式错误 |
+| `TypeInvalidToken` | 401 | auth | Token 存在但签名无效 |
+| `TypeExpiredToken` | 401 | auth | Token `exp` 字段已过期 |
+| `TypeForbidden` | 403 | auth | 已认证但缺少操作权限 |
+| `TypeNotFound` | 404 | resource | 资源不存在 |
+| `TypeConflict` | 409 | resource | 状态冲突（如并发更新） |
+| `TypeAlreadyExists` | 409 | resource | 唯一约束冲突 |
+| `TypeGone` | 410 | resource | 资源已永久删除 |
+| `TypeRateLimited` | 429 | rate_limit | 请求频率超出限制 |
+| `TypeInternal` | 500 | server | 服务端故障 |
+| `TypeUnavailable` | 503 | server | 下游依赖不可用 |
+| `TypeTimeout` | 504 | server | 上游调用超时 |
+
 ---
 
 ## 报文格式

@@ -12,7 +12,9 @@ import RequestFlowViz from '../../../components/marketing/RequestFlowViz.astro';
 
 # Docs Home
 
-Plumego is a stdlib-first Go web toolkit for explicit HTTP services. Start with the getting-started page, run the reference service, then move into boundaries only when the question becomes ownership.
+Plumego is a stdlib-first Go web toolkit for building explicit, auditable HTTP services. It keeps `net/http` handler signatures unchanged, provides a structured error and response contract, and organizes capabilities into a stable core plus optional extension families.
+
+**What "stdlib-first" means in practice:** your handlers are plain `func(http.ResponseWriter, *http.Request)`. They work with Plumego, with `http.ServeMux`, and in any test that imports `net/http/httptest` — no framework types to unwrap.
 
 > **v1.0.0:** Stable root APIs carry the v1 compatibility promise. `x/*` families remain labeled by maturity and should be adopted according to the support matrix.
 

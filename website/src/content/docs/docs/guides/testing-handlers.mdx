@@ -136,7 +136,43 @@ var errResp struct {
 json.NewDecoder(w.Body).Decode(&errResp)
 ```
 
-## Step 4 — Test middleware in isolation
+## Step 4 — Table-driven tests for multiple scenarios
+
+For handlers with several input variations, prefer table-driven tests over repeated test functions:
+
+```go
+func TestGreet(t *testing.T) {
+    h := handler.APIHandler{}
+
+    tests := []struct {
+        name   string
+        query  string
+        status int
+        body   string
+    }{
+        {"missing name", "/api/v1/greet", http.StatusBadRequest, ""},
+        {"alice", "/api/v1/greet?name=Alice", http.StatusOK, "hello, Alice"},
+        {"bob", "/api/v1/greet?name=Bob", http.StatusOK, "hello, Bob"},
+    }
+
+    for _, tc := range tests {
+        t.Run(tc.name, func(t *testing.T) {
+            r := httptest.NewRequest(http.MethodGet, tc.query, nil)
+            w := httptest.NewRecorder()
+            h.Greet(w, r)
+
+            if w.Code != tc.status {
+                t.Fatalf("want status %d, got %d", tc.status, w.Code)
+            }
+            if tc.body != "" && !strings.Contains(w.Body.String(), tc.body) {
+                t.Errorf("want body to contain %q, got %s", tc.body, w.Body.String())
+            }
+        })
+    }
+}
+```
+
+## Step 5 — Test middleware in isolation
 
 Middleware takes and returns `http.Handler`, so it is also directly testable:
 

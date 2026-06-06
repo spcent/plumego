@@ -160,6 +160,17 @@ if page == "" {
 }
 ```
 
+## 常见错误
+
+| 错误用法 | 正确模式 |
+| --- | --- |
+| 对错误使用 `WriteResponse` | 使用 `WriteError`——它会自动设置正确的 HTTP 状态码 |
+| `WriteError` 后忘记 `return` | 必须立即 `return`——响应已写入，继续执行会产生未定义行为 |
+| 用结构体字面量构造 `APIError` | 使用 `NewErrorBuilder()`——结构体布局不属于稳定 API |
+| 在 message 中暴露完整错误字符串 | 服务端记录内部错误；`WriteError` 中只返回固定的对用户友好的消息 |
+| 所有错误都用 `TypeInternal` | 选择具体类型：`TypeRequired`、`TypeNotFound` 等 |
+| 响应缺少 `request_id` | 确保 `middleware/requestid` 在 `Prepare` 之前注册 |
+
 ## 为什么单独写这一页
 
 `contract` 是稳定根中允许使用的最低层导入：只有 `stdlib`。这一约束使它成为系统中每个 handler 共同使用的语言。破坏错误形状或响应信封会造成跨仓库的回归。此处的改动会波及每一个消费者。把 `contract` 当作已发布的 API 表面，而不是实现细节。
