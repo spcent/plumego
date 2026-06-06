@@ -115,6 +115,44 @@ func (h *ItemHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 The handler translates; the domain stays clean.
 
+## Step 5 — Wrap multiple domain error types
+
+For handlers that deal with varied error conditions, a helper function keeps the translation logic in one place:
+
+```go
+func writeRepoError(w http.ResponseWriter, r *http.Request, err error, resourceName string) {
+    switch {
+    case errors.Is(err, repo.ErrNotFound):
+        _ = contract.WriteError(w, r, contract.NewErrorBuilder().
+            Type(contract.TypeNotFound).
+            Message(resourceName + " not found").
+            Build())
+    case errors.Is(err, repo.ErrDuplicate):
+        _ = contract.WriteError(w, r, contract.NewErrorBuilder().
+            Type(contract.TypeAlreadyExists).
+            Message(resourceName + " already exists").
+            Build())
+    default:
+        _ = contract.WriteError(w, r, contract.NewErrorBuilder().
+            Type(contract.TypeInternal).
+            Message("could not load " + resourceName).
+            Build())
+    }
+}
+
+// Usage in a handler:
+func (h *Handler) GetUser(w http.ResponseWriter, r *http.Request) {
+    user, err := h.Repo.Find(r.Context(), id)
+    if err != nil {
+        writeRepoError(w, r, err, "user")
+        return
+    }
+    _ = contract.WriteResponse(w, r, http.StatusOK, user, nil)
+}
+```
+
+Keep the translation function in your application code, not in a shared library — each service's domain errors are its own.
+
 ## What this pattern gives you
 
 - One serialization path for every error in the system — no per-handler error envelope variants.

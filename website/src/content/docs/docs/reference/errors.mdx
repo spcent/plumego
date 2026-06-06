@@ -12,6 +12,28 @@ This page covers every error type that `contract.WriteError` can produce. For ea
 
 For the builder API, see [contract API Reference](/docs/reference/api-contract). For error handling patterns, see [Handle Errors guide](/docs/guides/handle-errors).
 
+## Quick reference
+
+| Constant | HTTP | Category | Use when |
+| --- | --- | --- | --- |
+| `TypeRequired` | 400 | validation | Required field or param is absent |
+| `TypeValidation` | 400 | validation | Field present but fails a rule |
+| `TypeInvalidFormat` | 400 | validation | Wrong format (UUID, email, date) |
+| `TypeOutOfRange` | 400 | validation | Numeric or date value out of range |
+| `TypeDuplicate` | 400 | validation | Value must be unique, already exists |
+| `TypeUnauthorized` | 401 | auth | Missing or malformed credentials |
+| `TypeInvalidToken` | 401 | auth | Token present but invalid signature |
+| `TypeExpiredToken` | 401 | auth | Token `exp` claim is in the past |
+| `TypeForbidden` | 403 | auth | Authenticated but lacks permission |
+| `TypeNotFound` | 404 | resource | Resource does not exist |
+| `TypeConflict` | 409 | resource | State conflict (e.g. concurrent update) |
+| `TypeAlreadyExists` | 409 | resource | Unique constraint violation |
+| `TypeGone` | 410 | resource | Resource permanently deleted |
+| `TypeRateLimited` | 429 | rate_limit | Request rate limit exceeded |
+| `TypeInternal` | 500 | server | Server-side failure |
+| `TypeUnavailable` | 503 | server | Downstream dependency unavailable |
+| `TypeTimeout` | 504 | server | Upstream call timed out |
+
 ---
 
 ## Wire format

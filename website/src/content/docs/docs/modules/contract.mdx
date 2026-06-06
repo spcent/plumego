@@ -161,6 +161,17 @@ if page == "" {
 }
 ```
 
+## Common pitfalls
+
+| Mistake | Correct pattern |
+| --- | --- |
+| Using `WriteResponse` for errors | Use `WriteError` — it sets the correct HTTP status automatically |
+| Forgetting `return` after `WriteError` | Always `return` immediately — the response is already written |
+| Constructing `APIError` as a struct literal | Use `NewErrorBuilder()` — struct layout is not part of the stable API |
+| Logging the full error string in the message | Log internally; use a fixed human message in `WriteError` |
+| Using `TypeInternal` for client mistakes | Choose the specific type: `TypeRequired`, `TypeNotFound`, etc. |
+| Missing `request_id` in error responses | Ensure `middleware/requestid` is registered before `Prepare` |
+
 ## Why this primer exists
 
 `contract` is the lowest-level import allowed in stable roots: only `stdlib`. That constraint means it is the shared language for every handler in the system. Breaking the error shape or response envelope is a cross-repo regression. Changes here ripple into every consumer. Treat `contract` as a published API surface, not an implementation detail.

@@ -136,7 +136,43 @@ var errResp struct {
 json.NewDecoder(w.Body).Decode(&errResp)
 ```
 
-## 第四步 — 单独测试 middleware
+## 第四步 — 针对多场景使用表驱动测试
+
+对于有多种输入情况的 handler，表驱动测试优于重复的独立测试函数：
+
+```go
+func TestGreet(t *testing.T) {
+    h := handler.APIHandler{}
+
+    tests := []struct {
+        name   string
+        query  string
+        status int
+        body   string
+    }{
+        {"缺少 name", "/api/v1/greet", http.StatusBadRequest, ""},
+        {"alice", "/api/v1/greet?name=Alice", http.StatusOK, "hello, Alice"},
+        {"bob", "/api/v1/greet?name=Bob", http.StatusOK, "hello, Bob"},
+    }
+
+    for _, tc := range tests {
+        t.Run(tc.name, func(t *testing.T) {
+            r := httptest.NewRequest(http.MethodGet, tc.query, nil)
+            w := httptest.NewRecorder()
+            h.Greet(w, r)
+
+            if w.Code != tc.status {
+                t.Fatalf("期望状态 %d，实际 %d", tc.status, w.Code)
+            }
+            if tc.body != "" && !strings.Contains(w.Body.String(), tc.body) {
+                t.Errorf("期望响应体包含 %q，实际 %s", tc.body, w.Body.String())
+            }
+        })
+    }
+}
+```
+
+## 第五步 — 单独测试 middleware
 
 Middleware 接受并返回 `http.Handler`，因此也可以直接测试：
 

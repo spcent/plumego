@@ -66,6 +66,66 @@ main.go
   -> Start()
 ```
 
+## 各文件核心模式
+
+### `main.go` — 加载、构建、启动
+
+```go
+func main() {
+    cfg := config.Load()            // env → struct，显式，无全局变量
+    app := app.New(cfg)             // 通过 constructor 注入依赖
+    app.RegisterRoutes()            // 所有路由集中在一处
+    app.Start()                     // Prepare → ListenAndServe + 信号处理
+}
+```
+
+### `internal/app/app.go` — 显式接线
+
+```go
+type App struct {
+    Core    *core.App
+    Handler *handler.APIHandler
+}
+
+func New(cfg *config.Config) *App {
+    logger := plog.NewLogger()
+    coreApp := core.New(core.DefaultConfig(), core.AppDependencies{Logger: logger})
+    return &App{
+        Core:    coreApp,
+        Handler: handler.New(logger),
+    }
+}
+```
+
+### `internal/app/routes.go` — 一个 method、一个 path、一个 handler
+
+```go
+func (a *App) RegisterRoutes() {
+    a.Core.Get("/healthz",      http.HandlerFunc(a.Handler.Health.Live))
+    a.Core.Get("/readyz",       http.HandlerFunc(a.Handler.Health.Ready))
+    a.Core.Get("/api/v1/greet", http.HandlerFunc(a.Handler.API.Greet))
+}
+```
+
+### `internal/handler/api.go` — 标准库兼容的 handler
+
+```go
+type APIHandler struct{ Logger log.Logger }
+
+func (h APIHandler) Greet(w http.ResponseWriter, r *http.Request) {
+    name := r.URL.Query().Get("name")
+    if name == "" {
+        _ = contract.WriteError(w, r, contract.NewErrorBuilder().
+            Type(contract.TypeRequired).Detail("field", "name").Build())
+        return
+    }
+    _ = contract.WriteResponse(w, r, http.StatusOK,
+        map[string]string{"message": "hello, " + name}, nil)
+}
+```
+
+---
+
 ## 可以复制什么，不应推导什么
 
 | 可以安全复制 | 不应推导 |

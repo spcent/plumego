@@ -130,26 +130,43 @@ app.Use(requestid.Middleware(), recoveryMw, accesslogMw)
 
 ### Start the server
 
-```go
-ctx := context.Background()
+**Combined path** — for most services:
 
+```go
+app.Run() // Prepare + ListenAndServe in one call; logs and exits on error
+```
+
+**Explicit path** — when you need to inspect or wrap the server before it starts (TLS, connection tracking, graceful shutdown with OS signals):
+
+```go
 if err := app.Prepare(); err != nil {
     log.Fatalf("prepare: %v", err)
 }
 srv, err := app.Server()
 if err != nil {
-    log.Fatalf("server: %v", err)
+    log.Fatalf("get server: %w", err)
 }
-defer app.Shutdown(ctx)
 
-if cfg.TLS.Enabled {
-    log.Fatal(srv.ListenAndServeTLS("", ""))
-} else {
-    log.Fatal(srv.ListenAndServe())
+// Handle OS signals for graceful shutdown
+ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
+defer stop()
+
+serverErr := make(chan error, 1)
+go func() { serverErr <- srv.ListenAndServe() }()
+
+select {
+case err := <-serverErr:
+    log.Fatalf("server stopped: %v", err)
+case <-ctx.Done():
+    // signal received — begin graceful drain
 }
+
+shutdownCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+defer cancel()
+_ = app.Shutdown(shutdownCtx)
 ```
 
-`Prepare` freezes the route table and builds the handler chain. `Server` returns the `*http.Server`. `Shutdown` drains in-flight connections.
+`Prepare` freezes the route table and builds the handler chain. `Server` returns the `*http.Server`. `Shutdown` drains in-flight connections and respects the context deadline. See [Graceful Shutdown](/docs/guides/graceful-shutdown) for the complete pattern including resource cleanup.
 
 ## Why this primer exists
 

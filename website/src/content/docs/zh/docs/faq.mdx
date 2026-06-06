@@ -8,27 +8,44 @@ sidebar:
 
 # 常见问题
 
+按主题组织的常见问题。点击跳转或扫描下表直达答案。
+
+| 我想了解… | 跳转到 |
+| --- | --- |
+| Plumego 是否适合我的项目 | [适合度判断](#plumego-适合我的团队吗) |
+| 如何构建 REST API | [REST API](#如何用-plumego-构建-rest-api) |
+| 如何添加认证 | [JWT 认证](#如何给路由添加认证) |
+| 如何连接数据库 | [数据库](#如何连接数据库) |
+| 与 Gin/Echo/Chi 的对比 | [框架对比](#plumego-和-gin--echo--chi-有什么区别) |
+| 能不能现在用于生产 | [生产就绪](#现在可以在生产环境使用-plumego-吗) |
+| Router 性能开销 | [性能基准](#router-相对-stdlib-的性能开销是多少) |
+| 稳定根 vs x/* 的决策 | [模块决策](#怎么判断该放到稳定根还是-x) |
+| 自定义错误格式 | [自定义错误](#如何自定义错误响应格式) |
+| 显式 DI 的设计理由 | [DI 原理](#plumego-为什么用显式-di-而不是服务定位器) |
+
+---
+
 ## 快速上手
 
-## Plumego 适合我的团队吗？
+### Plumego 适合我的团队吗？
 
 在进行技术评估之前，请先阅读[不适合使用 Plumego 的场景](/zh/docs/when-not-to-use)。该页面列出了 Plumego 刻意做出的取舍，以及在哪些情况下其他工具才是更好的选择。诚实的评估比功能列表更重要。
 
-## 如何用 Plumego 构建 REST API？
+### 如何用 Plumego 构建 REST API？
 
 从 [开始使用](/zh/docs/getting-started) 的四步启动流程开始，然后用 `app.Get`、`app.Post`、`app.Put`、`app.Delete` 注册路由。成功响应使用 `contract.WriteResponse`，错误响应使用 `contract.NewErrorBuilder`。完整的 handler 示例见 [错误处理指南](/zh/docs/guides/handle-errors) 和 [参考应用](/zh/docs/reference-app)。
 
-## 如何给路由添加认证？
+### 如何给路由添加认证？
 
 使用 `security/jwt` 签发和验证 token，然后用 `middleware/auth` 保护路由。完整接入步骤见 [添加 JWT 认证指南](/zh/docs/guides/add-jwt-auth)。
 
-## 如何连接数据库？
+### 如何连接数据库？
 
 导入 `github.com/spcent/plumego/store/db` 后，用 `db.Open` 打开 `*sql.DB`，通过应用的依赖结构体注入，显式传给 handler。连接池配置和 context 助手见 [连接数据库指南](/zh/docs/guides/connect-database)。
 
 ## 框架对比
 
-## Plumego 和 Gin / Echo / Chi 有什么区别？
+### Plumego 和 Gin / Echo / Chi 有什么区别？
 
 四者都是基于 `net/http` 的 Go HTTP 工具包，关键区别在于设计哲学：
 
@@ -38,25 +55,25 @@ sidebar:
 
 如果你有现有的 Go HTTP handler，无需修改即可在 Plumego 中使用。
 
-## 我可以用 Plumego 做 GraphQL 吗？
+### 我可以用 Plumego 做 GraphQL 吗？
 
 可以。Plumego 对 HTTP 请求体格式没有意见——默认传输 JSON，但任何 handler 都可以写入任意 Content-Type。将 GraphQL handler（如 `graph-gophers/graphql-go` 或 `99designs/gqlgen`）作为标准 `http.Handler` 挂载到任意路由即可。
 
 ## 认证、安全与生产部署
 
-## 推荐的生产环境配置是什么？
+### 推荐的生产环境配置是什么？
 
 将 `ReadHeaderTimeout` 设为 `5s` 或更短以防范 slowloris 攻击；根据最长 handler 路径加余量设置 `WriteTimeout`；将 `IdleTimeout` 设为低于负载均衡器的 idle timeout。完整字段说明见 [配置模型](/zh/docs/concepts/configuration-model)。
 
-## 如何不重启服务更新路由？
+### 如何不重启服务更新路由？
 
 Plumego 在 `app.Prepare()` 时冻结路由表。动态路由（运行时添加/删除路由）不是稳定路由层的目标。需要 feature flag 路由时，在单个 handler 内实现分支逻辑，而不是注册多条路由。
 
-## Plumego 主要想优化什么？
+### Plumego 主要想优化什么？
 
 Plumego 优化的是基于标准库模型构建的显式 HTTP 服务。它偏好可见的 路由接线、可见的启动代码、收窄的 稳定根，以及让 agent 也能稳定分类的仓库结构。
 
-## Plumego 是一个全栈 Web 框架吗？
+### Plumego 是一个全栈 Web 框架吗？
 
 不是。Plumego 是一个 Go HTTP 工具包，并且对显式服务结构有很强的偏好。它不试图把应用接线隐藏在框架魔法后面。
 
@@ -64,13 +81,13 @@ Plumego 优化的是基于标准库模型构建的显式 HTTP 服务。它偏好
 
 Plumego 在标准库之上额外提供了：基于 trie 树的路由器、显式的中间件链、结构化的响应和错误合约、安全辅助工具，以及服务生命周期（`Prepare` → `Server` → `Shutdown`）。它不生成代码，不在 `init()` 里隐藏初始化逻辑，也没有全局状态。你在 main.go 和 internal/app 里写的 wiring 就是完整的全貌——没有任何框架自有的 bootstrap 在后台运行。
 
-## 为什么一直强调 stdlib-first？
+### 为什么一直强调 stdlib-first？
 
 因为请求和 handler 的形态应该尽量贴近 `net/http`。Plumego 希望服务对于已经理解 Go 标准库的人来说仍然是直接可读的。
 
 ## 模块稳定性
 
-## 现在可以在生产环境使用 Plumego 吗？
+### 现在可以在生产环境使用 Plumego 吗？
 
 可以——每个层级有一个对应的注意事项：
 
@@ -80,7 +97,7 @@ Plumego 在标准库之上额外提供了：基于 trie 树的路由器、显式
 
 参见 [稳定性](/zh/stability) 了解四层分级概览，[发布](/zh/releases) 查看完整的逐模块支持矩阵。
 
-## Router 相对 stdlib 的性能开销是多少？
+### Router 相对 stdlib 的性能开销是多少？
 
 以 Go 1.22+ `http.ServeMux` 配合 `PathValue()` 参数提取为对照（最接近的 stdlib 等价实现）：
 
@@ -93,7 +110,7 @@ Plumego 在标准库之上额外提供了：基于 trie 树的路由器、显式
 
 开销来源：per-request context 注入（480 B，5 次分配）、参数映射构建以及中间件链接线。对于典型的 handler（I/O 耗时 1 ms–100 ms），router 开销占总请求时间的 0.001%–0.1%。完整九个场景的数据和测试方法见 [发布页的 benchmark 表格](/zh/releases)。
 
-## 我应该从哪里开始？
+### 我应该从哪里开始？
 
 如果你还需要判断“第一步到底该看什么”，请先从[文档首页](/zh/docs)开始。然后再按更窄的问题进入对应页面：
 
@@ -104,47 +121,126 @@ Plumego 在标准库之上额外提供了：基于 trie 树的路由器、显式
 
 这条路径比随机扫包或随机翻概念页更安全。
 
-## 怎么判断该放到稳定根还是 `x/*`？
+### 怎么判断该放到稳定根还是 `x/*`？
 
 长期存在的传输层和内核基础能力放稳定根。能力型、变化更快、租户相关、协议特定，或者会偏离默认学习路径的内容，放到 `x/*`。
 
-## 现在是不是所有包都已经具备 v1 稳定承诺？
+### 现在是不是所有包都已经具备 v1 稳定承诺？
 
 不是。先看 [发布姿态](/zh/docs/release-posture) 和公开的 [发布页](/zh/releases)，再假设长期兼容性。
 
-## 为什么需要 reference app？
+### 为什么需要 reference app？
 
 `reference/standard-service` 提供了一条规范应用路径。它把 Plumego 期望保持可见的启动、接线、路由和 handler 形态落实成可检查的代码，但它不能替代[架构](/zh/architecture)对仓库边界的解释。
 
-## 仓库边界算产品的一部分吗？
+### 仓库边界算产品的一部分吗？
 
 它至少是 Plumego 被使用和维护方式的一部分。`docs`、`specs` 和 task cards 帮助贡献者与 agent 以同一套方式完成工作分类，这对一个同时拥有稳定根和多个扩展家族的仓库尤其重要。
 
-## `x/*` 的实验性包可以用于生产吗？
+### `x/*` 的实验性包可以用于生产吗？
 
 可以用，但你需要接受无缓冲期 API 变更的风险。[x/ai Primer](/zh/docs/modules/x-ai) 中的稳定性层级表是当前实验性子包分类方式的范例。在稳定服务路径中依赖实验性包之前，先查看该包的 `module.yaml` 确认声明的层级，并考虑在应用层用接口包装该依赖，这样升级时影响范围可以保持局部。
 
-## 稳定根可以导入 `x/*` 吗？
+### 稳定根可以导入 `x/*` 吗？
 
 不可以。这是硬边界。稳定根（`core`、`router`、`contract`、`middleware`、`security`、`store`、`health`、`log`、`metrics`）绝不能依赖扩展包。扩展包可以依赖稳定根。违反这一边界是停止条件。用依赖边界检查验证：`go run ./internal/checks/dependency-rules`。
 
 ## 进阶模式
 
-## 如何自定义错误响应格式？
+### 如何自定义错误响应格式？
 
 用 `contract.NewErrorBuilder()` 构造带有规范 type、message 和可选 details 的错误。如果你的服务需要不同的错误 wire 格式，在应用层实现一个自定义的 `contract.WriteError` 等价函数，并在所有 handler 中保持一致。不要在各个 handler 中内联自定义错误格式化。
 
-## 不用 `x/tenant` 如何做简单的多租户？
+### 不用 `x/tenant` 如何做简单的多租户？
 
 如果你只需要从 header 提取租户标识符并传递给存储查询，就在 handler 或薄应用中间件中显式处理：用 `r.Header.Get("X-Tenant-ID")` 提取并通过调用链传递。当你需要强制执行策略评估、每租户配额、JWT 支持的会话状态，或规模化的 tenant 感知存储适配器时，才引入 `x/tenant`。
 
-## `middleware` 和 `x/resilience` 有什么区别？
+### `middleware` 和 `x/resilience` 有什么区别？
 
 `middleware` 处理入站请求的传输层关注点：访问日志、request ID、CORS、超时执行、入站流量限流和恢复。`x/resilience` 处理出站调用保护：熔断器和限流器，包装你的服务对外部依赖发出的调用。如果你在保护一个入站路由，从 `middleware` 开始。如果你在为对数据库或上游 API 的出站调用加保护，从 `x/resilience` 开始。
 
-## Plumego 为什么用显式 DI 而不是服务定位器？
+### Plumego 为什么用显式 DI 而不是服务定位器？
 
 显式构造函数注入使依赖在调用处和 grep 结果中都清晰可见。隐藏的服务定位器（全局注册表、将 `context.Value` 当作服务包）使你无法一眼看出 handler 依赖什么。Plumego 将此作为第一等约束：无隐藏全局状态，无基于上下文的服务定位。
+
+### 如何在 handler 中读取路径参数？
+
+使用 `router.Param(r, "name")` 读取路由器设置的命名路径参数：
+
+```go
+import "github.com/spcent/plumego/router"
+
+// 路由注册为：app.Get("/users/:id", ...)
+func (h *Handler) GetUser(w http.ResponseWriter, r *http.Request) {
+    id := router.Param(r, "id")
+    if id == "" {
+        _ = contract.WriteError(w, r, contract.NewErrorBuilder().
+            Type(contract.TypeRequired).
+            Detail("param", "id").
+            Build())
+        return
+    }
+    // 使用 id...
+}
+```
+
+对于以 `*name` 注册的通配符路由，同样使用 `router.Param(r, "name")` 读取匹配前缀之后的所有内容。
+
+### 如何返回分页结果？
+
+在 `contract.WriteResponse` 的 `meta` 参数中传入分页元数据：
+
+```go
+func (h *Handler) ListItems(w http.ResponseWriter, r *http.Request) {
+    page, _ := strconv.Atoi(r.URL.Query().Get("page"))
+    if page < 1 {
+        page = 1
+    }
+    items, total := h.Repo.List(r.Context(), page, 20)
+
+    _ = contract.WriteResponse(w, r, http.StatusOK, items, map[string]any{
+        "total": total,
+        "page":  page,
+        "limit": 20,
+    })
+}
+```
+
+响应 envelope 格式：
+
+```json
+{
+  "data": [...],
+  "meta": { "total": 142, "page": 2, "limit": 20 },
+  "request_id": "req-abc-123"
+}
+```
+
+### 如何将路由分组到统一前缀下？
+
+使用 `app.Group(prefix)` 创建路由分组，组内所有路由都继承该前缀：
+
+```go
+v1 := app.Group("/api/v1")
+v1.Get("/users",        http.HandlerFunc(handler.ListUsers))
+v1.Post("/users",       http.HandlerFunc(handler.CreateUser))
+v1.Get("/users/:id",    http.HandlerFunc(handler.GetUser))
+v1.Delete("/users/:id", http.HandlerFunc(handler.DeleteUser))
+```
+
+分组只影响 URL 前缀——中间件仍须通过 `app.Use` 注册。
+
+### 如何设置响应 header？
+
+在调用 `WriteResponse` 或 `WriteError` 之前设置 `http.ResponseWriter` 的 header：
+
+```go
+w.Header().Set("X-Custom-Header", "value")
+w.Header().Set("Cache-Control", "max-age=300, public")
+_ = contract.WriteResponse(w, r, http.StatusOK, data, nil)
+```
+
+对于安全相关的 header（`Content-Security-Policy`、`X-Frame-Options`、HSTS），请使用 `middleware/security`，以便统一应用到所有路由。
 
 ---
 

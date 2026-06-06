@@ -14,7 +14,11 @@ import RequestFlowViz from '../../../../components/marketing/RequestFlowViz.astr
 
 > **注意：** 本页中文版本与英文版可能存在差异，建议关键决策前参考[英文版文档](/docs)。
 
-Plumego 是一个 stdlib-first 的 Go Web 工具包，强调显式 HTTP 服务结构。先从开始使用页进入，跑通参考服务，只有当问题变成"归谁负责"时才进入仓库边界。
+Plumego 是一个 stdlib-first 的 Go Web 工具包，用于构建显式、可审计的 HTTP 服务。它保持 `net/http` handler 签名不变，提供结构化的错误和响应合约，并将能力组织为稳定的内核加可选的扩展家族。
+
+**"stdlib-first"在实践中意味着什么：** 你的 handler 就是普通的 `func(http.ResponseWriter, *http.Request)`，可以在 Plumego、`http.ServeMux` 以及任何导入了 `net/http/httptest` 的测试中直接使用——无需解包任何框架类型。
+
+先从开始使用页进入，跑通参考服务，只有当问题变成"归谁负责"时才进入仓库边界。
 
 > **v1.0.0：** 稳定根 API 承载 v1 兼容性承诺。`x/*` 家族继续按成熟度标注，采用时应以支持矩阵为准。
 
