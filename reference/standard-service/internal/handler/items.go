@@ -75,52 +75,12 @@ type ItemHandler struct {
 }
 
 // itemWriteReq is the shared request body for create, update, and patch operations.
-// All three operations share the same fields; per-operation validation semantics
+// All three operations use the same fields; the per-operation validation semantics
 // (Create/Update require both non-empty; Patch requires at least one) are enforced
 // at the handler level, not the type level.
 type itemWriteReq struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
-}
-
-// itemDecodeCodes groups the three error codes needed for JSON decode errors on a
-// specific write operation, passed as a single value to handleDecodeErr.
-type itemDecodeCodes struct {
-	empty        string
-	unknownField string
-	malformed    string
-}
-
-// handleDecodeErr writes the appropriate error response for a JSON decode error.
-// Call it only when decodeJSONStrict returned a non-nil error; it always writes
-// a response and the caller must return after calling it.
-//
-//   - io.EOF (empty body)  → 400 TypeRequired   (codes.empty)
-//   - unknown JSON field   → 400 TypeBadRequest  (codes.unknownField)
-//   - other malformed JSON → 400 TypeBadRequest  (codes.malformed)
-func handleDecodeErr(w http.ResponseWriter, r *http.Request, logger plumelog.StructuredLogger, err error, codes itemDecodeCodes) {
-	if errors.Is(err, io.EOF) {
-		logWriteErr(logger, contract.WriteError(w, r, contract.NewErrorBuilder().
-			Type(contract.TypeRequired).
-			Code(codes.empty).
-			Message("request body is required").
-			Build()))
-		return
-	}
-	if field := unknownFieldName(err); field != "" {
-		logWriteErr(logger, contract.WriteError(w, r, contract.NewErrorBuilder().
-			Type(contract.TypeBadRequest).
-			Code(codes.unknownField).
-			Detail("field", field).
-			Message("request body contains an unknown field").
-			Build()))
-		return
-	}
-	logWriteErr(logger, contract.WriteError(w, r, contract.NewErrorBuilder().
-		Type(contract.TypeBadRequest).
-		Code(codes.malformed).
-		Message("request body must be valid JSON").
-		Build()))
 }
 
 // requireItemFields checks that name and description are both non-empty.
@@ -193,8 +153,14 @@ func unknownFieldName(err error) string {
 // later surfacing as a confusing "field required" response.
 //
 // On a 5xx storage error, the request_id is included in the response detail so
-// callers can quote it to the support team, and the full error is logged at Error
+// callers can quote it to the support team; the full error is logged at Error
 // level server-side so operators can trace it without exposing internal detail.
+//
+// Note on decode-error structure: the three-branch decode block (EOF / unknown
+// field / malformed JSON) is intentionally inlined in each write handler rather
+// than extracted into a shared helper. The repo conformance test requires that
+// every Code(...) argument is a traceable string constant; passing codes through
+// a struct or function parameter obscures that traceability.
 //
 // Examples:
 //
@@ -207,11 +173,28 @@ func unknownFieldName(err error) string {
 func (h ItemHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var req itemWriteReq
 	if err := decodeJSONStrict(r, &req); err != nil {
-		handleDecodeErr(w, r, h.Logger, err, itemDecodeCodes{
-			empty:        codeItemCreateBodyRequired,
-			unknownField: codeItemCreateUnknownField,
-			malformed:    codeItemCreateInvalidJSON,
-		})
+		if errors.Is(err, io.EOF) {
+			logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+				Type(contract.TypeRequired).
+				Code(codeItemCreateBodyRequired).
+				Message("request body is required").
+				Build()))
+			return
+		}
+		if field := unknownFieldName(err); field != "" {
+			logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+				Type(contract.TypeBadRequest).
+				Code(codeItemCreateUnknownField).
+				Detail("field", field).
+				Message("request body contains an unknown field").
+				Build()))
+			return
+		}
+		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+			Type(contract.TypeBadRequest).
+			Code(codeItemCreateInvalidJSON).
+			Message("request body must be valid JSON").
+			Build()))
 		return
 	}
 
@@ -367,11 +350,28 @@ func (h ItemHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	var req itemWriteReq
 	if err := decodeJSONStrict(r, &req); err != nil {
-		handleDecodeErr(w, r, h.Logger, err, itemDecodeCodes{
-			empty:        codeItemUpdateBodyRequired,
-			unknownField: codeItemUpdateUnknownField,
-			malformed:    codeItemUpdateInvalidJSON,
-		})
+		if errors.Is(err, io.EOF) {
+			logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+				Type(contract.TypeRequired).
+				Code(codeItemUpdateBodyRequired).
+				Message("request body is required").
+				Build()))
+			return
+		}
+		if field := unknownFieldName(err); field != "" {
+			logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+				Type(contract.TypeBadRequest).
+				Code(codeItemUpdateUnknownField).
+				Detail("field", field).
+				Message("request body contains an unknown field").
+				Build()))
+			return
+		}
+		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+			Type(contract.TypeBadRequest).
+			Code(codeItemUpdateInvalidJSON).
+			Message("request body must be valid JSON").
+			Build()))
 		return
 	}
 
@@ -432,11 +432,28 @@ func (h ItemHandler) Patch(w http.ResponseWriter, r *http.Request) {
 
 	var req itemWriteReq
 	if err := decodeJSONStrict(r, &req); err != nil {
-		handleDecodeErr(w, r, h.Logger, err, itemDecodeCodes{
-			empty:        codeItemPatchBodyRequired,
-			unknownField: codeItemPatchUnknownField,
-			malformed:    codeItemPatchInvalidJSON,
-		})
+		if errors.Is(err, io.EOF) {
+			logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+				Type(contract.TypeRequired).
+				Code(codeItemPatchBodyRequired).
+				Message("request body is required").
+				Build()))
+			return
+		}
+		if field := unknownFieldName(err); field != "" {
+			logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+				Type(contract.TypeBadRequest).
+				Code(codeItemPatchUnknownField).
+				Detail("field", field).
+				Message("request body contains an unknown field").
+				Build()))
+			return
+		}
+		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+			Type(contract.TypeBadRequest).
+			Code(codeItemPatchInvalidJSON).
+			Message("request body must be valid JSON").
+			Build()))
 		return
 	}
 
