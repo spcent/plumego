@@ -14,7 +14,7 @@ const WriteKeyHeader = "X-Write-Key"
 const codeAuthKeyInvalid = "auth.key.invalid"
 
 // RequireWriteKey returns a middleware that gates mutating operations behind a
-// static bearer key supplied via the X-Write-Key header.
+// static key supplied via the X-Write-Key header.
 //
 // When key is empty the middleware is a no-op, allowing unauthenticated access
 // during local development. Set APP_WRITE_KEY in production to enforce the guard.
@@ -23,6 +23,13 @@ const codeAuthKeyInvalid = "auth.key.invalid"
 // the handlers that need protection rather than adding the check globally.
 // Timing-safe comparison (crypto/subtle.ConstantTimeCompare) prevents attackers
 // from using response time to guess the key byte-by-byte.
+//
+// Header choice: X-Write-Key is a private API key header rather than the standard
+// Authorization: Bearer pattern from security/authn.StaticToken(). A private header
+// suits service-to-service API keys where callers are automated tools or internal
+// services — not browsers where credential stores manage Authorization headers.
+// For user-facing bearer token authentication (login flows, OAuth), use
+// security/authn.StaticToken() with security/authn.ExtractBearerToken() instead.
 //
 //	writeGuard := handler.RequireWriteKey(cfg.App.WriteKey, a.Core.Logger())
 //	v1.post("/items", writeGuard(http.HandlerFunc(items.Create)))

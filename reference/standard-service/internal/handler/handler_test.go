@@ -7,6 +7,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/spcent/plumego/contract"
@@ -1202,6 +1203,33 @@ func TestRequireWriteKey(t *testing.T) {
 			t.Fatalf("status = %d, want %d", rec.Code, http.StatusUnauthorized)
 		}
 	})
+}
+
+// TestUnknownFieldNameAnchorsStdlibFormat pins the exact error message format that
+// unknownFieldName relies on. If this test breaks after a Go version upgrade, it
+// means the stdlib json package changed its error text and unknownFieldName must be
+// updated to match — otherwise unknown-field errors silently fall through to the
+// generic malformed-JSON error response, degrading API error messages for clients.
+func TestUnknownFieldNameAnchorsStdlibFormat(t *testing.T) {
+	var dst struct {
+		Name string `json:"name"`
+	}
+	dec := json.NewDecoder(strings.NewReader(`{"name":"x","unexpected_field":"y"}`))
+	dec.DisallowUnknownFields()
+	err := dec.Decode(&dst)
+	if err == nil {
+		t.Fatal("expected unknown-field error from DisallowUnknownFields, got nil")
+	}
+	if got := unknownFieldName(err); got != "unexpected_field" {
+		t.Fatalf("unknownFieldName = %q, want %q — stdlib json error format may have changed", got, "unexpected_field")
+	}
+	// A regular malformed-JSON error must not be mistaken for an unknown field.
+	malformed := json.NewDecoder(strings.NewReader(`{bad}`))
+	malformed.DisallowUnknownFields()
+	parseErr := malformed.Decode(&dst)
+	if got := unknownFieldName(parseErr); got != "" {
+		t.Fatalf("unknownFieldName(malformed) = %q, want empty string", got)
+	}
 }
 
 // assertMeta verifies pagination metadata from the response meta field.

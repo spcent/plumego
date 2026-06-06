@@ -74,23 +74,53 @@ type ItemHandler struct {
 	Logger  plumelog.StructuredLogger
 }
 
-// createItemReq, updateItemReq, and patchItemReq carry the same fields but are
-// distinct types: Create and Update require both fields non-empty; Patch requires
-// at least one. Separate types make the per-operation validation contract explicit
-// at the type level and allow the request shapes to diverge independently.
-type createItemReq struct {
+// itemWriteReq is the shared request body for create, update, and patch operations.
+// All three operations share the same fields; per-operation validation semantics
+// (Create/Update require both non-empty; Patch requires at least one) are enforced
+// at the handler level, not the type level.
+type itemWriteReq struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
 }
 
-type updateItemReq struct {
-	Name        string `json:"name"`
-	Description string `json:"description"`
+// itemDecodeCodes groups the three error codes needed for JSON decode errors on a
+// specific write operation, passed as a single value to handleDecodeErr.
+type itemDecodeCodes struct {
+	empty        string
+	unknownField string
+	malformed    string
 }
 
-type patchItemReq struct {
-	Name        string `json:"name"`
-	Description string `json:"description"`
+// handleDecodeErr writes the appropriate error response for a JSON decode error.
+// Call it only when decodeJSONStrict returned a non-nil error; it always writes
+// a response and the caller must return after calling it.
+//
+//   - io.EOF (empty body)  → 400 TypeRequired   (codes.empty)
+//   - unknown JSON field   → 400 TypeBadRequest  (codes.unknownField)
+//   - other malformed JSON → 400 TypeBadRequest  (codes.malformed)
+func handleDecodeErr(w http.ResponseWriter, r *http.Request, logger plumelog.StructuredLogger, err error, codes itemDecodeCodes) {
+	if errors.Is(err, io.EOF) {
+		logWriteErr(logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+			Type(contract.TypeRequired).
+			Code(codes.empty).
+			Message("request body is required").
+			Build()))
+		return
+	}
+	if field := unknownFieldName(err); field != "" {
+		logWriteErr(logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+			Type(contract.TypeBadRequest).
+			Code(codes.unknownField).
+			Detail("field", field).
+			Message("request body contains an unknown field").
+			Build()))
+		return
+	}
+	logWriteErr(logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+		Type(contract.TypeBadRequest).
+		Code(codes.malformed).
+		Message("request body must be valid JSON").
+		Build()))
 }
 
 // requireItemFields checks that name and description are both non-empty.
@@ -130,6 +160,10 @@ func decodeJSONStrict(r *http.Request, dst any) error {
 // (`json: unknown field "x"`), or "" for any other error. The standard library
 // does not expose a typed error for this case, so the documented message prefix
 // is matched directly.
+//
+// TestUnknownFieldNameAnchorsStdlibFormat pins the exact message format used here
+// so a Go version upgrade that changes the message text will surface as a test
+// failure rather than a silent fallback to the generic malformed-JSON error response.
 func unknownFieldName(err error) string {
 	const prefix = `json: unknown field "`
 	if err == nil {
@@ -158,6 +192,10 @@ func unknownFieldName(err error) string {
 // rejected with a clear unknown-field error instead of being silently dropped and
 // later surfacing as a confusing "field required" response.
 //
+// On a 5xx storage error, the request_id is included in the response detail so
+// callers can quote it to the support team, and the full error is logged at Error
+// level server-side so operators can trace it without exposing internal detail.
+//
 // Examples:
 //
 //	POST /api/v1/items {"name":"widget","description":"a widget"}  → 201 item
@@ -167,30 +205,13 @@ func unknownFieldName(err error) string {
 //	POST /api/v1/items {}                                          → 400 TypeRequired  details: name + description
 //	POST /api/v1/items {"name":"widget"}                           → 400 TypeRequired  detail: description
 func (h ItemHandler) Create(w http.ResponseWriter, r *http.Request) {
-	var req createItemReq
+	var req itemWriteReq
 	if err := decodeJSONStrict(r, &req); err != nil {
-		if errors.Is(err, io.EOF) {
-			logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
-				Type(contract.TypeRequired).
-				Code(codeItemCreateBodyRequired).
-				Message("request body is required").
-				Build()))
-			return
-		}
-		if field := unknownFieldName(err); field != "" {
-			logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
-				Type(contract.TypeBadRequest).
-				Code(codeItemCreateUnknownField).
-				Detail("field", field).
-				Message("request body contains an unknown field").
-				Build()))
-			return
-		}
-		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
-			Type(contract.TypeBadRequest).
-			Code(codeItemCreateInvalidJSON).
-			Message("request body must be valid JSON").
-			Build()))
+		handleDecodeErr(w, r, h.Logger, err, itemDecodeCodes{
+			empty:        codeItemCreateBodyRequired,
+			unknownField: codeItemCreateUnknownField,
+			malformed:    codeItemCreateInvalidJSON,
+		})
 		return
 	}
 
@@ -205,9 +226,15 @@ func (h ItemHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	created, err := h.Service.Create(r.Context(), req.Name, req.Description)
 	if err != nil {
+		requestID := contract.RequestIDFromContext(r.Context())
+		h.Logger.Error("item create failed", plumelog.Fields{
+			"request_id": requestID,
+			"err":        err.Error(),
+		})
 		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeInternal).
 			Code(codeItemCreateFailed).
+			Detail("request_id", requestID).
 			Message("failed to create item").
 			Build()))
 		return
@@ -261,9 +288,15 @@ func (h ItemHandler) List(w http.ResponseWriter, r *http.Request) {
 	// their page was requested relative to the full list.
 	page, total, err := h.Service.List(r.Context(), offset, limit)
 	if err != nil {
+		requestID := contract.RequestIDFromContext(r.Context())
+		h.Logger.Error("item list failed", plumelog.Fields{
+			"request_id": requestID,
+			"err":        err.Error(),
+		})
 		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeInternal).
 			Code(codeItemListFailed).
+			Detail("request_id", requestID).
 			Message("failed to list items").
 			Build()))
 		return
@@ -332,30 +365,13 @@ func (h ItemHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 func (h ItemHandler) Update(w http.ResponseWriter, r *http.Request) {
 	id := router.Param(r, "id")
 
-	var req updateItemReq
+	var req itemWriteReq
 	if err := decodeJSONStrict(r, &req); err != nil {
-		if errors.Is(err, io.EOF) {
-			logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
-				Type(contract.TypeRequired).
-				Code(codeItemUpdateBodyRequired).
-				Message("request body is required").
-				Build()))
-			return
-		}
-		if field := unknownFieldName(err); field != "" {
-			logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
-				Type(contract.TypeBadRequest).
-				Code(codeItemUpdateUnknownField).
-				Detail("field", field).
-				Message("request body contains an unknown field").
-				Build()))
-			return
-		}
-		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
-			Type(contract.TypeBadRequest).
-			Code(codeItemUpdateInvalidJSON).
-			Message("request body must be valid JSON").
-			Build()))
+		handleDecodeErr(w, r, h.Logger, err, itemDecodeCodes{
+			empty:        codeItemUpdateBodyRequired,
+			unknownField: codeItemUpdateUnknownField,
+			malformed:    codeItemUpdateInvalidJSON,
+		})
 		return
 	}
 
@@ -370,9 +386,16 @@ func (h ItemHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	updated, ok, err := h.Service.Update(r.Context(), id, req.Name, req.Description)
 	if err != nil {
+		requestID := contract.RequestIDFromContext(r.Context())
+		h.Logger.Error("item update failed", plumelog.Fields{
+			"request_id": requestID,
+			"item_id":    id,
+			"err":        err.Error(),
+		})
 		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeInternal).
 			Code(codeItemUpdateFailed).
+			Detail("request_id", requestID).
 			Message("failed to update item").
 			Build()))
 		return
@@ -407,30 +430,13 @@ func (h ItemHandler) Update(w http.ResponseWriter, r *http.Request) {
 func (h ItemHandler) Patch(w http.ResponseWriter, r *http.Request) {
 	id := router.Param(r, "id")
 
-	var req patchItemReq
+	var req itemWriteReq
 	if err := decodeJSONStrict(r, &req); err != nil {
-		if errors.Is(err, io.EOF) {
-			logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
-				Type(contract.TypeRequired).
-				Code(codeItemPatchBodyRequired).
-				Message("request body is required").
-				Build()))
-			return
-		}
-		if field := unknownFieldName(err); field != "" {
-			logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
-				Type(contract.TypeBadRequest).
-				Code(codeItemPatchUnknownField).
-				Detail("field", field).
-				Message("request body contains an unknown field").
-				Build()))
-			return
-		}
-		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
-			Type(contract.TypeBadRequest).
-			Code(codeItemPatchInvalidJSON).
-			Message("request body must be valid JSON").
-			Build()))
+		handleDecodeErr(w, r, h.Logger, err, itemDecodeCodes{
+			empty:        codeItemPatchBodyRequired,
+			unknownField: codeItemPatchUnknownField,
+			malformed:    codeItemPatchInvalidJSON,
+		})
 		return
 	}
 
@@ -445,9 +451,16 @@ func (h ItemHandler) Patch(w http.ResponseWriter, r *http.Request) {
 
 	updated, ok, err := h.Service.Patch(r.Context(), id, req.Name, req.Description)
 	if err != nil {
+		requestID := contract.RequestIDFromContext(r.Context())
+		h.Logger.Error("item patch failed", plumelog.Fields{
+			"request_id": requestID,
+			"item_id":    id,
+			"err":        err.Error(),
+		})
 		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeInternal).
 			Code(codeItemPatchFailed).
+			Detail("request_id", requestID).
 			Message("failed to patch item").
 			Build()))
 		return
@@ -473,9 +486,16 @@ func (h ItemHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	id := router.Param(r, "id")
 	ok, err := h.Service.Delete(r.Context(), id)
 	if err != nil {
+		requestID := contract.RequestIDFromContext(r.Context())
+		h.Logger.Error("item delete failed", plumelog.Fields{
+			"request_id": requestID,
+			"item_id":    id,
+			"err":        err.Error(),
+		})
 		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeInternal).
 			Code(codeItemDeleteFailed).
+			Detail("request_id", requestID).
 			Message("failed to delete item").
 			Build()))
 		return

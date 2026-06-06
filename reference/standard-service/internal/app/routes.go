@@ -1,8 +1,10 @@
 package app
 
 import (
+	"context"
 	"net/http"
 
+	"github.com/spcent/plumego/health"
 	"standard-service/internal/domain/item"
 	"standard-service/internal/handler"
 )
@@ -12,12 +14,19 @@ import (
 // Routes that share a common path prefix are registered through a RouteGroup
 // so the prefix is declared once and not repeated on every line.
 func (a *App) RegisterRoutes() error {
-	// HealthHandler receives no Checkers here because the reference has no real
-	// dependencies to probe. In a production service, pass one health.ComponentChecker
-	// per dependency (database, cache, downstream) so /readyz reflects real state.
+	// HealthHandler receives one ComponentChecker per dependency so /readyz reflects
+	// the real readiness of each backing resource. storeChecker adapts the in-memory
+	// item store; it always passes because MemoryStore is process-local — its role
+	// here is to demonstrate the wiring pattern. In production replace it with real
+	// dependency probes passed in the same slice:
+	//
+	//   db    := &dbChecker{pool: pool}     // Check() calls pool.PingContext(ctx)
+	//   cache := &cacheChecker{c: redis}    // Check() calls redis.Ping(ctx).Err()
+	//   handler.HealthHandler{Checkers: []health.ComponentChecker{db, cache}}
 	health := handler.HealthHandler{
 		ServiceName: a.Cfg.App.ServiceName,
 		Logger:      a.Core.Logger(),
+		Checkers:    []health.ComponentChecker{storeChecker{}},
 	}
 	// ItemHandler demonstrates the three-layer architecture: handler → service → repository.
 	// handler/items.go declares the ItemService interface; routes.go wires
@@ -77,6 +86,15 @@ func (a *App) RegisterRoutes() error {
 	v1.delete("/items/:id", writeGuard(http.HandlerFunc(items.Delete)))
 	return v1.err
 }
+
+// storeChecker is a synthetic readiness probe for the in-memory item store.
+// MemoryStore is always reachable (it is process-local memory), so this checker
+// always passes — its purpose is to demonstrate the ComponentChecker wiring
+// pattern. Replace it with real dependency probes as described in RegisterRoutes.
+type storeChecker struct{}
+
+func (storeChecker) Name() string                  { return "item_store" }
+func (storeChecker) Check(_ context.Context) error { return nil }
 
 // routeAdder is the minimal interface shared by *core.App and *core.RouteGroup,
 // allowing newRouteReg to work with both without type-switching.
