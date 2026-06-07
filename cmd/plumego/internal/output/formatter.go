@@ -232,13 +232,17 @@ func (f *Formatter) printCommandResultText(result commandResult) error {
 	if prefix == "" {
 		prefix = "RESULT"
 	}
+
+	isErr := result.Status == "error" || result.Status == "warning"
+	writer := f.out
+	if isErr {
+		writer = f.err
+		prefix = f.colorize(result.Status, prefix)
+	}
+
 	line := prefix + ": " + result.Message
 	if result.ExitCode != 0 {
 		line = fmt.Sprintf("%s (exit %d)", line, result.ExitCode)
-	}
-	writer := f.out
-	if result.Status == "error" || result.Status == "warning" {
-		writer = f.err
 	}
 	if _, err := fmt.Fprintln(writer, line); err != nil {
 		return err
@@ -246,12 +250,14 @@ func (f *Formatter) printCommandResultText(result commandResult) error {
 	if result.Data == nil {
 		return nil
 	}
-	encoded, err := json.MarshalIndent(result.Data, "", "  ")
+
+	// Render data as YAML in text mode — significantly more readable than JSON.
+	encoded, err := yaml.Marshal(result.Data)
 	if err != nil {
 		_, err = fmt.Fprintf(writer, "%v\n", result.Data)
 		return err
 	}
-	_, err = fmt.Fprintf(writer, "%s\n", encoded)
+	_, err = fmt.Fprintf(writer, "%s", encoded)
 	return err
 }
 

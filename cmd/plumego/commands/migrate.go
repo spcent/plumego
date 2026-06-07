@@ -23,10 +23,13 @@ func (c *MigrateCmd) Name() string  { return "migrate" }
 func (c *MigrateCmd) Short() string { return "Manage database migrations" }
 
 func (c *MigrateCmd) Run(ctx *Context, args []string) error {
+	// Parse config file first so explicit flags can override it.
+	// Empty-string sentinels distinguish "user omitted" from explicit values for strings.
+	// For --steps (int), we use fs.Visit to detect explicit provision.
 	fs := flag.NewFlagSet("migrate", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 
-	dir := fs.String("dir", "./migrations", "Migrations directory")
+	dirFlag := fs.String("dir", "", "Migrations directory")
 	dbURL := fs.String("db-url", "", "Database connection string")
 	driver := fs.String("driver", "", "Database driver name")
 	configPath := fs.String("config", "plumego.migrate.yaml", "Migration config file")
@@ -44,37 +47,44 @@ func (c *MigrateCmd) Run(ctx *Context, args []string) error {
 		subcommand = positionals[0]
 		positionals = positionals[1:]
 	}
-	stepsProvided := false
+
+	// Detect whether --steps was explicitly provided (fs.Visit only visits flags that were set).
+	var stepsExplicit bool
 	fs.Visit(func(f *flag.Flag) {
 		if f.Name == "steps" {
-			stepsProvided = true
+			stepsExplicit = true
 		}
 	})
-	if *steps < 0 {
+
+	if stepsExplicit && *steps < 0 {
 		return out.Error("--steps must be greater than or equal to 0", 1)
 	}
-	if subcommand == "status" && stepsProvided {
+	if subcommand == "status" && stepsExplicit {
 		return out.Error("--steps is not supported for migrate status", 1)
 	}
-	providedFlags := make(map[string]bool)
-	fs.Visit(func(f *flag.Flag) {
-		providedFlags[f.Name] = true
-	})
+
+	// Load config file; explicit flags take precedence over config values.
 	cfg, err := loadMigrateConfig(*configPath)
 	if err != nil {
 		return out.Error(fmt.Sprintf("failed to load migrate config: %v", err), 1)
 	}
-	if !providedFlags["dir"] && cfg.Dir != "" {
-		*dir = cfg.Dir
+
+	dir := *dirFlag
+	if dir == "" {
+		if cfg.Dir != "" {
+			dir = cfg.Dir
+		} else {
+			dir = "./migrations"
+		}
 	}
-	if !providedFlags["db-url"] && cfg.DBURL != "" {
+	if *dbURL == "" && cfg.DBURL != "" {
 		*dbURL = cfg.DBURL
 	}
-	if !providedFlags["driver"] && cfg.Driver != "" {
+	if *driver == "" && cfg.Driver != "" {
 		*driver = cfg.Driver
 	}
 
-	absDir, err := filepath.Abs(*dir)
+	absDir, err := filepath.Abs(dir)
 	if err != nil {
 		return out.Error(fmt.Sprintf("invalid directory: %v", err), 1)
 	}
@@ -114,6 +124,7 @@ func (c *MigrateCmd) Run(ctx *Context, args []string) error {
 			return out.Error("driver and db-url are required", 1)
 		}
 		return c.runWithDatabase(out, subcommand, absDir, driverName, databaseURL, *steps)
+
 	default:
 		return out.Error(fmt.Sprintf("unknown subcommand: %s", subcommand), 1)
 	}

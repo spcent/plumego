@@ -108,13 +108,10 @@ func (c *DevCmd) runWithContext(ctx context.Context, out *output.Formatter, opts
 		return err
 	}
 
-	uiPath := filepath.Join(getExecutableDir(), "internal", "devserver", "ui")
-
 	cfg := devserver.Config{
 		DashboardAddr:     opts.dashboardAddr,
 		AppAddr:           opts.addr,
 		ProjectDir:        absDir,
-		UIPath:            uiPath,
 		DashboardToken:    opts.dashboardToken,
 		OutputPassthrough: out.Format() == "text" && !out.IsQuiet(),
 	}

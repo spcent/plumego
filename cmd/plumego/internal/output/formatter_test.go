@@ -166,8 +166,8 @@ func TestFormatterTextCommandResultAvoidsGoStructDump(t *testing.T) {
 	if strings.Contains(text, "{success") || strings.Contains(text, "map[") {
 		t.Fatalf("text output should not expose Go formatting: %s", text)
 	}
-	if !strings.Contains(text, `"id": "app"`) {
-		t.Fatalf("expected JSON data block, got: %s", text)
+	if !strings.Contains(text, "id: app") {
+		t.Fatalf("expected YAML data block, got: %s", text)
 	}
 }
 
@@ -210,7 +210,7 @@ func TestFormatterCommandResultContracts(t *testing.T) {
 			format: "text",
 			assert: func(t *testing.T, out string) {
 				t.Helper()
-				if !strings.Contains(out, "SUCCESS: contract ok") || !strings.Contains(out, `"name": "plumego"`) {
+				if !strings.Contains(out, "SUCCESS: contract ok") || !strings.Contains(out, "name: plumego") {
 					t.Fatalf("unexpected text result: %s", out)
 				}
 			},

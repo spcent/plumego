@@ -281,33 +281,37 @@ func runAgentsBundle(ctx *Context, args []string) error {
 		return ctx.Out.Error(fmt.Sprintf("generate bundle: %v", err), 1)
 	}
 
-	enc := yaml.NewEncoder(os.Stdout)
-	enc.SetIndent(2)
-	dest := os.Stdout
+	// Write to file when --output is specified; otherwise stream to stdout.
+	// Bundle output is always YAML regardless of --format: it is a file artifact,
+	// not a command-result envelope. --quiet suppresses stdout-only output.
 	if *output != "" {
 		f, err := os.Create(*output)
 		if err != nil {
 			return ctx.Out.Error(fmt.Sprintf("create output file: %v", err), 1)
 		}
 		defer f.Close()
-		dest = f
-		enc = yaml.NewEncoder(f)
+		enc := yaml.NewEncoder(f)
 		enc.SetIndent(2)
-	}
-	_ = dest
-	if err := enc.Encode(b); err != nil {
-		return ctx.Out.Error(fmt.Sprintf("encode bundle: %v", err), 1)
-	}
-	if err := enc.Close(); err != nil {
-		return ctx.Out.Error(fmt.Sprintf("flush bundle: %v", err), 1)
-	}
-
-	if *output != "" {
+		if err := enc.Encode(b); err != nil {
+			return ctx.Out.Error(fmt.Sprintf("encode bundle: %v", err), 1)
+		}
+		if err := enc.Close(); err != nil {
+			return ctx.Out.Error(fmt.Sprintf("flush bundle: %v", err), 1)
+		}
 		return ctx.Out.Success(fmt.Sprintf("bundle written to %s", *output), map[string]any{
 			"task":   *taskType,
 			"module": *modulePath,
 			"output": *output,
 		})
 	}
-	return nil
+
+	if ctx.Out.IsQuiet() {
+		return nil
+	}
+	enc := yaml.NewEncoder(os.Stdout)
+	enc.SetIndent(2)
+	if err := enc.Encode(b); err != nil {
+		return ctx.Out.Error(fmt.Sprintf("encode bundle: %v", err), 1)
+	}
+	return enc.Close()
 }

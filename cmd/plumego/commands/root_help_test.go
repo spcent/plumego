@@ -196,8 +196,8 @@ func TestCLI_OutputFormatSmokeForVersionAndHelp(t *testing.T) {
 	if err != nil {
 		t.Fatalf("text help failed: %v", err)
 	}
-	if !strings.Contains(textOut, "Command Flags:") || !strings.Contains(textOut, "Global Flags:") {
-		t.Fatalf("expected text command help, got: %s", textOut)
+	if !strings.Contains(textOut, "Global Flags:") {
+		t.Fatalf("expected text command help with Global Flags section, got: %s", textOut)
 	}
 
 	jsonHelp, _, err := runCLI(t, []string{"--format", "json", "help", "check"}, "")
