@@ -84,20 +84,12 @@ func (c *CheckCmd) Run(ctx *Context, args []string) error {
 		}
 	}
 
-	exitCode := 0
 	switch checks.Status {
-	case "unhealthy":
-		exitCode = 1
-	case "degraded":
-		exitCode = 2
-	}
-
-	if exitCode == 0 {
+	case "healthy":
 		return ctx.Out.Success("All checks passed", checks)
+	case "degraded":
+		return ctx.Out.Warning("Checks completed with warnings", 1, checks)
+	default:
+		return ctx.Out.Error("Checks failed", 1, checks)
 	}
-
-	if exitCode == 2 {
-		return ctx.Out.Warning("Checks completed with warnings", exitCode, checks)
-	}
-	return ctx.Out.Error("Checks failed", exitCode, checks)
 }

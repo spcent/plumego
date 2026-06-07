@@ -90,7 +90,7 @@ func (c *ConfigCmd) runValidate(out *output.Formatter, envFile string, args []st
 	}
 
 	if len(result.Warnings) > 0 {
-		return out.Warning("Configuration has warnings", 2, result)
+		return out.Warning("Configuration has warnings", 1, result)
 	}
 
 	return out.Success("Configuration is valid", result)

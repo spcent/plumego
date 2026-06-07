@@ -11,7 +11,7 @@ import (
 type RoutesCmd struct{}
 
 func (c *RoutesCmd) Name() string  { return "routes" }
-func (c *RoutesCmd) Short() string { return "Inspect registered routes" }
+func (c *RoutesCmd) Short() string { return "List routes via static analysis (best-effort)" }
 
 func (c *RoutesCmd) Run(ctx *Context, args []string) error {
 	fs := flag.NewFlagSet("routes", flag.ContinueOnError)
@@ -20,8 +20,8 @@ func (c *RoutesCmd) Run(ctx *Context, args []string) error {
 	dir := fs.String("dir", ".", "Project directory")
 	method := fs.String("method", "", "Filter by HTTP method")
 	pattern := fs.String("pattern", "", "Filter routes by pattern")
-	showMiddleware := fs.Bool("middleware", false, "Show middleware chains")
-	group := fs.String("group", "", "Filter by route group")
+	showMiddleware := fs.Bool("middleware", false, "Not yet supported by the static analyzer")
+	group := fs.String("group", "", "Not yet supported by the static analyzer")
 	sortBy := fs.String("sort", "path", "Sort by: path, method")
 
 	positionals, err := parseInterspersedFlags(fs, args)

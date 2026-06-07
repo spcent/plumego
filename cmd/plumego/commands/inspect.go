@@ -19,7 +19,7 @@ const maxInspectResponseBytes = 10 << 20
 type InspectCmd struct{}
 
 func (c *InspectCmd) Name() string  { return "inspect" }
-func (c *InspectCmd) Short() string { return "Inspect running application" }
+func (c *InspectCmd) Short() string { return "Inspect a running plumego application" }
 
 func (c *InspectCmd) Run(ctx *Context, args []string) error {
 	fs := flag.NewFlagSet("inspect", flag.ContinueOnError)

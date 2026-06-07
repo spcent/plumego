@@ -42,6 +42,7 @@ func Execute(info BuildInfo) error {
 	root.Register(NewDevCmd())
 	root.Register(&RoutesCmd{})
 	root.Register(&CheckCmd{})
+	root.Register(&LintCmd{})
 	root.Register(&ConfigCmd{})
 	root.Register(&MigrateCmd{})
 	root.Register(&TestCmd{})
@@ -129,7 +130,7 @@ type globalFlags struct {
 
 func defaultGlobalFlags() globalFlags {
 	return globalFlags{
-		Format:  "json",
+		Format:  "text",
 		EnvFile: ".env",
 	}
 }
@@ -205,7 +206,7 @@ func (r *RootCmd) showCommandHelp(name string) error {
 func globalHelpFooter() string {
 	return `
 Global Flags:
-  -f, --format <type>    Output format: json, yaml, text (default: json)
+  -f, --format <type>    Output format: text, json, yaml (default: text)
   -q, --quiet            Suppress non-essential output
   -v, --verbose          Detailed logging
       --no-color         Disable color output
@@ -221,7 +222,7 @@ Usage:
   plumego [global-flags] <command> [command-flags] [args]
 
 Global Flags:
-  -f, --format <type>    Output format: json, yaml, text (default: json)
+  -f, --format <type>    Output format: text, json, yaml (default: text)
   -q, --quiet            Suppress non-essential output
   -v, --verbose          Detailed logging
       --no-color         Disable color output
@@ -244,12 +245,12 @@ Examples:
   plumego new myapp --template api
   plumego generate handler Auth
   plumego dev --addr :3000
-  plumego --format json routes
   plumego check --security
+  plumego lint
+  plumego --format json routes
   plumego agents verify --changed log
   plumego agents explain --module middleware
   plumego doctor
-  plumego serve
   plumego serve ./public --addr :3000
 
 Documentation:

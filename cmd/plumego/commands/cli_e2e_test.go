@@ -46,6 +46,7 @@ func runCLI(t *testing.T, args []string, cwd string) (string, string, error) {
 	root.Register(&DevCmd{})
 	root.Register(&RoutesCmd{})
 	root.Register(&CheckCmd{})
+	root.Register(&LintCmd{})
 	root.Register(&ConfigCmd{})
 	root.Register(&MigrateCmd{})
 	root.Register(&TestCmd{})
@@ -166,18 +167,17 @@ func TestCLI_VersionJSONOutput(t *testing.T) {
 	}
 }
 
-func TestCLI_DefaultFormatIsJSON(t *testing.T) {
+func TestCLI_DefaultFormatIsText(t *testing.T) {
 	stdout, _, err := runCLI(t, []string{"version"}, "")
 	if err != nil {
 		t.Fatalf("version command failed: %v", err)
 	}
-
-	var payload cliJSONEnvelope
-	if err := json.Unmarshal([]byte(stdout), &payload); err != nil {
-		t.Fatalf("default output should be json: %v\noutput: %s", err, stdout)
+	// Default format is text; output must begin with "SUCCESS:" and must not be a JSON object.
+	if !strings.HasPrefix(strings.TrimSpace(stdout), "SUCCESS:") {
+		t.Fatalf("default output should be text (SUCCESS: ...), got: %s", stdout)
 	}
-	if payload.Status != "success" {
-		t.Fatalf("expected success status, got %q", payload.Status)
+	if strings.HasPrefix(strings.TrimSpace(stdout), "{") {
+		t.Fatalf("default output must not be JSON, got: %s", stdout)
 	}
 }
 
@@ -197,7 +197,9 @@ func TestCLI_GlobalInlineFormatFlag(t *testing.T) {
 }
 
 func TestCLI_GlobalFlagsStopAtCommandToken(t *testing.T) {
-	stdout, _, err := runCLI(t, []string{"version", "--format", "text"}, "")
+	// Global flags must come before the command token; --format after the command
+	// must be rejected as an unknown argument rather than silently consumed.
+	stdout, _, err := runCLI(t, []string{"--format", "json", "version", "--format", "text"}, "")
 	if err == nil {
 		t.Fatalf("expected command-local --format to fail instead of being consumed globally")
 	}
@@ -234,7 +236,9 @@ func TestCLI_JSONEnvelopeIsCommandOutput(t *testing.T) {
 }
 
 func TestCLI_InvalidFormatFailsClosed(t *testing.T) {
-	stdout, _, err := runCLI(t, []string{"--format", "bogus", "version"}, "")
+	// When the user provides an unsupported --format value, the CLI must fail with
+	// exit code 1. The error is emitted in the fallback (text) format.
+	stdout, stderr, err := runCLI(t, []string{"--format", "bogus", "version"}, "")
 	if err == nil {
 		t.Fatalf("expected invalid format error")
 	}
@@ -244,12 +248,9 @@ func TestCLI_InvalidFormatFailsClosed(t *testing.T) {
 		t.Fatalf("expected exit code 1, got %d (ok=%v)", code, ok)
 	}
 
-	var payload cliJSONEnvelope
-	if err := json.Unmarshal([]byte(stdout), &payload); err != nil {
-		t.Fatalf("invalid format error should be json: %v\noutput: %s", err, stdout)
-	}
-	if payload.Status != "error" || !strings.Contains(payload.Message, "unsupported output format") {
-		t.Fatalf("unexpected invalid format response: %#v", payload)
+	combined := stdout + stderr
+	if !strings.Contains(combined, "unsupported output format") {
+		t.Fatalf("expected 'unsupported output format' in output, got stdout=%q stderr=%q", stdout, stderr)
 	}
 }
 
@@ -1044,8 +1045,8 @@ func TestCLI_CheckDegradedUsesWarningEnvelope(t *testing.T) {
 		t.Fatalf("expected degraded check to return exit error")
 	}
 	code, ok := output.ExitCode(err)
-	if !ok || code != 2 {
-		t.Fatalf("expected exit code 2, got %d (ok=%v)", code, ok)
+	if !ok || code != 1 {
+		t.Fatalf("expected exit code 1, got %d (ok=%v)", code, ok)
 	}
 
 	var payload struct {
@@ -1058,7 +1059,7 @@ func TestCLI_CheckDegradedUsesWarningEnvelope(t *testing.T) {
 	if err := json.Unmarshal([]byte(stdout), &payload); err != nil {
 		t.Fatalf("failed to parse output: %v\noutput: %s", err, stdout)
 	}
-	if payload.Status != "warning" || payload.ExitCode != 2 || payload.Data.Status != "degraded" {
+	if payload.Status != "warning" || payload.ExitCode != 1 || payload.Data.Status != "degraded" {
 		t.Fatalf("unexpected degraded envelope: %#v", payload)
 	}
 }
