@@ -307,58 +307,42 @@ func TestCheckPasswordInvalidFormat(t *testing.T) {
 	}
 }
 
-func TestPBKDF2Implementation(t *testing.T) {
-	// Test pbkdf2SHA512 with various parameters
-	password := []byte("test")
-	salt := []byte("salt")
+func TestDeriveKey(t *testing.T) {
+	password := "test"
+	salt := []byte("saltsalt")
 
-	// Test with different iterations
-	result1 := pbkdf2SHA512(password, salt, 1, 32)
-	result2 := pbkdf2SHA512(password, salt, 100, 32)
-
-	if len(result1) != 32 {
-		t.Errorf("pbkdf2SHA512 returned length %d, expected 32", len(result1))
+	// Different iteration counts produce different results.
+	r1, err := deriveKey(password, salt, 1, 32)
+	if err != nil {
+		t.Fatalf("deriveKey iter=1: %v", err)
 	}
-	if len(result2) != 32 {
-		t.Errorf("pbkdf2SHA512 returned length %d, expected 32", len(result2))
+	r2, err := deriveKey(password, salt, 100, 32)
+	if err != nil {
+		t.Fatalf("deriveKey iter=100: %v", err)
 	}
-
-	// Results should be different with different iterations
-	if string(result1) == string(result2) {
-		t.Error("pbkdf2SHA512 with different iterations should produce different results")
+	if len(r1) != 32 {
+		t.Errorf("expected len=32, got %d", len(r1))
 	}
-
-	// Test with invalid iterations
-	result3 := pbkdf2SHA512(password, salt, 0, 32)
-	if result3 != nil {
-		t.Error("pbkdf2SHA512 with iterations=0 should return nil")
+	if len(r2) != 32 {
+		t.Errorf("expected len=32, got %d", len(r2))
+	}
+	if string(r1) == string(r2) {
+		t.Error("different iteration counts must produce different results")
 	}
 
-	// Test with different key lengths
-	result4 := pbkdf2SHA512(password, salt, 10, 16)
-	if len(result4) != 16 {
-		t.Errorf("pbkdf2SHA512 with keyLen=16 returned length %d", len(result4))
+	// Requested key length is honoured.
+	r3, err := deriveKey(password, salt, 10, 16)
+	if err != nil {
+		t.Fatalf("deriveKey keyLen=16: %v", err)
 	}
-}
-
-func TestPBKDF2Block(t *testing.T) {
-	password := []byte("test")
-	salt := []byte("salt")
-
-	// Test block with different indices
-	block1 := pbkdf2Block(password, salt, 10, 1)
-	block2 := pbkdf2Block(password, salt, 10, 2)
-
-	// Verify blocks are non-nil and have expected length
-	if block1 == nil || len(block1) == 0 {
-		t.Error("pbkdf2Block should return non-empty result")
-	}
-	if block2 == nil || len(block2) == 0 {
-		t.Error("pbkdf2Block should return non-empty result")
+	if len(r3) != 16 {
+		t.Errorf("expected len=16, got %d", len(r3))
 	}
 
-	// Blocks with different indices should be different
-	if string(block1) == string(block2) {
-		t.Error("pbkdf2Block with different indices should produce different results")
+	// Derivation is deterministic.
+	ra, _ := deriveKey(password, salt, 5, 32)
+	rb, _ := deriveKey(password, salt, 5, 32)
+	if string(ra) != string(rb) {
+		t.Error("deriveKey must be deterministic for identical inputs")
 	}
 }

@@ -2,13 +2,25 @@ package jwt
 
 import "strings"
 
-// AuthZPolicy defines role/permission requirements.
+// AuthZPolicy defines role/permission requirements for PolicyAuthorizer.
+//
+// An empty policy with AllowEmpty false (the zero value) denies all requests.
+// Set AllowEmpty true to allow requests when no requirements are configured.
+//
+// Role and permission comparisons are case-insensitive: "Admin" and "admin"
+// are treated as the same value. Callers must normalise role and permission
+// strings consistently at issuance time if strict casing is required.
 type AuthZPolicy struct {
-	AnyRole        []string
-	AllRoles       []string
-	AnyPermission  []string
+	// AnyRole requires the principal to hold at least one of these roles.
+	AnyRole []string
+	// AllRoles requires the principal to hold every one of these roles.
+	AllRoles []string
+	// AnyPermission requires the principal to hold at least one of these permissions.
+	AnyPermission []string
+	// AllPermissions requires the principal to hold every one of these permissions.
 	AllPermissions []string
-	AllowEmpty     bool
+	// AllowEmpty permits access when no role or permission requirements are set.
+	AllowEmpty bool
 }
 
 func checkPolicy(policy AuthZPolicy, auth AuthorizationClaims) bool {
@@ -58,6 +70,7 @@ func policyHasRequirements(policy AuthZPolicy) bool {
 		len(policy.AllPermissions) > 0
 }
 
+// contains reports whether target appears in list using case-insensitive comparison.
 func contains(list []string, target string) bool {
 	for _, v := range list {
 		if strings.EqualFold(v, target) {

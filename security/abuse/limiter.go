@@ -182,11 +182,22 @@ func (sc *shardCounter) Load() int64 {
 	return sc.Total()
 }
 
+// LimiterMetrics holds monitoring counters for a Limiter.
+//
+// Allowed, Rejected, and Evictions are cumulative counters that increase
+// monotonically since the limiter was created. Buckets is a point-in-time
+// snapshot of the current number of tracked keys; it rises and falls as keys
+// are added and evicted.
 type LimiterMetrics struct {
-	Allowed   int64
-	Rejected  int64
+	// Allowed is the cumulative number of requests that passed the rate limit.
+	Allowed int64
+	// Rejected is the cumulative number of requests that were denied.
+	Rejected int64
+	// Evictions is the cumulative number of bucket entries evicted due to
+	// MaxEntries pressure or idle expiry.
 	Evictions int64
-	Buckets   int64
+	// Buckets is the current number of active per-key buckets (point-in-time snapshot).
+	Buckets int64
 }
 
 type limiterMetricCounters struct {
