@@ -15,8 +15,10 @@ import (
 // LintCmd checks user projects for plumego anti-patterns.
 type LintCmd struct{}
 
-func (c *LintCmd) Name() string  { return "lint" }
-func (c *LintCmd) Short() string { return "Check project for plumego anti-patterns and boundary violations" }
+func (c *LintCmd) Name() string { return "lint" }
+func (c *LintCmd) Short() string {
+	return "Check project for plumego anti-patterns and boundary violations"
+}
 
 type lintViolation struct {
 	File    string `json:"file" yaml:"file"`
@@ -27,10 +29,10 @@ type lintViolation struct {
 }
 
 type lintResult struct {
-	Status     string           `json:"status" yaml:"status"` // clean, violations
-	Dir        string           `json:"dir" yaml:"dir"`
-	Violations []lintViolation  `json:"violations" yaml:"violations"`
-	Stats      map[string]int   `json:"stats" yaml:"stats"`
+	Status     string          `json:"status" yaml:"status"` // clean, violations
+	Dir        string          `json:"dir" yaml:"dir"`
+	Violations []lintViolation `json:"violations" yaml:"violations"`
+	Stats      map[string]int  `json:"stats" yaml:"stats"`
 }
 
 func (c *LintCmd) Run(ctx *Context, args []string) error {
