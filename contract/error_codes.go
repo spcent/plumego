@@ -25,6 +25,7 @@ const (
 	CodeConflict      = "RESOURCE_CONFLICT"
 	CodeAlreadyExists = "RESOURCE_ALREADY_EXISTS"
 	CodeGone          = "RESOURCE_GONE"
+	CodeNotAcceptable = "NOT_ACCEPTABLE"
 
 	// System sub-codes
 	CodeUnavailable      = "SERVICE_UNAVAILABLE"

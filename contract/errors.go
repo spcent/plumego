@@ -2,6 +2,7 @@ package contract
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"reflect"
 )
@@ -92,7 +93,7 @@ var errorTypeLookup = map[ErrorType]ErrorTypeMeta{
 	TypeConflict:        {CategoryClient, CodeConflict, http.StatusConflict},
 	TypeAlreadyExists:   {CategoryClient, CodeAlreadyExists, http.StatusConflict},
 	TypeGone:            {CategoryClient, CodeGone, http.StatusGone},
-	TypeNotAcceptable:   {CategoryClient, CodeInvalidRequest, http.StatusNotAcceptable},
+	TypeNotAcceptable:   {CategoryClient, CodeNotAcceptable, http.StatusNotAcceptable},
 	TypePayloadTooLarge: {CategoryClient, CodeRequestBodyTooLarge, http.StatusRequestEntityTooLarge},
 	// System
 	TypeInternal:         {CategoryServer, CodeInternalError, http.StatusInternalServerError},
@@ -151,14 +152,20 @@ func (t ErrorType) Meta() ErrorTypeMeta {
 // NewErrorBuilder(), rather than struct literals, to guarantee that all
 // required fields are populated consistently. APIError is intentionally opaque;
 // use its read-only methods to inspect normalized values.
+//
+// APIError implements the error interface and participates in errors.As chains:
+//
+//	var target contract.APIError
+//	if errors.As(err, &target) { ... }
 type APIError struct {
-	status    int
-	code      string
-	message   string
-	category  ErrorCategory
-	errorType ErrorType
-	requestID string
-	details   map[string]any
+	status       int
+	code         string
+	message      string
+	category     ErrorCategory
+	errorType    ErrorType
+	requestID    string
+	details      map[string]any
+	isNormalized bool
 }
 
 // Error implements the error interface for APIError
@@ -168,36 +175,60 @@ func (e APIError) Error() string {
 
 // Status returns the normalized HTTP status associated with the error.
 func (e APIError) Status() int {
+	if e.isNormalized {
+		return e.status
+	}
 	return normalizeAPIError(e).status
 }
 
 // Code returns the normalized machine-readable error code.
 func (e APIError) Code() string {
+	if e.isNormalized {
+		return e.code
+	}
 	return normalizeAPIError(e).code
 }
 
 // Message returns the normalized client-facing error message.
 func (e APIError) Message() string {
+	if e.isNormalized {
+		return e.message
+	}
 	return normalizeAPIError(e).message
 }
 
 // Category returns the normalized high-level error category.
 func (e APIError) Category() ErrorCategory {
+	if e.isNormalized {
+		return e.category
+	}
 	return normalizeAPIError(e).category
 }
 
 // Type returns the normalized error type, or an empty value for untyped errors.
 func (e APIError) Type() ErrorType {
+	if e.isNormalized {
+		return e.errorType
+	}
 	return normalizeAPIError(e).errorType
 }
 
 // RequestID returns the normalized request id associated with the error.
 func (e APIError) RequestID() string {
+	if e.isNormalized {
+		return e.requestID
+	}
 	return normalizeAPIError(e).requestID
 }
 
-// Details returns an isolated copy of the normalized error detail map.
+// Details returns an isolated copy of the error detail map.
+// Scalar values, slices, and nested maps are deep-copied. Struct values stored
+// in the map are returned as interface copies and do not have their internal
+// reference fields deep-copied.
 func (e APIError) Details() map[string]any {
+	if e.isNormalized {
+		return cloneAnyMap(e.details)
+	}
 	return cloneAnyMap(normalizeAPIError(e).details)
 }
 
@@ -364,6 +395,16 @@ func (b *ErrorBuilder) Build() APIError {
 	return normalizeAPIError(b.err)
 }
 
+// AsAPIError unwraps err using errors.As and reports whether an APIError was found.
+// It supports errors wrapped with fmt.Errorf("...: %w", apiErr).
+func AsAPIError(err error) (APIError, bool) {
+	var target APIError
+	if errors.As(err, &target) {
+		return target, true
+	}
+	return APIError{}, false
+}
+
 func normalizeAPIError(err APIError) APIError {
 	err, invalidStatus := normalizeAPIErrorBase(err)
 	err, typed := normalizeTypedAPIError(err)
@@ -371,6 +412,7 @@ func normalizeAPIError(err APIError) APIError {
 		normalizeUntypedAPIError(&err, invalidStatus)
 	}
 	applyDefaultAPIErrorMessage(&err)
+	err.isNormalized = true
 	return err
 }
 

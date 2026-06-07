@@ -558,8 +558,8 @@ func (t *Tracer) EndSpan(span *Span, options ...SpanOption) {
 
 // GetActiveSpan returns the active span from the context.
 func (t *Tracer) GetActiveSpan(ctx context.Context) *Span {
-	spanCtx := contract.TraceContextFromContext(ctx)
-	if spanCtx == nil || !spanCtx.HasSpanID() {
+	spanCtx, ok := contract.TraceContextFromContext(ctx)
+	if !ok || !spanCtx.HasSpanID() {
 		return nil
 	}
 	t.mu.RLock()

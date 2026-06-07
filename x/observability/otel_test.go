@@ -103,8 +103,8 @@ func TestOpenTelemetryTracerIgnoresInvalidInboundTraceIDForContext(t *testing.T)
 		t.Fatalf("tracer should return span")
 	}
 
-	traceCtx := contract.TraceContextFromContext(ctx)
-	if traceCtx == nil || !traceCtx.Valid() {
+	traceCtx, ok := contract.TraceContextFromContext(ctx)
+	if !ok || !traceCtx.Valid() {
 		t.Fatalf("expected valid generated trace context, got %+v", traceCtx)
 	}
 	spanCtx, ok := span.(interface {
@@ -211,8 +211,8 @@ func TestOpenTelemetryTracerUsesContextTraceID(t *testing.T) {
 		t.Fatalf("expected trace id from header, got %s", spanCtx.TraceID())
 	}
 
-	traceCtx := contract.TraceContextFromContext(ctx)
-	if traceCtx == nil || traceCtx.TraceID != traceID {
+	traceCtx, ok := contract.TraceContextFromContext(ctx)
+	if !ok || traceCtx.TraceID != traceID {
 		t.Fatalf("expected contract trace context to be set with traceID %s", traceID)
 	}
 	if !traceCtx.Valid() {

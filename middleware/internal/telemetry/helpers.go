@@ -90,7 +90,7 @@ func BeginTrace(w http.ResponseWriter, prepared PreparedRequest, start TraceStar
 		spanID = span.SpanID()
 	}
 	spanContext := contract.TraceContext{TraceID: traceID, SpanID: spanID}
-	if tc := contract.TraceContextFromContext(ctx); tc != nil {
+	if tc, ok := contract.TraceContextFromContext(ctx); ok {
 		if spanID == "" && tc.Valid() {
 			spanID = tc.SpanID
 		}

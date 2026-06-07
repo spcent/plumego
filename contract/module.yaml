@@ -70,6 +70,9 @@ public_entrypoints:
   - TraceContext.HasTraceID
   - TraceContext.HasSpanID
   - TraceContext.Valid
+  - AsAPIError
+  - GetRouteState
+  - PutRouteState
   - ErrHandlerNil
   - ErrResponseWriterNil
   - ErrInvalidResponseStatus
@@ -107,6 +110,9 @@ public_surface_stability:
     - TraceContext.HasTraceID
     - TraceContext.HasSpanID
     - TraceContext.Valid
+    - AsAPIError
+    - GetRouteState
+    - PutRouteState
   guardrail_constants:
     - HeaderContentType
     - ContentTypeJSON

@@ -46,7 +46,7 @@ func Middleware(config Config) (middleware.Middleware, error) {
 				}
 				if headerSpanID := recorder.Header().Get(internaltelemetry.SpanIDHeader); headerSpanID != "" {
 					fields["span_id"] = headerSpanID
-				} else if tc := contract.TraceContextFromContext(r.Context()); tc != nil && tc.HasSpanID() {
+				} else if tc, ok := contract.TraceContextFromContext(r.Context()); ok && tc.HasSpanID() {
 					fields["span_id"] = tc.SpanID
 				}
 
