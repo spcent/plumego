@@ -1,6 +1,9 @@
 package item
 
-import "context"
+import (
+	"context"
+	"strings"
+)
 
 // Service is the business logic contract for items.
 // Routes.go wires ItemService as the concrete implementation; handlers declare
@@ -11,9 +14,6 @@ import "context"
 // Business logic that spans multiple repository operations, applies domain-level
 // invariants, coordinates side effects (events, notifications, audit logs), or
 // implements caching strategies belongs here — not in the handler or the repository.
-// For this reference the service delegates directly to the repository because there
-// is no cross-cutting business logic to demonstrate; a real service would add logic
-// between the interface boundary and the repository call.
 type Service interface {
 	Create(ctx context.Context, name, description string) (Item, error)
 	Get(ctx context.Context, id string) (Item, bool)
@@ -36,8 +36,12 @@ func NewItemService(repo Repository) *ItemService {
 	return &ItemService{repo: repo}
 }
 
+// Create normalises name and description by trimming leading/trailing whitespace
+// before persisting. Handlers validate that the trimmed fields are non-empty;
+// normalisation runs at the domain boundary so stored values are always in
+// canonical form regardless of what the transport layer delivers.
 func (s *ItemService) Create(ctx context.Context, name, description string) (Item, error) {
-	return s.repo.Create(ctx, name, description)
+	return s.repo.Create(ctx, strings.TrimSpace(name), strings.TrimSpace(description))
 }
 
 func (s *ItemService) Get(ctx context.Context, id string) (Item, bool) {
@@ -48,12 +52,14 @@ func (s *ItemService) List(ctx context.Context, offset, limit int) ([]Item, int,
 	return s.repo.List(ctx, offset, limit)
 }
 
+// Update normalises name and description before persisting, matching Create.
 func (s *ItemService) Update(ctx context.Context, id, name, description string) (Item, bool, error) {
-	return s.repo.Update(ctx, id, name, description)
+	return s.repo.Update(ctx, id, strings.TrimSpace(name), strings.TrimSpace(description))
 }
 
+// Patch normalises any non-empty fields before persisting, matching Create.
 func (s *ItemService) Patch(ctx context.Context, id, name, description string) (Item, bool, error) {
-	return s.repo.Patch(ctx, id, name, description)
+	return s.repo.Patch(ctx, id, strings.TrimSpace(name), strings.TrimSpace(description))
 }
 
 func (s *ItemService) Delete(ctx context.Context, id string) (bool, error) {

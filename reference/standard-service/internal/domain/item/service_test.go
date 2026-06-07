@@ -105,6 +105,63 @@ func TestItemServicePatch(t *testing.T) {
 	}
 }
 
+// TestItemServiceNormalisesInput verifies that the service trims leading/trailing
+// whitespace from name and description before persisting. This is the domain
+// boundary normalisation described in service.go: handlers validate non-emptiness,
+// the service ensures canonical storage form.
+func TestItemServiceNormalisesInput(t *testing.T) {
+	svc := NewItemService(NewMemoryStore())
+	ctx := context.Background()
+
+	t.Run("Create trims whitespace", func(t *testing.T) {
+		it, err := svc.Create(ctx, "  widget  ", "  a widget  ")
+		if err != nil {
+			t.Fatalf("Create: %v", err)
+		}
+		if it.Name != "widget" {
+			t.Errorf("Name = %q, want %q", it.Name, "widget")
+		}
+		if it.Description != "a widget" {
+			t.Errorf("Description = %q, want %q", it.Description, "a widget")
+		}
+	})
+
+	t.Run("Update trims whitespace", func(t *testing.T) {
+		it, err := svc.Create(ctx, "original", "original desc")
+		if err != nil {
+			t.Fatalf("Create: %v", err)
+		}
+		updated, ok, err := svc.Update(ctx, it.ID, "  renamed  ", "  new desc  ")
+		if err != nil || !ok {
+			t.Fatalf("Update: ok=%v err=%v", ok, err)
+		}
+		if updated.Name != "renamed" {
+			t.Errorf("Name = %q, want %q", updated.Name, "renamed")
+		}
+		if updated.Description != "new desc" {
+			t.Errorf("Description = %q, want %q", updated.Description, "new desc")
+		}
+	})
+
+	t.Run("Patch trims whitespace on changed fields", func(t *testing.T) {
+		it, err := svc.Create(ctx, "original", "original desc")
+		if err != nil {
+			t.Fatalf("Create: %v", err)
+		}
+		patched, ok, err := svc.Patch(ctx, it.ID, "  renamed  ", "")
+		if err != nil || !ok {
+			t.Fatalf("Patch: ok=%v err=%v", ok, err)
+		}
+		if patched.Name != "renamed" {
+			t.Errorf("Name = %q, want %q", patched.Name, "renamed")
+		}
+		// Unchanged field must be preserved verbatim.
+		if patched.Description != "original desc" {
+			t.Errorf("Description = %q, want preserved %q", patched.Description, "original desc")
+		}
+	})
+}
+
 func TestItemServiceDelete(t *testing.T) {
 	svc := NewItemService(NewMemoryStore())
 	ctx := context.Background()
