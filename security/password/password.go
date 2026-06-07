@@ -39,7 +39,7 @@
 package password
 
 import (
-	"crypto/hmac"
+	"crypto/pbkdf2"
 	"crypto/rand"
 	"crypto/sha512"
 	"crypto/subtle"
@@ -216,7 +216,14 @@ const MaxPasswordLength = 4096
 
 const (
 	saltSize = 16
-	hashSize = 32
+
+	// hashSize is the derived key length for new hashes (full SHA-512 output).
+	hashSize = 64
+
+	// hashSizeLegacy is the derived key length used by hashes produced before
+	// the hashSize increase. CheckPassword accepts both sizes for backward
+	// compatibility; HashPassword always produces hashSize-byte hashes.
+	hashSizeLegacy = 32
 )
 
 // HashPassword generates a salted hash of the password with the default cost.
@@ -239,7 +246,10 @@ func HashPasswordWithCost(password string, cost int) (string, error) {
 		return "", fmt.Errorf("generate salt: %w", err)
 	}
 
-	derived := deriveKey(password, salt, cost)
+	derived, err := deriveKey(password, salt, cost, hashSize)
+	if err != nil {
+		return "", fmt.Errorf("derive key: %w", err)
+	}
 	encodedSalt := base64.StdEncoding.EncodeToString(salt)
 	encodedHash := base64.StdEncoding.EncodeToString(derived)
 
@@ -247,6 +257,9 @@ func HashPasswordWithCost(password string, cost int) (string, error) {
 }
 
 // CheckPassword compares a hashed password with its plaintext version.
+//
+// It accepts both 64-byte hashes (current default) and 32-byte hashes
+// (produced by earlier versions) for backward compatibility.
 func CheckPassword(hashedPassword, password string) error {
 	if err := validatePasswordLength(password); err != nil {
 		return err
@@ -277,11 +290,17 @@ func CheckPassword(hashedPassword, password string) error {
 	if err != nil {
 		return fmt.Errorf("%w: decode hash: %v", ErrInvalidHash, err)
 	}
-	if len(expectedHash) != hashSize {
+
+	// Accept both current (64-byte) and legacy (32-byte) derived key lengths.
+	targetLen := len(expectedHash)
+	if targetLen != hashSizeLegacy && targetLen != hashSize {
 		return fmt.Errorf("%w: invalid hash length", ErrInvalidHash)
 	}
 
-	derived := deriveKey(password, salt, cost)
+	derived, keyErr := deriveKey(password, salt, cost, targetLen)
+	if keyErr != nil {
+		return fmt.Errorf("%w: derive key: %w", ErrInvalidHash, keyErr)
+	}
 	if subtle.ConstantTimeCompare(expectedHash, derived) == 1 {
 		return nil
 	}
@@ -289,8 +308,8 @@ func CheckPassword(hashedPassword, password string) error {
 	return ErrPasswordMismatch
 }
 
-func deriveKey(password string, salt []byte, cost int) []byte {
-	return pbkdf2SHA512([]byte(password), salt, cost, hashSize)
+func deriveKey(password string, salt []byte, cost, keyLen int) ([]byte, error) {
+	return pbkdf2.Key(sha512.New, password, salt, cost, keyLen)
 }
 
 func validateCost(cost int) error {
@@ -310,45 +329,3 @@ func validatePasswordLength(password string) error {
 	return nil
 }
 
-func pbkdf2SHA512(password, salt []byte, iterations, keyLen int) []byte {
-	if iterations < 1 {
-		return nil
-	}
-
-	hLen := sha512.Size
-	numBlocks := (keyLen + hLen - 1) / hLen
-	derived := make([]byte, 0, numBlocks*hLen)
-
-	for block := 1; block <= numBlocks; block++ {
-		t := pbkdf2Block(password, salt, iterations, block)
-		derived = append(derived, t...)
-	}
-
-	return derived[:keyLen]
-}
-
-func pbkdf2Block(password, salt []byte, iterations, blockIndex int) []byte {
-	h := hmac.New(sha512.New, password)
-	h.Write(salt)
-	h.Write([]byte{
-		byte(blockIndex >> 24),
-		byte(blockIndex >> 16),
-		byte(blockIndex >> 8),
-		byte(blockIndex),
-	})
-
-	u := h.Sum(nil)
-	t := make([]byte, len(u))
-	copy(t, u)
-
-	for i := 1; i < iterations; i++ {
-		h = hmac.New(sha512.New, password)
-		h.Write(u)
-		u = h.Sum(nil)
-		for j := range t {
-			t[j] ^= u[j]
-		}
-	}
-
-	return t
-}

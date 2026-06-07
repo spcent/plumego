@@ -1,7 +1,10 @@
 package password
 
 import (
+	"crypto/rand"
+	"encoding/base64"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 )
@@ -110,6 +113,35 @@ func TestHashPasswordWithCostInvalidCostTooHigh(t *testing.T) {
 	}
 }
 
+// TestCheckPasswordAcceptsLegacyHash verifies backward compatibility with
+// 32-byte (hashSizeLegacy) hashes produced before the hashSize increase.
+func TestCheckPasswordAcceptsLegacyHash(t *testing.T) {
+	pw := "test-legacy-password"
+	salt := make([]byte, saltSize)
+	if _, err := rand.Read(salt); err != nil {
+		t.Fatalf("rand.Read: %v", err)
+	}
+	cost := MinimumCost
+
+	derived, err := deriveKey(pw, salt, cost, hashSizeLegacy)
+	if err != nil {
+		t.Fatalf("deriveKey: %v", err)
+	}
+
+	stored := fmt.Sprintf("%d$%s$%s",
+		cost,
+		base64.StdEncoding.EncodeToString(salt),
+		base64.StdEncoding.EncodeToString(derived),
+	)
+
+	if err := CheckPassword(stored, pw); err != nil {
+		t.Fatalf("CheckPassword with legacy 32-byte hash: %v", err)
+	}
+	if err := CheckPassword(stored, "wrong-password"); !errors.Is(err, ErrPasswordMismatch) {
+		t.Fatalf("expected ErrPasswordMismatch, got %v", err)
+	}
+}
+
 // TestCheckPasswordInvalidHashFormats covers the various ErrInvalidHash paths
 // in CheckPassword (not enough segments, non-numeric cost, cost out of range,
 // bad salt base64, wrong salt length, bad hash base64, wrong hash length).
@@ -127,7 +159,7 @@ func TestCheckPasswordInvalidHashFormats(t *testing.T) {
 		{"wrong salt length", "100000$dGVzdA==$aGFzaA=="},
 		// Valid cost + valid 16-byte salt + bad hash base64.
 		{"bad hash base64", "100000$AAAAAAAAAAAAAAAAAAAAAA==$not!base64"},
-		// Valid cost + valid 16-byte salt + valid base64 but wrong hash length (not 32 bytes).
+		// Valid cost + valid 16-byte salt + valid base64 but wrong hash length (not 32 or 64 bytes).
 		{"wrong hash length", "100000$AAAAAAAAAAAAAAAAAAAAAA==$aGFzaA=="},
 	}
 
