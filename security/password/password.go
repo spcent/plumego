@@ -221,8 +221,8 @@ const (
 	hashSize = 64
 
 	// hashSizeLegacy is the derived key length used by hashes produced before
-	// the hashSize increase. CheckPassword accepts both sizes for backward
-	// compatibility; HashPassword always produces hashSize-byte hashes.
+	// the hashSize increase. CheckPassword accepts both sizes; HashPassword
+	// always produces hashSize-byte hashes.
 	hashSizeLegacy = 32
 )
 
@@ -259,7 +259,7 @@ func HashPasswordWithCost(password string, cost int) (string, error) {
 // CheckPassword compares a hashed password with its plaintext version.
 //
 // It accepts both 64-byte hashes (current default) and 32-byte hashes
-// (produced by earlier versions) for backward compatibility.
+// produced by earlier versions of HashPassword; both formats remain valid.
 func CheckPassword(hashedPassword, password string) error {
 	if err := validatePasswordLength(password); err != nil {
 		return err
@@ -328,4 +328,3 @@ func validatePasswordLength(password string) error {
 	}
 	return nil
 }
-

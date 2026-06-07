@@ -113,8 +113,8 @@ func TestHashPasswordWithCostInvalidCostTooHigh(t *testing.T) {
 	}
 }
 
-// TestCheckPasswordAcceptsLegacyHash verifies backward compatibility with
-// 32-byte (hashSizeLegacy) hashes produced before the hashSize increase.
+// TestCheckPasswordAcceptsLegacyHash verifies that 32-byte hashes
+// (hashSizeLegacy) produced before the hashSize increase remain verifiable.
 func TestCheckPasswordAcceptsLegacyHash(t *testing.T) {
 	pw := "test-legacy-password"
 	salt := make([]byte, saltSize)
