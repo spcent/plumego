@@ -57,7 +57,7 @@ type RouterConfig struct {
 
 ```go
 type AppDependencies struct {
-    Logger log.Logger
+    Logger log.StructuredLogger
 }
 ```
 
@@ -235,7 +235,7 @@ Initiates graceful shutdown. Drains in-flight connections at `DrainInterval` int
 ### Logger
 
 ```go
-func (a *App) Logger() log.Logger
+func (a *App) Logger() log.StructuredLogger
 ```
 
 Returns the logger passed in `AppDependencies`. Returns a no-op logger when none was provided.

@@ -1,10 +1,10 @@
 name: x/data/file
 path: x/data/file
 layer: extension
-status: experimental
+status: beta
 suggested_gate_profile: single_module_behavior
 parent_family: x/data
-stability_tier: experimental
+stability_tier: beta
 owner: persistence
 risk: medium
 summary: Tenant-aware file storage and metadata implementations behind the stable store/file contracts.

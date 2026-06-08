@@ -12,7 +12,14 @@ sidebar:
 
 Open this page after [x/* Family](/docs/x-family) when the change is clearly about edge transport behavior rather than the smallest canonical service shape: proxying upstream requests, rewriting paths, balancing across backends, or wiring gateway-level health.
 
-`x/gateway` is the canonical and only app-facing entrypoint for gateway and edge transport work in Plumego. Its two subordinate packages — `x/gateway/discovery` (service instance resolution) and `x/gateway/ipc` (inter-process transport) — are reached through `x/gateway` first, not opened directly.
+`x/gateway` is the canonical and only app-facing entrypoint for gateway and edge transport work in Plumego. Its subordinate packages are reached through `x/gateway` first, not opened directly:
+
+- `x/gateway/cache` — gateway-edge HTTP response caching
+- `x/gateway/discovery` — service instance resolution
+- `x/gateway/ipc` — inter-process transport
+- `x/gateway/protocol` — protocol adapter registry (gRPC, GraphQL transcoding)
+- `x/gateway/protocolmw` — protocol-aware middleware for the proxy pipeline
+- `x/gateway/transform` — request/response header, query-param, and body transformation chains
 
 ## Stability and adoption
 
@@ -30,6 +37,8 @@ rewrite, balancer, discovery, or IPC APIs in production.
 - you are wiring a cache layer at the gateway edge (`cache/`)
 - you are implementing gateway-level health checks (`health.go`)
 - you are adding discovery-based backend resolution or IPC transport helpers
+- you are adapting gRPC or GraphQL upstream protocols via the proxy pipeline (`protocol/`, `protocolmw/`)
+- you are composing header, query-param, or body transforms at the gateway edge (`transform/`)
 
 ## Do not start here when
 
@@ -56,6 +65,9 @@ rewrite, balancer, discovery, or IPC APIs in production.
 | `balancer`: backend pool management and load-balancing strategy selection | tenant-specific routing policy or per-tenant backend assignment |
 | `cache`: gateway-edge response caching adapters | application-level data caching not at the edge — use `x/data/cache` instead |
 | `health`: gateway-level backend health tracking and circuit state | fine-grained component health types in the stable `health` module |
+| `protocol`: protocol adapter registry, gRPC and GraphQL transcoding at the proxy edge | business-level protocol logic — keep that in application code |
+| `protocolmw`: protocol-aware middleware composing adapters into the proxy pipeline | generic HTTP middleware not tied to protocol adaptation — use `middleware/` |
+| `transform`: header injection/removal, query-param edits, JSON body rewriting, method/status overrides | application-level response shaping outside the gateway edge |
 | `discovery` / `ipc` via `x/gateway` entrypoints | opening `x/gateway/discovery` or `x/gateway/ipc` directly for work that belongs at the gateway surface |
 
 ## Usage
@@ -151,7 +163,7 @@ defer checker.Stop()
 
 ## Why this primer exists
 
-Gateway and edge transport is where the confusion between "routing" (which belongs in `router`) and "proxying" (which belongs here) causes the most boundary drift. `x/gateway` is also the gatekeeper for two subordinate families: if you need service discovery or IPC, you start here rather than opening those packages directly. That indirection keeps the app-facing surface stable even as the discovery and IPC internals evolve.
+Gateway and edge transport is where the confusion between "routing" (which belongs in `router`) and "proxying" (which belongs here) causes the most boundary drift. `x/gateway` is the gatekeeper for all six subordinate packages: always start here before opening `cache`, `discovery`, `ipc`, `protocol`, `protocolmw`, or `transform` directly. That indirection keeps the app-facing surface stable even as subordinate internals evolve.
 
 ## Read next
 
