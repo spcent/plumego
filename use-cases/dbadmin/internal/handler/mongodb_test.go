@@ -307,6 +307,20 @@ func TestParseMongoPipelineJSON_rejectsUnsupportedStage(t *testing.T) {
 	}
 }
 
+func TestParseMongoFilterJSON_rejectsDeeplyNested(t *testing.T) {
+	// Build a document nested one level beyond maxMongoFilterDepth.
+	root := map[string]any{}
+	cur := root
+	for i := 0; i < maxMongoFilterDepth+1; i++ {
+		child := map[string]any{}
+		cur["field"] = child
+		cur = child
+	}
+	if err := validateMongoFilterDocument(root); err == nil {
+		t.Error("validateMongoFilterDocument should reject document nested beyond maxMongoFilterDepth")
+	}
+}
+
 func TestParseMongoPipelineJSON_detectsDangerousWriteStage(t *testing.T) {
 	_, dangerous, err := parseMongoPipelineJSON(`[{"$match":{"status":"active"}},{"$merge":{"into":"archive"}}]`)
 	if err != nil {

@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"net/http"
+	"regexp"
 	"strings"
 
 	"github.com/spcent/plumego/contract"
@@ -302,6 +303,18 @@ func buildCreateTable(dbName string, req createTableRequest, driver connection.D
 	return sb.String()
 }
 
+// ddlIdentifierRe allows only SQL-safe identifier characters: start with a
+// letter, underscore, or dollar sign; remainder letters, digits, underscore,
+// dollar sign.  This is an allowlist — anything outside it is rejected even
+// though quoteIdent would technically make it safe, giving defence-in-depth.
+var ddlIdentifierRe = regexp.MustCompile(`^[a-zA-Z_$][a-zA-Z0-9_$]*$`)
+
+// columnTypeRe allows standard SQL data-type syntax: one or more
+// space-separated words (e.g. DOUBLE PRECISION, INT UNSIGNED) optionally
+// followed by a single (n) or (n,m) precision clause.  Everything else —
+// semicolons, commas outside parens, dashes, comment markers — is rejected.
+var columnTypeRe = regexp.MustCompile(`(?i)^[a-z][a-z0-9]*(?:\s+[a-z][a-z0-9]*)*(?:\(\d+(?:,\d+)?\))?$`)
+
 func validateDDLIdentifier(kind, name string) error {
 	if name == "" {
 		return fmt.Errorf("%s is required", kind)
@@ -309,15 +322,14 @@ func validateDDLIdentifier(kind, name string) error {
 	if len(name) > 64 {
 		return fmt.Errorf("%s too long (max 64 chars)", kind)
 	}
-	if strings.ContainsRune(name, 0) {
+	if !ddlIdentifierRe.MatchString(name) {
 		return fmt.Errorf("%s contains unsafe characters", kind)
 	}
 	return nil
 }
 
-// validateColumnType rejects column type strings that contain SQL injection
-// characters while allowing all standard SQL type syntax (e.g. VARCHAR(255),
-// DECIMAL(10,2), DOUBLE PRECISION, INT UNSIGNED).
+// validateColumnType rejects column type strings outside the expected
+// SQL-type grammar, using an allowlist regex rather than a blocklist.
 func validateColumnType(s string) error {
 	s = strings.TrimSpace(s)
 	if s == "" {
@@ -326,10 +338,8 @@ func validateColumnType(s string) error {
 	if len(s) > 64 {
 		return fmt.Errorf("column type too long (max 64 chars)")
 	}
-	for _, bad := range []string{";", "--", "/*", "*/", "\x00"} {
-		if strings.Contains(s, bad) {
-			return fmt.Errorf("column type contains unsafe characters")
-		}
+	if !columnTypeRe.MatchString(s) {
+		return fmt.Errorf("column type contains unsafe characters")
 	}
 	return nil
 }

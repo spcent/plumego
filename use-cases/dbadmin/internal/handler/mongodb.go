@@ -269,12 +269,24 @@ func parseMongoPipelineJSON(raw string) ([]any, bool, error) {
 	return pipeline, hasDangerousWriteStage, nil
 }
 
+// maxMongoFilterDepth caps recursive filter validation to prevent stack
+// exhaustion from a maliciously crafted deeply-nested document.
+const maxMongoFilterDepth = 15
+
 func validateMongoFilterDocument(doc map[string]any) error {
+	return validateMongoFilterDocumentAt(doc, 0)
+}
+
+// validateMongoFilterDocumentAt is the depth-aware core of filter validation.
+// It performs a single traversal: operator allowlist checks happen at every
+// key position via validateMongoFilterKey, so there is no need for a
+// separate validateNoDangerousMongoExpressions pass over the same subtree.
+func validateMongoFilterDocumentAt(doc map[string]any, depth int) error {
+	if depth > maxMongoFilterDepth {
+		return fmt.Errorf("filter too deeply nested (max depth %d)", maxMongoFilterDepth)
+	}
 	for key, value := range doc {
 		if err := validateMongoFilterKey(key); err != nil {
-			return err
-		}
-		if err := validateNoDangerousMongoExpressions(value); err != nil {
 			return err
 		}
 		if strings.HasPrefix(key, "$") {
@@ -289,7 +301,7 @@ func validateMongoFilterDocument(doc map[string]any) error {
 					if !ok {
 						return fmt.Errorf("%s entries must be objects", key)
 					}
-					if err := validateMongoFilterDocument(nested); err != nil {
+					if err := validateMongoFilterDocumentAt(nested, depth+1); err != nil {
 						return err
 					}
 				}
@@ -298,20 +310,32 @@ func validateMongoFilterDocument(doc map[string]any) error {
 				if !ok {
 					return fmt.Errorf("$not value must be an object")
 				}
-				if err := validateMongoFilterDocument(nested); err != nil {
+				if err := validateMongoFilterDocumentAt(nested, depth+1); err != nil {
 					return err
 				}
 			default:
-				if nested, ok := value.(map[string]any); ok {
-					if err := validateMongoFilterDocument(nested); err != nil {
-						return err
-					}
+				if err := validateMongoFilterValue(value, depth+1); err != nil {
+					return err
 				}
 			}
 			continue
 		}
-		if nested, ok := value.(map[string]any); ok {
-			if err := validateMongoFilterDocument(nested); err != nil {
+		if err := validateMongoFilterValue(value, depth+1); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// validateMongoFilterValue recurses into map and array values so that operator
+// keys at any nesting depth are validated by validateMongoFilterDocumentAt.
+func validateMongoFilterValue(v any, depth int) error {
+	switch val := v.(type) {
+	case map[string]any:
+		return validateMongoFilterDocumentAt(val, depth)
+	case []any:
+		for _, item := range val {
+			if err := validateMongoFilterValue(item, depth); err != nil {
 				return err
 			}
 		}

@@ -114,10 +114,15 @@ func TestValidateEngine_invalid(t *testing.T) {
 }
 
 func TestValidateDDLIdentifier(t *testing.T) {
-	if err := validateDDLIdentifier("table name", "users"); err != nil {
-		t.Fatalf("validateDDLIdentifier valid name: %v", err)
+	for _, name := range []string{"users", "user_id", "_private", "My$Field", "T2"} {
+		if err := validateDDLIdentifier("table name", name); err != nil {
+			t.Errorf("validateDDLIdentifier(%q) = %v, want nil", name, err)
+		}
 	}
-	for _, name := range []string{"", strings.Repeat("x", 65), "bad\x00name"} {
+	for _, name := range []string{
+		"", strings.Repeat("x", 65), "bad\x00name",
+		"name-with-hyphen", "123start", "name with space", "a.b",
+	} {
 		if err := validateDDLIdentifier("table name", name); err == nil {
 			t.Errorf("validateDDLIdentifier(%q) = nil, want error", name)
 		}
