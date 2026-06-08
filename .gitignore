@@ -11,6 +11,9 @@
 cmd/plumego/plumego
 cmd/plumego/plumego-*
 
+# doc-snippets binary (produced by go build ./internal/tools/doc-snippets)
+doc-snippets
+
 # Generated task execution bundle (agent working context, not for commit)
 .agent-bundle.yaml
 
