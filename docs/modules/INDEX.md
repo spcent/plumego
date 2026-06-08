@@ -8,12 +8,19 @@ Directories use the following naming scheme:
 
 | Directory pattern | Meaning | Example |
 |---|---|---|
+| `plumego/` | Root package convenience facade | `plumego/` |
 | `<name>/` (no prefix) | Stable root package | `core/`, `contract/`, `middleware/` |
 | `x/<family>/` | Top-level extension family | `x/ai/`, `x/gateway/`, `x/messaging/` |
 | `x/<family>/<subpkg>/` | Sub-package of an extension family | `x/data/cache/`, `x/messaging/mq/` |
 
 The directory tree under `docs/modules/x/` is a 1:1 mirror of the `x/` source tree.
 The primer path is always `docs/modules/<import-path>/README.md`.
+
+## Root Package
+
+| Import path | Primer |
+|---|---|
+| `github.com/spcent/plumego` | [`plumego/README.md`](plumego/README.md) |
 
 ## Extension Primers
 

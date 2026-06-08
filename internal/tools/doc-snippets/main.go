@@ -183,7 +183,8 @@ func goBlocks(path string) ([]string, error) {
 func wrappedFragment(block string) []byte {
 	var body strings.Builder
 	for _, line := range strings.SplitAfter(block, "\n") {
-		if strings.TrimSpace(line) == `import "github.com/spcent/plumego/router"` {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == `import "github.com/spcent/plumego/router"` {
 			continue
 		}
 		body.WriteString(line)
@@ -196,6 +197,7 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/spcent/plumego"
 	"github.com/spcent/plumego/core"
 	"github.com/spcent/plumego/router"
 )
@@ -203,6 +205,7 @@ import (
 func main() {
 	app := core.New(core.DefaultConfig(), core.AppDependencies{})
 	_ = router.Param
+	_ = plumego.Param
 `)
 	out.WriteString(body.String())
 	out.WriteString("}\n")

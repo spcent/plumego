@@ -24,27 +24,16 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/spcent/plumego"
 	"github.com/spcent/plumego/contract"
-	"github.com/spcent/plumego/core"
 )
 
 func main() {
-	cfg := core.DefaultConfig()
-	cfg.Addr = ":8080"
-	app := core.New(cfg, core.AppDependencies{})
-	if err := app.Get("/ping", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	app := plumego.New()
+	app.Get("/ping", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_ = contract.WriteResponse(w, r, http.StatusOK, map[string]string{"message": "pong"}, nil)
-	})); err != nil {
-		log.Fatal(err)
-	}
-	if err := app.Prepare(); err != nil {
-		log.Fatal(err)
-	}
-	srv, err := app.Server()
-	if err != nil {
-		log.Fatal(err)
-	}
-	log.Fatal(srv.ListenAndServe())
+	}))
+	log.Fatal(http.ListenAndServe(":8080", app))
 }
 ```
 
@@ -58,6 +47,17 @@ go run main.go
 
 Open `http://localhost:8080/ping`. For a production-style layout, read
 [`reference/standard-service`](./reference/standard-service) next.
+
+For non-default address, timeouts, or TLS:
+
+```go
+cfg := plumego.DefaultConfig()
+cfg.Addr = ":9090"
+app := plumego.NewWithConfig(cfg)
+```
+
+For production wiring with explicit logger injection, use `core.New` directly —
+see [`docs/start/getting-started.md`](./docs/start/getting-started.md).
 
 ## Choose Your Starting Point
 

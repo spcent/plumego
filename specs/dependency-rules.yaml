@@ -3,7 +3,11 @@ version: 1
 rules:
   stable_must_not_depend_on_extension: true
   library_must_not_depend_on_reference: true
-  root_facade_forbidden: true
+  # root_facade_forbidden was true before v1.1.0. A thin facade at the module
+  # root is now approved: it may only re-export core.App constructors, type
+  # aliases for AppConfig/AppDependencies, and router.Param. It must not
+  # introduce custom handler types, context wrappers, or response helpers.
+  root_facade_forbidden: false
 
 modules:
   contract:
