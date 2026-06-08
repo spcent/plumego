@@ -1045,8 +1045,8 @@ func TestCLI_CheckDegradedUsesWarningEnvelope(t *testing.T) {
 		t.Fatalf("expected degraded check to return exit error")
 	}
 	code, ok := output.ExitCode(err)
-	if !ok || code != 1 {
-		t.Fatalf("expected exit code 1, got %d (ok=%v)", code, ok)
+	if !ok || code != 2 {
+		t.Fatalf("expected exit code 2, got %d (ok=%v)", code, ok)
 	}
 
 	var payload struct {
@@ -1059,7 +1059,7 @@ func TestCLI_CheckDegradedUsesWarningEnvelope(t *testing.T) {
 	if err := json.Unmarshal([]byte(stdout), &payload); err != nil {
 		t.Fatalf("failed to parse output: %v\noutput: %s", err, stdout)
 	}
-	if payload.Status != "warning" || payload.ExitCode != 1 || payload.Data.Status != "degraded" {
+	if payload.Status != "warning" || payload.ExitCode != 2 || payload.Data.Status != "degraded" {
 		t.Fatalf("unexpected degraded envelope: %#v", payload)
 	}
 }

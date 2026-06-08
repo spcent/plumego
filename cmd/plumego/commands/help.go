@@ -127,7 +127,7 @@ func (c *GenerateCmd) Help() CommandHelp {
 			{"--format <json|yaml>", "Spec output format (spec only)"},
 			{"--app <package>", "Application package to introspect (spec only)"},
 			{"--package <name>", "Package name for generated file"},
-			{"--methods <list>", "HTTP methods, comma-separated (handler only, default: GET)"},
+			{"--methods <list>", "HTTP methods, comma-separated: GET, POST, PUT, PATCH, DELETE (handler only, default: GET)"},
 			{"--with-tests", "Also generate test file"},
 			{"--with-validation", "Add Validate() method (model only)"},
 			{"--force", "Overwrite existing files"},

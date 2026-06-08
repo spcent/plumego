@@ -103,6 +103,73 @@ func TestCLI_NewParsesFlagsAfterProjectName(t *testing.T) {
 	}
 }
 
+func TestCLI_NewNextStepUsesOutputDir(t *testing.T) {
+	tmpDir := t.TempDir()
+	customDir := filepath.Join(tmpDir, "services", "myapp")
+
+	stdout, _, err := runCLI(t, []string{
+		"--format", "json",
+		"new", "myapp",
+		"--dir", customDir,
+		"--module", "example.com/myapp",
+		"--no-git",
+	}, "")
+	if err != nil {
+		t.Fatalf("new with custom dir failed: %v\noutput: %s", err, stdout)
+	}
+
+	var payload struct {
+		Status string `json:"status"`
+		Data   struct {
+			NextSteps []string `json:"next_steps"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(stdout), &payload); err != nil {
+		t.Fatalf("failed to parse output: %v\noutput: %s", err, stdout)
+	}
+	if len(payload.Data.NextSteps) == 0 {
+		t.Fatalf("expected next_steps, got none; output: %s", stdout)
+	}
+	cdStep := payload.Data.NextSteps[0]
+	// The cd step should point to the custom output dir, not just the project name.
+	if !strings.Contains(cdStep, "services") {
+		t.Fatalf("cd hint should reference output dir path, got %q", cdStep)
+	}
+	if cdStep == "cd myapp" {
+		t.Fatalf("cd hint must not use bare project name when --dir is set, got %q", cdStep)
+	}
+}
+
+func TestCLI_NewNextStepUsesDefaultDir(t *testing.T) {
+	tmpDir := t.TempDir()
+	stdout, _, err := runCLI(t, []string{
+		"--format", "json",
+		"new", "myservice",
+		"--module", "example.com/myservice",
+		"--no-git",
+	}, tmpDir)
+	if err != nil {
+		t.Fatalf("new with default dir failed: %v\noutput: %s", err, stdout)
+	}
+
+	var payload struct {
+		Status string `json:"status"`
+		Data   struct {
+			NextSteps []string `json:"next_steps"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(stdout), &payload); err != nil {
+		t.Fatalf("failed to parse output: %v\noutput: %s", err, stdout)
+	}
+	if len(payload.Data.NextSteps) == 0 {
+		t.Fatalf("expected next_steps, got none; output: %s", stdout)
+	}
+	cdStep := payload.Data.NextSteps[0]
+	if !strings.Contains(cdStep, "myservice") {
+		t.Fatalf("cd hint should reference project dir, got %q", cdStep)
+	}
+}
+
 func TestCLI_NewRejectsUnexpectedArguments(t *testing.T) {
 	stdout, _, err := runCLI(t, []string{
 		"--format", "json",

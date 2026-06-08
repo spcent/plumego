@@ -73,9 +73,9 @@ func parseHTTPMethods(value string) ([]string, error) {
 			return nil, fmt.Errorf("empty HTTP method")
 		}
 		switch method {
-		case "GET", "POST", "PUT", "DELETE":
+		case "GET", "POST", "PUT", "PATCH", "DELETE":
 		default:
-			return nil, fmt.Errorf("unsupported HTTP method: %s", method)
+			return nil, fmt.Errorf("unsupported HTTP method: %s (valid: GET, POST, PUT, PATCH, DELETE)", method)
 		}
 		if _, ok := seen[method]; ok {
 			continue

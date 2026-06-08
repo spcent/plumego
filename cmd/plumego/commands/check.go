@@ -88,7 +88,7 @@ func (c *CheckCmd) Run(ctx *Context, args []string) error {
 	case "healthy":
 		return ctx.Out.Success("All checks passed", checks)
 	case "degraded":
-		return ctx.Out.Warning("Checks completed with warnings", 1, checks)
+		return ctx.Out.Warning("Checks completed with warnings", 2, checks)
 	default:
 		return ctx.Out.Error("Checks failed", 1, checks)
 	}
