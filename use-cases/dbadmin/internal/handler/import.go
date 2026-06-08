@@ -100,7 +100,7 @@ func (h ImportHandler) Import(w http.ResponseWriter, r *http.Request) {
 	if guardReadonly(conn, w, r, h.Logger) {
 		return
 	}
-	db, err := h.Manager.Open(conn)
+	db, err := h.Manager.Open(r.Context(), conn)
 	if err != nil {
 		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeInternal).Message("failed to connect").

@@ -2,15 +2,29 @@ package handler
 
 import (
 	"context"
-	"sync"
 	"time"
+
+	"dbadmin/internal/domain/connection"
+)
+
+// OperationKind categorises a non-SQL datasource operation.
+type OperationKind string
+
+const (
+	OperationKindQuery     OperationKind = "query"
+	OperationKindAggregate OperationKind = "aggregate"
+	OperationKindExport    OperationKind = "export"
+	OperationKindImport    OperationKind = "import"
+	OperationKindCommand   OperationKind = "command"
+	OperationKindSearch    OperationKind = "search"
+	OperationKindDelete    OperationKind = "delete"
 )
 
 // OperationInfo tracks an active non-SQL datasource operation.
 type OperationInfo struct {
 	OperationID string
-	Driver      string
-	Kind        string
+	Driver      connection.DriverType
+	Kind        OperationKind
 	ConnID      string
 	Resource    string
 	Summary     string
@@ -20,22 +34,16 @@ type OperationInfo struct {
 
 // OperationRegistry manages active non-SQL operations and cancellation.
 type OperationRegistry struct {
-	mu         sync.RWMutex
-	operations map[string]*OperationInfo
+	reg activeRegistry[OperationInfo]
 }
 
 // NewOperationRegistry creates an active operation registry.
 func NewOperationRegistry() *OperationRegistry {
-	return &OperationRegistry{
-		operations: make(map[string]*OperationInfo),
-	}
+	return &OperationRegistry{reg: newActiveRegistry[OperationInfo]()}
 }
 
 // Register adds an operation and returns the operation ID.
 func (r *OperationRegistry) Register(info OperationInfo, cancel context.CancelFunc) string {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
 	id := info.OperationID
 	if id == "" {
 		id, _ = generateHistoryID()
@@ -43,22 +51,18 @@ func (r *OperationRegistry) Register(info OperationInfo, cancel context.CancelFu
 	info.OperationID = id
 	info.CancelFunc = cancel
 	info.StartTime = time.Now().UTC()
-	r.operations[id] = &info
+	r.reg.put(id, &info)
 	return id
 }
 
 // Unregister removes an operation.
 func (r *OperationRegistry) Unregister(operationID string) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	delete(r.operations, operationID)
+	r.reg.remove(operationID)
 }
 
 // Cancel cancels an operation by ID and returns true if it was active.
 func (r *OperationRegistry) Cancel(operationID string) bool {
-	r.mu.RLock()
-	info, ok := r.operations[operationID]
-	r.mu.RUnlock()
+	info, ok := r.reg.get(operationID)
 	if !ok {
 		return false
 	}
@@ -68,19 +72,10 @@ func (r *OperationRegistry) Cancel(operationID string) bool {
 
 // ListActive returns all active operations.
 func (r *OperationRegistry) ListActive() []*OperationInfo {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-
-	result := make([]*OperationInfo, 0, len(r.operations))
-	for _, info := range r.operations {
-		result = append(result, info)
-	}
-	return result
+	return r.reg.list()
 }
 
 // Count returns the number of active operations.
 func (r *OperationRegistry) Count() int {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-	return len(r.operations)
+	return r.reg.count()
 }

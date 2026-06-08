@@ -3,14 +3,16 @@ package handler
 import (
 	"context"
 	"testing"
+
+	"dbadmin/internal/domain/connection"
 )
 
 func TestOperationRegistry_RegisterCancelUnregister(t *testing.T) {
 	reg := NewOperationRegistry()
 	ctx, cancel := context.WithCancel(context.Background())
 	id := reg.Register(OperationInfo{
-		Driver:   "redis",
-		Kind:     "command",
+		Driver:   connection.DriverRedis,
+		Kind:     OperationKindCommand,
 		ConnID:   "conn1",
 		Resource: "db0",
 		Summary:  "PING",
@@ -40,7 +42,7 @@ func TestOperationRegistry_ListActive(t *testing.T) {
 	_, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	reg.Register(OperationInfo{OperationID: "op1", Driver: "mongodb", Kind: "query"}, cancel)
+	reg.Register(OperationInfo{OperationID: "op1", Driver: connection.DriverMongoDB, Kind: OperationKindQuery}, cancel)
 	active := reg.ListActive()
 	if len(active) != 1 {
 		t.Fatalf("active len=%d, want 1", len(active))

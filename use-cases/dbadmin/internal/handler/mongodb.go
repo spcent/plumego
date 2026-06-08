@@ -36,12 +36,12 @@ type MongoDBHandler struct {
 	QueryTimeoutSeconds int
 }
 
-func (h MongoDBHandler) registerOperation(cancel context.CancelFunc, kind, connID, resource, summary string) string {
+func (h MongoDBHandler) registerOperation(cancel context.CancelFunc, kind OperationKind, connID, resource, summary string) string {
 	if h.Registry == nil {
 		return ""
 	}
 	return h.Registry.Register(OperationInfo{
-		Driver:   string(connection.DriverMongoDB),
+		Driver:   connection.DriverMongoDB,
 		Kind:     kind,
 		ConnID:   connID,
 		Resource: resource,
@@ -679,7 +679,7 @@ func (h MongoDBHandler) QueryDocuments(w http.ResponseWriter, r *http.Request) {
 
 	ctx, cancel := h.timeout(r.Context())
 	defer cancel()
-	operationID := h.registerOperation(cancel, "query", connID, req.Database+"."+req.Collection, "find documents")
+	operationID := h.registerOperation(cancel, OperationKindQuery, connID, req.Database+"."+req.Collection, "find documents")
 	defer h.unregisterOperation(operationID)
 
 	filter, err := parseMongoFilterJSON(req.Filter)
@@ -1192,7 +1192,7 @@ func (h MongoDBHandler) Aggregate(w http.ResponseWriter, r *http.Request) {
 
 	ctx, cancel := h.timeout(r.Context())
 	defer cancel()
-	operationID := h.registerOperation(cancel, "aggregate", connID, req.Database+"."+req.Collection, "aggregation pipeline")
+	operationID := h.registerOperation(cancel, OperationKindAggregate, connID, req.Database+"."+req.Collection, "aggregation pipeline")
 	defer h.unregisterOperation(operationID)
 
 	// Convert pipeline to bson.A
@@ -1748,7 +1748,7 @@ func (h MongoDBHandler) ExportDocuments(w http.ResponseWriter, r *http.Request) 
 
 	ctx, cancel := h.timeout(r.Context())
 	defer cancel()
-	operationID := h.registerOperation(cancel, "export", connID, dbName+"."+collName, format+" export")
+	operationID := h.registerOperation(cancel, OperationKindExport, connID, dbName+"."+collName, format+" export")
 	defer h.unregisterOperation(operationID)
 
 	filter, err := parseMongoFilterJSON(filterStr)
@@ -1998,7 +1998,7 @@ func (h MongoDBHandler) ImportDocuments(w http.ResponseWriter, r *http.Request) 
 
 	ctx, cancel := h.timeout(r.Context())
 	defer cancel()
-	operationID := h.registerOperation(cancel, "import", connID, req.Database+"."+req.Collection, "import documents")
+	operationID := h.registerOperation(cancel, OperationKindImport, connID, req.Database+"."+req.Collection, "import documents")
 	defer h.unregisterOperation(operationID)
 
 	// Convert documents to bson.M

@@ -2,7 +2,6 @@ package handler
 
 import (
 	"context"
-	"sync"
 	"time"
 )
 
@@ -18,75 +17,53 @@ type QueryInfo struct {
 
 // QueryRegistry manages active queries and provides cancellation capability.
 type QueryRegistry struct {
-	mu      sync.RWMutex
-	queries map[string]*QueryInfo
+	reg activeRegistry[QueryInfo]
 }
 
 // NewQueryRegistry creates a new query registry.
 func NewQueryRegistry() *QueryRegistry {
-	return &QueryRegistry{
-		queries: make(map[string]*QueryInfo),
-	}
+	return &QueryRegistry{reg: newActiveRegistry[QueryInfo]()}
 }
 
-// Register adds a query to the registry and returns a context that can be cancelled.
+// Register adds a query to the registry.
 func (r *QueryRegistry) Register(queryID, connID, database, sql string, cancel context.CancelFunc) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	r.queries[queryID] = &QueryInfo{
+	r.reg.put(queryID, &QueryInfo{
 		QueryID:    queryID,
 		ConnID:     connID,
 		Database:   database,
 		SQL:        sql,
 		StartTime:  time.Now(),
 		CancelFunc: cancel,
-	}
+	})
 }
 
 // Unregister removes a query from the registry.
 func (r *QueryRegistry) Unregister(queryID string) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	delete(r.queries, queryID)
+	r.reg.remove(queryID)
 }
 
 // Cancel cancels a query by ID and returns true if the query was found and cancelled.
 func (r *QueryRegistry) Cancel(queryID string) bool {
-	r.mu.RLock()
-	info, exists := r.queries[queryID]
-	r.mu.RUnlock()
-
-	if !exists {
+	info, ok := r.reg.get(queryID)
+	if !ok {
 		return false
 	}
-
 	info.CancelFunc()
 	return true
 }
 
 // ListActive returns all active queries.
 func (r *QueryRegistry) ListActive() []*QueryInfo {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-
-	result := make([]*QueryInfo, 0, len(r.queries))
-	for _, info := range r.queries {
-		result = append(result, info)
-	}
-	return result
+	return r.reg.list()
 }
 
 // GetActive returns a specific active query.
 func (r *QueryRegistry) GetActive(queryID string) *QueryInfo {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-	return r.queries[queryID]
+	info, _ := r.reg.get(queryID)
+	return info
 }
 
 // Count returns the number of active queries.
 func (r *QueryRegistry) Count() int {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-	return len(r.queries)
+	return r.reg.count()
 }

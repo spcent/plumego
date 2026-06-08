@@ -219,7 +219,7 @@ func (h ConnectionHandler) Test(w http.ResponseWriter, r *http.Request) {
 		logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusOK, map[string]any{"ok": true}, nil))
 		return
 	}
-	if err := h.Manager.Test(c); err != nil {
+	if err := h.Manager.Test(r.Context(), c); err != nil {
 		logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusOK,
 			map[string]any{"ok": false, "error": err.Error()}, nil))
 		return

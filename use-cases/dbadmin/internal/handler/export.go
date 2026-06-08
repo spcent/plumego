@@ -55,7 +55,7 @@ func (h ExportHandler) Export(w http.ResponseWriter, r *http.Request) {
 			Type(contract.TypeInternal).Message("failed to get connection").Build()))
 		return
 	}
-	db, err := h.Manager.Open(conn)
+	db, err := h.Manager.Open(r.Context(), conn)
 	if err != nil {
 		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeInternal).Message("failed to connect").
@@ -66,9 +66,9 @@ func (h ExportHandler) Export(w http.ResponseWriter, r *http.Request) {
 	var tableFQN string
 	switch conn.Driver {
 	case connection.DriverMySQL:
-		tableFQN = fmt.Sprintf("`%s`.`%s`", dbName, table)
+		tableFQN = fmt.Sprintf("%s.%s", quoteIdent(dbName, conn.Driver), quoteIdent(table, conn.Driver))
 	default:
-		tableFQN = fmt.Sprintf(`"%s"`, table)
+		tableFQN = quoteIdent(table, conn.Driver)
 	}
 
 	query := fmt.Sprintf("SELECT * FROM %s LIMIT %d", tableFQN, limit+1)
@@ -161,17 +161,17 @@ func (h ExportHandler) exportSQL(w http.ResponseWriter, r *http.Request, rows in
 	var tableFQN string
 	switch conn.Driver {
 	case connection.DriverMySQL:
-		tableFQN = fmt.Sprintf("`%s`.`%s`", dbName, table)
+		tableFQN = fmt.Sprintf("%s.%s", quoteIdent(dbName, conn.Driver), quoteIdent(table, conn.Driver))
 	default:
-		tableFQN = fmt.Sprintf(`"%s"`, table)
+		tableFQN = quoteIdent(table, conn.Driver)
 	}
 
 	var ins dbmanager.Inspector
 	if conn.Driver == connection.DriverMySQL {
-		db, _ := h.Manager.Open(conn)
+		db, _ := h.Manager.Open(r.Context(), conn)
 		ins = mysqlinspect.New(db)
 	} else {
-		db, _ := h.Manager.Open(conn)
+		db, _ := h.Manager.Open(r.Context(), conn)
 		ins = sqliteinspect.New(db)
 	}
 

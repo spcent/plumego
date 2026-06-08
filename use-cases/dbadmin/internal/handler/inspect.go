@@ -29,7 +29,7 @@ func (h InspectHandler) openInspector(r *http.Request) (dbmanager.Inspector, *co
 	if err != nil {
 		return nil, nil, err
 	}
-	db, err := h.Manager.Open(conn)
+	db, err := h.Manager.Open(r.Context(), conn)
 	if err != nil {
 		return nil, conn, err
 	}

@@ -370,7 +370,7 @@ func (h RowHandler) openTable(r *http.Request) (*sql.DB, *connection.Connection,
 	if err != nil {
 		return nil, nil, "", err
 	}
-	db, err := h.Manager.Open(conn)
+	db, err := h.Manager.Open(r.Context(), conn)
 	if err != nil {
 		return nil, conn, "", err
 	}
@@ -379,11 +379,9 @@ func (h RowHandler) openTable(r *http.Request) (*sql.DB, *connection.Connection,
 	var tableFQN string
 	switch conn.Driver {
 	case connection.DriverMySQL:
-		tableFQN = fmt.Sprintf("`%s`.`%s`", dbName, table)
-	case connection.DriverSQLite:
-		tableFQN = fmt.Sprintf(`"%s"`, table)
+		tableFQN = fmt.Sprintf("%s.%s", quoteIdent(dbName, conn.Driver), quoteIdent(table, conn.Driver))
 	default:
-		tableFQN = table
+		tableFQN = quoteIdent(table, conn.Driver)
 	}
 	return db, conn, tableFQN, nil
 }

@@ -208,7 +208,7 @@ func (h QueryHandler) Execute(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	db, err := h.Manager.Open(conn)
+	db, err := h.Manager.Open(r.Context(), conn)
 	if err != nil {
 		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeInternal).Message("failed to connect to database").Build()))
@@ -418,11 +418,15 @@ func (h QueryHandler) ListActive(w http.ResponseWriter, r *http.Request) {
 	queries := h.Registry.ListActive()
 	result := make([]map[string]any, 0, len(queries))
 	for _, q := range queries {
+		sql := q.SQL
+		if len(sql) > 200 {
+			sql = sql[:200] + "…"
+		}
 		result = append(result, map[string]any{
 			"queryId":   q.QueryID,
 			"connId":    q.ConnID,
 			"database":  q.Database,
-			"sql":       q.SQL,
+			"sql":       sql,
 			"startTime": q.StartTime,
 			"duration":  time.Since(q.StartTime).String(),
 		})
