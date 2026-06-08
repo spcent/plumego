@@ -80,14 +80,14 @@ func (t *OpenTelemetryTracer) WithMaxSpans(max int) *OpenTelemetryTracer {
 
 func (t *OpenTelemetryTracer) Start(ctx context.Context, r *http.Request) (context.Context, mwtracing.TraceSpan) {
 	spanID := t.generateSpanID()
-	parent := contract.TraceContextFromContext(ctx)
+	parent, hasParent := contract.TraceContextFromContext(ctx)
 
 	inboundTraceID := r.Header.Get("X-Trace-ID")
 	traceID := ""
 	if traceContextHasTraceID(inboundTraceID) {
 		traceID = inboundTraceID
 	}
-	if traceID == "" && parent != nil && parent.Valid() {
+	if traceID == "" && hasParent && parent.Valid() {
 		traceID = string(parent.TraceID)
 	}
 	if traceID == "" {
@@ -95,7 +95,7 @@ func (t *OpenTelemetryTracer) Start(ctx context.Context, r *http.Request) (conte
 	}
 
 	parentID := ""
-	if parent != nil && parent.Valid() {
+	if hasParent && parent.Valid() {
 		parentID = string(parent.SpanID)
 	}
 

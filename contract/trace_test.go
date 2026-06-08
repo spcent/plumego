@@ -167,8 +167,8 @@ func TestTraceContextManagement(t *testing.T) {
 	}
 
 	ctx := WithTraceContext(originalCtx, traceContext)
-	retrieved := TraceContextFromContext(ctx)
-	if retrieved == nil {
+	retrieved, ok := TraceContextFromContext(ctx)
+	if !ok {
 		t.Fatalf("expected trace context to be retrieved")
 	}
 	if retrieved.TraceID != "test-trace" {
@@ -189,11 +189,11 @@ func TestTraceContextManagement(t *testing.T) {
 }
 
 func TestTraceContextFromContextNilSafe(t *testing.T) {
-	if tc := TraceContextFromContext(nil); tc != nil {
-		t.Fatalf("expected nil trace context for nil context, got %#v", tc)
+	if _, ok := TraceContextFromContext(nil); ok {
+		t.Fatalf("expected no trace context for nil context")
 	}
-	if tc := TraceContextFromContext(t.Context()); tc != nil {
-		t.Fatalf("expected nil trace context for nil context, got %#v", tc)
+	if _, ok := TraceContextFromContext(t.Context()); ok {
+		t.Fatalf("expected no trace context for empty context")
 	}
 }
 
@@ -210,8 +210,8 @@ func TestTraceContextUsesDefensiveCopies(t *testing.T) {
 	parent = "3333333333333333"
 	baggage["user.id"] = "mutated"
 
-	got := TraceContextFromContext(ctx)
-	if got == nil {
+	got, ok := TraceContextFromContext(ctx)
+	if !ok {
 		t.Fatal("expected TraceContext")
 	}
 	if got.ParentSpanID == nil || *got.ParentSpanID != "1111111111111111" {
@@ -224,8 +224,8 @@ func TestTraceContextUsesDefensiveCopies(t *testing.T) {
 	*got.ParentSpanID = "4444444444444444"
 	got.Baggage["user.id"] = "returned-mutated"
 
-	again := TraceContextFromContext(ctx)
-	if again == nil {
+	again, ok := TraceContextFromContext(ctx)
+	if !ok {
 		t.Fatal("expected TraceContext on second lookup")
 	}
 	if again.ParentSpanID == nil || *again.ParentSpanID != "1111111111111111" {
@@ -259,8 +259,8 @@ func TestWithTraceContextDoesNotValidateCarrierPolicy(t *testing.T) {
 		},
 	})
 
-	got := TraceContextFromContext(ctx)
-	if got == nil {
+	got, ok := TraceContextFromContext(ctx)
+	if !ok {
 		t.Fatal("expected TraceContext")
 	}
 	if got.Valid() {
@@ -279,7 +279,8 @@ func TestTraceContextReadPatternRequiresValid(t *testing.T) {
 		TraceID: "not-a-trace-id",
 		SpanID:  "not-a-span-id",
 	})
-	if got := TraceContextFromContext(invalid); got == nil {
+	got, ok := TraceContextFromContext(invalid)
+	if !ok {
 		t.Fatal("expected invalid carrier data to be returned for caller inspection")
 	} else if got.Valid() {
 		t.Fatalf("caller must not treat invalid carrier data as valid trace context: %+v", got)
@@ -289,7 +290,7 @@ func TestTraceContextReadPatternRequiresValid(t *testing.T) {
 		TraceID: "1234567890abcdef1234567890abcdef",
 		SpanID:  "1234567890abcdef",
 	})
-	if got := TraceContextFromContext(valid); got == nil || !got.Valid() {
+	if got, ok := TraceContextFromContext(valid); !ok || !got.Valid() {
 		t.Fatalf("expected valid trace context after caller-provided valid ids, got %+v", got)
 	}
 }

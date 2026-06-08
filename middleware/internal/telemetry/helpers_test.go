@@ -79,8 +79,8 @@ func TestBeginTraceAttachesSpanHeaderAndContext(t *testing.T) {
 	if got := rec.Header().Get(SpanIDHeader); got != tracer.span.spanID {
 		t.Fatalf("expected span header %q, got %q", tracer.span.spanID, got)
 	}
-	tc := contract.TraceContextFromContext(r.Context())
-	if tc == nil || tc.TraceID != tracer.span.traceID || tc.SpanID != tracer.span.spanID {
+	tc, ok := contract.TraceContextFromContext(r.Context())
+	if !ok || tc.TraceID != tracer.span.traceID || tc.SpanID != tracer.span.spanID {
 		t.Fatalf("expected trace context from span identity, got %+v", tc)
 	}
 }
@@ -101,8 +101,8 @@ func TestBeginTraceDerivesContextFromReturnedSpan(t *testing.T) {
 	if gotSpan != span {
 		t.Fatalf("span = %v, want original span", gotSpan)
 	}
-	tc := contract.TraceContextFromContext(r.Context())
-	if tc == nil || tc.TraceID != span.traceID || tc.SpanID != span.spanID {
+	tc, ok := contract.TraceContextFromContext(r.Context())
+	if !ok || tc.TraceID != span.traceID || tc.SpanID != span.spanID {
 		t.Fatalf("expected trace context to be derived from span, got %+v", tc)
 	}
 	if !tc.Valid() {

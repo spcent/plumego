@@ -96,8 +96,8 @@ func TracingInterceptor(tracer TraceStarter) UnaryInterceptor {
 
 // TraceMetadata returns outgoing trace IDs in a transport-neutral map.
 func TraceMetadata(ctx context.Context) map[string]string {
-	traceCtx := contract.TraceContextFromContext(ctx)
-	if traceCtx == nil || !traceCtx.Valid() {
+	traceCtx, ok := contract.TraceContextFromContext(ctx)
+	if !ok || !traceCtx.Valid() {
 		return nil
 	}
 	return map[string]string{

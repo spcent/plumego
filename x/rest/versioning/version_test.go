@@ -282,8 +282,8 @@ func TestUnsupportedVersionUsesVersioningCode(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
 		t.Fatalf("failed to parse response: %v", err)
 	}
-	if got := payload.Error.Code; got != contract.CodeInvalidRequest {
-		t.Fatalf("expected code %q, got %q", contract.CodeInvalidRequest, got)
+	if got := payload.Error.Code; got != contract.CodeNotAcceptable {
+		t.Fatalf("expected code %q, got %q", contract.CodeNotAcceptable, got)
 	}
 }
 

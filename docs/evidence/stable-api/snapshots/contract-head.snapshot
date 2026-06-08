@@ -24,6 +24,7 @@ symbol	github.com/spcent/plumego/contract	const	CodeInvalidRequest	const CodeInv
 symbol	github.com/spcent/plumego/contract	const	CodeInvalidToken	const CodeInvalidToken = "INVALID_TOKEN"
 symbol	github.com/spcent/plumego/contract	const	CodeMaintenance	const CodeMaintenance = "MAINTENANCE_MODE"
 symbol	github.com/spcent/plumego/contract	const	CodeMethodNotAllowed	const CodeMethodNotAllowed = "METHOD_NOT_ALLOWED"
+symbol	github.com/spcent/plumego/contract	const	CodeNotAcceptable	const CodeNotAcceptable = "NOT_ACCEPTABLE"
 symbol	github.com/spcent/plumego/contract	const	CodeNotImplemented	const CodeNotImplemented = "NOT_IMPLEMENTED"
 symbol	github.com/spcent/plumego/contract	const	CodeOutOfRange	const CodeOutOfRange = "VALUE_OUT_OF_RANGE"
 symbol	github.com/spcent/plumego/contract	const	CodeRateLimited	const CodeRateLimited = "RATE_LIMITED"
@@ -63,11 +64,14 @@ symbol	github.com/spcent/plumego/contract	const	TypeTimeout	const TypeTimeout Er
 symbol	github.com/spcent/plumego/contract	const	TypeUnauthorized	const TypeUnauthorized ErrorType = "unauthorized_request"
 symbol	github.com/spcent/plumego/contract	const	TypeUnavailable	const TypeUnavailable ErrorType = "service_unavailable"
 symbol	github.com/spcent/plumego/contract	const	TypeValidation	const TypeValidation ErrorType = "validation_failure"
+symbol	github.com/spcent/plumego/contract	func	AsAPIError	func AsAPIErrorfunc(err error) (APIError, bool)
+symbol	github.com/spcent/plumego/contract	func	GetRouteState	func GetRouteStatefunc() *RouteState
 symbol	github.com/spcent/plumego/contract	func	NewErrorBuilder	func NewErrorBuilderfunc() *ErrorBuilder
 symbol	github.com/spcent/plumego/contract	func	RequestContextFromContext	func RequestContextFromContextfunc(ctx context.Context) RequestContext
 symbol	github.com/spcent/plumego/contract	func	RequestIDFromContext	func RequestIDFromContextfunc(ctx context.Context) string
 symbol	github.com/spcent/plumego/contract	func	RequestParamFromContext	func RequestParamFromContextfunc(ctx context.Context, name string) string
-symbol	github.com/spcent/plumego/contract	func	TraceContextFromContext	func TraceContextFromContextfunc(ctx context.Context) *TraceContext
+symbol	github.com/spcent/plumego/contract	func	PutRouteState	func PutRouteStatefunc(rs *RouteState)
+symbol	github.com/spcent/plumego/contract	func	TraceContextFromContext	func TraceContextFromContextfunc(ctx context.Context) (TraceContext, bool)
 symbol	github.com/spcent/plumego/contract	func	WithRequestContext	func WithRequestContextfunc(ctx context.Context, rc RequestContext) context.Context
 symbol	github.com/spcent/plumego/contract	func	WithRequestID	func WithRequestIDfunc(ctx context.Context, id string) context.Context
 symbol	github.com/spcent/plumego/contract	func	WithRouteState	func WithRouteStatefunc(ctx context.Context, rs *RouteState) context.Context
@@ -78,6 +82,7 @@ symbol	github.com/spcent/plumego/contract	method	APIError.Category	func (APIErro
 symbol	github.com/spcent/plumego/contract	method	APIError.Code	func (APIError) Codefunc() string
 symbol	github.com/spcent/plumego/contract	method	APIError.Details	func (APIError) Detailsfunc() map[string]any
 symbol	github.com/spcent/plumego/contract	method	APIError.Error	func (APIError) Errorfunc() string
+symbol	github.com/spcent/plumego/contract	method	APIError.Unwrap	func (APIError) Unwrapfunc() error
 symbol	github.com/spcent/plumego/contract	method	APIError.Message	func (APIError) Messagefunc() string
 symbol	github.com/spcent/plumego/contract	method	APIError.RequestID	func (APIError) RequestIDfunc() string
 symbol	github.com/spcent/plumego/contract	method	APIError.Status	func (APIError) Statusfunc() int
@@ -89,6 +94,7 @@ symbol	github.com/spcent/plumego/contract	method	ErrorBuilder.Details	func (Erro
 symbol	github.com/spcent/plumego/contract	method	ErrorBuilder.Message	func (ErrorBuilder) Messagefunc(message string) *ErrorBuilder
 symbol	github.com/spcent/plumego/contract	method	ErrorBuilder.RequestID	func (ErrorBuilder) RequestIDfunc(requestID string) *ErrorBuilder
 symbol	github.com/spcent/plumego/contract	method	ErrorBuilder.Type	func (ErrorBuilder) Typefunc(errorType ErrorType) *ErrorBuilder
+symbol	github.com/spcent/plumego/contract	method	ErrorBuilder.Wrap	func (ErrorBuilder) Wrapfunc(cause error) *ErrorBuilder
 symbol	github.com/spcent/plumego/contract	method	ErrorType.Meta	func (ErrorType) Metafunc() ErrorTypeMeta
 symbol	github.com/spcent/plumego/contract	method	RouteState.AddParam	func (RouteState) AddParamfunc(key, val string)
 symbol	github.com/spcent/plumego/contract	method	RouteState.Reset	func (RouteState) Resetfunc()
@@ -109,4 +115,3 @@ symbol	github.com/spcent/plumego/contract	type	TraceContext	type TraceContext st
 symbol	github.com/spcent/plumego/contract	var	ErrHandlerNil	var ErrHandlerNil = errors.New("handler cannot be nil")
 symbol	github.com/spcent/plumego/contract	var	ErrInvalidResponseStatus	var ErrInvalidResponseStatus = errors.New("response status must be 2xx")
 symbol	github.com/spcent/plumego/contract	var	ErrResponseWriterNil	var ErrResponseWriterNil = errors.New("response writer cannot be nil")
-symbol	github.com/spcent/plumego/contract	var	RouteStatePool	var RouteStatePool = sync.Pool{ New: func() any { return new(RouteState) }, }

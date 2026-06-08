@@ -1,7 +1,7 @@
 package contract
 
 import (
-	"encoding/json"
+	"errors"
 	"net/http"
 	"reflect"
 )
@@ -92,7 +92,7 @@ var errorTypeLookup = map[ErrorType]ErrorTypeMeta{
 	TypeConflict:        {CategoryClient, CodeConflict, http.StatusConflict},
 	TypeAlreadyExists:   {CategoryClient, CodeAlreadyExists, http.StatusConflict},
 	TypeGone:            {CategoryClient, CodeGone, http.StatusGone},
-	TypeNotAcceptable:   {CategoryClient, CodeInvalidRequest, http.StatusNotAcceptable},
+	TypeNotAcceptable:   {CategoryClient, CodeNotAcceptable, http.StatusNotAcceptable},
 	TypePayloadTooLarge: {CategoryClient, CodeRequestBodyTooLarge, http.StatusRequestEntityTooLarge},
 	// System
 	TypeInternal:         {CategoryServer, CodeInternalError, http.StatusInternalServerError},
@@ -151,14 +151,24 @@ func (t ErrorType) Meta() ErrorTypeMeta {
 // NewErrorBuilder(), rather than struct literals, to guarantee that all
 // required fields are populated consistently. APIError is intentionally opaque;
 // use its read-only methods to inspect normalized values.
+//
+// APIError implements the error interface and participates in errors.As/Is chains:
+//
+//	var target contract.APIError
+//	if errors.As(err, &target) { ... }
+//
+// Use ErrorBuilder.Wrap to attach a diagnostic cause; the cause is available via
+// errors.Unwrap and is never included in the JSON response.
 type APIError struct {
-	status    int
-	code      string
-	message   string
-	category  ErrorCategory
-	errorType ErrorType
-	requestID string
-	details   map[string]any
+	status       int
+	code         string
+	message      string
+	category     ErrorCategory
+	errorType    ErrorType
+	requestID    string
+	details      map[string]any
+	cause        error // not serialized; accessible via errors.Unwrap
+	isNormalized bool
 }
 
 // Error implements the error interface for APIError
@@ -166,100 +176,70 @@ func (e APIError) Error() string {
 	return e.message
 }
 
+// Unwrap returns the underlying cause error stored via ErrorBuilder.Wrap,
+// enabling APIError to participate in errors.Is and errors.As chains.
+// The cause is never included in the JSON response.
+func (e APIError) Unwrap() error {
+	return e.cause
+}
+
 // Status returns the normalized HTTP status associated with the error.
 func (e APIError) Status() int {
+	if e.isNormalized {
+		return e.status
+	}
 	return normalizeAPIError(e).status
 }
 
 // Code returns the normalized machine-readable error code.
 func (e APIError) Code() string {
+	if e.isNormalized {
+		return e.code
+	}
 	return normalizeAPIError(e).code
 }
 
 // Message returns the normalized client-facing error message.
 func (e APIError) Message() string {
+	if e.isNormalized {
+		return e.message
+	}
 	return normalizeAPIError(e).message
 }
 
 // Category returns the normalized high-level error category.
 func (e APIError) Category() ErrorCategory {
+	if e.isNormalized {
+		return e.category
+	}
 	return normalizeAPIError(e).category
 }
 
 // Type returns the normalized error type, or an empty value for untyped errors.
 func (e APIError) Type() ErrorType {
+	if e.isNormalized {
+		return e.errorType
+	}
 	return normalizeAPIError(e).errorType
 }
 
 // RequestID returns the normalized request id associated with the error.
 func (e APIError) RequestID() string {
+	if e.isNormalized {
+		return e.requestID
+	}
 	return normalizeAPIError(e).requestID
 }
 
-// Details returns an isolated copy of the normalized error detail map.
+// Details returns an isolated copy of the error detail map.
+// Scalar values, slices, and nested maps are deep-copied. Struct values stored
+// in the map are returned as interface copies and do not have their internal
+// reference fields deep-copied.
 func (e APIError) Details() map[string]any {
+	if e.isNormalized {
+		return cloneAnyMap(e.details)
+	}
 	return cloneAnyMap(normalizeAPIError(e).details)
-}
-
-type errorPayload struct {
-	Code     string         `json:"code"`
-	Message  string         `json:"message"`
-	Category ErrorCategory  `json:"category"`
-	Type     ErrorType      `json:"type,omitempty"`
-	Details  map[string]any `json:"details,omitempty"`
-}
-
-type errorResponse struct {
-	Error     errorPayload `json:"error"`
-	RequestID string       `json:"request_id,omitempty"`
-}
-
-// WriteError writes a structured error response with request id context when available.
-// It returns the encoding error, if any; callers may ignore it when the response
-// headers have already been sent.
-//
-// Prefer building APIError values through NewErrorBuilder() so that required
-// fields are always populated. WriteError still normalizes incomplete APIError
-// values, but it does so deterministically with no package-global side effects.
-func WriteError(w http.ResponseWriter, r *http.Request, err APIError) error {
-	if w == nil {
-		return ErrResponseWriterNil
-	}
-
-	err = normalizeAPIError(err)
-
-	if err.requestID == "" && r != nil {
-		if requestID := RequestIDFromContext(r.Context()); requestID != "" {
-			err.requestID = requestID
-		}
-	}
-
-	resp := errorResponse{
-		Error:     errorPayloadFromAPIError(err),
-		RequestID: err.requestID,
-	}
-
-	buf := getJSONBuffer()
-	defer putJSONBuffer(buf)
-
-	if encErr := json.NewEncoder(buf).Encode(resp); encErr != nil {
-		return encErr
-	}
-
-	w.Header().Set(HeaderContentType, ContentTypeJSON)
-	w.WriteHeader(err.status)
-	_, writeErr := w.Write(buf.Bytes())
-	return writeErr
-}
-
-func errorPayloadFromAPIError(err APIError) errorPayload {
-	return errorPayload{
-		Code:     err.code,
-		Message:  err.message,
-		Category: err.category,
-		Type:     err.errorType,
-		Details:  cloneAnyMap(err.details),
-	}
 }
 
 func categoryForStatus(status int) ErrorCategory {
@@ -329,6 +309,14 @@ func (b *ErrorBuilder) RequestID(requestID string) *ErrorBuilder {
 	return b
 }
 
+// Wrap stores cause as the underlying error for diagnostic purposes.
+// The cause is not included in the JSON response and is accessible only
+// via errors.Unwrap, errors.Is, or errors.As on the built APIError.
+func (b *ErrorBuilder) Wrap(cause error) *ErrorBuilder {
+	b.err.cause = cause
+	return b
+}
+
 // Detail adds a detail field to the error.
 func (b *ErrorBuilder) Detail(key string, value any) *ErrorBuilder {
 	if key == "" {
@@ -364,6 +352,16 @@ func (b *ErrorBuilder) Build() APIError {
 	return normalizeAPIError(b.err)
 }
 
+// AsAPIError unwraps err using errors.As and reports whether an APIError was found.
+// It supports errors wrapped with fmt.Errorf("...: %w", apiErr).
+func AsAPIError(err error) (APIError, bool) {
+	var target APIError
+	if errors.As(err, &target) {
+		return target, true
+	}
+	return APIError{}, false
+}
+
 func normalizeAPIError(err APIError) APIError {
 	err, invalidStatus := normalizeAPIErrorBase(err)
 	err, typed := normalizeTypedAPIError(err)
@@ -371,6 +369,7 @@ func normalizeAPIError(err APIError) APIError {
 		normalizeUntypedAPIError(&err, invalidStatus)
 	}
 	applyDefaultAPIErrorMessage(&err)
+	err.isNormalized = true
 	return err
 }
 

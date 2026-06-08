@@ -121,7 +121,7 @@ func TestErrorTypeTaxonomyMatrix(t *testing.T) {
 		{TypeConflict, CategoryClient, CodeConflict, http.StatusConflict},
 		{TypeAlreadyExists, CategoryClient, CodeAlreadyExists, http.StatusConflict},
 		{TypeGone, CategoryClient, CodeGone, http.StatusGone},
-		{TypeNotAcceptable, CategoryClient, CodeInvalidRequest, http.StatusNotAcceptable},
+		{TypeNotAcceptable, CategoryClient, CodeNotAcceptable, http.StatusNotAcceptable},
 		{TypePayloadTooLarge, CategoryClient, CodeRequestBodyTooLarge, http.StatusRequestEntityTooLarge},
 		{TypeInternal, CategoryServer, CodeInternalError, http.StatusInternalServerError},
 		{TypeUnavailable, CategoryServer, CodeUnavailable, http.StatusServiceUnavailable},

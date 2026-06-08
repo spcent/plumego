@@ -50,8 +50,8 @@ func TestTracer(t *testing.T) {
 		t.Fatalf("expected span ID to be set")
 	}
 
-	traceCtx := contract.TraceContextFromContext(ctx)
-	if traceCtx == nil {
+	traceCtx, ok := contract.TraceContextFromContext(ctx)
+	if !ok {
 		t.Fatalf("expected trace context in context")
 	}
 	if traceCtx.TraceID != string(span.TraceID) {
@@ -87,7 +87,7 @@ func TestTracerWithOptions(t *testing.T) {
 	if span.Kind != SpanKindClient {
 		t.Fatalf("expected span kind to be client")
 	}
-	if contract.TraceContextFromContext(ctx) == nil {
+	if _, ok := contract.TraceContextFromContext(ctx); !ok {
 		t.Fatalf("expected trace context")
 	}
 }
@@ -110,7 +110,10 @@ func TestStartChildSpan(t *testing.T) {
 		t.Fatalf("expected child span to reference parent span ID")
 	}
 
-	traceCtx := contract.TraceContextFromContext(ctx)
+	traceCtx, ok := contract.TraceContextFromContext(ctx)
+	if !ok {
+		t.Fatalf("expected trace context in context")
+	}
 	if traceCtx.SpanID != string(childSpan.ID) {
 		t.Fatalf("expected context to contain child span ID")
 	}
@@ -132,7 +135,7 @@ func TestStartChildSpanWithNilParent(t *testing.T) {
 	if span.ParentSpanID != nil {
 		t.Fatalf("expected no parent span ID for standalone operation")
 	}
-	if contract.TraceContextFromContext(ctx).ParentSpanID != nil {
+	if tc, _ := contract.TraceContextFromContext(ctx); tc.ParentSpanID != nil {
 		t.Fatalf("expected no parent span ID in context")
 	}
 }

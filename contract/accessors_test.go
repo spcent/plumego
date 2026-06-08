@@ -227,10 +227,10 @@ func TestAPIErrorAccessorMethodsCoverage(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestRouteStateSetPatternAndSetName(t *testing.T) {
-	rs := RouteStatePool.Get().(*RouteState)
+	rs := GetRouteState()
 	defer func() {
 		rs.Reset()
-		RouteStatePool.Put(rs)
+		PutRouteState(rs)
 	}()
 
 	rs.SetPattern("/users/:id")
@@ -245,10 +245,10 @@ func TestRouteStateSetPatternAndSetName(t *testing.T) {
 }
 
 func TestRouteStateAddParam(t *testing.T) {
-	rs := RouteStatePool.Get().(*RouteState)
+	rs := GetRouteState()
 	defer func() {
 		rs.Reset()
-		RouteStatePool.Put(rs)
+		PutRouteState(rs)
 	}()
 
 	rs.AddParam("id", "42")
@@ -266,10 +266,10 @@ func TestRouteStateAddParam(t *testing.T) {
 }
 
 func TestRouteStateAddParamSilentlyDropsBeyondMax(t *testing.T) {
-	rs := RouteStatePool.Get().(*RouteState)
+	rs := GetRouteState()
 	defer func() {
 		rs.Reset()
-		RouteStatePool.Put(rs)
+		PutRouteState(rs)
 	}()
 
 	for i := 0; i < maxInlineParams+5; i++ {
@@ -281,9 +281,9 @@ func TestRouteStateAddParamSilentlyDropsBeyondMax(t *testing.T) {
 }
 
 func TestRouteStateReset(t *testing.T) {
-	rs := RouteStatePool.Get().(*RouteState)
+	rs := GetRouteState()
 	defer func() {
-		RouteStatePool.Put(rs)
+		PutRouteState(rs)
 	}()
 
 	rs.SetPattern("/items/:id")
@@ -310,10 +310,10 @@ func TestRouteStateReset(t *testing.T) {
 }
 
 func TestWithRouteState(t *testing.T) {
-	rs := RouteStatePool.Get().(*RouteState)
+	rs := GetRouteState()
 	defer func() {
 		rs.Reset()
-		RouteStatePool.Put(rs)
+		PutRouteState(rs)
 	}()
 
 	rs.SetPattern("/orders/:id")
@@ -336,10 +336,10 @@ func TestWithRouteState(t *testing.T) {
 }
 
 func TestWithRouteStateEmptyParams(t *testing.T) {
-	rs := RouteStatePool.Get().(*RouteState)
+	rs := GetRouteState()
 	defer func() {
 		rs.Reset()
-		RouteStatePool.Put(rs)
+		PutRouteState(rs)
 	}()
 
 	rs.SetPattern("/health")
@@ -636,10 +636,10 @@ func TestMakeAssignableConvertibleTo(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestRequestParamFromContextRouteStateNotFound(t *testing.T) {
-	rs := RouteStatePool.Get().(*RouteState)
+	rs := GetRouteState()
 	defer func() {
 		rs.Reset()
-		RouteStatePool.Put(rs)
+		PutRouteState(rs)
 	}()
 	rs.AddParam("id", "42")
 

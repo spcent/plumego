@@ -62,20 +62,20 @@ func WithTraceContext(ctx context.Context, traceContext TraceContext) context.Co
 	return context.WithValue(ctx, traceContextKey{}, &traceContext)
 }
 
-// TraceContextFromContext retrieves trace context from a context. The returned
-// carrier may be invalid or span-only; callers must use Valid when they require
-// a complete propagation context.
-func TraceContextFromContext(ctx context.Context) *TraceContext {
+// TraceContextFromContext retrieves trace context from a context.
+// The second return value reports whether a TraceContext was stored.
+// The returned carrier may be invalid or span-only; callers must use Valid when
+// they require a complete propagation context.
+func TraceContextFromContext(ctx context.Context) (TraceContext, bool) {
 	if ctx == nil {
-		return nil
+		return TraceContext{}, false
 	}
 	if v := ctx.Value(traceContextKey{}); v != nil {
 		if tc, ok := v.(*TraceContext); ok {
-			cloned := cloneTraceContext(*tc)
-			return &cloned
+			return cloneTraceContext(*tc), true
 		}
 	}
-	return nil
+	return TraceContext{}, false
 }
 
 func cloneTraceContext(traceContext TraceContext) TraceContext {

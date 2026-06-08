@@ -54,8 +54,8 @@ func (t *spanContextTracer) Start(ctx context.Context, r *http.Request) (context
 func TestMiddlewareSetsTraceHeadersAndSpanContext(t *testing.T) {
 	tracer := &spanContextTracer{}
 	handler := Middleware(tracer)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		tc := contract.TraceContextFromContext(r.Context())
-		if tc == nil || tc.TraceID != tracer.span.traceID || tc.SpanID != tracer.span.spanID {
+		tc, ok := contract.TraceContextFromContext(r.Context())
+		if !ok || tc.TraceID != tracer.span.traceID || tc.SpanID != tracer.span.spanID {
 			t.Fatalf("expected trace context from tracer span identity, got %+v", tc)
 		}
 		w.WriteHeader(http.StatusAccepted)
@@ -80,8 +80,8 @@ func TestMiddlewareSetsTraceHeadersAndSpanContext(t *testing.T) {
 func TestMiddlewareDerivesTraceContextFromReturnedSpan(t *testing.T) {
 	tracer := &spanContextTracer{skipContext: true}
 	handler := Middleware(tracer)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		tc := contract.TraceContextFromContext(r.Context())
-		if tc == nil || tc.TraceID != tracer.span.traceID || tc.SpanID != tracer.span.spanID {
+		tc, ok := contract.TraceContextFromContext(r.Context())
+		if !ok || tc.TraceID != tracer.span.traceID || tc.SpanID != tracer.span.spanID {
 			t.Fatalf("expected trace context to be derived from returned span, got %+v", tc)
 		}
 		if !tc.Valid() {
@@ -148,7 +148,7 @@ func TestMiddlewareContinuesWhenTracerStartPanics(t *testing.T) {
 	called := false
 	handler := Middleware(tracer)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		called = true
-		if tc := contract.TraceContextFromContext(r.Context()); tc != nil {
+		if tc, ok := contract.TraceContextFromContext(r.Context()); ok {
 			t.Fatalf("trace context = %+v, want nil after start panic", tc)
 		}
 		w.WriteHeader(http.StatusAccepted)
