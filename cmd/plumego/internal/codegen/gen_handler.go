@@ -136,7 +136,7 @@ func generateHandlerMethodCode(name, method string) string {
 	switch method {
 	case "GET":
 		return fmt.Sprintf(`
-// Get handles GET /%s/:id
+// Get handles GET /%s/{id}
 func (h %sHandler) Get(w http.ResponseWriter, r *http.Request) {
 	id := contract.RequestContextFromContext(r.Context()).Params["id"]
 	item, err := h.Service.Get(r.Context(), id)
@@ -186,7 +186,7 @@ type Update%sRequest struct {
 	Name string `+"`json:\"name\"`"+`
 }
 
-// Update handles PUT /%s/:id
+// Update handles PUT /%s/{id}
 func (h %sHandler) Update(w http.ResponseWriter, r *http.Request) {
 	id := contract.RequestContextFromContext(r.Context()).Params["id"]
 	var req Update%sRequest
@@ -211,7 +211,7 @@ func (h %sHandler) Update(w http.ResponseWriter, r *http.Request) {
 `, name, lower, name, lower, name, name, lower)
 	case "DELETE":
 		return fmt.Sprintf(`
-// Delete handles DELETE /%s/:id
+// Delete handles DELETE /%s/{id}
 func (h %sHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	id := contract.RequestContextFromContext(r.Context()).Params["id"]
 	if err := h.Service.Delete(r.Context(), id); err != nil {

@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 )
@@ -117,8 +118,10 @@ func parseServeArgs(args []string) (serveOptions, error) {
 	fs := flag.NewFlagSet("serve", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 
-	addr := fs.String("addr", ":8080", "Server address")
-	fs.StringVar(addr, "a", ":8080", "Server address")
+	addrFlag := fs.String("addr", ":8080", "Server address (e.g. :8080 or 0.0.0.0:8080)")
+	fs.StringVar(addrFlag, "a", ":8080", "Server address shorthand")
+	portFlag := fs.String("port", "", "Listen port (e.g. 3000); shorthand for --addr :PORT")
+	fs.StringVar(portFlag, "p", "", "Listen port shorthand")
 
 	positionals, err := parseInterspersedFlags(fs, args)
 	if err != nil {
@@ -128,9 +131,17 @@ func parseServeArgs(args []string) (serveOptions, error) {
 		return serveOptions{}, fmt.Errorf("serve accepts at most one directory")
 	}
 
+	addr := *addrFlag
+	if p := *portFlag; p != "" {
+		if !strings.HasPrefix(p, ":") {
+			p = ":" + p
+		}
+		addr = p
+	}
+
 	dir := "."
 	if len(positionals) == 1 {
 		dir = positionals[0]
 	}
-	return serveOptions{dir: dir, addr: *addr}, nil
+	return serveOptions{dir: dir, addr: addr}, nil
 }

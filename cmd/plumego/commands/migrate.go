@@ -156,7 +156,15 @@ func loadMigrateConfig(path string) (migrateConfig, error) {
 
 func (c *MigrateCmd) runWithDatabase(out *output.Formatter, subcommand, dir, driver, dbURL string, steps int) error {
 	if !isSQLDriverRegistered(driver) {
-		return out.Error(fmt.Sprintf("database driver %q is not registered; runtime migration commands require a CLI build that imports the target database driver. Use migrate create for offline migration file generation.", driver), 1)
+		return out.Error(
+			fmt.Sprintf("database driver %q is not registered; use `plumego migrate create` for offline file generation (no driver needed)", driver),
+			1,
+			map[string]any{
+				"driver":             driver,
+				"registered_drivers": sql.Drivers(),
+				"hint":               "Runtime commands (status, up, down) require a CLI build that imports the target driver: add a blank import to your main.go, e.g. `import _ \"github.com/lib/pq\"` (PostgreSQL) or `import _ \"github.com/mattn/go-sqlite3\"` (SQLite).",
+			},
+		)
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
