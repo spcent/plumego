@@ -3,6 +3,7 @@ import MarketingLayout from '../layouts/MarketingLayout.astro';
 import PageHero from '../components/marketing/PageHero.astro';
 import JourneyBar from '../components/marketing/JourneyBar.astro';
 import { MODULE_FACTS } from '../generated/modules';
+import { EXTENSION_META_EN } from '../data/extensions';
 
 const journeySteps = [
   { label: 'Why Plumego', href: '/why-plumego' },
@@ -11,36 +12,21 @@ const journeySteps = [
   { label: 'Releases', href: '/releases' },
 ];
 
-interface ExtCard {
-  name: string;
-  status: 'beta' | 'experimental';
-  description: string;
-  entrypoint: string;
-  docHref: string;
-  tags: string[];
-}
+// Status is authoritative from MODULE_FACTS; descriptions from EXTENSION_META_EN.
+const betaCards = MODULE_FACTS.betaExtensionFamilies.map((name) => ({
+  name,
+  status: 'beta' as const,
+  ...EXTENSION_META_EN[name],
+}));
+const expCards = MODULE_FACTS.experimentalFamilies.map((name) => ({
+  name,
+  status: 'experimental' as const,
+  ...EXTENSION_META_EN[name],
+}));
+const extensionCards = [...betaCards, ...expCards];
 
-const extensionCards: ExtCard[] = [
-  // Beta families
-  { name: 'x/rest', status: 'beta', description: 'CRUD resource conventions, typed handlers, and REST response contracts over the stable HTTP kernel.', entrypoint: 'x/rest', docHref: '/docs/modules/x-rest', tags: ['api', 'rest', 'crud'] },
-  { name: 'x/gateway', status: 'beta', description: 'Reverse proxy, upstream health, load balancing, and route composition at the service edge.', entrypoint: 'x/gateway', docHref: '/docs/modules/x-gateway', tags: ['proxy', 'edge', 'lb'] },
-  { name: 'x/websocket', status: 'beta', description: 'Full-duplex WebSocket connections managed by a hub, coexisting with standard HTTP routes.', entrypoint: 'x/websocket', docHref: '/docs/modules/x-websocket', tags: ['realtime', 'ws'] },
-  { name: 'x/observability', status: 'beta', description: 'Prometheus metrics, OpenTelemetry traces, and structured log exporters wired at the service boundary.', entrypoint: 'x/observability', docHref: '/docs/modules/x-observability', tags: ['metrics', 'traces', 'otel'] },
-  { name: 'x/tenant', status: 'beta', description: 'Per-tenant JWT identity, quota enforcement, and policy evaluation at the transport layer.', entrypoint: 'x/tenant', docHref: '/docs/modules/x-tenant', tags: ['saas', 'multi-tenant', 'jwt'] },
-  { name: 'x/frontend', status: 'beta', description: 'Static asset serving, SPA fallback routing, and embedded filesystem support for frontend integration.', entrypoint: 'x/frontend', docHref: '/docs/modules/x-frontend', tags: ['static', 'spa', 'assets'] },
-  { name: 'x/messaging', status: 'beta', description: 'Event publishing, webhook dispatch, and messaging service-level API over pluggable transports.', entrypoint: 'x/messaging', docHref: '/docs/modules/x-messaging', tags: ['events', 'pubsub', 'webhooks'] },
-  // Experimental families
-  { name: 'x/ai', status: 'experimental', description: 'Multi-provider AI abstraction, session lifecycle, streaming SSE responses, and tool-call routing.', entrypoint: 'x/ai/provider', docHref: '/docs/modules/x-ai', tags: ['ai', 'llm', 'streaming'] },
-  { name: 'x/data', status: 'experimental', description: 'File storage, idempotency keys, and data access primitives above the stable store interface.', entrypoint: 'x/data', docHref: '/docs/modules/x-data', tags: ['storage', 'data', 'files'] },
-  { name: 'x/resilience', status: 'experimental', description: 'Circuit breakers, retry policies, and timeout wrappers for outbound HTTP and service calls.', entrypoint: 'x/resilience', docHref: '/docs/modules/x-resilience', tags: ['resilience', 'circuit-breaker', 'retry'] },
-  { name: 'x/rpc', status: 'experimental', description: 'gRPC + HTTP dual-protocol service wiring that shares the same stable middleware chain.', entrypoint: 'x/rpc', docHref: '/docs/modules/x-rpc', tags: ['grpc', 'rpc', 'protocol'] },
-  { name: 'x/openapi', status: 'experimental', description: 'OpenAPI 3 spec generation from route definitions, with schema inference and doc server.', entrypoint: 'x/openapi', docHref: '/docs/modules/x-openapi', tags: ['openapi', 'swagger', 'docs'] },
-  { name: 'x/validate', status: 'experimental', description: 'Request body validation middleware with struct tag rules and structured error responses.', entrypoint: 'x/validate', docHref: '/docs/modules/x-validate', tags: ['validation', 'input'] },
-  { name: 'x/fileapi', status: 'experimental', description: 'Multipart upload handlers, chunk resumption, and file metadata management over the stable HTTP kernel.', entrypoint: 'x/fileapi', docHref: '/docs/modules/x-fileapi', tags: ['upload', 'files', 'multipart'] },
-];
-
-const betaCount = extensionCards.filter(c => c.status === 'beta').length;
-const expCount = extensionCards.filter(c => c.status === 'experimental').length;
+const betaCount = betaCards.length;
+const expCount = expCards.length;
 ---
 
 <MarketingLayout

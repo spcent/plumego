@@ -115,17 +115,29 @@ who use AI coding tools and need to know the framework is designed with that in 
 
 ## Rule 9 — JourneyBar consistency
 
-Every marketing page that renders a `<JourneyBar>` must use the same three-step sequence:
+Every marketing page that renders a `<JourneyBar>` must use the same four-step sequence:
 
 ```js
+// English
 [
   { label: 'Why Plumego', href: '/why-plumego' },
+  { label: 'Extensions', href: '/extensions' },
   { label: 'Examples', href: '/examples' },
   { label: 'Releases', href: '/releases' },
+]
+
+// Chinese
+[
+  { label: '为什么选择', href: '/zh/why-plumego' },
+  { label: '扩展', href: '/zh/extensions' },
+  { label: '示例', href: '/zh/examples' },
+  { label: '发布', href: '/zh/releases' },
 ]
 ```
 
 Do not add, remove, or reorder steps between pages. The JourneyBar must visually convey a single adoption path, not a sitemap. Architecture is not a step in the adoption path — it is a reference page.
+
+**Enforcement:** `node scripts/check-content-contracts.mjs` validates the exact step sequence on every `.astro` page that renders `<JourneyBar>`.
 
 ---
 
@@ -216,7 +228,7 @@ all public API patterns. Website pages are downstream — when in doubt, match t
 Run `node scripts/check-content-contracts.mjs` before merging website content changes. The checker
 owns three executable contracts:
 
-- every `<JourneyBar>` uses the fixed Why Plumego → Examples → Releases sequence
+- every `<JourneyBar>` uses the fixed Why Plumego → Extensions → Examples → Releases sequence
 - every `reference/` service app is either listed in the examples reference matrix or explicitly
   declared as an exception
 - subordinate extension primitives are displayed with their full owning path, such as
@@ -224,3 +236,24 @@ owns three executable contracts:
 
 Run `node scripts/check-doc-api-symbols.mjs` as the companion API-pattern check. It scans docs,
 marketing pages, and `src/data/site.ts` for stale Plumego API examples.
+
+---
+
+## Rule 16 — Module documentation coverage is intentionally selective
+
+The website presents **32 curated module pages** (9 stable roots + 14 x/* families + 9 selected subordinates). The repository contains **75 exhaustive module primers** under `docs/modules/`. This is intentional, not a gap.
+
+**Design rationale:** Website pages are scoped to the primary entrypoint for each capability family. Sub-packages that are consumed indirectly (`x/ai/semanticcache/*`, `x/gateway/protocolmw`, etc.) are documented in `docs/modules/` for engineers working inside those packages, but are not surfaced as standalone website pages to avoid overwhelming evaluators.
+
+**What belongs on the website:**
+- Every stable root module (`core`, `router`, `contract`, etc.) — one page each
+- Every top-level `x/*` family (`x/ai`, `x/gateway`, etc.) — one page each
+- Sub-packages that users directly import as their primary entry point (`x/observability/ops`, `x/messaging/webhook`, etc.)
+
+**What belongs only in `docs/modules/`:**
+- Sub-packages that are consumed transitively or only by advanced users
+- Internal implementation packages within a family
+
+**Maintenance rule:** When a new module is added under `x/`, its `docs/modules/` primer is mandatory. A website page is only required if the module is a top-level family entrypoint or a sub-package that users will directly import as their primary entry. When in doubt, start with `docs/modules/` only and promote to a website page once adoption patterns confirm user need.
+
+**Verification:** `docs/modules/INDEX.md` is the master list of all 75 module primers. `src/content/docs/docs/modules/` is the website subset. These are intentionally different sizes.

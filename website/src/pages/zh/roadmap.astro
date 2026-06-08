@@ -30,7 +30,7 @@ const roadmapSections = [
     kicker: 'non-goals',
     title: copy.sections[3].title,
     body: '这些边界是刻意保留下来的。它们用来防止仓库重新滑回隐藏兼容层和过度膨胀的稳定根。',
-    items: copy.sections[3].items,
+    items: ROADMAP_FACTS.nonGoals,
   },
 ] as const;
 
@@ -119,6 +119,18 @@ const adoptionNotes = [
 
   <section class="section">
     <div class="section__intro">
+      <h2>设计原则</h2>
+      <p>无论当前哪些阶段处于活跃状态，这些约束始终保持不变。它们解释了路线图为何如此构造，以及哪些取舍是不可谈判的。</p>
+    </div>
+    <ul class="principles-list">
+      {ROADMAP_FACTS.roadmapPrinciples.map((item) => (
+        <li class="principles-list__item">{item}</li>
+      ))}
+    </ul>
+  </section>
+
+  <section class="section">
+    <div class="section__intro">
       <h2>{copy.orderTitle}</h2>
       <p>{copy.orderBody}</p>
     </div>
@@ -152,3 +164,25 @@ const adoptionNotes = [
     </div>
   </section>
 </MarketingLayout>
+
+<style>
+  .principles-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    max-width: 56rem;
+  }
+
+  .principles-list__item {
+    font-size: 0.9rem;
+    color: var(--fg-soft);
+    line-height: 1.6;
+    padding: 0.65rem 1rem;
+    border-left: 3px solid var(--accent);
+    background: var(--bg-elevated);
+    border-radius: 0 0.4rem 0.4rem 0;
+  }
+</style>
