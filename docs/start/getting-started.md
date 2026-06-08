@@ -28,35 +28,23 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/spcent/plumego"
 	"github.com/spcent/plumego/contract"
-	"github.com/spcent/plumego/core"
 )
 
 func main() {
-	cfg := core.DefaultConfig()
-	cfg.Addr = ":8080"
+	app := plumego.New()
 
-	app := core.New(cfg, core.AppDependencies{})
-	if err := app.Get("/ping", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	app.Get("/ping", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if err := contract.WriteResponse(w, r, http.StatusOK, map[string]string{
 			"message": "pong",
 		}, nil); err != nil {
 			http.Error(w, "write response", http.StatusInternalServerError)
 		}
-	})); err != nil {
-		log.Fatalf("register route: %v", err)
-	}
-
-	if err := app.Prepare(); err != nil {
-		log.Fatalf("prepare server: %v", err)
-	}
-	srv, err := app.Server()
-	if err != nil {
-		log.Fatalf("get server: %v", err)
-	}
+	}))
 
 	log.Println("server started at :8080")
-	log.Fatal(srv.ListenAndServe())
+	log.Fatal(http.ListenAndServe(":8080", app))
 }
 ```
 
@@ -68,10 +56,38 @@ go run main.go
 
 Open `http://localhost:8080/ping`.
 
+`plumego.New()` uses `DefaultConfig` (`:8080`, 30 s timeouts, HTTP/2 on).
+For a non-default address or TLS, use `plumego.NewWithConfig`:
+
+```go
+package main
+
+import (
+	"log"
+	"net/http"
+
+	"github.com/spcent/plumego"
+	"github.com/spcent/plumego/contract"
+)
+
+func main() {
+	cfg := plumego.DefaultConfig()
+	cfg.Addr = ":9090"
+	app := plumego.NewWithConfig(cfg)
+	app.Get("/ping", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = contract.WriteResponse(w, r, 200, map[string]string{"status": "ok"}, nil)
+	}))
+	log.Fatal(http.ListenAndServe(cfg.Addr, app))
+}
+```
+
+For explicit lifecycle control — `Prepare`, `Server`, `Shutdown` — use `core.New` directly (see the production example below).
+
 ## Production-Style Canonical Example
 
 Use this when you need request ID, panic recovery, graceful shutdown, and
-canonical lifecycle wiring:
+canonical lifecycle wiring. Use `core.New` directly for explicit logger
+injection:
 
 ```go
 package main
@@ -170,13 +186,12 @@ if err := app.Post("/users", http.HandlerFunc(func(w http.ResponseWriter, r *htt
 }
 ```
 
-For path parameters, use `router.Param`:
+For path parameters, use `plumego.Param` (or `router.Param` when importing
+`router` directly):
 
 ```go
-import "github.com/spcent/plumego/router"
-
 if err := app.Get("/users/:id", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-	id := router.Param(r, "id")
+	id := plumego.Param(r, "id")
 	_, _ = w.Write([]byte(id))
 })); err != nil {
 	log.Fatalf("register route: %v", err)
