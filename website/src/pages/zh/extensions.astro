@@ -3,6 +3,7 @@ import MarketingLayout from '../../layouts/MarketingLayout.astro';
 import PageHero from '../../components/marketing/PageHero.astro';
 import JourneyBar from '../../components/marketing/JourneyBar.astro';
 import { MODULE_FACTS } from '../../generated/modules';
+import { EXTENSION_META_ZH } from '../../data/extensions';
 
 const journeySteps = [
   { label: '为什么选择', href: '/zh/why-plumego' },
@@ -11,36 +12,21 @@ const journeySteps = [
   { label: '发布', href: '/zh/releases' },
 ];
 
-interface ExtCard {
-  name: string;
-  status: 'beta' | 'experimental';
-  description: string;
-  entrypoint: string;
-  docHref: string;
-  tags: string[];
-}
+// Status is authoritative from MODULE_FACTS; descriptions from EXTENSION_META_ZH.
+const betaCards = MODULE_FACTS.betaExtensionFamilies.map((name) => ({
+  name,
+  status: 'beta' as const,
+  ...EXTENSION_META_ZH[name],
+}));
+const expCards = MODULE_FACTS.experimentalFamilies.map((name) => ({
+  name,
+  status: 'experimental' as const,
+  ...EXTENSION_META_ZH[name],
+}));
+const extensionCards = [...betaCards, ...expCards];
 
-const extensionCards: ExtCard[] = [
-  // Beta families
-  { name: 'x/rest', status: 'beta', description: 'CRUD 资源规范、类型化 handler 和基于稳定 HTTP 内核的 REST 响应 contract。', entrypoint: 'x/rest', docHref: '/zh/docs/modules/x-rest', tags: ['api', 'rest', 'crud'] },
-  { name: 'x/gateway', status: 'beta', description: '反向代理、上游健康检查、负载均衡以及服务边缘的路由组合。', entrypoint: 'x/gateway', docHref: '/zh/docs/modules/x-gateway', tags: ['proxy', 'edge', 'lb'] },
-  { name: 'x/websocket', status: 'beta', description: '由 hub 管理的全双工 WebSocket 连接，与标准 HTTP 路由共存。', entrypoint: 'x/websocket', docHref: '/zh/docs/modules/x-websocket', tags: ['realtime', 'ws'] },
-  { name: 'x/observability', status: 'beta', description: 'Prometheus 指标、OpenTelemetry 链路追踪和结构化日志导出，接入服务边界。', entrypoint: 'x/observability', docHref: '/zh/docs/modules/x-observability', tags: ['metrics', 'traces', 'otel'] },
-  { name: 'x/tenant', status: 'beta', description: '在传输层进行 per-tenant JWT 身份识别、配额执行和策略评估。', entrypoint: 'x/tenant', docHref: '/zh/docs/modules/x-tenant', tags: ['saas', 'multi-tenant', 'jwt'] },
-  { name: 'x/frontend', status: 'beta', description: '静态资产服务、SPA fallback 路由和嵌入式文件系统支持，用于前端集成。', entrypoint: 'x/frontend', docHref: '/zh/docs/modules/x-frontend', tags: ['static', 'spa', 'assets'] },
-  { name: 'x/messaging', status: 'beta', description: '基于可插拔 transport 的事件发布、webhook 分发和消息服务层 API。', entrypoint: 'x/messaging', docHref: '/zh/docs/modules/x-messaging', tags: ['events', 'pubsub', 'webhooks'] },
-  // Experimental families
-  { name: 'x/ai', status: 'experimental', description: '多 provider AI 抽象、session 生命周期、streaming SSE 响应以及 tool-call 路由。', entrypoint: 'x/ai/provider', docHref: '/zh/docs/modules/x-ai', tags: ['ai', 'llm', 'streaming'] },
-  { name: 'x/data', status: 'experimental', description: '基于稳定 store 接口之上的文件存储、幂等键和数据访问原语。', entrypoint: 'x/data', docHref: '/zh/docs/modules/x-data', tags: ['storage', 'data', 'files'] },
-  { name: 'x/resilience', status: 'experimental', description: '用于出站 HTTP 和服务调用的熔断器、重试策略和超时包装器。', entrypoint: 'x/resilience', docHref: '/zh/docs/modules/x-resilience', tags: ['resilience', 'circuit-breaker', 'retry'] },
-  { name: 'x/rpc', status: 'experimental', description: 'gRPC + HTTP 双协议服务装配，共享同一条稳定中间件链。', entrypoint: 'x/rpc', docHref: '/zh/docs/modules/x-rpc', tags: ['grpc', 'rpc', 'protocol'] },
-  { name: 'x/openapi', status: 'experimental', description: '从路由定义生成 OpenAPI 3 规范，支持 schema 推断和文档服务器。', entrypoint: 'x/openapi', docHref: '/zh/docs/modules/x-openapi', tags: ['openapi', 'swagger', 'docs'] },
-  { name: 'x/validate', status: 'experimental', description: '带 struct tag 规则和结构化错误响应的请求体验证中间件。', entrypoint: 'x/validate', docHref: '/zh/docs/modules/x-validate', tags: ['validation', 'input'] },
-  { name: 'x/fileapi', status: 'experimental', description: '基于稳定 HTTP 内核的 multipart 上传 handler、分片续传和文件元数据管理。', entrypoint: 'x/fileapi', docHref: '/zh/docs/modules/x-fileapi', tags: ['upload', 'files', 'multipart'] },
-];
-
-const betaCount = extensionCards.filter(c => c.status === 'beta').length;
-const expCount = extensionCards.filter(c => c.status === 'experimental').length;
+const betaCount = betaCards.length;
+const expCount = expCards.length;
 ---
 
 <MarketingLayout

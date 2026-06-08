@@ -25,5 +25,20 @@ export const ROADMAP_FACTS = {
     "Execute task card 1502 (x/openapi module.yaml cleanup and beta evaluation) once release evidence is available.",
     "Clarify `x/data` and `x/fileapi` operational guidance.",
     "Expand `x/gateway/discovery` backends only when explicit adapters are ready."
+  ],
+  "roadmapPrinciples": [
+    "Keep `core` as a kernel, not a feature catalog.",
+    "Preserve `net/http` compatibility and explicit control flow.",
+    "Keep one canonical entrypoint per capability family.",
+    "Let `specs/*` and module manifests carry machine-readable authority.",
+    "Document only implemented behavior; remove stale drafts instead of preserving them in the active docs surface."
+  ],
+  "nonGoals": [
+    "reintroduce component-style compatibility APIs",
+    "add new broad legacy roots for short-term convenience",
+    "let scenario reference apps replace the canonical app path",
+    "move tenant or topology-heavy logic back into stable roots",
+    "leave stale historical drafts inside the active docs surface",
+    "mark `x/*` packages as GA without explicit policy, tests, and docs"
   ]
 } as const;

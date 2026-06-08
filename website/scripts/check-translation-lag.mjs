@@ -104,8 +104,14 @@ export async function checkTranslationLag() {
   } else {
     console.log(`[check-translation-lag] All zh pages are within ${LAG_DAYS}-day threshold.`);
   }
+
+  return flagged;
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
-  await checkTranslationLag();
+  const strict = process.argv.includes('--strict');
+  const flagged = await checkTranslationLag();
+  if (strict && flagged > 0) {
+    process.exit(1);
+  }
 }

@@ -30,7 +30,7 @@ const roadmapSections = [
     kicker: 'non-goals',
     title: copy.sections[3].title,
     body: 'These boundaries are deliberate. They protect the repository from drifting back toward hidden compatibility layers and overloaded stable roots.',
-    items: copy.sections[3].items,
+    items: ROADMAP_FACTS.nonGoals,
   },
 ] as const;
 
@@ -118,6 +118,18 @@ const adoptionNotes = [
 
   <section class="section">
     <div class="section__intro">
+      <h2>Design principles</h2>
+      <p>These constraints stay fixed regardless of what phases are active. They explain why the roadmap looks the way it does and which trade-offs are non-negotiable.</p>
+    </div>
+    <ul class="principles-list">
+      {ROADMAP_FACTS.roadmapPrinciples.map((item) => (
+        <li class="principles-list__item">{item}</li>
+      ))}
+    </ul>
+  </section>
+
+  <section class="section">
+    <div class="section__intro">
       <h2>{copy.orderTitle}</h2>
       <p>{copy.orderBody}</p>
     </div>
@@ -154,3 +166,25 @@ const adoptionNotes = [
     </div>
   </section>
 </MarketingLayout>
+
+<style>
+  .principles-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    max-width: 56rem;
+  }
+
+  .principles-list__item {
+    font-size: 0.9rem;
+    color: var(--fg-soft);
+    line-height: 1.6;
+    padding: 0.65rem 1rem;
+    border-left: 3px solid var(--accent);
+    background: var(--bg-elevated);
+    border-radius: 0 0.4rem 0.4rem 0;
+  }
+</style>

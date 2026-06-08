@@ -26,6 +26,14 @@ export async function syncRoadmap() {
     .map((line) => line.replace(/^\d+\.\s+/, ''));
   const phases = parsePhases(roadmap);
 
+  const roadmapPrinciples = markdownBulletList(
+    roadmap.match(/## Roadmap Principles\s+([\s\S]*?)(?=\n## |\s*$)/)?.[1] ?? '',
+  );
+
+  const nonGoals = markdownBulletList(
+    roadmap.match(/## What Not to Do\s+([\s\S]*?)(?=\n## |\s*$)/)?.[1] ?? '',
+  ).map((item) => item.replace(/^do not /, ''));
+
   await writeGeneratedFile(
     'roadmap.ts',
     toTsModule('ROADMAP_FACTS', {
@@ -33,6 +41,8 @@ export async function syncRoadmap() {
       inProgress: phases.filter((phase) => phase.status === 'in progress').map((phase) => phase.title),
       planned: phases.filter((phase) => phase.status === 'planned').map((phase) => phase.title),
       suggestedExecutionOrder,
+      roadmapPrinciples,
+      nonGoals,
     }),
   );
 }
