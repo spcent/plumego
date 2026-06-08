@@ -58,6 +58,7 @@ func (c *RoutesCmd) Run(ctx *Context, args []string) error {
 	result := map[string]any{
 		"routes": routes.Routes,
 		"total":  routes.Total,
+		"note":   "static analysis only; route groups, middleware chains, dynamic path patterns, and factory-wrapped registrations are not detected",
 	}
 
 	return ctx.Out.Success("Routes analyzed successfully", result)

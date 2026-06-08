@@ -87,6 +87,9 @@ func generateHandlerCode(name, pkg string, methods []string) string {
 		case "PUT":
 			needsJSON = true
 			svcMethods += fmt.Sprintf("\tUpdate(ctx context.Context, id, name string) (*%s, error)\n", name)
+		case "PATCH":
+			needsJSON = true
+			svcMethods += fmt.Sprintf("\tPatch(ctx context.Context, id, name string) (*%s, error)\n", name)
 		case "DELETE":
 			svcMethods += "\tDelete(ctx context.Context, id string) error\n"
 		}
@@ -136,7 +139,7 @@ func generateHandlerMethodCode(name, method string) string {
 	switch method {
 	case "GET":
 		return fmt.Sprintf(`
-// Get handles GET /%s/:id
+// Get handles GET /%s/{id}
 func (h %sHandler) Get(w http.ResponseWriter, r *http.Request) {
 	id := contract.RequestContextFromContext(r.Context()).Params["id"]
 	item, err := h.Service.Get(r.Context(), id)
@@ -186,7 +189,7 @@ type Update%sRequest struct {
 	Name string `+"`json:\"name\"`"+`
 }
 
-// Update handles PUT /%s/:id
+// Update handles PUT /%s/{id}
 func (h %sHandler) Update(w http.ResponseWriter, r *http.Request) {
 	id := contract.RequestContextFromContext(r.Context()).Params["id"]
 	var req Update%sRequest
@@ -209,9 +212,39 @@ func (h %sHandler) Update(w http.ResponseWriter, r *http.Request) {
 	_ = contract.WriteResponse(w, r, http.StatusOK, item, nil)
 }
 `, name, lower, name, lower, name, name, lower)
+	case "PATCH":
+		return fmt.Sprintf(`
+// Patch%sRequest carries the fields for partially updating a %s.
+type Patch%sRequest struct {
+	Name string `+"`json:\"name,omitempty\"`"+`
+}
+
+// Patch handles PATCH /%s/{id}
+func (h %sHandler) Patch(w http.ResponseWriter, r *http.Request) {
+	id := contract.RequestContextFromContext(r.Context()).Params["id"]
+	var req Patch%sRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+			Type(contract.TypeValidation).
+			Code(contract.CodeInvalidJSON).
+			Message("invalid request body").
+			Build())
+		return
+	}
+	item, err := h.Service.Patch(r.Context(), id, req.Name)
+	if err != nil {
+		_ = contract.WriteError(w, r, contract.NewErrorBuilder().
+			Type(contract.TypeInternal).
+			Message("failed to patch %s").
+			Build())
+		return
+	}
+	_ = contract.WriteResponse(w, r, http.StatusOK, item, nil)
+}
+`, name, lower, name, lower, name, name, lower)
 	case "DELETE":
 		return fmt.Sprintf(`
-// Delete handles DELETE /%s/:id
+// Delete handles DELETE /%s/{id}
 func (h %sHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	id := contract.RequestContextFromContext(r.Context()).Params["id"]
 	if err := h.Service.Delete(r.Context(), id); err != nil {
@@ -230,11 +263,11 @@ func (h %sHandler) Delete(w http.ResponseWriter, r *http.Request) {
 }
 
 func generateHandlerTestCode(name, pkg string, methods []string) string {
-	// Determine if any POST/PUT method is present (needs strings import).
+	// Determine if any POST/PUT/PATCH method is present (needs strings import).
 	needsStrings := false
 	for _, m := range methods {
 		m = strings.TrimSpace(strings.ToUpper(m))
-		if m == "POST" || m == "PUT" {
+		if m == "POST" || m == "PUT" || m == "PATCH" {
 			needsStrings = true
 		}
 	}
@@ -264,6 +297,12 @@ func (m *mock%sService) Create(_ context.Context, name string) (*%s, error) {
 		case "PUT":
 			mockMethods += fmt.Sprintf(`
 func (m *mock%sService) Update(_ context.Context, id, name string) (*%s, error) {
+	return &%s{ID: id, Name: name}, nil
+}
+`, name, name, name)
+		case "PATCH":
+			mockMethods += fmt.Sprintf(`
+func (m *mock%sService) Patch(_ context.Context, id, name string) (*%s, error) {
 	return &%s{ID: id, Name: name}, nil
 }
 `, name, name, name)
@@ -331,6 +370,19 @@ func TestUpdate%s(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPut, "/%s/1", body)
 	rec := httptest.NewRecorder()
 	h.Update(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %%d", rec.Code)
+	}
+}
+`, name, name, name, lower)
+	case "PATCH":
+		return fmt.Sprintf(`
+func TestPatch%s(t *testing.T) {
+	h := %sHandler{Service: &mock%sService{}}
+	body := strings.NewReader(`+"`"+`{"name":"patched"}`+"`"+`)
+	req := httptest.NewRequest(http.MethodPatch, "/%s/1", body)
+	rec := httptest.NewRecorder()
+	h.Patch(rec, req)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %%d", rec.Code)
 	}

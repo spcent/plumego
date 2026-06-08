@@ -114,7 +114,7 @@ func (c *NewCmd) Run(ctx *Context, args []string) error {
 		"template":      template,
 		"files_created": files,
 		"next_steps": []string{
-			fmt.Sprintf("cd %s", projectName),
+			fmt.Sprintf("cd %s", dir),
 			"go mod tidy",
 			"plumego dev",
 		},

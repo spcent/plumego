@@ -30,8 +30,11 @@ type GenerateResult struct {
 
 // Generate generates code based on options
 func Generate(dir string, opts GenerateOptions) (*GenerateResult, error) {
-	if err := validateGoIdentifier("name", opts.Name); err != nil {
-		return nil, err
+	// health-handler and metrics-middleware use fixed function names; name is display-only.
+	if !isNameOptionalType(opts.Type) {
+		if err := validateGoIdentifier("name", opts.Name); err != nil {
+			return nil, err
+		}
 	}
 	switch opts.Type {
 	case "middleware":
@@ -46,9 +49,18 @@ func Generate(dir string, opts GenerateOptions) (*GenerateResult, error) {
 		return generateService(dir, opts)
 	case "repo":
 		return generateRepo(dir, opts)
+	case "health-handler":
+		return generateHealthHandler(dir, opts)
+	case "metrics-middleware":
+		return generateMetricsMiddleware(dir, opts)
 	default:
-		return nil, fmt.Errorf("unknown generation type: %s", opts.Type)
+		return nil, fmt.Errorf("unknown generation type %q (valid: handler, endpoint, middleware, health-handler, metrics-middleware, model, service, repo, spec)", opts.Type)
 	}
+}
+
+// isNameOptionalType reports whether opts.Type does not require a Name argument.
+func isNameOptionalType(t string) bool {
+	return t == "health-handler" || t == "metrics-middleware"
 }
 
 func parseHTTPMethods(value string) ([]string, error) {
@@ -61,9 +73,9 @@ func parseHTTPMethods(value string) ([]string, error) {
 			return nil, fmt.Errorf("empty HTTP method")
 		}
 		switch method {
-		case "GET", "POST", "PUT", "DELETE":
+		case "GET", "POST", "PUT", "PATCH", "DELETE":
 		default:
-			return nil, fmt.Errorf("unsupported HTTP method: %s", method)
+			return nil, fmt.Errorf("unsupported HTTP method: %s (valid: GET, POST, PUT, PATCH, DELETE)", method)
 		}
 		if _, ok := seen[method]; ok {
 			continue

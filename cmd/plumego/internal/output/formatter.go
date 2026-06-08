@@ -32,7 +32,7 @@ type commandResult struct {
 // NewFormatter creates a new output formatter
 func NewFormatter() *Formatter {
 	return &Formatter{
-		format: "json",
+		format: "text",
 		color:  true,
 		out:    os.Stdout,
 		err:    os.Stderr,

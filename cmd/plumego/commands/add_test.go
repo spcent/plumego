@@ -213,6 +213,7 @@ func runAddCommand(t *testing.T, runner *fakeAddRunner, args []string) (int, str
 	})
 
 	formatter := output.NewFormatter()
+	formatter.SetFormat("json")
 	var out bytes.Buffer
 	var errOut bytes.Buffer
 	formatter.SetWriters(&out, &errOut)

@@ -103,6 +103,7 @@ func TestGenerateHandlerCode_ServiceMethodsPresent(t *testing.T) {
 		{"GET", "Get(ctx context.Context"},
 		{"POST", "Create(ctx context.Context"},
 		{"PUT", "Update(ctx context.Context"},
+		{"PATCH", "Patch(ctx context.Context"},
 		{"DELETE", "Delete(ctx context.Context"},
 	}
 	for _, tt := range tests {
@@ -125,6 +126,7 @@ func TestGenerateHandlerCode_HandlerCallsService(t *testing.T) {
 		{"GET", "h.Service.Get("},
 		{"POST", "h.Service.Create("},
 		{"PUT", "h.Service.Update("},
+		{"PATCH", "h.Service.Patch("},
 		{"DELETE", "h.Service.Delete("},
 	}
 	for _, tt := range tests {
@@ -134,6 +136,28 @@ func TestGenerateHandlerCode_HandlerCallsService(t *testing.T) {
 				t.Errorf("missing service call %q:\n%s", tt.wantCall, content)
 			}
 		})
+	}
+}
+
+// TestGenerateHandlerCode_PATCHIsParseableAndUsesOmitempty verifies the PATCH
+// template produces valid Go and uses json:"name,omitempty" to support partial updates.
+func TestGenerateHandlerCode_PATCHIsParseableAndUsesOmitempty(t *testing.T) {
+	content := generateHandlerCode("Order", "handlers", []string{"PATCH"})
+	assertParseableGo(t, "order.go", content)
+	if !strings.Contains(content, "omitempty") {
+		t.Errorf("PATCH request struct should use omitempty for partial updates:\n%s", content)
+	}
+	if !strings.Contains(content, "h.Service.Patch(") {
+		t.Errorf("PATCH handler should call h.Service.Patch:\n%s", content)
+	}
+}
+
+// TestGenerateHandlerTestCode_PATCHIsParseable verifies the PATCH test template compiles.
+func TestGenerateHandlerTestCode_PATCHIsParseable(t *testing.T) {
+	content := generateHandlerTestCode("Order", "handlers", []string{"PATCH"})
+	assertParseableGo(t, "order_test.go", content)
+	if !strings.Contains(content, "MethodPatch") {
+		t.Errorf("PATCH test should use http.MethodPatch:\n%s", content)
 	}
 }
 

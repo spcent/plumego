@@ -134,13 +134,15 @@ func parseCheckList(s string) map[string]bool {
 	return m
 }
 
-// checkGlobals detects mutable package-level variables in handler and middleware packages.
+// checkGlobals detects clearly mutable package-level variables in handler and middleware packages.
+// Flags pointer types, map/chan/func types, make/new calls, composite map or slice literals,
+// address-of expressions, and function literals. Does NOT flag effectively-constant vars
+// (basic literals, arithmetic, named constants, errors.New calls, etc.).
 // plumego rule: no hidden globals (AGENTS.md §2).
 func checkGlobals(root string) ([]lintViolation, error) {
 	var violations []lintViolation
 
 	err := walkGoFiles(root, func(path string, fset *token.FileSet, f *ast.File) {
-		// Only flag packages that look like handlers or middleware.
 		if !isHandlerOrMiddlewarePkg(filepath.Dir(path)) {
 			return
 		}
@@ -151,7 +153,7 @@ func checkGlobals(root string) ([]lintViolation, error) {
 			}
 			for _, spec := range gd.Specs {
 				vs, ok := spec.(*ast.ValueSpec)
-				if !ok {
+				if !ok || !isMutableVarSpec(vs) {
 					continue
 				}
 				for _, name := range vs.Names {
@@ -164,13 +166,78 @@ func checkGlobals(root string) ([]lintViolation, error) {
 						Line:    pos.Line,
 						Check:   "globals",
 						Level:   "error",
-						Message: fmt.Sprintf("package-level variable %q in handler/middleware package (plumego: no hidden globals)", name.Name),
+						Message: fmt.Sprintf("mutable package-level variable %q in handler/middleware package (plumego: no hidden globals)", name.Name),
 					})
 				}
 			}
 		}
 	})
 	return violations, err
+}
+
+// isMutableVarSpec reports whether a var spec declares mutable state in a
+// handler/middleware package.
+//
+// Any explicit non-primitive type annotation is treated as mutable: pointer,
+// map, chan, func, slice, and third-party types (e.g. sync.Map, sync.Mutex) all
+// indicate dependency injection or shared state — both violate the no-hidden-globals rule.
+// Basic primitive types (int, string, bool, …) as explicit annotations are allowed.
+//
+// When there is no explicit type, only clearly mutable initializer expressions
+// are flagged: make/new calls, composite map or slice literals, address-of, and
+// function literals.
+func isMutableVarSpec(vs *ast.ValueSpec) bool {
+	if vs.Type != nil && !isBasicPrimitiveType(vs.Type) {
+		return true
+	}
+	for _, val := range vs.Values {
+		if isMutableExpr(val) {
+			return true
+		}
+	}
+	return false
+}
+
+// isBasicPrimitiveType reports whether t is an unqualified Go primitive type
+// identifier (int, string, bool, etc.) that is treated as effectively immutable.
+func isBasicPrimitiveType(t ast.Expr) bool {
+	ident, ok := t.(*ast.Ident)
+	if !ok {
+		return false
+	}
+	switch ident.Name {
+	case "bool", "byte", "complex64", "complex128",
+		"float32", "float64",
+		"int", "int8", "int16", "int32", "int64",
+		"rune", "string",
+		"uint", "uint8", "uint16", "uint32", "uint64", "uintptr":
+		return true
+	}
+	return false
+}
+
+// isMutableExpr reports whether expr produces clearly mutable state:
+// make/new calls, composite map or slice literals, address-of, or function literals.
+func isMutableExpr(expr ast.Expr) bool {
+	switch e := expr.(type) {
+	case *ast.CallExpr:
+		if ident, ok := e.Fun.(*ast.Ident); ok {
+			return ident.Name == "make" || ident.Name == "new"
+		}
+		return false
+	case *ast.CompositeLit:
+		switch e.Type.(type) {
+		case *ast.MapType, *ast.ArrayType:
+			return true
+		}
+		return false
+	case *ast.UnaryExpr:
+		return e.Op == token.AND
+	case *ast.FuncLit:
+		return true
+	default:
+		return false
+	}
 }
 
 // checkInitSideEffects detects init() functions that register globals or start goroutines.
@@ -287,32 +354,39 @@ func checkBoundaries(root string) ([]lintViolation, error) {
 }
 
 // boundaryViolation returns a description of the boundary rule being violated, or "".
+// It scans all segments of importPath, not just the last, to catch packages like
+// internal/service/user or internal/svc/order.
 func boundaryViolation(pkgClass, importPath string) string {
-	parts := strings.Split(importPath, "/")
-	lastPart := ""
-	if len(parts) > 0 {
-		lastPart = parts[len(parts)-1]
-	}
-
 	switch pkgClass {
 	case "middleware":
-		// Middleware must be transport-only: no service or domain imports.
-		if lastPart == "service" || lastPart == "services" {
+		if pathContainsSegment(importPath, "service", "services", "svc") {
 			return "middleware must be transport-only; move business logic to a domain service"
 		}
-		if lastPart == "domain" {
+		if pathContainsSegment(importPath, "domain", "biz", "business") {
 			return "middleware must be transport-only; domain types belong in the service layer"
 		}
-		if lastPart == "dto" || lastPart == "dtos" {
+		if pathContainsSegment(importPath, "dto", "dtos") {
 			return "middleware must not assemble DTOs; delegate to handlers"
 		}
 	case "handler":
-		// Handlers should not import infrastructure packages directly.
-		if lastPart == "store" || lastPart == "stores" || lastPart == "repository" || lastPart == "repo" {
+		if pathContainsSegment(importPath, "store", "stores", "repository", "repo", "repositories") {
 			return "handler should depend on a service interface, not infrastructure directly"
 		}
 	}
 	return ""
+}
+
+// pathContainsSegment reports whether any slash-delimited segment of importPath
+// matches one of the provided keywords exactly.
+func pathContainsSegment(importPath string, keywords ...string) bool {
+	for _, part := range strings.Split(importPath, "/") {
+		for _, kw := range keywords {
+			if part == kw {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // classifyPackage returns "middleware" or "handler" based on directory name, or "" if unclassified.

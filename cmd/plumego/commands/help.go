@@ -109,14 +109,16 @@ func (c *NewCmd) Help() CommandHelp {
 
 func (c *GenerateCmd) Help() CommandHelp {
 	return CommandHelp{
-		Args: "<type> <name> [command-flags]  OR  spec [command-flags]",
+		Args: "<type> [name] [command-flags]",
 		Subcommands: []HelpItem{
-			{"handler <Name>", "net/http handler with canonical plumego shape"},
-			{"middleware <Name>", "transport-only middleware (no service injection)"},
-			{"model <Name>", "domain model struct"},
-			{"service <Name>", "domain service interface + implementation"},
-			{"repo <Name>", "repository interface + stub"},
-			{"endpoint <Name>", "combined handler + route wiring"},
+			{"handler <Name>", "Struct-based HTTP handler with contract.WriteResponse"},
+			{"endpoint <Name>", "Functional HTTP handler (canonical plumego shape)"},
+			{"middleware <Name>", "Transport-only HTTP middleware func"},
+			{"health-handler", "Health check handler using health.ComponentChecker"},
+			{"metrics-middleware", "Metrics-recording middleware using metrics.HTTPObserver"},
+			{"model <Name>", "Domain entity struct"},
+			{"service <Name>", "Domain service interface + stub implementation"},
+			{"repo <Name>", "Repository interface + no-op stub"},
 			{"spec", "OpenAPI 3.1 document from registered routes"},
 		},
 		Flags: []HelpItem{
@@ -125,14 +127,17 @@ func (c *GenerateCmd) Help() CommandHelp {
 			{"--format <json|yaml>", "Spec output format (spec only)"},
 			{"--app <package>", "Application package to introspect (spec only)"},
 			{"--package <name>", "Package name for generated file"},
-			{"--methods <list>", "HTTP methods, comma-separated (default: GET)"},
+			{"--methods <list>", "HTTP methods, comma-separated: GET, POST, PUT, PATCH, DELETE (handler only, default: GET)"},
 			{"--with-tests", "Also generate test file"},
-			{"--with-validation", "Include validation scaffold"},
+			{"--with-validation", "Add Validate() method (model only)"},
 			{"--force", "Overwrite existing files"},
 		},
 		Examples: []string{
 			"plumego generate handler User --methods GET,POST,PUT,DELETE --with-tests",
+			"plumego generate endpoint Item --with-tests",
 			"plumego generate middleware RateLimit",
+			"plumego generate health-handler",
+			"plumego generate metrics-middleware",
 			"plumego generate model Invoice --with-validation",
 			"plumego generate spec --output openapi.yaml --format yaml",
 		},
@@ -161,6 +166,7 @@ func (c *DevCmd) Help() CommandHelp {
 		Args: "[command-flags]",
 		Flags: []HelpItem{
 			{"--addr <addr>", "Application listen address (default: :8080)"},
+			{"-p, --port <port>", "Listen port shorthand (e.g. 3000); sets --addr to :PORT"},
 			{"--dashboard-addr <addr>", "Dashboard listen address (default: 127.0.0.1:9999)"},
 			{"--dashboard-token <token>", "Auth token for action APIs (required when dashboard is non-loopback)"},
 			{"--dir <path>", "Project directory (default: .)"},
@@ -173,10 +179,11 @@ func (c *DevCmd) Help() CommandHelp {
 		},
 		Examples: []string{
 			"plumego dev",
+			"plumego dev --port 3000",
 			"plumego dev --addr :3000",
 			"plumego dev --dashboard-addr :9090 --dashboard-token secret",
 			"plumego dev --no-reload",
-			"plumego --format json dev --addr :3000",
+			"plumego --format json dev --port 3000",
 		},
 	}
 }
@@ -369,10 +376,12 @@ func (c *ServeCmd) Help() CommandHelp {
 		Args: "[directory] [command-flags]",
 		Flags: []HelpItem{
 			{"-a, --addr <addr>", "Listen address (default: :8080)"},
+			{"-p, --port <port>", "Listen port shorthand (e.g. 3000); sets --addr to :PORT"},
 		},
 		Examples: []string{
 			"plumego serve",
 			"plumego serve ./public",
+			"plumego serve ./dist --port 3000",
 			"plumego serve ./dist --addr :3000",
 			"plumego --format json serve ./public --addr :4000",
 		},

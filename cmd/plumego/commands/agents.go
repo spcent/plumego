@@ -281,9 +281,7 @@ func runAgentsBundle(ctx *Context, args []string) error {
 		return ctx.Out.Error(fmt.Sprintf("generate bundle: %v", err), 1)
 	}
 
-	// Write to file when --output is specified; otherwise stream to stdout.
-	// Bundle output is always YAML regardless of --format: it is a file artifact,
-	// not a command-result envelope. --quiet suppresses stdout-only output.
+	// Write to file when --output is specified: always raw YAML (file artifact).
 	if *output != "" {
 		f, err := os.Create(*output)
 		if err != nil {
@@ -302,6 +300,16 @@ func runAgentsBundle(ctx *Context, args []string) error {
 			"task":   *taskType,
 			"module": *modulePath,
 			"output": *output,
+		})
+	}
+
+	// No --output: machine formats (json/yaml) wrap in commandResult envelope;
+	// text mode streams raw YAML for human readability.
+	if ctx.Out.Format() != "text" {
+		return ctx.Out.Success(fmt.Sprintf("bundle: %s / %s", *taskType, *modulePath), map[string]any{
+			"task":   *taskType,
+			"module": *modulePath,
+			"bundle": b,
 		})
 	}
 

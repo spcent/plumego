@@ -29,7 +29,7 @@ func TestFormatterSuccessJSONUsesCommandResult(t *testing.T) {
 	}
 }
 
-func TestFormatterDefaultsToJSON(t *testing.T) {
+func TestFormatterDefaultsToText(t *testing.T) {
 	var out bytes.Buffer
 	f := NewFormatter()
 	f.SetWriters(&out, nil)
@@ -38,12 +38,9 @@ func TestFormatterDefaultsToJSON(t *testing.T) {
 		t.Fatalf("success: %v", err)
 	}
 
-	var result commandResult
-	if err := json.Unmarshal(out.Bytes(), &result); err != nil {
-		t.Fatalf("default formatter output should be json: %v; output: %s", err, out.String())
-	}
-	if result.Status != "success" {
-		t.Fatalf("unexpected result: %+v", result)
+	// Default format is text: output begins with "SUCCESS:" prefix.
+	if !strings.HasPrefix(out.String(), "SUCCESS:") {
+		t.Fatalf("default formatter should produce text output, got: %s", out.String())
 	}
 }
 

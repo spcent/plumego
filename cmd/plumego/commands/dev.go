@@ -66,7 +66,9 @@ func parseDevArgs(args []string) (devOptions, error) {
 
 	opts := devOptions{}
 	fs.StringVar(&opts.dir, "dir", ".", "Project directory")
-	fs.StringVar(&opts.addr, "addr", ":8080", "Application listen address")
+	fs.StringVar(&opts.addr, "addr", ":8080", "Application listen address (e.g. :8080 or 0.0.0.0:8080)")
+	portFlag := fs.String("port", "", "Listen port (e.g. 3000); shorthand for --addr :PORT")
+	fs.StringVar(portFlag, "p", "", "Listen port shorthand")
 	fs.StringVar(&opts.dashboardAddr, "dashboard-addr", "127.0.0.1:9999", "Dashboard listen address")
 	fs.StringVar(&opts.dashboardToken, "dashboard-token", "", "Token required for dashboard action APIs")
 	fs.StringVar(&opts.watchPatterns, "watch", "**/*.go", "Watch patterns")
@@ -82,6 +84,13 @@ func parseDevArgs(args []string) (devOptions, error) {
 	}
 	if len(positionals) > 0 {
 		return devOptions{}, fmt.Errorf("unexpected arguments: %v", positionals)
+	}
+
+	if p := *portFlag; p != "" {
+		if !strings.HasPrefix(p, ":") {
+			p = ":" + p
+		}
+		opts.addr = p
 	}
 
 	return opts, nil
@@ -482,13 +491,27 @@ func toEventMap(data any) map[string]any {
 	}
 }
 
+// addrToURL formats a network listen address as an HTTP URL for display.
+// ":8080" → "http://localhost:8080"
+// "0.0.0.0:8080" → "http://localhost:8080"
+// "127.0.0.1:9999" → "http://127.0.0.1:9999"
+func addrToURL(addr string) string {
+	if strings.HasPrefix(addr, ":") {
+		return "http://localhost" + addr
+	}
+	if strings.HasPrefix(addr, "0.0.0.0:") {
+		return "http://localhost:" + strings.TrimPrefix(addr, "0.0.0.0:")
+	}
+	return "http://" + addr
+}
+
 func emitDevStart(out *output.Formatter, absDir, addr, dashboardAddr string) error {
 	if out.Format() == "text" {
 		message := fmt.Sprintf(
-			"Starting Plumego Dev Server\n   Project: %s\n   App URL: http://localhost%s\n   Dashboard URL: http://localhost%s\n",
+			"Starting Plumego Dev Server\n   Project: %s\n   App URL: %s\n   Dashboard URL: %s\n",
 			absDir,
-			addr,
-			dashboardAddr,
+			addrToURL(addr),
+			addrToURL(dashboardAddr),
 		)
 		return out.Event(output.Event{
 			Event:   "starting",
@@ -511,7 +534,7 @@ func emitDashboardStarted(out *output.Formatter, dashboardAddr string) error {
 	if out.Format() == "text" {
 		return out.Event(output.Event{
 			Event:   "dashboard_started",
-			Message: fmt.Sprintf("Dashboard started at http://localhost%s\n", dashboardAddr),
+			Message: fmt.Sprintf("Dashboard started at %s\n", addrToURL(dashboardAddr)),
 		})
 	}
 
@@ -519,21 +542,25 @@ func emitDashboardStarted(out *output.Formatter, dashboardAddr string) error {
 		Event:   "dashboard_started",
 		Message: "Dashboard started",
 		Data: map[string]any{
-			"url": fmt.Sprintf("http://localhost%s", dashboardAddr),
+			"url": addrToURL(dashboardAddr),
 		},
 	})
 }
 
 func emitAppReady(out *output.Formatter, addr string) error {
+	url := addrToURL(addr)
 	if out.Format() == "text" {
-		return nil
+		return out.Event(output.Event{
+			Event:   "ready",
+			Message: fmt.Sprintf("App ready at %s\n", url),
+		})
 	}
 
 	return out.Event(output.Event{
 		Event:   "ready",
 		Message: "Application ready",
 		Data: map[string]any{
-			"url": fmt.Sprintf("http://localhost%s", addr),
+			"url": url,
 		},
 	})
 }
