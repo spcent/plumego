@@ -82,6 +82,7 @@ symbol	github.com/spcent/plumego/contract	method	APIError.Category	func (APIErro
 symbol	github.com/spcent/plumego/contract	method	APIError.Code	func (APIError) Codefunc() string
 symbol	github.com/spcent/plumego/contract	method	APIError.Details	func (APIError) Detailsfunc() map[string]any
 symbol	github.com/spcent/plumego/contract	method	APIError.Error	func (APIError) Errorfunc() string
+symbol	github.com/spcent/plumego/contract	method	APIError.Unwrap	func (APIError) Unwrapfunc() error
 symbol	github.com/spcent/plumego/contract	method	APIError.Message	func (APIError) Messagefunc() string
 symbol	github.com/spcent/plumego/contract	method	APIError.RequestID	func (APIError) RequestIDfunc() string
 symbol	github.com/spcent/plumego/contract	method	APIError.Status	func (APIError) Statusfunc() int
@@ -93,6 +94,7 @@ symbol	github.com/spcent/plumego/contract	method	ErrorBuilder.Details	func (Erro
 symbol	github.com/spcent/plumego/contract	method	ErrorBuilder.Message	func (ErrorBuilder) Messagefunc(message string) *ErrorBuilder
 symbol	github.com/spcent/plumego/contract	method	ErrorBuilder.RequestID	func (ErrorBuilder) RequestIDfunc(requestID string) *ErrorBuilder
 symbol	github.com/spcent/plumego/contract	method	ErrorBuilder.Type	func (ErrorBuilder) Typefunc(errorType ErrorType) *ErrorBuilder
+symbol	github.com/spcent/plumego/contract	method	ErrorBuilder.Wrap	func (ErrorBuilder) Wrapfunc(cause error) *ErrorBuilder
 symbol	github.com/spcent/plumego/contract	method	ErrorType.Meta	func (ErrorType) Metafunc() ErrorTypeMeta
 symbol	github.com/spcent/plumego/contract	method	RouteState.AddParam	func (RouteState) AddParamfunc(key, val string)
 symbol	github.com/spcent/plumego/contract	method	RouteState.Reset	func (RouteState) Resetfunc()

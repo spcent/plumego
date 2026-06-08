@@ -53,6 +53,8 @@ public_entrypoints:
   - APIError.RequestID
   - APIError.Details
   - APIError.Error
+  - APIError.Unwrap
+  - ErrorBuilder.Wrap
   - Code* transport error constants
   - WriteError
   - WriteResponse
@@ -94,6 +96,8 @@ public_surface_stability:
     - APIError.RequestID
     - APIError.Details
     - APIError.Error
+    - APIError.Unwrap
+    - ErrorBuilder.Wrap
     - Code* transport error constants
     - WriteError
     - WriteResponse
