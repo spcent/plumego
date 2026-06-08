@@ -832,8 +832,8 @@ func (h RedisHandler) ExportKeys(w http.ResponseWriter, r *http.Request) {
 	operationID := ""
 	if h.Registry != nil {
 		operationID = h.Registry.Register(OperationInfo{
-			Driver:   string(connection.DriverRedis),
-			Kind:     "export",
+			Driver:   connection.DriverRedis,
+			Kind:     OperationKindExport,
 			ConnID:   connID,
 			Resource: "db:" + strconv.Itoa(dbIndex),
 			Summary:  pattern,
@@ -1158,8 +1158,8 @@ func (h RedisHandler) registerOperation(cancel context.CancelFunc, connID, resou
 		return ""
 	}
 	return h.Registry.Register(OperationInfo{
-		Driver:   string(connection.DriverRedis),
-		Kind:     "command",
+		Driver:   connection.DriverRedis,
+		Kind:     OperationKindCommand,
 		ConnID:   connID,
 		Resource: resource,
 		Summary:  summary,

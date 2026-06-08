@@ -32,63 +32,71 @@ func NewManager() *Manager {
 }
 
 // Open opens (or reuses) a connection pool for the given config.
+// ctx is forwarded to the Ping and retry logic so that a cancelled or
+// deadline-exceeded request aborts the call immediately.
 // The returned *sql.DB is owned by the Manager; callers must not close it.
-func (m *Manager) Open(c *connection.Connection) (*sql.DB, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
+func (m *Manager) Open(ctx context.Context, c *connection.Connection) (*sql.DB, error) {
+	// Fast path: read-lock, check pool, release lock before any I/O.
+	m.mu.RLock()
+	existing, ok := m.pools[c.ID]
+	m.mu.RUnlock()
 
-	if db, ok := m.pools[c.ID]; ok {
-		// Validate connection is still alive with a short timeout
-		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	if ok {
+		pingCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
 		defer cancel()
-		if err := db.PingContext(ctx); err == nil {
-			return db, nil
+		if err := existing.PingContext(pingCtx); err == nil {
+			return existing, nil
 		}
-		// Connection is stale, close and remove it
-		db.Close()
-		delete(m.pools, c.ID)
+		// Stale — remove under write lock, but only if it hasn't already been
+		// replaced by another goroutine.
+		m.mu.Lock()
+		if cur, still := m.pools[c.ID]; still && cur == existing {
+			cur.Close()
+			delete(m.pools, c.ID)
+		}
+		m.mu.Unlock()
 	}
 
+	// Slow path: create a new pool outside any lock so other goroutines are
+	// not blocked during the network handshake / retry loop.
 	dsn, err := buildDSN(c)
 	if err != nil {
 		return nil, err
 	}
-
 	driverName := string(c.Driver)
 	if c.Driver == connection.DriverSQLite {
 		driverName = "sqlite"
 	}
 
-	// Use retry logic for connection creation to handle transient failures
-	ctx := context.Background()
 	cfg := retry.DefaultConfig()
-
-	db, err := retry.WithResult[*sql.DB](ctx, cfg, func() (*sql.DB, error) {
+	newDB, err := retry.WithResult[*sql.DB](ctx, cfg, func() (*sql.DB, error) {
 		db, err := sql.Open(driverName, dsn)
 		if err != nil {
-			// Use redactDSN so the password is never included in error messages.
 			return nil, fmt.Errorf("open %s connection (%s): %w", c.Driver, redactDSN(dsn), err)
 		}
-
-		// Configure connection pool for production stability
-		db.SetMaxOpenConns(25)                  // Max 25 concurrent connections
-		db.SetMaxIdleConns(5)                   // Keep 5 idle connections ready
-		db.SetConnMaxLifetime(5 * time.Minute)  // Recycle connections after 5 min
-		db.SetConnMaxIdleTime(10 * time.Minute) // Close idle connections after 10 min
-
+		db.SetMaxOpenConns(25)
+		db.SetMaxIdleConns(5)
+		db.SetConnMaxLifetime(5 * time.Minute)
+		db.SetConnMaxIdleTime(10 * time.Minute)
 		if err := db.PingContext(ctx); err != nil {
 			db.Close()
 			return nil, fmt.Errorf("ping %s: %w", c.Driver, err)
 		}
-
 		return db, nil
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	m.pools[c.ID] = db
-	return db, nil
+	// Write lock: insert only if no other goroutine beat us to it.
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if winner, ok := m.pools[c.ID]; ok {
+		newDB.Close()
+		return winner, nil
+	}
+	m.pools[c.ID] = newDB
+	return newDB, nil
 }
 
 // Stats returns the pool statistics for a connection ID.
@@ -142,7 +150,9 @@ func (m *Manager) CloseAll() {
 }
 
 // Test opens a temporary connection and pings it without caching the pool.
-func (m *Manager) Test(c *connection.Connection) error {
+// ctx is forwarded to PingContext so that a cancelled or deadline-exceeded
+// request aborts the call immediately.
+func (m *Manager) Test(ctx context.Context, c *connection.Connection) error {
 	dsn, err := buildDSN(c)
 	if err != nil {
 		return err
@@ -156,7 +166,7 @@ func (m *Manager) Test(c *connection.Connection) error {
 		return fmt.Errorf("open: %w", err)
 	}
 	defer db.Close()
-	if err := db.PingContext(context.Background()); err != nil {
+	if err := db.PingContext(ctx); err != nil {
 		return fmt.Errorf("ping: %w", err)
 	}
 	return nil

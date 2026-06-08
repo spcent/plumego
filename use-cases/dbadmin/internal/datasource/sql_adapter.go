@@ -43,21 +43,21 @@ func NewSQLAdapter(manager *dbmanager.Manager) *SQLAdapter {
 func (a *SQLAdapter) Type() DataSourceType { return TypeMySQL }
 
 // Test verifies connectivity without caching the pool.
-func (a *SQLAdapter) Test(_ context.Context, cfg ConnectionConfig) error {
+func (a *SQLAdapter) Test(ctx context.Context, cfg ConnectionConfig) error {
 	sc, ok := cfg.(SQLConfig)
 	if !ok {
 		return fmt.Errorf("sql_adapter: expected SQLConfig, got %T", cfg)
 	}
-	return a.manager.Test(sc.Conn)
+	return a.manager.Test(ctx, sc.Conn)
 }
 
 // Open opens (or reuses) a *sql.DB pool and wraps it in a Session.
-func (a *SQLAdapter) Open(_ context.Context, cfg ConnectionConfig) (*Session, error) {
+func (a *SQLAdapter) Open(ctx context.Context, cfg ConnectionConfig) (*Session, error) {
 	sc, ok := cfg.(SQLConfig)
 	if !ok {
 		return nil, fmt.Errorf("sql_adapter: expected SQLConfig, got %T", cfg)
 	}
-	db, err := a.manager.Open(sc.Conn)
+	db, err := a.manager.Open(ctx, sc.Conn)
 	if err != nil {
 		return nil, err
 	}

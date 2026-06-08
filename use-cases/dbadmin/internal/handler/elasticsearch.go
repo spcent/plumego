@@ -33,12 +33,12 @@ type ElasticsearchHandler struct {
 	QueryTimeoutSeconds int
 }
 
-func (h ElasticsearchHandler) registerOperation(cancel context.CancelFunc, kind, connID, resource, summary string) string {
+func (h ElasticsearchHandler) registerOperation(cancel context.CancelFunc, kind OperationKind, connID, resource, summary string) string {
 	if h.Registry == nil {
 		return ""
 	}
 	return h.Registry.Register(OperationInfo{
-		Driver:   string(connection.DriverElasticsearch),
+		Driver:   connection.DriverElasticsearch,
 		Kind:     kind,
 		ConnID:   connID,
 		Resource: resource,
@@ -373,7 +373,7 @@ func (h ElasticsearchHandler) Search(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
 	ctx, cancel := h.timeout(r.Context())
 	defer cancel()
-	operationID := h.registerOperation(cancel, "search", connID, req.Index, "search DSL")
+	operationID := h.registerOperation(cancel, OperationKindSearch, connID, req.Index, "search DSL")
 	defer h.unregisterOperation(operationID)
 
 	res, err := client.Search(
@@ -563,7 +563,7 @@ func (h ElasticsearchHandler) DeleteDocument(w http.ResponseWriter, r *http.Requ
 	}
 	ctx, cancel := h.timeout(r.Context())
 	defer cancel()
-	operationID := h.registerOperation(cancel, "delete", connID, req.Index, "delete document")
+	operationID := h.registerOperation(cancel, OperationKindDelete, connID, req.Index, "delete document")
 	defer h.unregisterOperation(operationID)
 
 	res, err := delReq.Do(ctx, client)
@@ -629,7 +629,7 @@ func (h ElasticsearchHandler) ExportDocuments(w http.ResponseWriter, r *http.Req
 
 	ctx, cancel := h.timeout(r.Context())
 	defer cancel()
-	operationID := h.registerOperation(cancel, "export", connID, indexName, format+" export")
+	operationID := h.registerOperation(cancel, OperationKindExport, connID, indexName, format+" export")
 	defer h.unregisterOperation(operationID)
 
 	res, err := client.Search(
@@ -762,7 +762,7 @@ func (h ElasticsearchHandler) ImportDocuments(w http.ResponseWriter, r *http.Req
 
 	ctx, cancel := h.timeout(r.Context())
 	defer cancel()
-	operationID := h.registerOperation(cancel, "import", connID, req.Index, "bulk import")
+	operationID := h.registerOperation(cancel, OperationKindImport, connID, req.Index, "bulk import")
 	defer h.unregisterOperation(operationID)
 
 	bulkReq := esapi.BulkRequest{

@@ -241,7 +241,7 @@ func (h DDLHandler) openDB(r *http.Request) (*sql.DB, *connection.Connection, st
 	if err != nil {
 		return nil, nil, "", err
 	}
-	db, err := h.Manager.Open(conn)
+	db, err := h.Manager.Open(r.Context(), conn)
 	if err != nil {
 		return nil, conn, "", err
 	}
