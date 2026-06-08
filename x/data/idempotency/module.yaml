@@ -2,9 +2,9 @@ name: x/data/idempotency
 path: x/data/idempotency
 parent_family: x/data
 layer: extension
-status: experimental
+status: beta
 suggested_gate_profile: single_module_behavior
-stability_tier: experimental
+stability_tier: beta
 owner: persistence
 risk: medium
 summary: Durable idempotency provider implementations behind the stable store/idempotency contract.

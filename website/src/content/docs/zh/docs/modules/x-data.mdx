@@ -14,6 +14,18 @@ sidebar:
 
 `x/data` 是拓扑型数据能力的规范入口点。其下级包 `x/data/cache`（带一致性哈希、复制、故障转移和 Redis 适配器的分布式缓存）首先通过 `x/data` 访问，而不是直接打开。
 
+## 稳定性说明
+
+`x/data` 在家族层面是实验性的。两个下级包自 v1.1.0 起带有更窄的 beta surface 承诺——其导出 API 在 v1.0.0 → v1.1.0 期间未发生变化，并已有 owner 签字记录：
+
+| 子包 | 分级 | 含义 |
+| --- | --- | --- |
+| `file` | **beta surface** | API 在连续两个发布版本中未变化；通过应用本地 adapter 采用 |
+| `idempotency` | **beta surface** | API 在连续两个发布版本中未变化；通过应用本地 adapter 采用 |
+| `cache`、`kvengine`、`migrate`、`pgx`、`rw`、`sharding`、`sqlx` | **experimental** | 可能在没有弃用期的情况下发生变化 |
+
+在稳定生产路径中依赖任何 `x/data` 子包之前，请查看[发布策略](/zh/docs/release-posture)。
+
 ## 什么时候从这里开始
 
 - 你正在实现或修改主从路由的读写分离（`rw/`）

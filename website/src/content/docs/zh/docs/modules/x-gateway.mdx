@@ -12,7 +12,14 @@ sidebar:
 
 当你已经通过 [x/* 家族](/zh/docs/x-family) 确认问题明显属于 edge transport 行为，而不是最小 canonical 服务形态时，就打开这一页：代理上游请求、重写路径、在后端之间做负载均衡，或 wiring gateway 级健康检查。
 
-`x/gateway` 是 Plumego 中 gateway 与 edge transport 工作的规范且唯一的面向应用的入口点。它的两个下级包 — `x/gateway/discovery`（服务实例解析）和 `x/gateway/ipc`（进程间传输）— 首先通过 `x/gateway` 访问，而不是直接打开。
+`x/gateway` 是 Plumego 中 gateway 与 edge transport 工作的规范且唯一的面向应用的入口点。它的所有下级包首先通过 `x/gateway` 访问，而不是直接打开：
+
+- `x/gateway/cache` — gateway edge 层 HTTP 响应缓存
+- `x/gateway/discovery` — 服务实例解析
+- `x/gateway/ipc` — 进程间传输
+- `x/gateway/protocol` — 协议适配器注册表（gRPC、GraphQL 转码）
+- `x/gateway/protocolmw` — 代理管道中协议感知的 middleware
+- `x/gateway/transform` — 请求/响应 header、查询参数与 body 变换链
 
 ## 稳定性与采用
 
@@ -26,6 +33,8 @@ sidebar:
 - 你正在在 gateway edge 层 wiring 缓存层（`cache/`）
 - 你正在实现 gateway 级健康检查（`health.go`）
 - 你正在添加基于服务发现的后端解析或 IPC transport 助手
+- 你正在通过代理管道适配 gRPC 或 GraphQL 上游协议（`protocol/`、`protocolmw/`）
+- 你正在 gateway edge 层组合 header、查询参数或 body 变换（`transform/`）
 
 ## 什么时候不该从这里开始
 
@@ -52,6 +61,9 @@ sidebar:
 | `balancer`：后端池管理与负载均衡策略选择 | tenant 专属路由策略或每租户后端分配 |
 | `cache`：gateway edge 响应缓存适配器 | 非 edge 层的应用级数据缓存 — 使用 `x/data/cache` 代替 |
 | `health`：gateway 级后端健康追踪与断路状态 | 稳定 `health` 模块中细粒度的组件健康类型 |
+| `protocol`：协议适配器注册表、proxy edge 的 gRPC 和 GraphQL 转码 | 业务级协议逻辑 — 保留在应用代码中 |
+| `protocolmw`：将协议适配器组合进代理管道的协议感知 middleware | 与协议适配无关的通用 HTTP middleware — 使用 `middleware/` |
+| `transform`：header 注入/删除、查询参数编辑、JSON body 改写、method/status 覆盖 | gateway edge 之外的应用级响应塑形 |
 | 通过 `x/gateway` 入口点使用 `discovery` / `ipc` | 为属于 gateway 表面的工作直接打开 `x/gateway/discovery` 或 `x/gateway/ipc` |
 
 ## 使用方式
@@ -147,7 +159,7 @@ defer checker.Stop()
 
 ## 为什么单独写这一页
 
-Gateway 与 edge transport 是"路由"（属于 `router`）与"代理"（属于这里）之间混淆最容易导致边界漂移的地方。`x/gateway` 也是两个下级家族的守门人：如果你需要服务发现或 IPC，你先从这里开始，而不是直接打开那些包。这种间接层使面向应用的表面保持稳定，即使 discovery 和 IPC 内部在演进。
+Gateway 与 edge transport 是"路由"（属于 `router`）与"代理"（属于这里）之间混淆最容易导致边界漂移的地方。`x/gateway` 是所有 6 个下级包的守门人：在直接打开 `cache`、`discovery`、`ipc`、`protocol`、`protocolmw` 或 `transform` 之前，始终先从这里开始。这种间接层使面向应用的表面保持稳定，即使下级包内部在演进。
 
 ## 下一步阅读
 

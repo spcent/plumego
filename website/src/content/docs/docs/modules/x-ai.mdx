@@ -47,7 +47,9 @@ Open this page after [x/* Family](/docs/x-family) when the change is clearly ins
 | Subpackage | Tier | What it means |
 | --- | --- | --- |
 | `provider`, `session`, `streaming`, `tool` | **stable** | Covered by semantic versioning |
-| `orchestration`, `semanticcache`, `marketplace`, `distributed`, `resilience` | **experimental** | May change without a deprecation period |
+| `tokenizer`, `llmcache` | **experimental** | Foundation tier — depended on by other x/ai packages |
+| `resilience`, `semanticcache`, `instrumentation` | **experimental** | Composition tier — builds on foundation or x/resilience |
+| `orchestration`, `marketplace`, `distributed`, `sse`, `filter`, `metrics`, `multimodal`, `prompt` | **experimental** | Feature tier — may change without a deprecation period |
 
 For production services, keep experimental `x/ai` subpackages behind
 application-local adapters and review [Release Posture](/docs/release-posture)
