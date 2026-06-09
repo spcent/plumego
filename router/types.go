@@ -14,9 +14,11 @@ type matchResult struct {
 	RouteName    string
 }
 
-// RouteMeta describes route metadata used for reverse URL generation.
+// RouteMeta describes route metadata attached at registration time.
+// All fields have zero values that are safe to omit.
 type RouteMeta struct {
-	Name string `json:"name,omitempty"`
+	Name string   `json:"name,omitempty"`
+	Tags []string `json:"tags,omitempty"`
 }
 
 // RouteInfo describes a registered route with metadata.

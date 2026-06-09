@@ -57,9 +57,13 @@ func FuzzReverseRoutingURLDoesNotPanic(f *testing.F) {
 			}
 		}()
 
-		got := r.URL("files.show", "id", id, "path", rest)
+		got, err := r.URL("files.show", "id", id, "path", rest)
+		if err != nil {
+			// Empty params (and other invalid inputs) are expected errors, not panics.
+			return
+		}
 		if got == "" {
-			t.Fatalf("URL returned empty for provided params")
+			t.Fatalf("URL returned empty for non-empty params id=%q rest=%q", id, rest)
 		}
 		if !strings.HasPrefix(got, "/files/") {
 			t.Fatalf("URL = %q, want /files/ prefix", got)

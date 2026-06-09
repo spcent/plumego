@@ -47,9 +47,18 @@ func (r *Router) registerNamedRoute(name, method, pattern string) {
 }
 
 // URL generates a URL for a named route with the given parameters.
-func (r *Router) URL(name string, params ...string) string {
-	result, _ := r.urlForNamedRoute(name, params...)
-	return result
+// It returns an error when the route is unknown, a required parameter is
+// missing or empty, parameters are unpaired, or the router is not initialised.
+// On error the returned string is always "".
+//
+// Use [URLMust] at startup time when the route names are compile-time constants
+// and a missing route is a programming error.
+func (r *Router) URL(name string, params ...string) (string, error) {
+	result, reason := r.urlForNamedRoute(name, params...)
+	if reason != "" {
+		return "", errors.New(reason)
+	}
+	return result, nil
 }
 
 func (r *Router) urlForNamedRoute(name string, params ...string) (string, string) {

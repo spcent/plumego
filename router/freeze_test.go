@@ -3,6 +3,7 @@ package router
 import (
 	"encoding/json"
 	"net/http"
+	"reflect"
 	"testing"
 
 	"github.com/spcent/plumego/contract"
@@ -24,7 +25,7 @@ func TestFreezeRoutesSnapshotSortedAndIncludesMetadata(t *testing.T) {
 		t.Fatalf("route count = %d, want %d: %#v", len(routes), len(want), routes)
 	}
 	for i := range want {
-		if routes[i] != want[i] {
+		if !reflect.DeepEqual(routes[i], want[i]) {
 			t.Fatalf("route %d = %#v, want %#v", i, routes[i], want[i])
 		}
 	}
@@ -54,8 +55,8 @@ func TestFreezeNestedGroupDispatchContext(t *testing.T) {
 	rec := serveRouter(r, http.MethodGet, "/api/v1/tenants/acme/users/u-1")
 	assertResponseStatus(t, rec, http.StatusOK)
 	assertResponseBody(t, rec, "ok")
-	if got := r.URL("tenant.users.show", "tenant", "acme", "id", "u-1"); got != "/api/v1/tenants/acme/users/u-1" {
-		t.Fatalf("URL() = %q", got)
+	if got, err := r.URL("tenant.users.show", "tenant", "acme", "id", "u-1"); err != nil || got != "/api/v1/tenants/acme/users/u-1" {
+		t.Fatalf("URL() = %q, err = %v", got, err)
 	}
 }
 

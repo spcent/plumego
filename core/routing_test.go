@@ -123,8 +123,8 @@ func TestGroupAddRouteWithNamedRoute(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	}), router.WithRouteName("items.show")))
 
-	if got := app.URL("items.show", "id", "42"); got != "/api/v1/items/42" {
-		t.Fatalf("URL = %q, want %q", got, "/api/v1/items/42")
+	if got, err := app.URL("items.show", "id", "42"); err != nil || got != "/api/v1/items/42" {
+		t.Fatalf("URL = %q, err = %v, want /api/v1/items/42", got, err)
 	}
 }
 
@@ -176,8 +176,8 @@ func TestAny(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	}), router.WithRouteName("any.show")))
 
-	if got := app.URL("any.show", "id", "42"); got != "/any/42" {
-		t.Fatalf("named ANY route URL = %q, want %q", got, "/any/42")
+	if got, err := app.URL("any.show", "id", "42"); err != nil || got != "/any/42" {
+		t.Fatalf("named ANY route URL = %q, err = %v, want /any/42", got, err)
 	}
 
 	methods := []string{"GET", "POST", "PUT", "DELETE", "PATCH"}
@@ -255,7 +255,7 @@ func TestRouterReadPathsDoNotResyncPolicy(t *testing.T) {
 
 	app.config.Router.MethodNotAllowed = false
 	_ = app.Routes()
-	_ = app.URL("missing")
+	_, _ = app.URL("missing")
 
 	if !app.router.MethodNotAllowedEnabled() {
 		t.Fatal("expected read paths to not re-sync router policy")
@@ -316,7 +316,10 @@ func TestNamedRouteRegistration(t *testing.T) {
 				w.WriteHeader(http.StatusNoContent)
 			}), router.WithRouteName(tt.route)))
 
-			url := app.URL(tt.route, "id", "42")
+			url, urlErr := app.URL(tt.route, "id", "42")
+			if urlErr != nil {
+				t.Fatalf("URL() error for route %q: %v", tt.route, urlErr)
+			}
 			reqMethod := tt.method
 			if tt.method == router.MethodAny {
 				reqMethod = http.MethodGet
@@ -331,9 +334,6 @@ func TestNamedRouteRegistration(t *testing.T) {
 			}
 			if rr.Code != http.StatusNoContent {
 				t.Fatalf("expected status 204, got %d", rr.Code)
-			}
-			if url == "" {
-				t.Fatalf("expected URL for route %q", tt.route)
 			}
 		})
 	}
@@ -377,8 +377,8 @@ func TestAddRouteWithRouteNameRegistersURLAndReturnsErrors(t *testing.T) {
 		t.Fatalf("unexpected add named route error: %v", err)
 	}
 
-	if got := app.URL("users.show", "id", "42"); got != "/users/42" {
-		t.Fatalf("named route URL = %q, want %q", got, "/users/42")
+	if got, err := app.URL("users.show", "id", "42"); err != nil || got != "/users/42" {
+		t.Fatalf("named route URL = %q, err = %v, want /users/42", got, err)
 	}
 
 	if err := app.AddRoute(http.MethodGet, "/users/:id", handler, router.WithRouteName("users.show")); err == nil {

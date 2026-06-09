@@ -49,9 +49,7 @@ func assertResponseHeader(t testing.TB, rec *httptest.ResponseRecorder, key, wan
 }
 
 func withCacheCapacity(capacity int) RouterOption {
-	return func(r *Router) {
-		r.state.matchCache = newMatchCache(capacity)
-	}
+	return WithCacheCapacity(capacity)
 }
 
 func newRouterWithMatchCapacity(capacity int, opts ...RouterOption) *Router {

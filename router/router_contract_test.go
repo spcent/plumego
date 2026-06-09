@@ -276,8 +276,8 @@ func TestNilAndZeroValueRouterPublicMethodsDoNotPanic(t *testing.T) {
 			if r.MethodNotAllowedEnabled() {
 				t.Fatalf("expected method-not-allowed to remain disabled")
 			}
-			if got := r.URL("missing"); got != "" {
-				t.Fatalf("expected empty URL, got %q", got)
+			if got, err := r.URL("missing"); err == nil || got != "" {
+				t.Fatalf("expected error and empty URL for unknown route, got %q err %v", got, err)
 			}
 			if r.HasRoute("missing") {
 				t.Fatalf("expected missing route")
@@ -428,8 +428,8 @@ func TestAddRouteCanonicalizesRepeatedLeadingSlashes(t *testing.T) {
 	if routes[0].Path != "/users/:id" {
 		t.Fatalf("stored route path = %q, want %q", routes[0].Path, "/users/:id")
 	}
-	if got := r.URL("users.show", "id", "42"); got != "/users/42" {
-		t.Fatalf("URL() = %q, want %q", got, "/users/42")
+	if got, err := r.URL("users.show", "id", "42"); err != nil || got != "/users/42" {
+		t.Fatalf("URL() = %q, err = %v, want /users/42", got, err)
 	}
 }
 
@@ -459,8 +459,8 @@ func TestGroupCanonicalizesRepeatedLeadingSlashes(t *testing.T) {
 	if routes[0].Path != "/api/users/:id" {
 		t.Fatalf("stored route path = %q, want %q", routes[0].Path, "/api/users/:id")
 	}
-	if got := r.URL("api.users.show", "id", "42"); got != "/api/users/42" {
-		t.Fatalf("URL() = %q, want %q", got, "/api/users/42")
+	if got, err := r.URL("api.users.show", "id", "42"); err != nil || got != "/api/users/42" {
+		t.Fatalf("URL() = %q, err = %v, want /api/users/42", got, err)
 	}
 }
 

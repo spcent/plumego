@@ -1,6 +1,7 @@
 package core
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -38,10 +39,12 @@ func (a *App) AddRoute(method, path string, handler http.Handler, opts ...router
 }
 
 // URL resolves a named route against the owned app router.
-func (a *App) URL(name string, params ...string) string {
+// It returns an error when the route is unknown, a required parameter is
+// missing or empty, or the app has no router configured.
+func (a *App) URL(name string, params ...string) (string, error) {
 	r := a.ensureRouter()
 	if r == nil {
-		return ""
+		return "", errors.New("router not configured")
 	}
 	return r.URL(name, params...)
 }

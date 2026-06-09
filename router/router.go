@@ -94,10 +94,42 @@ type RouteOption func(*RouteMeta)
 // Example:
 //
 //	r.AddRoute(http.MethodGet, "/users/:id", handler, router.WithRouteName("user.show"))
-//	url := r.URL("user.show", "id", "123") // → "/users/123"
+//	url, err := r.URL("user.show", "id", "123") // → "/users/123"
 func WithRouteName(name string) RouteOption {
 	return func(meta *RouteMeta) {
 		meta.Name = name
+	}
+}
+
+// WithTags attaches classification labels to a route. Tags appear in RouteInfo
+// snapshots returned by Routes() and can be used by x/* extensions to filter or
+// annotate routes (e.g. openapi operation grouping, gateway policy selection).
+//
+// Example:
+//
+//	r.AddRoute(http.MethodGet, "/admin/users", handler,
+//	    router.WithRouteName("admin.users.list"),
+//	    router.WithTags("admin", "users"),
+//	)
+func WithTags(tags ...string) RouteOption {
+	return func(meta *RouteMeta) {
+		meta.Tags = append(meta.Tags, tags...)
+	}
+}
+
+// WithCacheCapacity sets the maximum number of distinct method:path pairs to
+// cache per router. The cache is a FIFO ring buffer; once full the oldest entry
+// is evicted on each new miss.
+//
+// The default of 100 works well for services whose hot paths are mostly static
+// URLs (/healthz, /readyz, /api/info). For fully parameterised APIs (every
+// request has a unique URL) the cache provides little benefit regardless of
+// size, so leave the default.
+func WithCacheCapacity(n int) RouterOption {
+	return func(r *Router) {
+		if n > 0 {
+			r.state.matchCache = newMatchCache(n)
+		}
 	}
 }
 

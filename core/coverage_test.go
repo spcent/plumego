@@ -97,21 +97,27 @@ func TestRoutesWithNilRouterReturnsNil(t *testing.T) {
 
 // ---- URL (75%) --------------------------------------------------------------
 
-func TestURLWithNilRouterReturnsEmpty(t *testing.T) {
+func TestURLWithNilRouterReturnsError(t *testing.T) {
 	// Zero-value App has no router.
 	var app App
-	got := app.URL("any-route")
+	got, err := app.URL("any-route")
+	if err == nil {
+		t.Fatalf("expected error for nil router, got nil")
+	}
 	if got != "" {
-		t.Fatalf("expected empty string, got %q", got)
+		t.Fatalf("expected empty string on error, got %q", got)
 	}
 }
 
-func TestURLForUnknownNameReturnsEmpty(t *testing.T) {
+func TestURLForUnknownNameReturnsError(t *testing.T) {
 	app := newTestApp()
 	mustRegisterRoute(t, app.Get("/other", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})))
-	got := app.URL("does-not-exist")
+	got, err := app.URL("does-not-exist")
+	if err == nil {
+		t.Fatalf("expected error for unknown route, got nil")
+	}
 	if got != "" {
-		t.Fatalf("expected empty string for unknown route, got %q", got)
+		t.Fatalf("expected empty string on error, got %q", got)
 	}
 }
 
