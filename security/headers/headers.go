@@ -142,6 +142,10 @@ type Policy struct {
 
 	// Additional allows custom security headers
 	Additional map[string]string
+
+	// compiledHSTS holds the precomputed Strict-Transport-Security header value.
+	// Populated by Compile; zero means "compute on demand".
+	compiledHSTS string
 }
 
 // DefaultPolicy returns a baseline header policy with safe defaults.
@@ -165,6 +169,19 @@ func DefaultPolicy() Policy {
 		ContentTypeOptions: "nosniff",
 		ReferrerPolicy:     "strict-origin-when-cross-origin",
 	}
+}
+
+// Compile precomputes invariant header values (currently HSTS) and returns an
+// optimised copy of the policy. The original is not modified.
+//
+// Call Compile once after the policy is fully configured, typically inside the
+// transport middleware constructor. Uncompiled policies still produce correct
+// output; Compile only avoids redundant string allocation per request.
+func (p Policy) Compile() Policy {
+	if p.StrictTransportSecurity != nil && p.StrictTransportSecurity.MaxAge > 0 {
+		p.compiledHSTS = formatHSTS(*p.StrictTransportSecurity)
+	}
+	return p
 }
 
 // StrictPolicy returns a hardened policy suitable for locked-down deployments.
@@ -249,7 +266,11 @@ func (p Policy) apply(w http.ResponseWriter, r *http.Request) {
 	setEnumHeader(headers, "Cross-Origin-Embedder-Policy", p.CrossOriginEmbedderPolicy, allowedCrossOriginEmbedderPolicies)
 
 	if p.StrictTransportSecurity != nil && p.StrictTransportSecurity.MaxAge > 0 && isHTTPSRequest(r) {
-		setHeader(headers, "Strict-Transport-Security", formatHSTS(*p.StrictTransportSecurity))
+		hsts := p.compiledHSTS
+		if hsts == "" {
+			hsts = formatHSTS(*p.StrictTransportSecurity)
+		}
+		setHeader(headers, "Strict-Transport-Security", hsts)
 	}
 
 	for name, value := range p.Additional {
