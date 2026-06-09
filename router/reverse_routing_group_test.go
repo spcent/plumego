@@ -23,7 +23,10 @@ func TestURLFromNestedGroupNamedRoute(t *testing.T) {
 		t.Fatalf("add named route failed: %v", err)
 	}
 
-	got := r.URL("files.show", "tenant", "acme corp", "path", "reports/2026 q1.pdf")
+	got, err := r.URL("files.show", "tenant", "acme corp", "path", "reports/2026 q1.pdf")
+	if err != nil {
+		t.Fatalf("URL() error: %v", err)
+	}
 	want := "/api/v1/files/acme%20corp/reports/2026%20q1.pdf"
 	if got != want {
 		t.Fatalf("URL() = %q, want %q", got, want)
@@ -53,16 +56,20 @@ func TestURLMissingParamsInNestedGroupRoute(t *testing.T) {
 		t.Fatalf("add named route failed: %v", err)
 	}
 
-	got := r.URL("users.file", "id", "u-1")
-	want := ""
-	if got != want {
-		t.Fatalf("URL() with missing wildcard = %q, want %q", got, want)
+	got, err := r.URL("users.file", "id", "u-1")
+	if err == nil {
+		t.Fatalf("URL() with missing wildcard should return error, got %q", got)
+	}
+	if got != "" {
+		t.Fatalf("URL() with missing wildcard = %q, want empty", got)
 	}
 
-	got = r.URL("users.file", "path", "a/b")
-	want = ""
-	if got != want {
-		t.Fatalf("URL() with missing param = %q, want %q", got, want)
+	got, err = r.URL("users.file", "path", "a/b")
+	if err == nil {
+		t.Fatalf("URL() with missing param should return error, got %q", got)
+	}
+	if got != "" {
+		t.Fatalf("URL() with missing param = %q, want empty", got)
 	}
 }
 
@@ -86,8 +93,12 @@ func TestURLEmptyParamsReturnEmpty(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := r.URL("users.file", tt.params...); got != "" {
-				t.Fatalf("URL() = %q, want empty string", got)
+			got, err := r.URL("users.file", tt.params...)
+			if err == nil {
+				t.Fatalf("URL() = %q, want error for empty param", got)
+			}
+			if got != "" {
+				t.Fatalf("URL() = %q, want empty string on error", got)
 			}
 		})
 	}
@@ -103,14 +114,14 @@ func TestURLMalformedParamPairsReturnEmpty(t *testing.T) {
 		t.Fatalf("add named route failed: %v", err)
 	}
 
-	if got := r.URL("users.show", "id", "42", "extra"); got != "" {
-		t.Fatalf("URL() with unpaired param = %q, want empty string", got)
+	if got, err := r.URL("users.show", "id", "42", "extra"); err == nil || got != "" {
+		t.Fatalf("URL() with unpaired param = %q, err = %v, want empty string and error", got, err)
 	}
-	if got := r.URL("users.show", "id", "42", "tenant", "acme"); got != "" {
-		t.Fatalf("URL() with unknown param = %q, want empty string", got)
+	if got, err := r.URL("users.show", "id", "42", "tenant", "acme"); err == nil || got != "" {
+		t.Fatalf("URL() with unknown param = %q, err = %v, want empty string and error", got, err)
 	}
-	if got := r.URL("users.show", "id", "42", "id", "43"); got != "" {
-		t.Fatalf("URL() with duplicate param = %q, want empty string", got)
+	if got, err := r.URL("users.show", "id", "42", "id", "43"); err == nil || got != "" {
+		t.Fatalf("URL() with duplicate param = %q, err = %v, want empty string and error", got, err)
 	}
 }
 
@@ -133,7 +144,10 @@ func TestNamedRouteCollisionAcrossGroupsReturnsError(t *testing.T) {
 		t.Fatal("expected duplicate named route registration to fail")
 	}
 
-	got := r.URL("users.show", "id", "42")
+	got, err := r.URL("users.show", "id", "42")
+	if err != nil {
+		t.Fatalf("URL() error: %v", err)
+	}
 	want := "/api/v1/users/42"
 	if got != want {
 		t.Fatalf("URL() after failed same-name registration = %q, want %q", got, want)
@@ -240,7 +254,11 @@ func TestGroupRootNamedRouteUsesNormalizedPrefix(t *testing.T) {
 		t.Fatalf("add group root route failed: %v", err)
 	}
 
-	if got := r.URL("api.v1.root"); got != "/api/v1" {
+	got, err := r.URL("api.v1.root")
+	if err != nil {
+		t.Fatalf("URL() error: %v", err)
+	}
+	if got != "/api/v1" {
 		t.Fatalf("URL() = %q, want %q", got, "/api/v1")
 	}
 
@@ -269,7 +287,10 @@ func TestNamedRoutesOnGroups(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	showURL := r.URL("users.show", "id", "42")
+	showURL, err := r.URL("users.show", "id", "42")
+	if err != nil {
+		t.Fatalf("URL() show error: %v", err)
+	}
 	if showURL != "/api/v1/users/42" {
 		t.Fatalf("show URL = %q, want %q", showURL, "/api/v1/users/42")
 	}
@@ -283,7 +304,10 @@ func TestNamedRoutesOnGroups(t *testing.T) {
 		t.Fatalf("expected body 42, got %q", rec.Body.String())
 	}
 
-	createURL := r.URL("users.create")
+	createURL, err := r.URL("users.create")
+	if err != nil {
+		t.Fatalf("URL() create error: %v", err)
+	}
 	if createURL != "/api/v1/users" {
 		t.Fatalf("create URL = %q, want %q", createURL, "/api/v1/users")
 	}

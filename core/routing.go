@@ -1,6 +1,7 @@
 package core
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -38,10 +39,12 @@ func (a *App) AddRoute(method, path string, handler http.Handler, opts ...router
 }
 
 // URL resolves a named route against the owned app router.
-func (a *App) URL(name string, params ...string) string {
+// It returns an error when the route is unknown, a required parameter is
+// missing or empty, or the app has no router configured.
+func (a *App) URL(name string, params ...string) (string, error) {
 	r := a.ensureRouter()
 	if r == nil {
-		return ""
+		return "", errors.New("router not configured")
 	}
 	return r.URL(name, params...)
 }
@@ -80,6 +83,12 @@ func (a *App) Any(path string, handler http.Handler, opts ...router.RouteOption)
 // All routes registered on the group share the prefix without repeating it.
 // Group itself does not register any routes; call Get/Post/Delete/etc. on the
 // returned group to register individual routes.
+//
+// Group panics when prefix does not begin with "/". This mirrors the behaviour of
+// [regexp.MustCompile]: Group is intended for startup wiring where the prefix is a
+// compile-time constant; a bad value is always a bug, not a runtime condition.
+// All dynamic errors (duplicate routes, frozen app) are still returned as errors
+// from the route registration methods on the returned group.
 //
 // Example:
 //

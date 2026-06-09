@@ -124,7 +124,7 @@ func (m *JWTManager) rotateKeyUnsafe(ctx context.Context) (JWTSigningKey, error)
 	return cloneSigningKey(key), nil
 }
 
-// persistKeyUnsafe is the unsafe version of persistKeyUnsafe, assuming the caller holds the lock.
+// persistKeyUnsafe is the unsafe version of persistKey, assuming the caller holds the lock.
 func (m *JWTManager) persistKeyUnsafe(ctx context.Context, key JWTSigningKey) error {
 	if err := contextErr(ctx); err != nil {
 		return err
@@ -140,7 +140,7 @@ func (m *JWTManager) persistKeyUnsafe(ctx context.Context, key JWTSigningKey) er
 	return nil
 }
 
-// generateKeyUnsafe is the unsafe version of generateKeyUnsafe, assuming the caller holds the lock.
+// generateKeyUnsafe is the unsafe version of generateKey, assuming the caller holds the lock.
 func (m *JWTManager) generateKeyUnsafe(alg Algorithm) (JWTSigningKey, error) {
 	kid, err := randomID()
 	if err != nil {

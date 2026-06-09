@@ -1,6 +1,17 @@
 package router
 
-// This file contains low-level path helpers used by trie matching.
+// This file contains low-level path helpers used at two distinct call sites:
+//
+//   - fastNormalizePath — hot dispatch path (ServeHTTP); zero-allocation, no
+//     internal-double-slash detection, used only to key the match cache and
+//     split the trie traversal input.
+//   - canonicalRoutePath / joinRoutePath — cold registration path (AddRoute,
+//     Group); allocating is fine; responsible for deduplicating leading slashes
+//     and joining prefix + relative path into the authoritative stored pattern.
+//
+// Do not merge them: the registration helpers tolerate sloppy input (e.g.
+// "///api/") while the dispatch helper trusts the Go http.Server to deliver a
+// cleaned URL.
 
 // fastNormalizePath normalizes the request path for cache keying and trie
 // traversal. It preserves exactly one leading slash, strips trailing slashes,

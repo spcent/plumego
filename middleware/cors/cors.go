@@ -20,6 +20,13 @@ var ErrStrictDefaultOriginsRequired = errors.New("cors: strict defaults require 
 var ErrStrictDefaultWildcardOrigin = errors.New("cors: strict defaults do not allow wildcard origins")
 
 // CORSOptions configures Cross-Origin Resource Sharing (CORS) behavior.
+//
+// Security notice: when AllowedOrigins is nil or empty, [Middleware] defaults to
+// the wildcard origin ["*"], which allows cross-origin requests from any domain.
+// This is appropriate for fully public APIs but is an open CORS policy and should
+// not be used when AllowCredentials is true or when the API is not public.
+// For production deployments use [StrictDefaultOptions] instead, which requires
+// at least one explicit origin and rejects wildcards.
 type CORSOptions struct {
 	AllowedOrigins   []string
 	AllowedMethods   []string

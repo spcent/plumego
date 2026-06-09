@@ -35,7 +35,7 @@ func TestNilAppEntrypointsPanic(t *testing.T) {
 	}{
 		{name: "Logger", call: func() { _ = app.Logger() }},
 		{name: "Routes", call: func() { _ = app.Routes() }},
-		{name: "URL", call: func() { _ = app.URL("missing") }},
+		{name: "URL", call: func() { _, _ = app.URL("missing") }},
 		{name: "PreparationState", call: func() { _ = app.PreparationState() }},
 		{name: "Use", call: func() { _ = app.Use(func(next http.Handler) http.Handler { return next }) }},
 		{name: "Get", call: func() { _ = app.Get("/nil", handler) }},

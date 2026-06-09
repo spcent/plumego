@@ -313,8 +313,8 @@ func TestPublicRouterPolicyAndNamedRouteURL(t *testing.T) {
 	}), router.WithRouteName("users.show")); err != nil {
 		t.Fatalf("AddRoute returned error: %v", err)
 	}
-	if got := app.URL("users.show", "id", "42"); got != "/users/42" {
-		t.Fatalf("URL returned %q, want /users/42", got)
+	if got, err := app.URL("users.show", "id", "42"); err != nil || got != "/users/42" {
+		t.Fatalf("URL returned %q, err = %v, want /users/42", got, err)
 	}
 
 	rec := httptest.NewRecorder()

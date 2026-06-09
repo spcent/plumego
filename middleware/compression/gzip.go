@@ -303,12 +303,6 @@ func (w *gzipResponseWriter) Write(p []byte) (int, error) {
 			if end > len(body) {
 				end = len(body)
 			}
-
-			// SECURITY NOTE: This Write method only compresses/buffers response data.
-			// The 'w.bodyBuffer' contains response data from upstream handlers,
-			// not user input. This middleware does not modify response content
-			// and therefore does not introduce XSS vulnerabilities.
-			// XSS protection should be implemented in handlers that generate HTML content.
 			n, err := internaltransport.SafeWrite(w.ResponseWriter, body[totalWritten:end])
 			if err != nil {
 				w.buffer.ClearBody()

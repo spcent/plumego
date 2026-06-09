@@ -9,6 +9,12 @@ import (
 
 // Group creates a new router group with the given prefix.
 // Groups allow sharing a common path prefix across multiple routes.
+//
+// Group panics when prefix is a programmer error (does not begin with "/").
+// This mirrors the behaviour of [regexp.MustCompile]: Group is intended for
+// startup wiring where the prefix is a compile-time constant; a bad value is
+// always a bug, not a runtime condition. All dynamic errors — duplicate routes,
+// frozen router — are still returned as errors from [AddRoute].
 func (r *Router) Group(prefix string) *Router {
 	mustValidateGroupPrefix(prefix)
 	if !r.ready() {
