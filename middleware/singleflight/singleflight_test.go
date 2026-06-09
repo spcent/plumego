@@ -202,7 +202,7 @@ func TestCoalesce_CoalescedHeader(t *testing.T) {
 		w.Write([]byte("response"))
 	})
 
-	middleware := testMiddleware(Config{})
+	middleware := testMiddleware(Config{AddCoalescedHeader: true})
 	handler := middleware(backend)
 
 	var wg sync.WaitGroup
@@ -239,7 +239,7 @@ func TestCoalesce_CoalescedHeader(t *testing.T) {
 }
 
 func TestCoalesce_CoalescedHEADDoesNotReplayBody(t *testing.T) {
-	coalescer := New(Config{Timeout: time.Second})
+	coalescer := New(Config{Timeout: time.Second, AddCoalescedHeader: true})
 	started := make(chan struct{})
 	release := make(chan struct{})
 	var startedOnce sync.Once
@@ -1368,7 +1368,7 @@ func TestWriteResponse_ReplacesStaleHeadersAndPreservesMultiValue(t *testing.T) 
 	rec := httptest.NewRecorder()
 	rec.Header().Set("X-Test", "stale")
 
-	writeResponse(rec, httptest.NewRequest(http.MethodGet, "/replay", nil), resp)
+	writeResponse(rec, httptest.NewRequest(http.MethodGet, "/replay", nil), resp, true)
 
 	if rec.Code != http.StatusAccepted {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusAccepted)
@@ -1395,7 +1395,7 @@ func TestWriteResponse_DoesNotWriteBodyForHEAD(t *testing.T) {
 	}
 	rec := httptest.NewRecorder()
 
-	writeResponse(rec, httptest.NewRequest(http.MethodHead, "/replay", nil), resp)
+	writeResponse(rec, httptest.NewRequest(http.MethodHead, "/replay", nil), resp, false)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
@@ -1420,7 +1420,7 @@ func TestCoalesce_WaiterReplayUsesCommittedHeaders(t *testing.T) {
 		_, _ = w.Write([]byte("response"))
 	})
 
-	coalescer := New(Config{Timeout: time.Second})
+	coalescer := New(Config{Timeout: time.Second, AddCoalescedHeader: true})
 	handler := coalescer.Middleware()(backend)
 	leaderDone := make(chan *httptest.ResponseRecorder, 1)
 	waiterDone := make(chan *httptest.ResponseRecorder, 1)

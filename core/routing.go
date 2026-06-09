@@ -84,6 +84,12 @@ func (a *App) Any(path string, handler http.Handler, opts ...router.RouteOption)
 // Group itself does not register any routes; call Get/Post/Delete/etc. on the
 // returned group to register individual routes.
 //
+// Group panics when prefix does not begin with "/". This mirrors the behaviour of
+// [regexp.MustCompile]: Group is intended for startup wiring where the prefix is a
+// compile-time constant; a bad value is always a bug, not a runtime condition.
+// All dynamic errors (duplicate routes, frozen app) are still returned as errors
+// from the route registration methods on the returned group.
+//
 // Example:
 //
 //	v1 := app.Group("/api/v1")

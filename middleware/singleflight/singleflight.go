@@ -35,11 +35,11 @@ package singleflight
 import (
 	"bufio"
 	"errors"
-	"fmt"
 	"hash"
 	"hash/fnv"
 	"net"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -95,6 +95,14 @@ type Config struct {
 
 	// OnError is called when an error occurs during coalescing (optional)
 	OnError func(key string, err error)
+
+	// AddCoalescedHeader, when true, sets the X-Coalesced: true response header
+	// on replies that were served from a coalesced in-flight response.
+	// The header is opt-in: it is never set by default because it leaks
+	// infrastructure topology to end-clients and can interfere with CDN caches.
+	// Enable it only for internal service-to-service paths where the information
+	// is useful for debugging or observability.
+	AddCoalescedHeader bool
 }
 
 // WithDefaults returns a Config with default values applied
@@ -212,7 +220,7 @@ func (c *Coalescer) waitForInFlight(w http.ResponseWriter, r *http.Request, key 
 			return
 		}
 
-		writeResponse(w, r, inflight.response)
+		writeResponse(w, r, inflight.response, c.config.AddCoalescedHeader)
 
 		// Call hook
 		c.reportCoalesced(key, 1)
@@ -308,17 +316,14 @@ func (c *Coalescer) isSafeMethod(method string) bool {
 	return false
 }
 
-// writeResponse writes a captured response to the client
-func writeResponse(w http.ResponseWriter, r *http.Request, resp *capturedResponse) {
+// writeResponse writes a captured response to the client.
+// addCoalescedHeader controls whether the X-Coalesced response header is set.
+func writeResponse(w http.ResponseWriter, r *http.Request, resp *capturedResponse, addCoalescedHeader bool) {
 	internaltransport.ReplaceHeaders(w.Header(), resp.header)
-
-	// Add coalesced indicator
-	w.Header().Set("X-Coalesced", "true")
-
-	// Write status code
+	if addCoalescedHeader {
+		w.Header().Set("X-Coalesced", "true")
+	}
 	w.WriteHeader(resp.statusCode)
-
-	// Write body
 	if r.Method != http.MethodHead && resp.body != nil {
 		_, _ = w.Write(resp.body)
 	}
@@ -440,7 +445,7 @@ func DefaultKeyFunc(r *http.Request) string {
 	for _, header := range defaultKeyHeaders {
 		writeHeaderKey(h, r, header)
 	}
-	return fmt.Sprintf("%x", h.Sum64())
+	return strconv.FormatUint(h.Sum64(), 16)
 }
 
 // HeaderAwareKeyFunc generates a key including specific headers
@@ -448,15 +453,10 @@ func HeaderAwareKeyFunc(headers []string) KeyFunc {
 	return func(r *http.Request) string {
 		h := fnv.New64a()
 
-		// Method
 		h.Write([]byte(r.Method))
 		h.Write([]byte("|"))
-
-		// Host
 		h.Write([]byte(r.Host))
 		h.Write([]byte("|"))
-
-		// URL
 		h.Write([]byte(r.URL.String()))
 		h.Write([]byte("|"))
 
@@ -464,7 +464,7 @@ func HeaderAwareKeyFunc(headers []string) KeyFunc {
 			writeHeaderKey(h, r, header)
 		}
 
-		return fmt.Sprintf("%x", h.Sum64())
+		return strconv.FormatUint(h.Sum64(), 16)
 	}
 }
 
