@@ -61,18 +61,18 @@ see [`docs/start/getting-started.md`](./docs/start/getting-started.md).
 
 ## Choose Your Starting Point
 
-| I want to build... | Start here |
-| --- | --- |
-| A plain JSON API | `reference/standard-service` → stable roots only |
-| REST resources with CRUD conventions | `reference/with-rest` → `x/rest` |
-| A multi-tenant SaaS API | `reference/with-tenant` → `x/tenant` |
-| An API gateway or reverse proxy | `reference/with-gateway` → `x/gateway` |
-| Real-time WebSocket features | `reference/with-websocket` → `x/websocket` |
-| An AI-backed service | `reference/with-ai` → `x/ai/provider` |
-| A service with rich messaging/webhooks | `reference/with-messaging` → `x/messaging` |
-| A gRPC + HTTP service | `reference/with-rpc` → `x/rpc` |
-| Observability (Prometheus / OpenTelemetry) | `reference/with-observability` → `x/observability` |
-| A tenant administration console | `reference/with-tenant-admin` → `x/tenant` |
+| I want to build... | Start here | Tier |
+| --- | --- | --- |
+| A plain JSON API | `reference/standard-service` → stable roots only | **GA** |
+| REST resources with CRUD conventions | `reference/with-rest` → `x/rest` | beta |
+| A multi-tenant SaaS API | `reference/with-tenant` → `x/tenant` | experimental |
+| An API gateway or reverse proxy | `reference/with-gateway` → `x/gateway` | beta |
+| Real-time WebSocket features | `reference/with-websocket` → `x/websocket` | beta |
+| An AI-backed service | `reference/with-ai` → `x/ai/provider` | experimental |
+| A service with rich messaging/webhooks | `reference/with-messaging` → `x/messaging` | experimental |
+| A gRPC + HTTP service | `reference/with-rpc` → `x/rpc` | experimental |
+| Observability (Prometheus / OpenTelemetry) | `reference/with-observability` → `x/observability` | beta |
+| A tenant administration console | `reference/with-tenant-admin` → `x/tenant` | experimental |
 
 All paths keep `reference/standard-service` as the base layout; extensions are
 explicit additions, not alternate bootstraps.
@@ -120,6 +120,22 @@ taking on a large framework model.
 
 Optional capability families live under `x/*` — additions to the stable root
 path, not alternate layouts.
+
+## Current Status
+
+The nine packages listed above are **stable roots** carrying a full `v1`
+compatibility guarantee: signatures, package names, and behaviour are frozen for
+the `v1.x` release series.
+
+Four `x/*` extension families are **beta** — stable across cited release refs
+and suitable for production adoption with minor caveats: `x/gateway`,
+`x/observability`, `x/rest`, and `x/websocket`.
+
+All remaining `x/*` extensions are **experimental**: APIs may change in any
+minor version without notice. Do not use them in production services without
+explicit project-level stabilization.
+
+See [`docs/reference/extension-stability-policy.md`](./docs/reference/extension-stability-policy.md) for the full compatibility policy, SemVer expectations, and promotion criteria.
 
 ## Agent-First Design
 
