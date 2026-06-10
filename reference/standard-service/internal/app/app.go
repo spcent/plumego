@@ -72,7 +72,7 @@ func New(cfg config.Config) (*App, error) {
 	//   httpmetrics→ measures handler latency and status; swap NewNoopCollector for
 	//               observability.NewPrometheusCollector (from x/observability) in production,
 	//               then register GET /metrics with observability.NewPrometheusExporter.
-	//               See reference/with-observability for a complete wiring example.
+	//               See reference/with-ops for a complete wiring example.
 	//   timeout    → per-request wall-clock limit; innermost so only handler time is counted
 	if err := app.Use(
 		requestid.Middleware(),

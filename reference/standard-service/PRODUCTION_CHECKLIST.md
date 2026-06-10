@@ -38,11 +38,12 @@ Each item is a conscious decision, not a default assumption.
   `middleware/securityheaders` is wired in `internal/app/app.go` and sets
   `X-Frame-Options`, `X-Content-Type-Options`, and `Referrer-Policy`.
   Review the defaults against your Content Security Policy and HSTS requirements;
-  extend `midsecurity.Config{}` if stricter headers are needed.
+  extend `securityheaders.Config{}` if stricter headers are needed.
 
 - [ ] **Rate limiting** is configured for public endpoints.
-  Add `security/abuse` or `x/resilience/ratelimit` middleware to protect
-  high-traffic or unauthenticated routes.
+  Add `middleware/abuseguard` to protect high-traffic or unauthenticated routes
+  (stable-root, token-bucket defaults). For advanced patterns, use `x/resilience/ratelimit`
+  (extension; distributed rate limiting across services).
 
 - [ ] **Authentication** is enforced on all non-public endpoints.
   There is no default authentication. Every protected route must have an explicit
