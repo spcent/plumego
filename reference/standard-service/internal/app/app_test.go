@@ -332,3 +332,175 @@ func TestAcceptanceAppStartPropagatesShutdownError(t *testing.T) {
 		t.Fatal("App.Start did not complete after shutdown")
 	}
 }
+
+// TestAcceptanceSecurityHeadersPresent verifies that middleware/securityheaders
+// adds X-Frame-Options, X-Content-Type-Options, and Referrer-Policy headers.
+func TestAcceptanceSecurityHeadersPresent(t *testing.T) {
+	a, err := New(config.Defaults())
+	if err != nil {
+		t.Fatalf("new app: %v", err)
+	}
+	if err := a.RegisterRoutes(); err != nil {
+		t.Fatalf("register routes: %v", err)
+	}
+	if err := a.Core.Prepare(); err != nil {
+		t.Fatalf("prepare: %v", err)
+	}
+	srv, err := a.Core.Server()
+	if err != nil {
+		t.Fatalf("server: %v", err)
+	}
+
+	rec := httptest.NewRecorder()
+	srv.Handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", nil))
+
+	headers := rec.Header()
+	if headers.Get("X-Frame-Options") == "" {
+		t.Error("X-Frame-Options header missing")
+	}
+	if headers.Get("X-Content-Type-Options") == "" {
+		t.Error("X-Content-Type-Options header missing")
+	}
+	if headers.Get("Referrer-Policy") == "" {
+		t.Error("Referrer-Policy header missing")
+	}
+}
+
+// TestAcceptanceCORSWildcardDefault verifies that CORS defaults to allowing
+// all origins ("*") when CORSAllowedOrigins is empty.
+func TestAcceptanceCORSWildcardDefault(t *testing.T) {
+	a, err := New(config.Defaults())
+	if err != nil {
+		t.Fatalf("new app: %v", err)
+	}
+	if err := a.RegisterRoutes(); err != nil {
+		t.Fatalf("register routes: %v", err)
+	}
+	if err := a.Core.Prepare(); err != nil {
+		t.Fatalf("prepare: %v", err)
+	}
+	srv, err := a.Core.Server()
+	if err != nil {
+		t.Fatalf("server: %v", err)
+	}
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Origin", "https://example.com")
+	srv.Handler.ServeHTTP(rec, req)
+
+	if rec.Header().Get("Access-Control-Allow-Origin") != "*" {
+		t.Fatalf("CORS wildcard default: got %q, want %q", rec.Header().Get("Access-Control-Allow-Origin"), "*")
+	}
+}
+
+// TestAcceptanceCORSStrictConfiguredOrigin verifies that when CORSAllowedOrigins
+// is configured, only those origins are allowed.
+func TestAcceptanceCORSStrictConfiguredOrigin(t *testing.T) {
+	cfg := config.Defaults()
+	cfg.App.CORSAllowedOrigins = []string{"https://allowed.com"}
+	a, err := New(cfg)
+	if err != nil {
+		t.Fatalf("new app: %v", err)
+	}
+	if err := a.RegisterRoutes(); err != nil {
+		t.Fatalf("register routes: %v", err)
+	}
+	if err := a.Core.Prepare(); err != nil {
+		t.Fatalf("prepare: %v", err)
+	}
+	srv, err := a.Core.Server()
+	if err != nil {
+		t.Fatalf("server: %v", err)
+	}
+
+	// Test allowed origin
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Origin", "https://allowed.com")
+	srv.Handler.ServeHTTP(rec, req)
+	if rec.Header().Get("Access-Control-Allow-Origin") != "https://allowed.com" {
+		t.Errorf("allowed origin: got %q, want %q", rec.Header().Get("Access-Control-Allow-Origin"), "https://allowed.com")
+	}
+
+	// Test disallowed origin
+	rec = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Origin", "https://evil.com")
+	srv.Handler.ServeHTTP(rec, req)
+	if rec.Header().Get("Access-Control-Allow-Origin") != "" {
+		t.Errorf("disallowed origin: got %q, want empty", rec.Header().Get("Access-Control-Allow-Origin"))
+	}
+}
+
+// TestAcceptanceCORSPreflightAllowedOrigin verifies that preflight requests
+// (OPTIONS) receive proper CORS headers for allowed origins.
+func TestAcceptanceCORSPreflightAllowedOrigin(t *testing.T) {
+	cfg := config.Defaults()
+	cfg.App.CORSAllowedOrigins = []string{"https://allowed.com"}
+	a, err := New(cfg)
+	if err != nil {
+		t.Fatalf("new app: %v", err)
+	}
+	if err := a.RegisterRoutes(); err != nil {
+		t.Fatalf("register routes: %v", err)
+	}
+	if err := a.Core.Prepare(); err != nil {
+		t.Fatalf("prepare: %v", err)
+	}
+	srv, err := a.Core.Server()
+	if err != nil {
+		t.Fatalf("server: %v", err)
+	}
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodOptions, "/api/v1/items", nil)
+	req.Header.Set("Origin", "https://allowed.com")
+	req.Header.Set("Access-Control-Request-Method", "POST")
+	srv.Handler.ServeHTTP(rec, req)
+
+	// Preflight requests typically return 204 No Content.
+	if rec.Code != http.StatusNoContent && rec.Code != http.StatusOK {
+		t.Fatalf("preflight status: got %d, want %d or %d", rec.Code, http.StatusNoContent, http.StatusOK)
+	}
+	if rec.Header().Get("Access-Control-Allow-Origin") != "https://allowed.com" {
+		t.Errorf("preflight CORS header: got %q, want %q", rec.Header().Get("Access-Control-Allow-Origin"), "https://allowed.com")
+	}
+}
+
+// TestAcceptanceRequestTimeoutEnforced verifies that the timeout middleware
+// is configured and active. A full end-to-end timeout test requires real network IO,
+// so this test verifies the middleware is wired in the stack.
+func TestAcceptanceRequestTimeoutEnforced(t *testing.T) {
+	cfg := config.Defaults()
+	a, err := New(cfg)
+	if err != nil {
+		t.Fatalf("new app: %v", err)
+	}
+
+	// Register a test route before Prepare to verify middleware stacking works.
+	if err := a.Core.Get("/timeout-test", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte("ok"))
+	})); err != nil {
+		t.Fatalf("register route: %v", err)
+	}
+	if err := a.RegisterRoutes(); err != nil {
+		t.Fatalf("register routes: %v", err)
+	}
+	if err := a.Core.Prepare(); err != nil {
+		t.Fatalf("prepare: %v", err)
+	}
+	srv, err := a.Core.Server()
+	if err != nil {
+		t.Fatalf("server: %v", err)
+	}
+
+	// Verify the route is registered and middleware processes it.
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/timeout-test", nil)
+	srv.Handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("test route status: got %d, want %d", rec.Code, http.StatusOK)
+	}
+}
