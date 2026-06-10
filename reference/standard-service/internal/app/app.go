@@ -90,6 +90,14 @@ func New(cfg config.Config) (*App, error) {
 		return nil, fmt.Errorf("register middleware: %w", err)
 	}
 
+	// Warn about insecure defaults to make the risk observable.
+	if cfg.App.WriteKey == "" {
+		app.Logger().Warn("write guard disabled: POST/PUT/PATCH/DELETE /api/v1/items are publicly writable; set APP_WRITE_KEY in production", plumelog.Fields{})
+	}
+	if len(cfg.App.CORSAllowedOrigins) == 0 {
+		app.Logger().Warn("CORS allows all origins (*); set APP_CORS_ALLOWED_ORIGINS in production", plumelog.Fields{})
+	}
+
 	return &App{
 		Core: app,
 		Cfg:  cfg,

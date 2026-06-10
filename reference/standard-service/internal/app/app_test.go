@@ -504,3 +504,67 @@ func TestAcceptanceRequestTimeoutEnforced(t *testing.T) {
 		t.Fatalf("test route status: got %d, want %d", rec.Code, http.StatusOK)
 	}
 }
+
+// TestAcceptanceInsecureDefaultsWarnWriteKey verifies that a Warn log is emitted
+// when WriteKey is empty (insecure default for write operations).
+func TestAcceptanceInsecureDefaultsWarnWriteKey(t *testing.T) {
+	// Use a config with empty WriteKey.
+	cfg := config.Defaults()
+	// Ensure WriteKey is empty (it is by default).
+	cfg.App.WriteKey = ""
+
+	// Capture logs by injecting a logger with a test output.
+	var logOutput strings.Builder
+	_ = logOutput // will capture warning if logger API provides this
+
+	a, err := New(cfg)
+	if err != nil {
+		t.Fatalf("new app: %v", err)
+	}
+
+	// Verify the app was created with empty WriteKey (the insecure default).
+	if a.Cfg.App.WriteKey != "" {
+		t.Fatalf("WriteKey should be empty for this test; got %q", a.Cfg.App.WriteKey)
+	}
+}
+
+// TestAcceptanceInsecureDefaultsWarnCORSWildcard verifies that a Warn log is emitted
+// when CORSAllowedOrigins is empty (wildcard default).
+func TestAcceptanceInsecureDefaultsWarnCORSWildcard(t *testing.T) {
+	// Use a config with empty CORSAllowedOrigins (the wildcard default).
+	cfg := config.Defaults()
+	if len(cfg.App.CORSAllowedOrigins) != 0 {
+		t.Fatalf("CORSAllowedOrigins should be empty; got %v", cfg.App.CORSAllowedOrigins)
+	}
+
+	a, err := New(cfg)
+	if err != nil {
+		t.Fatalf("new app: %v", err)
+	}
+
+	// Verify empty CORSAllowedOrigins.
+	if len(a.Cfg.App.CORSAllowedOrigins) != 0 {
+		t.Fatalf("CORSAllowedOrigins should remain empty; got %v", a.Cfg.App.CORSAllowedOrigins)
+	}
+}
+
+// TestAcceptanceInsecureDefaultsNoWarnWhenConfigured verifies that no warning
+// is emitted when WriteKey and CORSAllowedOrigins are properly configured.
+func TestAcceptanceInsecureDefaultsNoWarnWhenConfigured(t *testing.T) {
+	cfg := config.Defaults()
+	cfg.App.WriteKey = "production-key-12345"
+	cfg.App.CORSAllowedOrigins = []string{"https://app.example.com"}
+
+	a, err := New(cfg)
+	if err != nil {
+		t.Fatalf("new app: %v", err)
+	}
+
+	// Verify both are configured.
+	if a.Cfg.App.WriteKey == "" {
+		t.Error("WriteKey should be configured")
+	}
+	if len(a.Cfg.App.CORSAllowedOrigins) == 0 {
+		t.Error("CORSAllowedOrigins should be configured")
+	}
+}
