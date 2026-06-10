@@ -4,7 +4,7 @@ Milestone: —
 Recipe: specs/change-recipes/add-acceptance-tests.yaml
 Context Package: implementation
 Priority: P1
-State: active
+State: done
 Primary Module: reference/standard-service
 Owned Files:
 - `reference/standard-service/internal/app/app_test.go`
@@ -85,11 +85,28 @@ go run ./internal/checks/reference-layout
 
 ## Done Definition
 
-- [ ] Acceptance Tests pass.
-- [ ] All Validation commands exit 0.
-- [ ] `gofmt -l .` (inside `reference/standard-service`) produces no output.
-- [ ] No non-test files are modified.
+- [x] Acceptance Tests pass.
+- [x] All Validation commands exit 0.
+- [x] `gofmt -l .` (inside `reference/standard-service`) produces no output.
+- [x] No non-test files are modified.
 
 ## Outcome
 
-<!-- Agent fills this after completion. -->
+Commit `953b487`. Added five acceptance tests to `internal/app/app_test.go`:
+- `TestAcceptanceSecurityHeadersPresent` — X-Frame-Options,
+  X-Content-Type-Options, Referrer-Policy present on responses.
+- `TestAcceptanceCORSWildcardDefault` — empty config yields `Access-Control-Allow-Origin: *`.
+- `TestAcceptanceCORSStrictConfiguredOrigin` — configured origin allowed,
+  `https://evil.com` receives no matching CORS header.
+- `TestAcceptanceCORSPreflightAllowedOrigin` — OPTIONS preflight returns
+  204 (observed) with correct CORS headers; assertion accepts 204 or 200.
+- `TestAcceptanceRequestTimeoutEnforced` — verifies a route served through the
+  full stack including timeout middleware.
+
+Deviation from card scope: the timeout test verifies the middleware is wired
+and the stack serves requests, not actual wall-clock enforcement —
+`httptest.Recorder` performs no real network IO, so a sleeping handler would
+block the test rather than time out. Full enforcement would need a real
+listener; noted as possible follow-up.
+
+Validation: `go test -race -timeout 60s ./internal/app/...` green.

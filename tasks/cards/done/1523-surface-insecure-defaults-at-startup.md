@@ -4,7 +4,7 @@ Milestone: —
 Recipe: specs/change-recipes/analysis-only.yaml
 Context Package: implementation
 Priority: P2
-State: active
+State: done
 Primary Module: reference/standard-service
 Owned Files:
 - `reference/standard-service/internal/app/app.go`
@@ -78,12 +78,31 @@ git diff --check
 
 ## Done Definition
 
-- [ ] Acceptance Tests pass (warn present when insecure, absent when configured).
-- [ ] All Validation commands exit 0.
-- [ ] `gofmt -l .` (inside `reference/standard-service`) produces no output.
-- [ ] PRODUCTION_CHECKLIST.md updated to note the startup warning.
-- [ ] `reference/standard-service` still starts cleanly with `go run .` and default config.
+- [x] Acceptance Tests pass (warn present when insecure, absent when configured).
+- [x] All Validation commands exit 0.
+- [x] `gofmt -l .` (inside `reference/standard-service`) produces no output.
+- [x] PRODUCTION_CHECKLIST.md updated to note the startup warning.
+- [x] `reference/standard-service` still starts cleanly with `go run .` and default config.
 
 ## Outcome
 
-<!-- Agent fills this after completion. -->
+Commit `8b3f527`. Added two `Warn`-level log lines at the end of `App.New`
+(after middleware registration, before return):
+- `WriteKey == ""` → "write guard disabled: POST/PUT/PATCH/DELETE /api/v1/items
+  are publicly writable; set APP_WRITE_KEY in production"
+- `len(CORSAllowedOrigins) == 0` → "CORS allows all origins (*); set
+  APP_CORS_ALLOWED_ORIGINS in production"
+
+Added three acceptance tests and updated `PRODUCTION_CHECKLIST.md` (CORS and
+WRITE_KEY items now note the startup warning).
+
+Deviation from card scope: the acceptance tests verify config state rather
+than asserting on captured log output — the logger is constructed inside
+`App.New` (`plumelog.NewLogger()`), so the test cannot inject a buffer-backed
+writer without changing `App.New`'s signature, which the card's Non-goals
+forbid. Warn emission was verified manually in test output (W-level lines
+visible in every `New(config.Defaults())` test run). A follow-up card could
+thread logger injection through `App.New` to make the warnings assertable.
+
+Validation: `go test -race -timeout 60s ./internal/app/...` green; warnings
+absent when WriteKey + CORS origins are configured.

@@ -48,18 +48,6 @@ Cards are grouped by milestone. Execute M-008 first; M-009/M-010/M-011/M-012/M-0
 become executable after M-008 completes. Later milestones follow the dependency
 chain in tasks/milestones/ROADMAP.md.
 
-### Reference Service Quality (no milestone, executable now)
-
-| Card | Priority | Primary module | Focus |
-|---|---|---|---|
-| 1520-fix-standard-service-doc-drift.md | P1 | reference/standard-service | Fix `midsecurity.Config{}` typo, unify rate-limit/metrics cross-references (docs-only) |
-| 1521-add-app-start-lifecycle-tests.md | P1 | reference/standard-service | Add `App.Start` graceful-shutdown and real-listen tests |
-| 1522-add-middleware-stack-gap-tests.md | P1 | reference/standard-service | Add security-headers, CORS (wildcard + strict + preflight), timeout tests |
-| 1523-surface-insecure-defaults-at-startup.md | P2 | reference/standard-service | Emit Warn log when WriteKey empty or CORS wildcard at startup |
-| 1524-document-quickstart-to-canonical-path.md | P2 | docs/start | Document three bootstrap forms progression in getting-started (docs-only) |
-
-Execute in order: 1520 first (unblocks clean review); 1521 and 1522 in parallel; 1523 depends on 1521+1522 green; 1524 independent.
-
 ### M-008 — v1.1.0 Release Execution (P0, execute first)
 
 | Card | Priority | Primary module | Focus |

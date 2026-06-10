@@ -4,7 +4,7 @@ Milestone: —
 Recipe: specs/change-recipes/add-acceptance-tests.yaml
 Context Package: implementation
 Priority: P1
-State: active
+State: done
 Primary Module: reference/standard-service
 Owned Files:
 - `reference/standard-service/internal/app/app_test.go`
@@ -71,11 +71,24 @@ go run ./internal/checks/reference-layout
 
 ## Done Definition
 
-- [ ] Acceptance Tests pass.
-- [ ] All Validation commands exit 0.
-- [ ] `gofmt -l .` (inside `reference/standard-service`) produces no output.
-- [ ] No new files created outside `internal/app/app_test.go`.
+- [x] Acceptance Tests pass.
+- [x] All Validation commands exit 0.
+- [x] `gofmt -l .` (inside `reference/standard-service`) produces no output.
+- [x] No new files created outside `internal/app/app_test.go`.
 
 ## Outcome
 
-<!-- Agent fills this after completion. -->
+Commit `e11946a`. Added three acceptance tests to `internal/app/app_test.go`:
+- `TestAcceptanceAppStartServesRequests` — handler stack served via
+  `httptest.NewServer` wrapping `srv.Handler`; `/healthz` returns 200.
+- `TestAcceptanceAppStartGracefulShutdown` — context cancel triggers shutdown;
+  `App.Start` returns nil within 5 s.
+- `TestAcceptanceAppStartPropagatesShutdownError` — exercises the
+  `<-shutdownErr` drain path; result is returned, not lost.
+
+Deviation from card scope: also fixed the pre-existing build failure in
+`TestRegisterRoutesCanonicalShape` (`slices.Equal` over `router.RouteInfo`,
+which contains a `[]string` and is not comparable) by comparing
+Method/Path pairs directly. This was required to make the package compile at all.
+
+Validation: `go test -race -timeout 60s ./internal/app/...` green.

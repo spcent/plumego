@@ -4,7 +4,7 @@ Milestone: —
 Recipe: specs/change-recipes/analysis-only.yaml
 Context Package: control-plane
 Priority: P2
-State: active
+State: done
 Primary Module: docs/start
 Owned Files:
 - `docs/start/getting-started.md`
@@ -80,14 +80,23 @@ git diff --check
 
 ## Done Definition
 
-- [ ] `getting-started.md` contains a "Progression" section naming all three
+- [x] `getting-started.md` contains a "Progression" section naming all three
   bootstrap forms in order.
-- [ ] `getting-started_CN.md` mirrors the English additions.
-- [ ] `reference/standard-service/README.md` first paragraph links to the progression
+- [x] `getting-started_CN.md` mirrors the English additions.
+- [x] `reference/standard-service/README.md` first paragraph links to the progression
   context in `getting-started.md`.
-- [ ] `git diff --check` exits 0.
-- [ ] No Go source files are modified.
+- [x] `git diff --check` exits 0.
+- [x] No Go source files are modified.
 
 ## Outcome
 
-<!-- Agent fills this after completion. -->
+Commit `5aeddda`. Added a "Bootstrap Progression" section to
+`docs/start/getting-started.md` (after the Production-Style Canonical Example)
+naming the three forms — `plumego.New()`, `core.New` + inline lifecycle,
+`app.New` + `RegisterRoutes` — with one sentence each and the closing
+guidance to copy structure from `reference/standard-service` rather than
+extending `main.go`. Mirrored the section in `getting-started_CN.md` and
+updated the first paragraph of `reference/standard-service/README.md` to
+identify itself as the third form with a back-link.
+
+Validation: `git diff --check` clean; no Go files modified.
