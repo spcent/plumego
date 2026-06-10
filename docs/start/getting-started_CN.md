@@ -150,6 +150,16 @@ func run() error {
 }
 ```
 
+## Bootstrap 形式的进展
+
+随着应用程序的增长，有三种常见的 bootstrap 模式：
+
+1. **`plumego.New()`** — 零配置示例：最适合学习和简单示例。
+2. **`core.New` + 内联 `Prepare/Server/Shutdown`** — 显式生命周期控制（如上所示）：需要信号处理和自定义 logger 注入。
+3. **`app.New` + `RegisterRoutes` 包装器** — 规范应用布局（见 `reference/standard-service`）：推荐用于生产服务，将 bootstrap、路由和中间件布线分离。
+
+当内联示例不再足够时，从 `reference/standard-service` 复制结构，而不是扩展 `main.go`。
+
 ## 路由基础
 
 Plumego 使用标准 `net/http` handler 形状，无需学习框架专属类型。

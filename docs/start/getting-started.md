@@ -168,6 +168,16 @@ func run() error {
 }
 ```
 
+## Bootstrap Progression
+
+As your application grows, three common bootstrap patterns emerge:
+
+1. **`plumego.New()`** — zero-config hello-world: best for learning and examples.
+2. **`core.New` + inline `Prepare/Server/Shutdown`** — explicit lifecycle control shown above: needed for signal handling and custom logger injection.
+3. **`app.New` + `RegisterRoutes` wrapper** — canonical app layout (see `reference/standard-service`): recommended for production services that separate bootstrap, routing, and middleware wiring.
+
+When the inline example stops being enough, copy structure from `reference/standard-service` rather than extending `main.go`.
+
 ## Basic Routing
 
 Plumego uses the standard `net/http` handler shape.

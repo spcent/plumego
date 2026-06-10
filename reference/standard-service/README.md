@@ -1,6 +1,7 @@
 # Standard Service Reference
 
-`reference/standard-service` is Plumego's canonical reference application.
+`reference/standard-service` is Plumego's canonical reference application and the third
+bootstrap form described in `docs/start/getting-started.md` — **recommended for production services**.
 
 Read this immediately after `docs/start/getting-started.md`. This directory is the
 default answer to "what should a Plumego application look like?"
