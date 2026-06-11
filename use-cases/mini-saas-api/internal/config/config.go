@@ -38,6 +38,10 @@ type AppConfig struct {
 	// MetricsToken optionally gates GET /metrics behind a Bearer token.
 	// Empty disables the guard (fine for private networks; always set in production).
 	MetricsToken string // APP_METRICS_TOKEN
+
+	// DataDir is where the embedded store/kv state file lives
+	// (JWT signing keys and refresh-token records).
+	DataDir string // APP_DATA_DIR; default ".data"
 }
 
 // DevJWTSecret is the placeholder secret used by Defaults() for local development.
@@ -58,6 +62,7 @@ func Defaults() Config {
 			JWTSecret:     DevJWTSecret,
 			JWTAccessTTL:  15 * time.Minute,
 			JWTRefreshTTL: 7 * 24 * time.Hour,
+			DataDir:       ".data",
 		},
 	}
 }
@@ -104,6 +109,12 @@ func Validate(cfg Config) error {
 	}
 	if cfg.App.JWTRefreshTTL <= 0 {
 		return fmt.Errorf("APP_JWT_REFRESH_TTL must be positive")
+	}
+	if cfg.App.JWTRefreshTTL < cfg.App.JWTAccessTTL {
+		return fmt.Errorf("APP_JWT_REFRESH_TTL must be >= APP_JWT_ACCESS_TTL")
+	}
+	if strings.TrimSpace(cfg.App.DataDir) == "" {
+		return fmt.Errorf("APP_DATA_DIR is required (embedded kv state directory)")
 	}
 	if cfg.Core.TLS.Enabled {
 		if cfg.Core.TLS.CertFile == "" {
@@ -165,6 +176,7 @@ func applyEnv(cfg *Config, lookupEnv func(string) (string, bool)) {
 	durf("APP_JWT_ACCESS_TTL", &cfg.App.JWTAccessTTL)
 	durf("APP_JWT_REFRESH_TTL", &cfg.App.JWTRefreshTTL)
 	clearable("APP_METRICS_TOKEN", &cfg.App.MetricsToken)
+	str("APP_DATA_DIR", &cfg.App.DataDir)
 
 	if val, ok := lookupEnv("APP_CORS_ALLOWED_ORIGINS"); ok {
 		if v := strings.TrimSpace(val); v != "" {

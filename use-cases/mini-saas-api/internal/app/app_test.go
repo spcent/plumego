@@ -8,12 +8,10 @@ import (
 	"strings"
 	"testing"
 	"time"
-
-	"mini-saas-api/internal/config"
 )
 
 func TestRegisterRoutesShape(t *testing.T) {
-	a, err := New(config.Defaults())
+	a, err := New(testConfig(t))
 	if err != nil {
 		t.Fatalf("new app: %v", err)
 	}
@@ -22,9 +20,14 @@ func TestRegisterRoutesShape(t *testing.T) {
 	}
 
 	got := a.Core.Routes()
+	// Sorted by Method then Path.
 	want := [][2]string{
+		{http.MethodGet, "/api/v1/me"},
 		{http.MethodGet, "/healthz"},
 		{http.MethodGet, "/readyz"},
+		{http.MethodPost, "/api/v1/auth/login"},
+		{http.MethodPost, "/api/v1/auth/refresh"},
+		{http.MethodPost, "/api/v1/auth/signup"},
 	}
 	if len(got) != len(want) {
 		t.Fatalf("got %d routes, want %d", len(got), len(want))
@@ -37,7 +40,7 @@ func TestRegisterRoutesShape(t *testing.T) {
 }
 
 func TestMiddlewareSecurityHeaders(t *testing.T) {
-	a, err := New(config.Defaults())
+	a, err := New(testConfig(t))
 	if err != nil {
 		t.Fatalf("new app: %v", err)
 	}
@@ -63,7 +66,7 @@ func TestMiddlewareSecurityHeaders(t *testing.T) {
 }
 
 func TestMiddlewarePanicRecovery(t *testing.T) {
-	a, err := New(config.Defaults())
+	a, err := New(testConfig(t))
 	if err != nil {
 		t.Fatalf("new app: %v", err)
 	}
@@ -91,7 +94,7 @@ func TestMiddlewarePanicRecovery(t *testing.T) {
 }
 
 func TestMiddlewareBodyLimit(t *testing.T) {
-	cfg := config.Defaults()
+	cfg := testConfig(t)
 	cfg.App.MaxBodyBytes = 10
 	a, err := New(cfg)
 	if err != nil {
@@ -125,7 +128,7 @@ func TestMiddlewareBodyLimit(t *testing.T) {
 
 // TestAcceptanceHealthLiveness verifies GET /healthz returns 200.
 func TestAcceptanceHealthLiveness(t *testing.T) {
-	a, err := New(config.Defaults())
+	a, err := New(testConfig(t))
 	if err != nil {
 		t.Fatalf("new app: %v", err)
 	}
@@ -149,7 +152,7 @@ func TestAcceptanceHealthLiveness(t *testing.T) {
 
 // TestAcceptanceHealthReadiness verifies GET /readyz returns 200 with no failing checkers.
 func TestAcceptanceHealthReadiness(t *testing.T) {
-	a, err := New(config.Defaults())
+	a, err := New(testConfig(t))
 	if err != nil {
 		t.Fatalf("new app: %v", err)
 	}
@@ -173,7 +176,7 @@ func TestAcceptanceHealthReadiness(t *testing.T) {
 
 // TestAcceptanceGracefulShutdown verifies that canceling ctx makes Start return nil.
 func TestAcceptanceGracefulShutdown(t *testing.T) {
-	cfg := config.Defaults()
+	cfg := testConfig(t)
 	cfg.Core.Addr = ":0"
 	a, err := New(cfg)
 	if err != nil {

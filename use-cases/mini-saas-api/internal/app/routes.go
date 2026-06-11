@@ -10,20 +10,46 @@ import (
 
 // RegisterRoutes wires all HTTP routes for mini-saas-api.
 // One method, one path, one handler per line — no scanning, no annotations.
-// Routes added by future cards (auth, tenant, projects, metrics) follow the same pattern.
 func (a *App) RegisterRoutes() error {
+	logger := a.Core.Logger()
 	healthH := handler.HealthHandler{
 		ServiceName: a.Cfg.App.ServiceName,
-		Logger:      a.Core.Logger(),
-		// Future cards inject real ComponentCheckers here (store/kv, idempotency store …).
-		// The storeChecker below is a no-op that demonstrates the wiring pattern.
-		Checkers: []health.ComponentChecker{appStateChecker{}},
+		Logger:      logger,
+		Checkers:    []health.ComponentChecker{appStateChecker{}},
 	}
+	authH := handler.AuthHandler{
+		Users:  a.Users,
+		Spaces: a.Spaces,
+		Tokens: a.Issuer,
+		Audit:  a.Audit,
+		Logger: logger,
+	}
+	meH := handler.MeHandler{
+		Users:  a.Users,
+		Spaces: a.Spaces,
+		Logger: logger,
+	}
+
+	// Per-route guards. authn is per-route (not global) so public endpoints
+	// stay guard-free and the wiring remains visible at the route table.
+	requireAuth := handler.RequireAuth(a.JWT, logger)
+	abuse := a.authGuard.Middleware()
 
 	root := newRouteReg(a.Core)
 	root.get("/healthz", http.HandlerFunc(healthH.Live))
 	root.get("/readyz", http.HandlerFunc(healthH.Ready))
-	return root.err
+	if root.err != nil {
+		return root.err
+	}
+
+	v1 := newRouteReg(a.Core.Group("/api/v1"))
+	// Public auth endpoints, brute-force-guarded by the abuse token bucket.
+	v1.post("/auth/signup", abuse(http.HandlerFunc(authH.Signup)))
+	v1.post("/auth/login", abuse(http.HandlerFunc(authH.Login)))
+	v1.post("/auth/refresh", abuse(http.HandlerFunc(authH.Refresh)))
+	// Authenticated surface.
+	v1.get("/me", requireAuth(http.HandlerFunc(meH.Get)))
+	return v1.err
 }
 
 // appStateChecker is a synthetic readiness probe.
