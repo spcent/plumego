@@ -85,3 +85,15 @@ func (s *Service) ByID(ctx context.Context, id string) (User, error) {
 	}
 	return u, nil
 }
+
+// ByEmail returns the account registered under email (case-insensitive).
+func (s *Service) ByEmail(ctx context.Context, email string) (User, error) {
+	u, ok, err := s.repo.ByEmail(ctx, email)
+	if err != nil {
+		return User{}, err
+	}
+	if !ok {
+		return User{}, ErrNotFound
+	}
+	return u, nil
+}

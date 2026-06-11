@@ -42,6 +42,12 @@ type AppConfig struct {
 	// DataDir is where the embedded store/kv state file lives
 	// (JWT signing keys and refresh-token records).
 	DataDir string // APP_DATA_DIR; default ".data"
+
+	// Per-tenant traffic limits enforced by the x/tenant chain on the
+	// authenticated API surface.
+	TenantRPS            int64 // APP_TENANT_RPS; token-bucket sustained rate
+	TenantBurst          int64 // APP_TENANT_BURST; token-bucket burst capacity
+	TenantQuotaPerMinute int64 // APP_TENANT_QUOTA_PER_MINUTE; fixed-window request quota
 }
 
 // DevJWTSecret is the placeholder secret used by Defaults() for local development.
@@ -63,6 +69,10 @@ func Defaults() Config {
 			JWTAccessTTL:  15 * time.Minute,
 			JWTRefreshTTL: 7 * 24 * time.Hour,
 			DataDir:       ".data",
+
+			TenantRPS:            50,
+			TenantBurst:          100,
+			TenantQuotaPerMinute: 600,
 		},
 	}
 }
@@ -115,6 +125,9 @@ func Validate(cfg Config) error {
 	}
 	if strings.TrimSpace(cfg.App.DataDir) == "" {
 		return fmt.Errorf("APP_DATA_DIR is required (embedded kv state directory)")
+	}
+	if cfg.App.TenantRPS <= 0 || cfg.App.TenantBurst <= 0 || cfg.App.TenantQuotaPerMinute <= 0 {
+		return fmt.Errorf("APP_TENANT_RPS, APP_TENANT_BURST, and APP_TENANT_QUOTA_PER_MINUTE must be positive")
 	}
 	if cfg.Core.TLS.Enabled {
 		if cfg.Core.TLS.CertFile == "" {
@@ -177,6 +190,9 @@ func applyEnv(cfg *Config, lookupEnv func(string) (string, bool)) {
 	durf("APP_JWT_REFRESH_TTL", &cfg.App.JWTRefreshTTL)
 	clearable("APP_METRICS_TOKEN", &cfg.App.MetricsToken)
 	str("APP_DATA_DIR", &cfg.App.DataDir)
+	int64f("APP_TENANT_RPS", &cfg.App.TenantRPS)
+	int64f("APP_TENANT_BURST", &cfg.App.TenantBurst)
+	int64f("APP_TENANT_QUOTA_PER_MINUTE", &cfg.App.TenantQuotaPerMinute)
 
 	if val, ok := lookupEnv("APP_CORS_ALLOWED_ORIGINS"); ok {
 		if v := strings.TrimSpace(val); v != "" {

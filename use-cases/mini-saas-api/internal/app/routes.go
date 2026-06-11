@@ -5,6 +5,12 @@ import (
 	"net/http"
 
 	"github.com/spcent/plumego/health"
+	"github.com/spcent/plumego/middleware"
+	tenantcore "github.com/spcent/plumego/x/tenant/core"
+	tenantquota "github.com/spcent/plumego/x/tenant/quota"
+	tenantratelimit "github.com/spcent/plumego/x/tenant/ratelimit"
+	tenantresolve "github.com/spcent/plumego/x/tenant/resolve"
+	"mini-saas-api/internal/domain/access"
 	"mini-saas-api/internal/handler"
 )
 
@@ -29,11 +35,46 @@ func (a *App) RegisterRoutes() error {
 		Spaces: a.Spaces,
 		Logger: logger,
 	}
+	tenantH := handler.TenantHandler{
+		Spaces:   a.Spaces,
+		Projects: a.Projects,
+		Audit:    a.Audit,
+		Logger:   logger,
+	}
+	membersH := handler.MembersHandler{
+		Users:  a.Users,
+		Spaces: a.Spaces,
+		Audit:  a.Audit,
+		Logger: logger,
+	}
 
 	// Per-route guards. authn is per-route (not global) so public endpoints
 	// stay guard-free and the wiring remains visible at the route table.
 	requireAuth := handler.RequireAuth(a.JWT, logger)
+	requireAdmin := handler.RequireRole(access.RoleAdmin, logger)
 	abuse := a.authGuard.Middleware()
+
+	// Tenant chain for the authenticated API surface (x/tenant, beta):
+	//   resolve   → lifts authn.Principal.TenantID into the tenant context
+	//   ratelimit → per-tenant token bucket (sustained APP_TENANT_RPS, burst APP_TENANT_BURST)
+	//   quota     → per-tenant fixed-window request quota (APP_TENANT_QUOTA_PER_MINUTE)
+	// Enforcement state is per tenant; the config providers are uniform.
+	tenantChain := middleware.NewChain(
+		tenantresolve.Middleware(tenantresolve.Options{}),
+		tenantratelimit.Middleware(tenantratelimit.Options{
+			Limiter: tenantcore.NewTokenBucketRateLimiter(uniformRateLimits{
+				rps:   a.Cfg.App.TenantRPS,
+				burst: a.Cfg.App.TenantBurst,
+			}),
+		}),
+		tenantquota.Middleware(tenantquota.Options{
+			Manager: tenantcore.NewFixedWindowQuotaManager(uniformQuota{
+				requestsPerMinute: a.Cfg.App.TenantQuotaPerMinute,
+			}),
+		}),
+	)
+	// authed wraps a handler with bearer-token auth followed by the tenant chain.
+	authed := func(h http.Handler) http.Handler { return requireAuth(tenantChain.Build(h)) }
 
 	root := newRouteReg(a.Core)
 	root.get("/healthz", http.HandlerFunc(healthH.Live))
@@ -47,8 +88,14 @@ func (a *App) RegisterRoutes() error {
 	v1.post("/auth/signup", abuse(http.HandlerFunc(authH.Signup)))
 	v1.post("/auth/login", abuse(http.HandlerFunc(authH.Login)))
 	v1.post("/auth/refresh", abuse(http.HandlerFunc(authH.Refresh)))
-	// Authenticated surface.
-	v1.get("/me", requireAuth(http.HandlerFunc(meH.Get)))
+	// Authenticated surface: auth → tenant resolve → rate limit → quota.
+	v1.get("/me", authed(http.HandlerFunc(meH.Get)))
+	v1.get("/tenant", authed(http.HandlerFunc(tenantH.Get)))
+	v1.patch("/tenant", authed(requireAdmin(http.HandlerFunc(tenantH.Update))))
+	v1.get("/tenant/members", authed(http.HandlerFunc(membersH.List)))
+	v1.post("/tenant/members", authed(requireAdmin(http.HandlerFunc(membersH.Add))))
+	v1.patch("/tenant/members/:id", authed(requireAdmin(http.HandlerFunc(membersH.ChangeRole))))
+	v1.delete("/tenant/members/:id", authed(requireAdmin(http.HandlerFunc(membersH.Remove))))
 	return v1.err
 }
 

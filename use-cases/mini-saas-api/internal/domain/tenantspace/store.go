@@ -13,6 +13,7 @@ import (
 type Repository interface {
 	CreateTenant(ctx context.Context, t Tenant) error
 	TenantByID(ctx context.Context, id string) (Tenant, bool, error)
+	TenantBySlug(ctx context.Context, slug string) (Tenant, bool, error)
 	UpdateTenant(ctx context.Context, t Tenant) error
 
 	AddMembership(ctx context.Context, m Membership) error
@@ -57,6 +58,17 @@ func (s *MemoryStore) CreateTenant(_ context.Context, t Tenant) error {
 func (s *MemoryStore) TenantByID(_ context.Context, id string) (Tenant, bool, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
+	t, ok := s.tenants[id]
+	return t, ok, nil
+}
+
+func (s *MemoryStore) TenantBySlug(_ context.Context, slug string) (Tenant, bool, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	id, ok := s.slugs[strings.ToLower(slug)]
+	if !ok {
+		return Tenant{}, false, nil
+	}
 	t, ok := s.tenants[id]
 	return t, ok, nil
 }

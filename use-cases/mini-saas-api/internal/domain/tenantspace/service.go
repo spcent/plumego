@@ -174,6 +174,19 @@ func (s *Service) MembershipForUser(ctx context.Context, tenantID, userID string
 	return m, nil
 }
 
+// MembershipBySlug returns the user's membership in the workspace identified
+// by slug. Unknown slug and non-membership both yield ErrNotFound.
+func (s *Service) MembershipBySlug(ctx context.Context, slug, userID string) (Membership, error) {
+	t, ok, err := s.repo.TenantBySlug(ctx, slug)
+	if err != nil {
+		return Membership{}, err
+	}
+	if !ok {
+		return Membership{}, ErrNotFound
+	}
+	return s.MembershipForUser(ctx, t.ID, userID)
+}
+
 // PrimaryMembership returns the user's oldest membership — the default tenant
 // for login when no tenant is specified.
 func (s *Service) PrimaryMembership(ctx context.Context, userID string) (Membership, error) {

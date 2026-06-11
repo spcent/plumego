@@ -14,18 +14,27 @@ import (
 	"mini-saas-api/internal/domain/user"
 )
 
-// UserService is the account dependency of AuthHandler.
+// UserService is the account dependency of the handlers.
 type UserService interface {
 	Register(ctx context.Context, email, name, password string) (user.User, error)
 	Authenticate(ctx context.Context, email, password string) (user.User, error)
 	ByID(ctx context.Context, id string) (user.User, error)
+	ByEmail(ctx context.Context, email string) (user.User, error)
 }
 
-// WorkspaceService is the tenant dependency of AuthHandler.
+// WorkspaceService is the tenant dependency of the handlers.
+// tenantspace.Service satisfies it.
 type WorkspaceService interface {
 	CreateWorkspace(ctx context.Context, name, slug, ownerUserID string) (tenantspace.Tenant, tenantspace.Membership, error)
+	Get(ctx context.Context, tenantID string) (tenantspace.Tenant, error)
+	Update(ctx context.Context, tenantID, name, plan string) (tenantspace.Tenant, error)
+	Members(ctx context.Context, tenantID string) ([]tenantspace.Membership, error)
+	AddMember(ctx context.Context, tenantID, userID string, role access.Role) (tenantspace.Membership, error)
+	ChangeRole(ctx context.Context, tenantID, membershipID string, role access.Role) (tenantspace.Membership, error)
+	RemoveMember(ctx context.Context, tenantID, membershipID string) error
 	PrimaryMembership(ctx context.Context, userID string) (tenantspace.Membership, error)
 	MembershipForUser(ctx context.Context, tenantID, userID string) (tenantspace.Membership, error)
+	MembershipBySlug(ctx context.Context, slug, userID string) (tenantspace.Membership, error)
 }
 
 // TokenIssuer is the token dependency of AuthHandler.
@@ -87,7 +96,7 @@ func (h AuthHandler) Signup(w http.ResponseWriter, r *http.Request) {
 		writeDomainError(w, r, h.Logger, err)
 		return
 	}
-	h.record(r.Context(), tenant.ID, u.ID, "tenant.created", "tenant", tenant.ID, "workspace "+tenant.Slug+" created")
+	recordAudit(r.Context(), h.Audit, h.Logger, tenant.ID, u.ID, "tenant.created", "tenant", tenant.ID, "workspace "+tenant.Slug+" created")
 	logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusCreated, authResponse{
 		User:   u,
 		Tenant: &tenant,
@@ -98,10 +107,13 @@ func (h AuthHandler) Signup(w http.ResponseWriter, r *http.Request) {
 type loginRequest struct {
 	Email    string `json:"email"`
 	Password string `json:"password"`
+	// WorkspaceSlug optionally selects which workspace to log into; the
+	// default is the user's oldest membership.
+	WorkspaceSlug string `json:"workspace_slug"`
 }
 
-// Login verifies credentials and returns a token pair bound to the user's
-// primary (oldest) workspace.
+// Login verifies credentials and returns a token pair bound to the selected
+// workspace (workspace_slug) or the user's primary (oldest) one.
 //
 //	POST /api/v1/auth/login → 200 {user, tokens}
 func (h AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
@@ -115,10 +127,15 @@ func (h AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		writeDomainError(w, r, h.Logger, err)
 		return
 	}
-	membership, err := h.Spaces.PrimaryMembership(r.Context(), u.ID)
+	var membership tenantspace.Membership
+	if req.WorkspaceSlug != "" {
+		membership, err = h.Spaces.MembershipBySlug(r.Context(), req.WorkspaceSlug, u.ID)
+	} else {
+		membership, err = h.Spaces.PrimaryMembership(r.Context(), u.ID)
+	}
 	if err != nil {
-		// An account without any membership cannot enter a workspace; treat as
-		// invalid credentials rather than leaking account state.
+		// No usable membership: treat as invalid credentials rather than
+		// leaking workspace existence or membership state.
 		writeDomainError(w, r, h.Logger, user.ErrInvalidCredentials)
 		return
 	}
@@ -127,7 +144,7 @@ func (h AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		writeDomainError(w, r, h.Logger, err)
 		return
 	}
-	h.record(r.Context(), membership.TenantID, u.ID, "auth.login", "user", u.ID, "")
+	recordAudit(r.Context(), h.Audit, h.Logger, membership.TenantID, u.ID, "auth.login", "user", u.ID, "")
 	logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusOK, authResponse{User: u, Tokens: tokens}, nil))
 }
 
@@ -169,21 +186,4 @@ func (h AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 		ExpiresIn:    expiresIn,
 		TokenType:    "Bearer",
 	}}, nil))
-}
-
-// record appends an audit entry; audit failures are logged, never surfaced.
-func (h AuthHandler) record(ctx context.Context, tenantID, actorID, action, resourceType, resourceID, detail string) {
-	if h.Audit == nil {
-		return
-	}
-	if err := h.Audit.Record(ctx, audit.Entry{
-		TenantID:     tenantID,
-		ActorID:      actorID,
-		Action:       action,
-		ResourceType: resourceType,
-		ResourceID:   resourceID,
-		Detail:       detail,
-	}); err != nil && h.Logger != nil {
-		h.Logger.Warn("audit record failed", plumelog.Fields{"error": err.Error()})
-	}
 }

@@ -22,12 +22,18 @@ func TestRegisterRoutesShape(t *testing.T) {
 	got := a.Core.Routes()
 	// Sorted by Method then Path.
 	want := [][2]string{
+		{http.MethodDelete, "/api/v1/tenant/members/:id"},
 		{http.MethodGet, "/api/v1/me"},
+		{http.MethodGet, "/api/v1/tenant"},
+		{http.MethodGet, "/api/v1/tenant/members"},
 		{http.MethodGet, "/healthz"},
 		{http.MethodGet, "/readyz"},
+		{http.MethodPatch, "/api/v1/tenant"},
+		{http.MethodPatch, "/api/v1/tenant/members/:id"},
 		{http.MethodPost, "/api/v1/auth/login"},
 		{http.MethodPost, "/api/v1/auth/refresh"},
 		{http.MethodPost, "/api/v1/auth/signup"},
+		{http.MethodPost, "/api/v1/tenant/members"},
 	}
 	if len(got) != len(want) {
 		t.Fatalf("got %d routes, want %d", len(got), len(want))
