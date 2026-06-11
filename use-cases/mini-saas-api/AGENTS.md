@@ -27,8 +27,10 @@ Read in order:
   `main.go` → `internal/config` → `internal/app` → `internal/handler` → `internal/domain`
 - Handlers must not import `internal/app` or `internal/config`.
 - Domain packages must not import handler packages.
-- Beta extensions (`x/rest`, `x/tenant`, `x/observability`) are imported only in
-  `internal/app/app.go` and `internal/app/routes.go` — never in handler or domain code.
+- Beta extensions `x/tenant` and `x/observability` are imported only in
+  `internal/app` (wiring). `x/rest` may additionally be imported by
+  `internal/handler` for resource controllers (transport adaptation).
+  Domain code never imports `x/*`.
 - No new external dependencies in `go.mod` without milestone approval.
 - No `init()` registration, no reflection routing, no hidden globals.
 - `contract.WriteResponse` / `contract.WriteError` are the only response paths.

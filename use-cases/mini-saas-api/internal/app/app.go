@@ -28,6 +28,7 @@ import (
 	"mini-saas-api/internal/domain/session"
 	"mini-saas-api/internal/domain/tenantspace"
 	"mini-saas-api/internal/domain/user"
+	"mini-saas-api/internal/platform/idemstore"
 )
 
 // App holds application-wide dependencies, constructed once in New and wired
@@ -40,6 +41,7 @@ type App struct {
 	Spaces   *tenantspace.Service
 	Projects *project.Service
 	Audit    *audit.Recorder
+	Idem     *idemstore.Memory
 
 	JWT    *jwt.JWTManager
 	Issuer *session.Issuer
@@ -150,6 +152,7 @@ func New(cfg config.Config) (*App, error) {
 	}
 	projects := project.NewService(project.NewMemoryStore(), project.DefaultLimits(), planLookup)
 	auditLog := audit.NewRecorder(1000)
+	idem := idemstore.NewMemory()
 
 	issuer := &session.Issuer{
 		JWT:     manager,
@@ -168,6 +171,7 @@ func New(cfg config.Config) (*App, error) {
 		Spaces:    spaces,
 		Projects:  projects,
 		Audit:     auditLog,
+		Idem:      idem,
 		JWT:       manager,
 		Issuer:    issuer,
 		kv:        kv,

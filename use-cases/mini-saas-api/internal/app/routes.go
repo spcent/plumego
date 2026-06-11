@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"net/http"
+	"time"
 
 	"github.com/spcent/plumego/health"
 	"github.com/spcent/plumego/middleware"
@@ -47,6 +48,7 @@ func (a *App) RegisterRoutes() error {
 		Audit:  a.Audit,
 		Logger: logger,
 	}
+	projectsC := handler.NewProjectsController(a.Projects, a.Audit, logger)
 
 	// Per-route guards. authn is per-route (not global) so public endpoints
 	// stay guard-free and the wiring remains visible at the route table.
@@ -75,6 +77,9 @@ func (a *App) RegisterRoutes() error {
 	)
 	// authed wraps a handler with bearer-token auth followed by the tenant chain.
 	authed := func(h http.Handler) http.Handler { return requireAuth(tenantChain.Build(h)) }
+	// idem adds Idempotency-Key replay protection (stable store/idempotency);
+	// a no-op when the header is absent. Must sit inside authed.
+	idem := handler.Idempotent(a.Idem, 24*time.Hour, logger)
 
 	root := newRouteReg(a.Core)
 	root.get("/healthz", http.HandlerFunc(healthH.Live))
@@ -89,13 +94,20 @@ func (a *App) RegisterRoutes() error {
 	v1.post("/auth/login", abuse(http.HandlerFunc(authH.Login)))
 	v1.post("/auth/refresh", abuse(http.HandlerFunc(authH.Refresh)))
 	// Authenticated surface: auth → tenant resolve → rate limit → quota.
+	// Mutating routes additionally honor Idempotency-Key via idem.
 	v1.get("/me", authed(http.HandlerFunc(meH.Get)))
 	v1.get("/tenant", authed(http.HandlerFunc(tenantH.Get)))
-	v1.patch("/tenant", authed(requireAdmin(http.HandlerFunc(tenantH.Update))))
+	v1.patch("/tenant", authed(requireAdmin(idem(http.HandlerFunc(tenantH.Update)))))
 	v1.get("/tenant/members", authed(http.HandlerFunc(membersH.List)))
-	v1.post("/tenant/members", authed(requireAdmin(http.HandlerFunc(membersH.Add))))
-	v1.patch("/tenant/members/:id", authed(requireAdmin(http.HandlerFunc(membersH.ChangeRole))))
-	v1.delete("/tenant/members/:id", authed(requireAdmin(http.HandlerFunc(membersH.Remove))))
+	v1.post("/tenant/members", authed(requireAdmin(idem(http.HandlerFunc(membersH.Add)))))
+	v1.patch("/tenant/members/:id", authed(requireAdmin(idem(http.HandlerFunc(membersH.ChangeRole)))))
+	v1.delete("/tenant/members/:id", authed(requireAdmin(idem(http.HandlerFunc(membersH.Remove)))))
+	// Projects CRUD through the x/rest resource controller (beta).
+	v1.get("/projects", authed(http.HandlerFunc(projectsC.Index)))
+	v1.post("/projects", authed(idem(http.HandlerFunc(projectsC.Create))))
+	v1.get("/projects/:id", authed(http.HandlerFunc(projectsC.Show)))
+	v1.put("/projects/:id", authed(idem(http.HandlerFunc(projectsC.Update))))
+	v1.delete("/projects/:id", authed(requireAdmin(idem(http.HandlerFunc(projectsC.Delete)))))
 	return v1.err
 }
 

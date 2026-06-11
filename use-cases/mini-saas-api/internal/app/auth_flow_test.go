@@ -30,7 +30,7 @@ func newTestServer(t *testing.T) http.Handler {
 	return srv.Handler
 }
 
-func doJSON(t *testing.T, h http.Handler, method, path, bearer string, body any) (*httptest.ResponseRecorder, map[string]any) {
+func buildJSONRequest(t *testing.T, method, path, bearer string, body any) *http.Request {
 	t.Helper()
 	var reader *bytes.Reader
 	if body != nil {
@@ -47,15 +47,26 @@ func doJSON(t *testing.T, h http.Handler, method, path, bearer string, body any)
 	if bearer != "" {
 		req.Header.Set("Authorization", "Bearer "+bearer)
 	}
-	rec := httptest.NewRecorder()
-	h.ServeHTTP(rec, req)
+	return req
+}
+
+func decodeBody(t *testing.T, rec *httptest.ResponseRecorder) map[string]any {
+	t.Helper()
 	var decoded map[string]any
 	if rec.Body.Len() > 0 {
 		if err := json.Unmarshal(rec.Body.Bytes(), &decoded); err != nil {
 			t.Fatalf("decode response (%d): %v\n%s", rec.Code, err, rec.Body.String())
 		}
 	}
-	return rec, decoded
+	return decoded
+}
+
+func doJSON(t *testing.T, h http.Handler, method, path, bearer string, body any) (*httptest.ResponseRecorder, map[string]any) {
+	t.Helper()
+	req := buildJSONRequest(t, method, path, bearer, body)
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	return rec, decodeBody(t, rec)
 }
 
 // signup registers a user+workspace and returns (accessToken, refreshToken).
