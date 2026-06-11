@@ -10,7 +10,6 @@ import (
 
 	"github.com/spcent/plumego/core"
 	plumelog "github.com/spcent/plumego/log"
-	"github.com/spcent/plumego/metrics"
 	"github.com/spcent/plumego/middleware/abuseguard"
 	"github.com/spcent/plumego/middleware/accesslog"
 	"github.com/spcent/plumego/middleware/bodylimit"
@@ -22,6 +21,7 @@ import (
 	"github.com/spcent/plumego/middleware/timeout"
 	"github.com/spcent/plumego/security/jwt"
 	kvstore "github.com/spcent/plumego/store/kv"
+	"github.com/spcent/plumego/x/observability"
 	"mini-saas-api/internal/config"
 	"mini-saas-api/internal/domain/audit"
 	"mini-saas-api/internal/domain/project"
@@ -43,8 +43,9 @@ type App struct {
 	Audit    *audit.Recorder
 	Idem     *idemstore.Memory
 
-	JWT    *jwt.JWTManager
-	Issuer *session.Issuer
+	JWT       *jwt.JWTManager
+	Issuer    *session.Issuer
+	Collector *observability.PrometheusCollector
 
 	kv        *kvstore.KVStore
 	authGuard *abuseguard.AbuseGuardMiddleware
@@ -55,6 +56,10 @@ type App struct {
 // all global middleware here is stdlib-only stable-root.
 func New(cfg config.Config) (*App, error) {
 	app := core.New(cfg.Core, core.AppDependencies{Logger: plumelog.NewLogger()})
+
+	// Prometheus collector (x/observability, beta) feeds the httpmetrics
+	// middleware; the exporter serves it on GET /metrics in routes.go.
+	collector := observability.NewPrometheusCollector("mini_saas_api")
 
 	securityMw, err := securityheaders.Middleware(securityheaders.Config{})
 	if err != nil {
@@ -99,7 +104,7 @@ func New(cfg config.Config) (*App, error) {
 			MaxBytes: cfg.App.MaxBodyBytes,
 			Logger:   app.Logger(),
 		}),
-		httpmetrics.Middleware(metrics.NewNoopCollector()),
+		httpmetrics.Middleware(collector),
 		timeoutMw,
 	); err != nil {
 		return nil, fmt.Errorf("register middleware: %w", err)
@@ -174,6 +179,7 @@ func New(cfg config.Config) (*App, error) {
 		Idem:      idem,
 		JWT:       manager,
 		Issuer:    issuer,
+		Collector: collector,
 		kv:        kv,
 		authGuard: authGuard,
 	}, nil

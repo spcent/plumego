@@ -2,11 +2,13 @@ package app
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"time"
 
 	"github.com/spcent/plumego/health"
 	"github.com/spcent/plumego/middleware"
+	"github.com/spcent/plumego/x/observability"
 	tenantcore "github.com/spcent/plumego/x/tenant/core"
 	tenantquota "github.com/spcent/plumego/x/tenant/quota"
 	tenantratelimit "github.com/spcent/plumego/x/tenant/ratelimit"
@@ -49,6 +51,15 @@ func (a *App) RegisterRoutes() error {
 		Logger: logger,
 	}
 	projectsC := handler.NewProjectsController(a.Projects, a.Audit, logger)
+	auditH := handler.AuditHandler{Audit: a.Audit, Logger: logger}
+
+	// Prometheus exporter (x/observability, beta) reads a live snapshot from
+	// the collector on every scrape; optionally token-guarded.
+	exporter, err := observability.NewPrometheusExporter(a.Collector)
+	if err != nil {
+		return fmt.Errorf("create prometheus exporter: %w", err)
+	}
+	metricsGuard := handler.RequireMetricsToken(a.Cfg.App.MetricsToken, logger)
 
 	// Per-route guards. authn is per-route (not global) so public endpoints
 	// stay guard-free and the wiring remains visible at the route table.
@@ -84,6 +95,7 @@ func (a *App) RegisterRoutes() error {
 	root := newRouteReg(a.Core)
 	root.get("/healthz", http.HandlerFunc(healthH.Live))
 	root.get("/readyz", http.HandlerFunc(healthH.Ready))
+	root.get("/metrics", metricsGuard(exporter.Handler()))
 	if root.err != nil {
 		return root.err
 	}
@@ -98,6 +110,7 @@ func (a *App) RegisterRoutes() error {
 	v1.get("/me", authed(http.HandlerFunc(meH.Get)))
 	v1.get("/tenant", authed(http.HandlerFunc(tenantH.Get)))
 	v1.patch("/tenant", authed(requireAdmin(idem(http.HandlerFunc(tenantH.Update)))))
+	v1.get("/tenant/audit", authed(requireAdmin(http.HandlerFunc(auditH.List))))
 	v1.get("/tenant/members", authed(http.HandlerFunc(membersH.List)))
 	v1.post("/tenant/members", authed(requireAdmin(idem(http.HandlerFunc(membersH.Add)))))
 	v1.patch("/tenant/members/:id", authed(requireAdmin(idem(http.HandlerFunc(membersH.ChangeRole)))))
