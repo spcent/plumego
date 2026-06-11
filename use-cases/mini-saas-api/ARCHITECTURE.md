@@ -14,6 +14,9 @@
 | `internal/domain/project` | Project model, repository, service (consumed by x/rest controller) |
 | `internal/domain/access` | RBAC role lattice; called from handlers, never from middleware |
 | `internal/domain/audit` | Append-only audit log recorder and query |
+| `internal/domain/session` | JWT access-token issuing + opaque refresh tokens with rotation and family revocation (over a narrow KV interface) |
+| `internal/domain/ident` | Random 128-bit hex identifiers |
+| `internal/platform/idemstore` | In-memory implementation of the stable `store/idempotency` contract |
 
 ## Dependency Direction (one-way, enforced)
 
@@ -31,9 +34,20 @@ Domain packages must not import handler packages.
 
 | Extension | Wired in | Purpose |
 |---|---|---|
-| `x/tenant` | `internal/app/routes.go` (per-route middleware chain) | Tenant resolution from JWT claim, rate limit, quota |
-| `x/rest` | `internal/app/routes.go` (resource controller) | Projects CRUD |
-| `x/observability` | `internal/app/app.go` (collector) + `routes.go` (/metrics route) | Prometheus metrics |
+| `x/tenant` | `internal/app/routes.go` (per-route chain: resolve → ratelimit → quota) | Tenant context from JWT claim, per-tenant token bucket + fixed-window quota |
+| `x/rest` | controller in `internal/handler/projects.go`, routes in `internal/app/routes.go` | Projects CRUD resource controller |
+| `x/observability` | `internal/app/app.go` (collector into httpmetrics) + `routes.go` (`/metrics` exporter) | Prometheus metrics |
+
+## Request path (authenticated routes)
+
+```
+requestid → securityheaders → cors → recovery → accesslog → bodylimit
+→ httpmetrics(Prometheus) → timeout                       (global, app.go)
+→ RequireAuth (JWT → principal w/ tenant+role)            (per route)
+→ x/tenant resolve → ratelimit → quota                    (per route)
+→ [RequireRole(admin)]  [Idempotent]                      (where applicable)
+→ handler → domain service → repository
+```
 
 ## Security Boundaries
 

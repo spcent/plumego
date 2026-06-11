@@ -6,15 +6,42 @@ Demonstrates stable roots (`core`, `contract`, `middleware`, `security`,
 `store`, `health`, `log`, `metrics`) plus beta extensions `x/rest`,
 `x/tenant`, and `x/observability` — explicitly wired, no framework magic.
 
-> **Status:** Scaffold in place (card 1525 complete). Auth, tenancy, projects,
-> and observability are implemented by cards 1526–1532.
-
 ## Run
 
 ```bash
 cp env.example .env           # edit APP_JWT_SECRET before running in production
-go run .
+go run .                      # listens on :8090
 ```
+
+Walk the whole API with the bundled examples:
+
+```bash
+bash api/curl.sh              # end-to-end walkthrough against a running server
+# or open api/examples.http in your editor (REST Client / JetBrains)
+# or import api/postman_collection.json into Postman
+```
+
+## What it demonstrates
+
+| Concern | Built with |
+|---|---|
+| App shape, lifecycle, graceful shutdown | `core` (canonical `reference/standard-service` layout) |
+| Middleware chain (requestid → headers → CORS → recovery → accesslog → bodylimit → metrics → timeout) | `middleware/*` |
+| Signup/login, bcrypt hashing, password strength | `security/password`, `security/authn` |
+| Access tokens (HS256 from `APP_JWT_SECRET`), per-route guards | `security/jwt` |
+| Single-use refresh tokens, rotation, family revocation on reuse | app `session` domain over `store/kv` |
+| Brute-force guard on auth endpoints | `middleware/abuseguard` |
+| Tenant resolution, per-tenant rate limit + request quota | `x/tenant` (beta) |
+| Simplified RBAC (owner > admin > member), last-owner invariant | app `access` domain, enforced per route |
+| Projects CRUD resource controller | `x/rest` (beta) |
+| Idempotency-Key replay protection on mutating routes | stable `store/idempotency` contract |
+| Tenant-scoped append-only audit log | app `audit` domain |
+| Prometheus metrics on `/metrics` (token-guardable) | `x/observability` (beta) |
+| Liveness/readiness | `health` |
+
+Persistence is in-memory behind repository interfaces by design (the embedded
+`store/kv` file holds JWT keys and refresh tokens). Swapping in a database
+means implementing the repository interfaces — no handler changes.
 
 ## Routes
 
@@ -32,7 +59,7 @@ go run .
 | POST | /api/v1/tenant/members | JWT admin | Add member |
 | PATCH | /api/v1/tenant/members/:id | JWT admin | Change role |
 | DELETE | /api/v1/tenant/members/:id | JWT admin | Remove member |
-| GET | /api/v1/tenant/audit | JWT admin | Audit log |
+| GET | /api/v1/tenant/audit?limit=N | JWT admin | Audit log, newest first |
 | GET | /api/v1/projects | JWT member | List projects |
 | POST | /api/v1/projects | JWT member | Create project |
 | GET | /api/v1/projects/:id | JWT member | Get project |
@@ -40,10 +67,22 @@ go run .
 | DELETE | /api/v1/projects/:id | JWT admin | Delete project |
 | GET | /metrics | optional token | Prometheus metrics |
 
+All mutating `/api/v1` routes accept an `Idempotency-Key` header: retries with
+the same key and payload replay the stored response (look for
+`X-Idempotency-Replay: true`); the same key with a different payload is
+rejected.
+
 ## Configuration
 
 See `env.example` for all `APP_*` variables.
-`APP_JWT_SECRET` must be at least 32 characters; the server refuses to start otherwise.
+`APP_JWT_SECRET` must be at least 32 characters; the server refuses to start
+otherwise. Auth notes:
+
+- Access tokens expire after `APP_JWT_ACCESS_TTL` (default 15 m); refresh via
+  `POST /api/v1/auth/refresh`.
+- Refresh tokens are single-use. Reusing a consumed token revokes the whole
+  session family (token-theft containment) — the client must log in again.
+- Role changes take effect when the access token is refreshed or re-issued.
 
 ## Module Milestone
 

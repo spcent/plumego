@@ -1,0 +1,222 @@
+{
+  "info": {
+    "name": "mini-saas-api",
+    "description": "Multi-tenant SaaS API use-case built on Plumego. Run signup or login first; tokens are captured into collection variables automatically.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base", "value": "http://localhost:8090" },
+    { "key": "access", "value": "" },
+    { "key": "refresh", "value": "" },
+    { "key": "project_id", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "health",
+      "item": [
+        { "name": "liveness", "request": { "method": "GET", "url": "{{base}}/healthz" } },
+        { "name": "readiness", "request": { "method": "GET", "url": "{{base}}/readyz" } },
+        { "name": "metrics", "request": { "method": "GET", "url": "{{base}}/metrics" } }
+      ]
+    },
+    {
+      "name": "auth",
+      "item": [
+        {
+          "name": "signup",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const data = pm.response.json().data;",
+                  "pm.collectionVariables.set('access', data.tokens.access_token);",
+                  "pm.collectionVariables.set('refresh', data.tokens.refresh_token);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{base}}/api/v1/auth/signup",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"alice@example.com\",\n  \"name\": \"Alice\",\n  \"password\": \"Str0ng!Password#2026\",\n  \"workspace_name\": \"Acme\",\n  \"workspace_slug\": \"acme\"\n}"
+            }
+          }
+        },
+        {
+          "name": "login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const data = pm.response.json().data;",
+                  "pm.collectionVariables.set('access', data.tokens.access_token);",
+                  "pm.collectionVariables.set('refresh', data.tokens.refresh_token);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{base}}/api/v1/auth/login",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"alice@example.com\",\n  \"password\": \"Str0ng!Password#2026\"\n}"
+            }
+          }
+        },
+        {
+          "name": "refresh (rotates token)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const data = pm.response.json().data;",
+                  "pm.collectionVariables.set('access', data.tokens.access_token);",
+                  "pm.collectionVariables.set('refresh', data.tokens.refresh_token);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{base}}/api/v1/auth/refresh",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"refresh_token\": \"{{refresh}}\"\n}" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "tenant",
+      "item": [
+        {
+          "name": "me",
+          "request": {
+            "method": "GET",
+            "url": "{{base}}/api/v1/me",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access}}" }]
+          }
+        },
+        {
+          "name": "get workspace",
+          "request": {
+            "method": "GET",
+            "url": "{{base}}/api/v1/tenant",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access}}" }]
+          }
+        },
+        {
+          "name": "rename workspace (admin)",
+          "request": {
+            "method": "PATCH",
+            "url": "{{base}}/api/v1/tenant",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Acme Renamed\"\n}" }
+          }
+        },
+        {
+          "name": "list members",
+          "request": {
+            "method": "GET",
+            "url": "{{base}}/api/v1/tenant/members",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access}}" }]
+          }
+        },
+        {
+          "name": "add member (admin)",
+          "request": {
+            "method": "POST",
+            "url": "{{base}}/api/v1/tenant/members",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"bob@example.com\",\n  \"role\": \"member\"\n}" }
+          }
+        },
+        {
+          "name": "audit trail (admin)",
+          "request": {
+            "method": "GET",
+            "url": "{{base}}/api/v1/tenant/audit?limit=20",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access}}" }]
+          }
+        }
+      ]
+    },
+    {
+      "name": "projects",
+      "item": [
+        {
+          "name": "list",
+          "request": {
+            "method": "GET",
+            "url": "{{base}}/api/v1/projects",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access}}" }]
+          }
+        },
+        {
+          "name": "create (idempotent)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.collectionVariables.set('project_id', pm.response.json().data.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{base}}/api/v1/projects",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access}}" },
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Idempotency-Key", "value": "create-apollo-1" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Apollo\",\n  \"description\": \"first project\"\n}" }
+          }
+        },
+        {
+          "name": "get one",
+          "request": {
+            "method": "GET",
+            "url": "{{base}}/api/v1/projects/{{project_id}}",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access}}" }]
+          }
+        },
+        {
+          "name": "update",
+          "request": {
+            "method": "PUT",
+            "url": "{{base}}/api/v1/projects/{{project_id}}",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Apollo 11\",\n  \"status\": \"paused\"\n}" }
+          }
+        },
+        {
+          "name": "delete (admin)",
+          "request": {
+            "method": "DELETE",
+            "url": "{{base}}/api/v1/projects/{{project_id}}",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access}}" }]
+          }
+        }
+      ]
+    }
+  ]
+}

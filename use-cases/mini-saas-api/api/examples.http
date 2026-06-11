@@ -1,0 +1,112 @@
+# mini-saas-api — editor-runnable requests (VS Code REST Client / JetBrains).
+# Run the server first: go run .  (default :8090)
+
+@base = http://localhost:8090
+@access = PASTE_ACCESS_TOKEN_HERE
+@refresh = PASTE_REFRESH_TOKEN_HERE
+
+### Liveness
+GET {{base}}/healthz
+
+### Readiness
+GET {{base}}/readyz
+
+### Sign up: creates user + workspace, returns token pair
+POST {{base}}/api/v1/auth/signup
+Content-Type: application/json
+
+{
+  "email": "alice@example.com",
+  "name": "Alice",
+  "password": "Str0ng!Password#2026",
+  "workspace_name": "Acme",
+  "workspace_slug": "acme"
+}
+
+### Log in (optionally pass "workspace_slug" to pick a workspace)
+POST {{base}}/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "email": "alice@example.com",
+  "password": "Str0ng!Password#2026"
+}
+
+### Rotate the refresh token (single-use; reuse revokes the session family)
+POST {{base}}/api/v1/auth/refresh
+Content-Type: application/json
+
+{
+  "refresh_token": "{{refresh}}"
+}
+
+### Current principal
+GET {{base}}/api/v1/me
+Authorization: Bearer {{access}}
+
+### Workspace details + project usage
+GET {{base}}/api/v1/tenant
+Authorization: Bearer {{access}}
+
+### Rename workspace (admin+)
+PATCH {{base}}/api/v1/tenant
+Authorization: Bearer {{access}}
+Content-Type: application/json
+
+{ "name": "Acme Renamed" }
+
+### List members
+GET {{base}}/api/v1/tenant/members
+Authorization: Bearer {{access}}
+
+### Add member by email (admin+; the account must exist)
+POST {{base}}/api/v1/tenant/members
+Authorization: Bearer {{access}}
+Content-Type: application/json
+
+{ "email": "bob@example.com", "role": "member" }
+
+### Change member role (admin+; cannot demote the last owner)
+PATCH {{base}}/api/v1/tenant/members/MEMBERSHIP_ID
+Authorization: Bearer {{access}}
+Content-Type: application/json
+
+{ "role": "admin" }
+
+### Remove member (admin+; cannot remove the last owner)
+DELETE {{base}}/api/v1/tenant/members/MEMBERSHIP_ID
+Authorization: Bearer {{access}}
+
+### Audit trail, newest first (admin+)
+GET {{base}}/api/v1/tenant/audit?limit=20
+Authorization: Bearer {{access}}
+
+### List projects
+GET {{base}}/api/v1/projects
+Authorization: Bearer {{access}}
+
+### Create project — Idempotency-Key makes retries safe
+POST {{base}}/api/v1/projects
+Authorization: Bearer {{access}}
+Content-Type: application/json
+Idempotency-Key: create-apollo-1
+
+{ "name": "Apollo", "description": "first project" }
+
+### Get one project
+GET {{base}}/api/v1/projects/PROJECT_ID
+Authorization: Bearer {{access}}
+
+### Update project (status: active | paused | archived)
+PUT {{base}}/api/v1/projects/PROJECT_ID
+Authorization: Bearer {{access}}
+Content-Type: application/json
+
+{ "name": "Apollo 11", "status": "paused" }
+
+### Delete project (admin+)
+DELETE {{base}}/api/v1/projects/PROJECT_ID
+Authorization: Bearer {{access}}
+
+### Prometheus metrics (Bearer APP_METRICS_TOKEN when configured)
+GET {{base}}/metrics
