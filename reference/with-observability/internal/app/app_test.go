@@ -35,7 +35,10 @@ func TestRegisterRoutesCanonicalShape(t *testing.T) {
 		t.Fatalf("routes count = %d, want %d\ngot:  %#v\nwant: %#v", len(got), len(want), got, want)
 	}
 	for i := range want {
-		if got[i] != want[i] {
+		// RouteInfo embeds router.RouteMeta, which now carries a Tags slice,
+		// so whole-struct comparison no longer compiles; compare the fields
+		// this test actually asserts on.
+		if got[i].Method != want[i].Method || got[i].Path != want[i].Path {
 			t.Errorf("routes[%d] = %v, want %v", i, got[i], want[i])
 		}
 	}
