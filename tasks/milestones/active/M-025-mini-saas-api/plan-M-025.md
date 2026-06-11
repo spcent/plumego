@@ -249,29 +249,29 @@ registration — then commit `website/src/generated/` together.
 
 | Card | Goal | Primary Module | Owned Files | Depends On | Quick Gates |
 |------|------|----------------|-------------|------------|-------------|
-| 2070 | Scaffold: go.mod+replace, main.go, config, middleware chain, /healthz,/readyz, env.example, AGENTS/ARCHITECTURE stubs | use-cases/mini-saas-api | go.mod, main.go, internal/config, internal/app, internal/handler/health.go | — | in-module gate |
-| 2071 | Domain: user/tenantspace/project/access/audit models, in-memory stores, services, unit tests | use-cases/mini-saas-api | internal/domain/** | 2070 | in-module gate |
-| 2072 | Auth: signup/login/refresh handlers, JWT manager wiring, refresh rotation in store/kv, abuseguard on auth routes | use-cases/mini-saas-api | internal/handler/auth.go, me.go, routes.go (auth section) | 2071 | in-module gate |
-| 2073 | Tenancy: x/tenant resolution from claim, per-tenant rate limit, quota, member CRUD, last-owner guard | use-cases/mini-saas-api | internal/handler/tenant.go, members.go, routes.go (tenant section) | 2072 | in-module gate |
-| 2074 | Projects: x/rest controller over project service, store/idempotency on mutating routes, isolation tests | use-cases/mini-saas-api | internal/handler + routes.go (projects section) | 2072 | in-module gate |
-| 2075 | Observability: Prometheus collector into httpmetrics, /metrics exporter with token guard, audit endpoint | use-cases/mini-saas-api | internal/app/app.go, internal/handler/audit.go, metrics route | 2072 | in-module gate |
-| 2076 | Examples + docs: api/curl.sh, examples.http, postman_collection.json, README walkthrough, ARCHITECTURE final | use-cases/mini-saas-api | api/**, README.md, ARCHITECTURE.md | 2073, 2074, 2075 | curl.sh against `go run .` |
-| 2077 | Register: use-cases/AGENTS.md table row, root AGENTS.md/CLAUDE.md app lists, website-sync if generated sources changed | docs | use-cases/AGENTS.md, AGENTS.md, CLAUDE.md | 2076 | agent-workflow check |
+| 1525 | Scaffold: go.mod+replace, main.go, config, middleware chain, /healthz,/readyz, env.example, AGENTS/ARCHITECTURE stubs | use-cases/mini-saas-api | go.mod, main.go, internal/config, internal/app, internal/handler/health.go | — | in-module gate |
+| 1526 | Domain: user/tenantspace/project/access/audit models, in-memory stores, services, unit tests | use-cases/mini-saas-api | internal/domain/** | 1525 | in-module gate |
+| 1527 | Auth: signup/login/refresh handlers, JWT manager wiring, refresh rotation in store/kv, abuseguard on auth routes | use-cases/mini-saas-api | internal/handler/auth.go, me.go, routes.go (auth section) | 1526 | in-module gate |
+| 1528 | Tenancy: x/tenant resolution from claim, per-tenant rate limit, quota, member CRUD, last-owner guard | use-cases/mini-saas-api | internal/handler/tenant.go, members.go, routes.go (tenant section) | 1527 | in-module gate |
+| 1529 | Projects: x/rest controller over project service, store/idempotency on mutating routes, isolation tests | use-cases/mini-saas-api | internal/handler + routes.go (projects section) | 1527 | in-module gate |
+| 1530 | Observability: Prometheus collector into httpmetrics, /metrics exporter with token guard, audit endpoint | use-cases/mini-saas-api | internal/app/app.go, internal/handler/audit.go, metrics route | 1527 | in-module gate |
+| 1531 | Examples + docs: api/curl.sh, examples.http, postman_collection.json, README walkthrough, ARCHITECTURE final | use-cases/mini-saas-api | api/**, README.md, ARCHITECTURE.md | 2073, 2074, 2075 | curl.sh against `go run .` |
+| 1532 | Register: use-cases/AGENTS.md table row, root AGENTS.md/CLAUDE.md app lists, website-sync if generated sources changed | docs | use-cases/AGENTS.md, AGENTS.md, CLAUDE.md | 1531 | agent-workflow check |
 
 Card IDs `2070–2077` are provisional — confirm against `tasks/cards/` at
 execution time and renumber if taken.
 
 ## Dependency Edges
 
-- `2070 -> 2071 -> 2072`
-- `2072 -> 2073`, `2072 -> 2074`, `2072 -> 2075` (parallel group)
-- `{2073, 2074, 2075} -> 2076 -> 2077`
+- `1525 -> 1526 -> 1527`
+- `1527 -> 1528`, `1527 -> 1529`, `1527 -> 1530` (parallel group)
+- `{1528, 1529, 1530} -> 1531 -> 1532`
 
 ## Parallel Groups
 
-- Group A: 2073 (tenancy)
-- Group B: 2074 (projects CRUD)
-- Group C: 2075 (observability/audit)
+- Group A: 1528 (tenancy)
+- Group B: 1529 (projects CRUD)
+- Group C: 1530 (observability/audit)
 
 ## Risk Register
 
