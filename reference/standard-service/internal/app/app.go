@@ -72,7 +72,7 @@ func New(cfg config.Config) (*App, error) {
 	//   httpmetrics→ measures handler latency and status; swap NewNoopCollector for
 	//               observability.NewPrometheusCollector (from x/observability) in production,
 	//               then register GET /metrics with observability.NewPrometheusExporter.
-	//               See reference/with-observability for a complete wiring example.
+	//               See reference/with-ops for a complete wiring example.
 	//   timeout    → per-request wall-clock limit; innermost so only handler time is counted
 	if err := app.Use(
 		requestid.Middleware(),
@@ -88,6 +88,14 @@ func New(cfg config.Config) (*App, error) {
 		timeoutMw,
 	); err != nil {
 		return nil, fmt.Errorf("register middleware: %w", err)
+	}
+
+	// Warn about insecure defaults to make the risk observable.
+	if cfg.App.WriteKey == "" {
+		app.Logger().Warn("write guard disabled: POST/PUT/PATCH/DELETE /api/v1/items are publicly writable; set APP_WRITE_KEY in production", plumelog.Fields{})
+	}
+	if len(cfg.App.CORSAllowedOrigins) == 0 {
+		app.Logger().Warn("CORS allows all origins (*); set APP_CORS_ALLOWED_ORIGINS in production", plumelog.Fields{})
 	}
 
 	return &App{

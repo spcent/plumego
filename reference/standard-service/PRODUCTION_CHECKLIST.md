@@ -27,8 +27,9 @@ Each item is a conscious decision, not a default assumption.
   Set `APP_CORS_ALLOWED_ORIGINS` to a comma-separated list of allowed origins
   (e.g. `https://app.example.com,https://admin.example.com`). When set, the app
   uses `cors.StrictDefaultOptions` to restrict cross-origin access to those domains.
-  When unset the default is `["*"]` (allow all) — safe for local dev only. Do not
-  use wildcard origins for authenticated APIs.
+  When unset the default is `["*"]` (allow all) — safe for local dev only. The service
+  logs a WARN-level message at startup when unset, making the risk observable.
+  Do not use wildcard origins for authenticated APIs.
 
 ---
 
@@ -38,11 +39,12 @@ Each item is a conscious decision, not a default assumption.
   `middleware/securityheaders` is wired in `internal/app/app.go` and sets
   `X-Frame-Options`, `X-Content-Type-Options`, and `Referrer-Policy`.
   Review the defaults against your Content Security Policy and HSTS requirements;
-  extend `midsecurity.Config{}` if stricter headers are needed.
+  extend `securityheaders.Config{}` if stricter headers are needed.
 
 - [ ] **Rate limiting** is configured for public endpoints.
-  Add `security/abuse` or `x/resilience/ratelimit` middleware to protect
-  high-traffic or unauthenticated routes.
+  Add `middleware/abuseguard` to protect high-traffic or unauthenticated routes
+  (stable-root, token-bucket defaults). For advanced patterns, use `x/resilience/ratelimit`
+  (extension; distributed rate limiting across services).
 
 - [ ] **Authentication** is enforced on all non-public endpoints.
   There is no default authentication. Every protected route must have an explicit
@@ -51,7 +53,8 @@ Each item is a conscious decision, not a default assumption.
 - [ ] **`APP_WRITE_KEY` is set** for services that use the write-key guard.
   `RequireWriteKey` is a no-op when `APP_WRITE_KEY` is empty — it passes all
   requests through without any header check. This is intentional for local
-  development but **must be disabled in production** by setting a non-empty key.
+  development but **must be set to a non-empty value in production**. The service logs a
+  WARN-level message at startup when this value is empty, making the risk observable.
   Deploy without this variable and every POST/PUT/DELETE is publicly writable.
 
 - [ ] **No debug endpoints are mounted** by default.
