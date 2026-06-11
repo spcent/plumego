@@ -66,13 +66,11 @@ func ExampleRegisterResourceRoutes() {
 	r.ServeHTTP(rec, req)
 
 	var resp struct {
-		Data struct {
-			Data []exampleUser `json:"data"`
-		} `json:"data"`
+		Data []exampleUser `json:"data"`
 	}
 	_ = json.NewDecoder(rec.Body).Decode(&resp)
 
-	fmt.Printf("GET /api/users -> %d (%d item)\n", rec.Code, len(resp.Data.Data))
+	fmt.Printf("GET /api/users -> %d (%d item)\n", rec.Code, len(resp.Data))
 	fmt.Println("content-type:", rec.Header().Get(contract.HeaderContentType))
 	for _, route := range r.Routes() {
 		fmt.Printf("%s %s\n", route.Method, route.Path)

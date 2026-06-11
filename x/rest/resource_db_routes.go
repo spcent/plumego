@@ -48,10 +48,9 @@ func (c *DBResourceController[T]) Index(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	_ = contract.WriteResponse(w, r, http.StatusOK, PaginatedResponse{
-		Data:       transformedResults,
-		Pagination: NewPaginationMeta(params.Page, params.PageSize, total),
-	}, nil)
+	_ = contract.WriteResponse(w, r, http.StatusOK, transformedResults, map[string]any{
+		"pagination": NewPaginationMeta(params.Page, params.PageSize, total),
+	})
 }
 
 // Show handles GET /resource/:id.

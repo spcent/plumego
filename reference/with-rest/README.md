@@ -5,8 +5,7 @@
 It shows how to add `x/rest` resource controllers to a service that still starts
 from Plumego's canonical application shape.
 
-`x/rest` remains experimental until beta promotion evidence is complete. Use
-this scenario reference as wiring guidance, not as a compatibility claim.
+`x/rest` is a beta extension. Use this scenario reference as wiring guidance.
 
 ## What It Demonstrates
 
