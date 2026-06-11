@@ -23,6 +23,7 @@ type AuditHandler struct {
 }
 
 const defaultAuditLimit = 50
+const maxAuditLimit = 200
 
 // List serves GET /api/v1/tenant/audit?limit=N (admin+; enforced in routes.go).
 // Entries are newest first.
@@ -35,11 +36,11 @@ func (h AuditHandler) List(w http.ResponseWriter, r *http.Request) {
 	limit := defaultAuditLimit
 	if raw := r.URL.Query().Get("limit"); raw != "" {
 		n, err := strconv.Atoi(raw)
-		if err != nil || n < 1 {
+		if err != nil || n < 1 || n > maxAuditLimit {
 			logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
 				Type(contract.TypeValidation).
 				Code("audit.invalid_limit").
-				Message("limit must be a positive integer").
+				Message("limit must be between 1 and 200").
 				Build()))
 			return
 		}
