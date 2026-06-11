@@ -21,46 +21,218 @@ Design constraints:
 - keeps all route registration explicit in `internal/app/routes.go`
 - keeps app-local configuration in `internal/config`
 
-Configuration precedence is explicit and test-covered:
-`Defaults()` < `.env` file < process environment < command-line flags.
+## Directory layout
 
-The middleware stack in `internal/app/app.go` wires the production-relevant
-stable-root set in order:
+```
+reference/standard-service/
+├── main.go                       startup only (load config → build app → register routes → start)
+├── env.example                   all supported environment variables with defaults
+├── Dockerfile                    multi-stage build; context must be the repo root
+├── internal/
+│   ├── config/
+│   │   └── config.go             Config struct, Defaults(), Load(), Validate()
+│   ├── app/
+│   │   ├── app.go                App struct, New() (middleware wiring), Start()
+│   │   └── routes.go             RegisterRoutes() — every public path is declared here
+│   ├── handler/
+│   │   ├── api.go                APIHandler: Root, Hello, Info, Greet
+│   │   ├── health.go             HealthHandler: Live (/healthz), Ready (/readyz)
+│   │   ├── items.go              ItemHandler: Create, List, GetByID, Update, Patch, Delete
+│   │   ├── guard.go              RequireWriteKey — per-route middleware for mutating ops
+│   │   └── write.go              logWriteErr helper
+│   └── domain/
+│       └── item/
+│           ├── item.go           Item domain model
+│           ├── store.go          Repository interface + MemoryStore (thread-safe, in-memory)
+│           └── service.go        Service interface + ItemService (normalises input)
+└── ARCHITECTURE.md               layout rationale, dependency direction, pattern explanations
+```
+
+Dependency direction is one-way:
+
+```
+main.go → internal/config → internal/app → internal/handler → internal/domain/item
+```
+
+`internal/handler` never imports `internal/app` or `internal/config`; handlers are
+independently testable by injecting stubs.
+
+## Quick start
+
+```bash
+cd reference/standard-service
+
+# Optional: copy env.example to .env and edit — the service works without it
+cp env.example .env
+
+go run .
+```
+
+The server starts on `:8080`. The first request:
+
+```bash
+curl http://localhost:8080/healthz
+```
+
+```json
+{"data":{"status":"ok","service":"plumego-reference","timestamp":"2024-01-01T00:00:00Z"},"request_id":"..."}
+```
+
+To change the listen address or service name without editing code:
+
+```bash
+APP_ADDR=:9090 APP_SERVICE_NAME=myservice go run .
+```
+
+All supported variables are documented in `env.example`.
+
+## Configuration precedence
+
+```
+Defaults() < .env file < process environment < command-line flags
+```
+
+`config.Load()` applies these layers in order. Each layer overrides the previous.
+The `--env-file` flag and `APP_ENV_FILE` variable control which `.env` file is loaded;
+the default is `.env` in the working directory (silently absent is fine).
+
+Add a config field by:
+1. Adding the field to `AppConfig` in `internal/config/config.go`
+2. Setting a safe default in `Defaults()`
+3. Reading it in `applyEnv()` — one function handles `.env`, process env, and test stubs
+4. Optionally adding a flag in `applyFlags()` — `filterFlagArgs` picks it up automatically
+5. Using the value in `routes.go` or passing it to a handler constructor
+
+## Middleware stack
 
 ```
 requestid → security → cors → recovery → accesslog → bodylimit → httpmetrics → timeout
 ```
 
-`middleware/securityheaders/headers` applies default security headers (X-Frame-Options,
-X-Content-Type-Options, Referrer-Policy) to every response. `middleware/cors`
-uses permissive defaults for the reference app; replace with
-`cors.StrictDefaultOptions(origins...)` in production. `middleware/httpmetrics`
-uses a noop collector; swap in a real `metrics.HTTPObserver` for production
-instrumentation.
+Order matters. The comment block in `internal/app/app.go` explains each position.
+The full stack is wired once in `New()` and applies to every route.
 
-Production services extend this stack with abuse guard rate limiting, auth
-adapters, and tracing as application-local decisions. Do not replace the visible
-wiring with a hidden global production bundle.
+- `requestid` stamps a correlation ID before any logging or error handling
+- `security` sets `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy` on every response
+- `cors` handles preflight; defaults to `*` — set `APP_CORS_ALLOWED_ORIGINS` in production
+- `recovery` converts panics to 500 responses
+- `accesslog` logs every request/response after recovery so panics appear as 500
+- `bodylimit` rejects oversized bodies with 413 (default: 1 MiB)
+- `httpmetrics` measures handler latency; swap `NewNoopCollector` for a real collector
+- `timeout` imposes a per-request wall-clock limit (default: 30 s), innermost so it covers only handler time
 
-For operations, keep telemetry, admin, and debug surfaces separate:
+Production services extend this stack with rate limiting, auth adapters, and tracing as
+application-local decisions. Do not replace visible wiring with a hidden global bundle.
 
-- request metrics, tracing, access logs, and request IDs stay in stable middleware
-- exporter and adapter wiring belongs in `x/observability`
-- protected admin and health orchestration surfaces belong in `x/observability/ops`
-- local debug endpoints belong in `x/observability/devtools` and are not mounted by default
+## curl examples
 
-Canonical files:
+The server must be running (`go run .`) before running these commands.
+All mutating endpoints (`POST`, `PUT`, `PATCH`, `DELETE`) are open by default.
+Set `APP_WRITE_KEY=mysecret` to require `X-Write-Key: mysecret` on those requests.
 
-- `main.go`
-- `internal/app/app.go`
-- `internal/app/routes.go`
-- `internal/config/config.go`
-- `internal/domain/item/item.go` — domain model
-- `internal/domain/item/store.go` — Repository interface + MemoryStore
-- `internal/domain/item/service.go` — Service interface + ItemService
-- `internal/handler/api.go`
-- `internal/handler/health.go`
-- `internal/handler/items.go`
+### Service discovery
+
+```bash
+# Root: service identity
+curl http://localhost:8080/
+
+# Full endpoint list
+curl http://localhost:8080/api/hello
+
+# Application wiring info
+curl http://localhost:8080/api/info
+
+# Health probes
+curl http://localhost:8080/healthz
+curl http://localhost:8080/readyz
+```
+
+### Greeting (demonstrates TypeRequired error path)
+
+```bash
+# Success
+curl "http://localhost:8080/api/v1/greet?name=Alice"
+# {"data":{"message":"hello, Alice"},"request_id":"..."}
+
+# Missing parameter — structured 400 error
+curl "http://localhost:8080/api/v1/greet"
+# {"error":{"code":"greet.name.required","message":"name is required",...},"request_id":"..."}
+```
+
+### Items CRUD
+
+```bash
+# Create
+curl -X POST http://localhost:8080/api/v1/items \
+     -H "Content-Type: application/json" \
+     -d '{"name":"widget","description":"a small widget"}'
+# 201 → {"data":{"id":"...","name":"widget","description":"a small widget","created_at":"..."},...}
+
+# List (with pagination)
+curl "http://localhost:8080/api/v1/items"
+curl "http://localhost:8080/api/v1/items?limit=5&offset=10"
+
+# Get by ID (replace <id> with the id from Create)
+curl http://localhost:8080/api/v1/items/<id>
+# 404 example:
+curl http://localhost:8080/api/v1/items/no-such-id
+# {"error":{"code":"item.not_found","message":"item not found",...},"request_id":"..."}
+
+# Full update — replaces all mutable fields
+curl -X PUT http://localhost:8080/api/v1/items/<id> \
+     -H "Content-Type: application/json" \
+     -d '{"name":"renamed widget","description":"updated description"}'
+
+# Partial update — updates only the non-empty fields in the body
+curl -X PATCH http://localhost:8080/api/v1/items/<id> \
+     -H "Content-Type: application/json" \
+     -d '{"name":"just rename"}'
+
+# Delete — returns 204 No Content
+curl -X DELETE http://localhost:8080/api/v1/items/<id>
+```
+
+### With write key enabled
+
+```bash
+# Start with a key:
+APP_WRITE_KEY=mysecret go run .
+
+# Guarded request — succeeds
+curl -X POST http://localhost:8080/api/v1/items \
+     -H "Content-Type: application/json" \
+     -H "X-Write-Key: mysecret" \
+     -d '{"name":"widget","description":"a widget"}'
+
+# Missing header — 401
+curl -X POST http://localhost:8080/api/v1/items \
+     -H "Content-Type: application/json" \
+     -d '{"name":"widget","description":"a widget"}'
+# {"error":{"code":"auth.key.invalid","message":"valid X-Write-Key header required",...},...}
+```
+
+### Error shape examples
+
+```bash
+# Validation — multiple field errors in one response
+curl -X POST http://localhost:8080/api/v1/items \
+     -H "Content-Type: application/json" \
+     -d '{}'
+# {"error":{"code":"item.fields.required","message":"one or more required fields are missing",
+#            "details":{"description":"field is required","name":"field is required"}},...}
+
+# Unknown field — strict decoding rejects typos
+curl -X POST http://localhost:8080/api/v1/items \
+     -H "Content-Type: application/json" \
+     -d '{"name":"widget","desc":"a widget"}'
+# {"error":{"code":"item.create.unknown_field","details":{"field":"desc"},...},...}
+
+# Oversized body (default 1 MiB limit)
+curl -X POST http://localhost:8080/api/v1/items \
+     -H "Content-Type: application/json" \
+     -d "$(python3 -c "print('{\"name\":\"' + 'x'*2000000 + '\"}')")"
+# 413 Request Entity Too Large
+```
 
 ## Response shape
 
@@ -99,29 +271,114 @@ not the Go identifier. `category` is derived automatically from the type
 is overridden per handler with a namespaced string (`<resource>.<operation>.<reason>`).
 `details` carries per-field annotations; it is omitted when empty.
 
-## Run it
+## Lifecycle
 
-```bash
-cd reference/standard-service
-go run .
+`main.go` wires `signal.NotifyContext(SIGINT, SIGTERM)` and passes the context to
+`app.Start(ctx)`. When a signal fires:
+
+1. The context is cancelled.
+2. `app.Start` triggers `core.Shutdown` with a 15 s deadline.
+3. In-flight requests are allowed to complete within that window.
+4. `app.Start` returns `nil` on clean shutdown, or an error if the deadline expires.
+5. `main.run` returns; the process exits.
+
+The full bootstrap sequence in `main.go` is:
+
+```
+config.Load()           → validated Config
+app.New(cfg)            → App (middleware wired)
+a.RegisterRoutes()      → route table frozen
+a.Start(ctx)            → server running; blocks until context cancels
 ```
 
-The CLI `canonical` scaffold template is expected to teach the same layout and
-stable-root-only wiring:
+Each step is a distinct function so failures are identified precisely. `main.go`
+contains exactly these four calls and no logic.
+
+## Where to add things
+
+### A new endpoint
+
+1. Add a handler method in `internal/handler/` (new file or an existing one).
+2. Add domain logic in `internal/domain/<name>/` if needed.
+3. Declare the handler's dependency as an interface field; wire concrete types from `routes.go`.
+4. Register in `internal/app/routes.go` with one method + one path + one handler per line.
+5. Add focused tests in `internal/handler/handler_test.go`.
+
+See `AGENT_TASKS.md` for copy-paste templates.
+
+### A new config field
+
+Add to `AppConfig` in `internal/config/config.go`, set a default in `Defaults()`,
+read it in `applyEnv()`, and use it in `routes.go` or pass it to a handler constructor.
+
+### Global middleware
+
+Add to `app.Use(...)` in `internal/app/app.go` at the correct position. Annotate the
+order comment if the position matters. All middleware here runs on every route.
+
+### Per-route middleware
+
+Wrap the handler at the call site in `routes.go`:
+
+```go
+v1.post("/items", writeGuard(http.HandlerFunc(items.Create)))
+```
+
+`writeGuard` is the existing example. For route-group protection, wrap every handler in
+the group rather than modifying `app.New`.
+
+### A new readiness probe
+
+Implement `health.ComponentChecker` and add it to `HealthHandler.Checkers` in
+`routes.go`. See `ARCHITECTURE.md §Readiness checking` for the full pattern.
+
+## Running the tests
+
+```bash
+cd reference/standard-service && go test -race -timeout 30s ./...
+```
+
+The test suite covers all handler paths, config precedence, domain behaviour, context
+cancellation, middleware wiring, CORS, security headers, and graceful shutdown.
+
+## Running as a container
+
+Build context must be the repository root (the `replace` directive in `go.mod` requires it):
+
+```bash
+docker build \
+  -f reference/standard-service/Dockerfile \
+  --build-arg VERSION=$(git describe --tags --always) \
+  -t standard-service .
+
+docker run --rm -p 8080:8080 \
+  -e APP_WRITE_KEY=mysecret \
+  -e APP_CORS_ALLOWED_ORIGINS=https://app.example.com \
+  standard-service
+```
+
+## Canonical scaffold template
 
 ```bash
 plumego new myapp --template canonical
 ```
 
-The scaffold is not a byte-for-byte copy of this directory. It preserves the
-same bootstrap, `internal/app`, `internal/handler`, and `internal/config`
-runtime shape, while adapting the entrypoint to a generated project layout
-(`cmd/app/main.go`) and adding project-local files such as `go.mod`,
+The scaffold preserves the same bootstrap, `internal/app`, `internal/handler`, and
+`internal/config` runtime shape, while adapting the entrypoint to a generated project
+layout (`cmd/app/main.go`) and adding project-local files such as `go.mod`,
 `env.example`, `.gitignore`, and `README.md`. Reference-only tests stay in this
-directory; generated projects should add their own tests next to changed
-behavior.
+directory; generated projects should add their own tests next to changed behaviour.
 
-Canonical next reads after this reference:
+## Production readiness
+
+See `PRODUCTION_CHECKLIST.md` before promoting to production. Key items:
+- Set `APP_WRITE_KEY` — empty means publicly writable mutations (a startup WARN is emitted)
+- Set `APP_CORS_ALLOWED_ORIGINS` — empty means wildcard `*` (a startup WARN is emitted)
+- Tighten `core.ReadTimeout`, `core.WriteTimeout`, `core.IdleTimeout` from their permissive defaults
+- Add rate limiting (`middleware/abuseguard`) on public endpoints
+- Swap `metrics.NewNoopCollector()` for a real collector if you need HTTP metrics
+
+## Canonical next reads
 
 1. `docs/README.md`
 2. `docs/reference/canonical-style-guide.md`
