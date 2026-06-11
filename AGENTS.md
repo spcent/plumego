@@ -14,7 +14,7 @@ CLI: `go run ./cmd/plumego --help` (agent-assist, validation runners, codegen, d
 
 - Preserve `net/http` compatibility.
 - Main module stdlib-only unless approved; no `go.mod` under `x/**`; stable roots must not import `x/*`.
-- `reference/` and `use-cases/` MAY have an independent `go.mod` for external deps via a `replace` directive + documented rationale (`workerfleet`=MongoDB, `cloud-vault`=multi-feature wiring, `dbadmin`=admin tooling, `guardus`=security services).
+- `reference/` and `use-cases/` MAY have an independent `go.mod` for external deps via a `replace` directive + documented rationale (`workerfleet`=MongoDB, `cloud-vault`=multi-feature wiring, `dbadmin`=admin tooling, `guardus`=security services, `mini-saas-api`=stable-roots + beta-extension SaaS showcase with zero external deps).
 - No hidden globals, `init()` registration, or context service-locator patterns.
 - Never log secrets/tokens/signatures/keys. Fail closed on auth/verification/policy errors; timing-safe comparison for secret checks.
 - Context accessors: `With{Type}` + `{Type}FromContext`; key types are unexported zero-value structs inlined at the call site.

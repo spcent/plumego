@@ -17,6 +17,7 @@ local operating rules.
 | App | What it is |
 |---|---|
 | `dbadmin/` | Local-first multi-database admin workbench — MySQL, SQLite, Redis, MongoDB, and Elasticsearch inspection with safety guardrails |
+| `mini-saas-api/` | Multi-tenant SaaS API showcase — JWT auth with rotated refresh tokens, RBAC, x/tenant rate limit + quota, x/rest projects CRUD, idempotent writes, audit log, Prometheus metrics; zero external deps |
 | `workerfleet/` | Worker fleet monitoring service — HTTP ingestion, domain events, MongoDB storage, Kubernetes reconciliation, Prometheus metrics, Feishu/webhook alerting |
 
 For canonical application layout, see `reference/standard-service`.

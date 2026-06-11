@@ -4,7 +4,7 @@ Milestone: M-025
 Recipe: (none — examples + docs)
 Context Package: use-cases/mini-saas-api
 Priority: P1
-State: active
+State: done
 Primary Module: use-cases/mini-saas-api
 Owned Files: api/**, README.md, ARCHITECTURE.md
 Depends On: 1528, 1529, 1530

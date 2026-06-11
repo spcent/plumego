@@ -4,7 +4,7 @@ Milestone: M-025
 Recipe: (none — tenancy capability)
 Context Package: use-cases/mini-saas-api
 Priority: P1
-State: active
+State: done
 Primary Module: use-cases/mini-saas-api
 Owned Files: internal/handler/{tenant,members}.go, internal/app/{routes,tenantlimits}.go, login-by-slug additions
 Depends On: 1527

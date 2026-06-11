@@ -4,7 +4,7 @@ Milestone: M-025
 Recipe: (none — auth capability)
 Context Package: use-cases/mini-saas-api
 Priority: P1
-State: active
+State: done
 Primary Module: use-cases/mini-saas-api
 Owned Files: internal/domain/session, internal/handler/{auth,guard,me,errors}.go, internal/app wiring
 Depends On: 1526

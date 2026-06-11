@@ -4,7 +4,7 @@ Milestone: M-025
 Recipe: (none — new use-case scaffold)
 Context Package: use-cases/mini-saas-api
 Priority: P1
-State: active
+State: done
 Primary Module: use-cases/mini-saas-api
 Owned Files: go.mod, main.go, internal/config/config.go, internal/app/app.go, internal/app/routes.go, internal/handler/health.go, env.example, AGENTS.md, ARCHITECTURE.md, README.md (new, all files)
 Depends On: (none)

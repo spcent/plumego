@@ -4,7 +4,7 @@ Milestone: M-025
 Recipe: (none — observability capability)
 Context Package: use-cases/mini-saas-api
 Priority: P1
-State: active
+State: done
 Primary Module: use-cases/mini-saas-api
 Owned Files: internal/handler/{audit,metricsguard}.go, app/routes observability wiring
 Depends On: 1527

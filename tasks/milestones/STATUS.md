@@ -22,7 +22,7 @@ matching `done/` directory on disk.
 | M-022 repo surface audit remediation | `tasks/milestones/active/M-022-repo-surface-audit-remediation/M-022.md` | Tracks the verified 2026-05 repo audit and splits it into bounded manifest, architecture, and deprecation cards | Implementation complete locally; verify artifact recorded, push and PR packaging pending |
 | M-023 AI resilience convergence | `tasks/milestones/active/M-023-ai-resilience-convergence/M-023.md` | Pulls the highest-risk residual audit finding forward: finish `x/ai/resilience` convergence onto shared `x/resilience/*` primitives without waiting on control-plane cleanup | Card implementation complete locally; verify artifact update and PR packaging still pending |
 | M-024 stable-tier metadata and control-plane clarity | `tasks/milestones/active/M-024-stable-tier-metadata-and-control-plane-clarity/M-024.md` | Follow-up cleanup after M-022 and M-023: stable-tier AI manifests plus the remaining docs/specs/tasks ambiguity | All planned cards completed locally; verify artifact update and PR packaging still pending |
-| M-025 mini SaaS API use-case | `tasks/milestones/active/M-025-mini-saas-api/M-025.md` | New `use-cases/mini-saas-api` composing stable roots with beta x/rest, x/tenant, and x/observability | Proposal and plan authored; implementation not started |
+| M-025 mini SaaS API use-case | `tasks/milestones/active/M-025-mini-saas-api/M-025.md` | New `use-cases/mini-saas-api` composing stable roots with beta x/rest, x/tenant, and x/observability | All cards (1525-1532) implemented and validated; verify artifact recorded; PR #343 awaiting review |
 
 ## Reconciliation Rules
 

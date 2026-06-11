@@ -4,7 +4,7 @@ Milestone: M-025
 Recipe: (none — projects capability)
 Context Package: use-cases/mini-saas-api
 Priority: P1
-State: active
+State: done
 Primary Module: use-cases/mini-saas-api
 Owned Files: internal/handler/{projects,idempotency}.go, internal/platform/idemstore, route wiring
 Depends On: 1527
