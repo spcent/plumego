@@ -3,6 +3,7 @@ package user
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"sync"
 
@@ -49,7 +50,7 @@ func (r *Repository) FindByID(_ context.Context, id string) (*User, error) {
 
 	item, ok := r.users[id]
 	if !ok {
-		return nil, nil
+		return nil, sql.ErrNoRows
 	}
 	return &item, nil
 }
@@ -70,6 +71,9 @@ func (r *Repository) Update(_ context.Context, id string, item *User) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
+	if _, ok := r.users[id]; !ok {
+		return sql.ErrNoRows
+	}
 	item.ID = id
 	r.users[id] = *item
 	return nil
@@ -79,6 +83,9 @@ func (r *Repository) Delete(_ context.Context, id string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
+	if _, ok := r.users[id]; !ok {
+		return sql.ErrNoRows
+	}
 	delete(r.users, id)
 	return nil
 }
