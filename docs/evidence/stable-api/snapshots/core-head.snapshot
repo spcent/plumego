@@ -1,6 +1,6 @@
 # plumego extension api snapshot v1
 module	github.com/spcent/plumego
-pattern	./core/...
+pattern	./core
 symbol	github.com/spcent/plumego/core	const	PreparationStateHandlerPrepared	const PreparationStateHandlerPrepared PreparationState = "handler_prepared"
 symbol	github.com/spcent/plumego/core	const	PreparationStateMutable	const PreparationStateMutable PreparationState = "mutable"
 symbol	github.com/spcent/plumego/core	const	PreparationStateServerPrepared	const PreparationStateServerPrepared PreparationState = "server_prepared"
@@ -23,7 +23,7 @@ symbol	github.com/spcent/plumego/core	method	App.Run	func (App) Runfunc() error
 symbol	github.com/spcent/plumego/core	method	App.ServeHTTP	func (App) ServeHTTPfunc(w http.ResponseWriter, r *http.Request)
 symbol	github.com/spcent/plumego/core	method	App.Server	func (App) Serverfunc() (*http.Server, error)
 symbol	github.com/spcent/plumego/core	method	App.Shutdown	func (App) Shutdownfunc(ctx context.Context) error
-symbol	github.com/spcent/plumego/core	method	App.URL	func (App) URLfunc(name string, params ...string) string
+symbol	github.com/spcent/plumego/core	method	App.URL	func (App) URLfunc(name string, params ...string) (string, error)
 symbol	github.com/spcent/plumego/core	method	App.Use	func (App) Usefunc(middlewares ...middleware.Middleware) error
 symbol	github.com/spcent/plumego/core	method	Component.Ready	func (Component) Readyfunc(ctx context.Context) error
 symbol	github.com/spcent/plumego/core	method	Component.Start	func (Component) Startfunc(ctx context.Context) error

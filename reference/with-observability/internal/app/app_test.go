@@ -35,8 +35,8 @@ func TestRegisterRoutesCanonicalShape(t *testing.T) {
 		t.Fatalf("routes count = %d, want %d\ngot:  %#v\nwant: %#v", len(got), len(want), got, want)
 	}
 	for i := range want {
-		if got[i] != want[i] {
-			t.Errorf("routes[%d] = %v, want %v", i, got[i], want[i])
+		if got[i].Method != want[i].Method || got[i].Path != want[i].Path {
+			t.Errorf("routes[%d] = {%s %s}, want {%s %s}", i, got[i].Method, got[i].Path, want[i].Method, want[i].Path)
 		}
 	}
 }

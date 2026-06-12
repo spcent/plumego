@@ -197,3 +197,40 @@ func assertBodyOmits(t *testing.T, body, value string) {
 		t.Fatalf("response body leaked %q: %s", value, body)
 	}
 }
+
+func TestDBResourceControllerIndex_CanonicalContractShape(t *testing.T) {
+	controller := NewDBResourceController("items", dbResourceTestRepo{})
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/items", nil)
+
+	controller.Index(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200; body: %s", rec.Code, rec.Body.String())
+	}
+
+	// Canonical contract shape: {"data": [...], "meta": {"pagination": {...}}}
+	// Must NOT be the old double-nested {"data": {"data": [...], "pagination": {...}}}
+	var resp struct {
+		Data []struct {
+			ID   string `json:"id"`
+			Name string `json:"name"`
+		} `json:"data"`
+		Meta struct {
+			Pagination *PaginationMeta `json:"pagination"`
+		} `json:"meta"`
+	}
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode: %v; body: %s", err, rec.Body.String())
+	}
+	if len(resp.Data) != 1 {
+		t.Fatalf("data len = %d, want 1; body: %s", len(resp.Data), rec.Body.String())
+	}
+	if resp.Meta.Pagination == nil {
+		t.Fatalf("meta.pagination missing; body: %s", rec.Body.String())
+	}
+	if resp.Meta.Pagination.TotalItems != 1 {
+		t.Fatalf("pagination.total_items = %d, want 1", resp.Meta.Pagination.TotalItems)
+	}
+}

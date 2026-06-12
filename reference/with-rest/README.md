@@ -3,9 +3,10 @@
 Canonical Plumego example for building a JSON REST API with `x/rest` resource
 controllers alongside plain HTTP handlers.
 
-Start here when your goal is a CRUD resource API backed by `x/rest`.
-For a plain handler-only service without `x/rest`, see
-`reference/standard-service` instead.
+It shows how to add `x/rest` resource controllers to a service that still starts
+from Plumego's canonical application shape.
+
+`x/rest` is a beta extension. Use this scenario reference as wiring guidance.
 
 ## What It Demonstrates
 
