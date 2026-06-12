@@ -55,6 +55,7 @@ coverage.
 | M-022 | Repo Surface Audit Remediation | [→] | — | Implementation complete locally with verify artifact; awaiting push and PR packaging before merge |
 | M-023 | AI Resilience Convergence | [→] | — | Card implementation complete locally; verify/PR packaging still pending before merge |
 | M-024 | Stable-Tier Metadata and Control-Plane Clarity | [→] | M-022, M-023 | All planned cards completed locally; verify/PR packaging still pending before merge |
+| M-025 | Mini SaaS API Use-Case | [→] | — | Implementation complete (cards 1525-1532); `use-cases/mini-saas-api` live with verify artifact; PR #343 open for review |
 
 ---
 

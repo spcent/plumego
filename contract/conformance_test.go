@@ -298,6 +298,7 @@ func TestExternalTypedErrorsUseCanonicalContractCodes(t *testing.T) {
 	var violations []string
 	registeredCustomCodes := loadContractErrorCodeRegistry(t, repoRoot)
 	allowedDynamicCustomCodes := map[string]int{
+		"use-cases/mini-saas-api/internal/handler/guard.go#writeUnauthorized":                   1,
 		"use-cases/workerfleet/internal/handler/worker_register.go#Handler.writeNotImplemented": 1,
 		"x/observability/ops/ops.go#Handler.writeHookError":                                     1,
 		"x/observability/ops/ops.go#writeNotImplemented":                                        1,

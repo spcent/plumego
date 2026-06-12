@@ -249,6 +249,36 @@
       "path": "use-cases/dbadmin/internal/handler/audit.go",
       "symbol": "literal:DBADMIN_RBAC_DENIED",
       "type": "TypeForbidden"
+    },
+    {
+      "path": "use-cases/mini-saas-api/internal/handler/audit.go",
+      "symbol": "literal:audit.invalid_limit",
+      "type": "TypeValidation"
+    },
+    {
+      "path": "use-cases/mini-saas-api/internal/handler/errors.go",
+      "symbol": "literal:request.invalid_json",
+      "type": "TypeBadRequest"
+    },
+    {
+      "path": "use-cases/mini-saas-api/internal/handler/guard.go",
+      "symbol": "literal:auth.insufficient_role",
+      "type": "TypeForbidden"
+    },
+    {
+      "path": "use-cases/mini-saas-api/internal/handler/idempotency.go",
+      "symbol": "literal:idempotency.payload_mismatch",
+      "type": "TypeValidation"
+    },
+    {
+      "path": "use-cases/mini-saas-api/internal/handler/idempotency.go",
+      "symbol": "literal:idempotency.in_flight",
+      "type": "TypeConflict"
+    },
+    {
+      "path": "use-cases/mini-saas-api/internal/handler/idempotency.go",
+      "symbol": "literal:idempotency.store_error",
+      "type": "TypeInternal"
     }
   ]
 }
