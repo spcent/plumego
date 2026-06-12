@@ -36,7 +36,6 @@
 
 - `ResourceSpec`
 - `RegisterResourceRoutes`
-- `RegisterContextResourceRoutes`
 - `NewDBResource`
 - `RegisterDBResource`
 
@@ -86,7 +85,9 @@ func RegisterRoutes(r *router.Router, repository rest.Repository[User]) {
 	spec := rest.DefaultResourceSpec("users").WithPrefix("/api/users")
 
 	controller := rest.NewDBResource(spec, repository)
-	rest.RegisterContextResourceRoutes(r, spec.Prefix, controller)
+	if err := rest.RegisterResourceRoutes(r, spec.Prefix, controller, rest.DefaultRouteOptions()); err != nil {
+		panic(err)
+	}
 }
 ```
 
@@ -112,6 +113,7 @@ func RegisterRoutes(r *router.Router, repository rest.Repository[User]) {
 - `RegisterResourceRoutes`: canonical route surface (all 11 routes), `RouteOptions` selective enable/disable, `BaseContextResourceController` wiring, nil router and nil controller errors, empty prefix normalization
 - `DefaultRouteOptions`: all three flags enabled
 - `BaseResourceController`: all 7 not-implemented methods return HTTP 501 with `contract.CodeNotImplemented`, `Options` sets CORS headers and returns 204, `Head` returns 200, empty `ResourceName` defaults to `"resource"`
+- `DBResourceController.Index`: canonical contract response shape (`{"data": [...], "meta": {"pagination": {...}}}`), repository errors use stable messages, hook errors use safe codes
 - `ResourceSpec` / `ApplyResourceSpec`: controller defaults preservation, spec-driven query normalization, legacy sort field filtering
 - `NewPaginationMeta`: first-page (HasPrev=false, HasNext=true), last-page (HasNext=false), zero-item (TotalPages=0, no navigation)
 - `QueryBuilder`: page-size clamping to max, invalid page input uses default (page=1), page=0 treated as default, unknown sort field filtered out, unknown filter field filtered out, descending sort prefix (`-`) parsing
