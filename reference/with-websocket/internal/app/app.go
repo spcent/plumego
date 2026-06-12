@@ -46,8 +46,11 @@ func New(cfg config.Config) (*App, error) {
 
 	wsCfg := websocket.DefaultWebSocketConfig()
 	wsCfg.Secret = []byte(cfg.WSSecret)
-	wsCfg.AllowUnauthenticated = true
-	wsCfg.AllowedOrigins = []string{"*"}
+	wsCfg.AllowUnauthenticated = true // demo only; set false and provide a JWT to enable auth
+	wsCfg.AllowAllOrigins = true      // demo only; restrict to specific origins in production
+	wsCfg.OnMessage = func(c *websocket.Conn, msg websocket.Message) error {
+		return c.WriteMessage(msg.Op, msg.Data)
+	}
 
 	ws, err := websocket.New(wsCfg)
 	if err != nil {
