@@ -21,6 +21,27 @@ Design constraints:
 - keeps all route registration explicit in `internal/app/routes.go`
 - keeps app-local configuration in `internal/config`
 
+## Not included
+
+This reference intentionally excludes capabilities that belong in the matching
+`reference/with-*` apps. Add them there rather than expanding this canonical baseline:
+
+| Need                        | Starting point                                            |
+|-----------------------------|-----------------------------------------------------------|
+| Authentication / authz      | `reference/production-service`                            |
+| Database connections        | swap `item.MemoryStore` for a DB-backed `item.Repository` |
+| Multi-tenancy               | `reference/with-tenant`                                   |
+| WebSocket                   | `reference/with-websocket`                                |
+| gRPC / RPC                  | `reference/with-rpc`                                      |
+| AI / LLM integration        | `reference/with-ai`                                       |
+| Frontend asset serving      | `reference/with-frontend`                                 |
+| Metrics export (Prometheus) | `reference/with-ops`                                      |
+| Distributed tracing         | `reference/with-observability`                            |
+
+No `x/*` extension packages are imported. Automatic route discovery, reflection routing,
+and controller scanning are absent by design — every route is declared explicitly in
+`internal/app/routes.go`.
+
 ## Directory layout
 
 ```
@@ -67,6 +88,10 @@ cp env.example .env
 
 go run .
 ```
+
+With the default config the server logs two startup warnings reminding you to set
+`APP_WRITE_KEY` and `APP_CORS_ALLOWED_ORIGINS` before deploying. Both are expected
+on a clean checkout. See `env.example` for all configuration variables.
 
 The server starts on `:8080`. The first request:
 
@@ -133,18 +158,25 @@ Set `APP_WRITE_KEY=mysecret` to require `X-Write-Key: mysecret` on those request
 ### Service discovery
 
 ```bash
-# Root: service identity
+# Root: minimal service identity
 curl http://localhost:8080/
+# {"data":{"service":"plumego-reference","version":"dev","docs":"/api/hello"},"request_id":"..."}
 
-# Full endpoint list
+# Full endpoint list (hand-authored; TestHelloEndpointListMatchesRegisteredRoutes detects drift)
 curl http://localhost:8080/api/hello
+# {"data":{"message":"hello from plumego standard-service","service":"...","version":"...","endpoints":[...]},...}
 
 # Application wiring info
 curl http://localhost:8080/api/info
+# {"data":{"service":"plumego-reference","version":"dev","timestamp":"2024-01-01T00:00:00Z"},"request_id":"..."}
 
-# Health probes
+# Liveness probe (always 200 while the process is alive — no dependency checks)
 curl http://localhost:8080/healthz
+# {"data":{"status":"ok","service":"plumego-reference","timestamp":"2024-01-01T00:00:00Z"},"request_id":"..."}
+
+# Readiness probe (probes all registered ComponentCheckers; 503 when any fail)
 curl http://localhost:8080/readyz
+# {"data":{"ready":true,"timestamp":"2024-01-01T00:00:00Z","components":{"item_store":true}},"request_id":"..."}
 ```
 
 ### Greeting (demonstrates TypeRequired error path)
@@ -368,6 +400,15 @@ The scaffold preserves the same bootstrap, `internal/app`, `internal/handler`, a
 layout (`cmd/app/main.go`) and adding project-local files such as `go.mod`,
 `env.example`, `.gitignore`, and `README.md`. Reference-only tests stay in this
 directory; generated projects should add their own tests next to changed behaviour.
+
+To copy manually without the scaffold, change three things:
+
+1. Rename the module in `go.mod` from `standard-service` to your module path
+   (e.g. `module github.com/yourorg/myapp`).
+2. Remove the `replace` directive and pin the real published version of
+   `github.com/spcent/plumego`.
+3. Replace the `standard-service/` import prefix in all `.go` files with your
+   new module path.
 
 ## Production readiness
 
