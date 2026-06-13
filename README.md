@@ -153,6 +153,7 @@ for the internal operating reference.
 
 - [`docs/start/getting-started.md`](./docs/start/getting-started.md) — smallest runnable walkthrough.
 - [`reference/standard-service`](./reference/standard-service) — canonical app layout.
+- [`docs/reference/reference-apps.md`](./docs/reference/reference-apps.md) — guide to choosing a reference application.
 - [`docs/reference/canonical-style-guide.md`](./docs/reference/canonical-style-guide.md) — handler, middleware, routing, DI conventions.
 - [`docs/modules`](./docs/modules) — package-specific primers.
 - [`docs/start/adoption-path.md`](./docs/start/adoption-path.md) — 5-minute, 30-minute, 1-day adoption path.
