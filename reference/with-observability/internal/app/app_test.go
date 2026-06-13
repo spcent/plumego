@@ -1,6 +1,7 @@
 package app
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -197,5 +198,149 @@ func TestRequestIDPropagationThroughMiddlewareStack(t *testing.T) {
 	}
 	if got := rec.Header().Get(contract.RequestIDHeader); got != "obs-test-1" {
 		t.Fatalf("%s = %q, want %q", contract.RequestIDHeader, got, "obs-test-1")
+	}
+}
+
+func TestHealthEndpointLivenessAlwaysReturns200(t *testing.T) {
+	a, err := New(config.Defaults())
+	if err != nil {
+		t.Fatalf("new app: %v", err)
+	}
+	if err := a.RegisterRoutes(); err != nil {
+		t.Fatalf("register routes: %v", err)
+	}
+	if err := a.Core.Prepare(); err != nil {
+		t.Fatalf("prepare app: %v", err)
+	}
+	srv, err := a.Core.Server()
+	if err != nil {
+		t.Fatalf("get server: %v", err)
+	}
+
+	rec := httptest.NewRecorder()
+	srv.Handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/healthz", nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET /healthz: status = %d, want %d", rec.Code, http.StatusOK)
+	}
+}
+
+func TestReadinessEndpointReturnsOKWithNoCheckers(t *testing.T) {
+	a, err := New(config.Defaults())
+	if err != nil {
+		t.Fatalf("new app: %v", err)
+	}
+	if err := a.RegisterRoutes(); err != nil {
+		t.Fatalf("register routes: %v", err)
+	}
+	if err := a.Core.Prepare(); err != nil {
+		t.Fatalf("prepare app: %v", err)
+	}
+	srv, err := a.Core.Server()
+	if err != nil {
+		t.Fatalf("get server: %v", err)
+	}
+
+	rec := httptest.NewRecorder()
+	srv.Handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/readyz", nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET /readyz: status = %d, want %d", rec.Code, http.StatusOK)
+	}
+}
+
+func TestSpansEndpointWithLimitParameter(t *testing.T) {
+	a, err := New(config.Defaults())
+	if err != nil {
+		t.Fatalf("new app: %v", err)
+	}
+	if err := a.RegisterRoutes(); err != nil {
+		t.Fatalf("register routes: %v", err)
+	}
+	if err := a.Core.Prepare(); err != nil {
+		t.Fatalf("prepare app: %v", err)
+	}
+	srv, err := a.Core.Server()
+	if err != nil {
+		t.Fatalf("get server: %v", err)
+	}
+
+	// Generate multiple requests to create multiple spans.
+	for range 5 {
+		rec := httptest.NewRecorder()
+		srv.Handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/hello", nil))
+		if rec.Code != http.StatusOK {
+			t.Fatalf("GET /api/hello: status = %d, want %d", rec.Code, http.StatusOK)
+		}
+	}
+
+	// Query with limit=2, should return only 2 spans.
+	rec := httptest.NewRecorder()
+	srv.Handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/v1/spans?limit=2", nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET /api/v1/spans?limit=2: status = %d, want %d", rec.Code, http.StatusOK)
+	}
+
+	var env struct {
+		Data struct {
+			Spans []map[string]interface{} `json:"spans"`
+		} `json:"data"`
+	}
+	if err := json.NewDecoder(rec.Body).Decode(&env); err != nil {
+		t.Fatalf("decode body: %v", err)
+	}
+	if len(env.Data.Spans) != 2 {
+		t.Fatalf("GET /api/v1/spans?limit=2: returned %d spans, want 2", len(env.Data.Spans))
+	}
+}
+
+func TestStatsEndpointAccumulatesMetricsCorrectly(t *testing.T) {
+	a, err := New(config.Defaults())
+	if err != nil {
+		t.Fatalf("new app: %v", err)
+	}
+	if err := a.RegisterRoutes(); err != nil {
+		t.Fatalf("register routes: %v", err)
+	}
+	if err := a.Core.Prepare(); err != nil {
+		t.Fatalf("prepare app: %v", err)
+	}
+	srv, err := a.Core.Server()
+	if err != nil {
+		t.Fatalf("get server: %v", err)
+	}
+
+	// First check: no requests yet, stats should be empty.
+	rec := httptest.NewRecorder()
+	srv.Handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/v1/stats", nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("initial GET /api/v1/stats: status = %d, want %d", rec.Code, http.StatusOK)
+	}
+
+	// Make some requests.
+	for range 3 {
+		rec := httptest.NewRecorder()
+		srv.Handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/hello", nil))
+		if rec.Code != http.StatusOK {
+			t.Fatalf("GET /api/hello: status = %d, want %d", rec.Code, http.StatusOK)
+		}
+	}
+
+	// Second check: stats should now show accumulated data.
+	rec = httptest.NewRecorder()
+	srv.Handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/v1/stats", nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET /api/v1/stats: status = %d, want %d", rec.Code, http.StatusOK)
+	}
+
+	var env struct {
+		Data struct {
+			TotalRequests int64 `json:"total_requests"`
+		} `json:"data"`
+	}
+	if err := json.NewDecoder(rec.Body).Decode(&env); err != nil {
+		t.Fatalf("decode body: %v", err)
+	}
+	// Should have at least the 3 /api/hello requests plus stats requests themselves.
+	if env.Data.TotalRequests < 3 {
+		t.Fatalf("GET /api/v1/stats: TotalRequests = %d, want >= 3", env.Data.TotalRequests)
 	}
 }

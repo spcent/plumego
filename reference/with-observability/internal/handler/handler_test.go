@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/spcent/plumego/contract"
+	"github.com/spcent/plumego/health"
 	plumelog "github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/x/observability"
 )
@@ -143,6 +144,68 @@ func TestMetricsHandlerCollectorStatsReturnsJSON(t *testing.T) {
 	}
 	if ct := rec.Header().Get("Content-Type"); ct != contract.ContentTypeJSON {
 		t.Errorf("Content-Type = %q, want %q", ct, contract.ContentTypeJSON)
+	}
+}
+
+// --- HealthHandler ---
+
+func TestHealthHandlerLiveReturnsOK(t *testing.T) {
+	h := HealthHandler{
+		ServiceName: "test-svc",
+		Logger:      discardLogger(),
+		Checkers:    []health.ComponentChecker{},
+	}
+	rec := httptest.NewRecorder()
+	h.Live(rec, httptest.NewRequest(http.MethodGet, "/healthz", nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+	if ct := rec.Header().Get("Content-Type"); ct != contract.ContentTypeJSON {
+		t.Errorf("Content-Type = %q, want %q", ct, contract.ContentTypeJSON)
+	}
+	var env struct {
+		Data struct {
+			Status    string `json:"status"`
+			Service   string `json:"service"`
+			Timestamp string `json:"timestamp"`
+		} `json:"data"`
+	}
+	if err := json.NewDecoder(rec.Body).Decode(&env); err != nil {
+		t.Fatalf("decode body: %v", err)
+	}
+	if env.Data.Status != "ok" {
+		t.Errorf("status = %q, want %q", env.Data.Status, "ok")
+	}
+	if env.Data.Service != "test-svc" {
+		t.Errorf("service = %q, want %q", env.Data.Service, "test-svc")
+	}
+	if env.Data.Timestamp == "" {
+		t.Error("timestamp is empty")
+	}
+}
+
+func TestHealthHandlerReadyWithNoCheckersReturnsOK(t *testing.T) {
+	h := HealthHandler{
+		ServiceName: "test-svc",
+		Logger:      discardLogger(),
+		Checkers:    []health.ComponentChecker{},
+	}
+	rec := httptest.NewRecorder()
+	h.Ready(rec, httptest.NewRequest(http.MethodGet, "/readyz", nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+	var env struct {
+		Data struct {
+			Ready      bool            `json:"ready"`
+			Components map[string]bool `json:"components"`
+		} `json:"data"`
+	}
+	if err := json.NewDecoder(rec.Body).Decode(&env); err != nil {
+		t.Fatalf("decode body: %v", err)
+	}
+	if !env.Data.Ready {
+		t.Errorf("ready = %v, want true", env.Data.Ready)
 	}
 }
 

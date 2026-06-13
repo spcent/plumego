@@ -12,6 +12,9 @@ import (
 const codeComponentUnhealthy = "health.component.unhealthy"
 
 // HealthHandler serves liveness and readiness endpoints.
+// Checkers may be empty; readiness will return success if no checkers fail.
+// To add health checks (e.g. database connectivity), pass ComponentChecker instances
+// when constructing the handler. See health.ComponentChecker for the interface.
 type HealthHandler struct {
 	ServiceName string
 	Logger      plumelog.StructuredLogger
