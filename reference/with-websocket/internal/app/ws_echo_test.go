@@ -3,6 +3,7 @@ package app
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"net/http/httptest"
 	"strings"
 	"testing"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/spcent/plumego/x/websocket"
 	"with-websocket/internal/config"
+	"with-websocket/internal/message"
 )
 
 // makeEchoApp builds an App with echo OnMessage and registers routes.
@@ -149,5 +151,85 @@ func TestEchoGracefulClientClose(t *testing.T) {
 	}
 	if !conn.IsClosed() {
 		t.Fatalf("conn.IsClosed() = false after WriteClose")
+	}
+}
+
+// TestEchoJSONPingRespondsWithPong verifies that {"type":"ping"} elicits {"type":"pong"}.
+// This demonstrates the JSON message encode/decode path in echoHandler.
+func TestEchoJSONPingRespondsWithPong(t *testing.T) {
+	srv := httptest.NewServer(makeEchoApp(t).Core)
+	defer srv.Close()
+
+	conn := dialEcho(t, srv)
+	defer conn.Close()
+
+	ping, err := message.Encode(message.Event{Type: "ping"})
+	if err != nil {
+		t.Fatalf("Encode ping: %v", err)
+	}
+	if err := conn.WriteText(string(ping)); err != nil {
+		t.Fatalf("WriteText: %v", err)
+	}
+
+	op, got, err := conn.ReadMessage()
+	if err != nil {
+		t.Fatalf("ReadMessage: %v", err)
+	}
+	if op != websocket.OpcodeText {
+		t.Fatalf("opcode = %d, want OpcodeText (%d)", op, websocket.OpcodeText)
+	}
+
+	var ev message.Event
+	if err := json.Unmarshal(got, &ev); err != nil {
+		t.Fatalf("unmarshal pong: %v (raw = %s)", err, got)
+	}
+	if ev.Type != "pong" {
+		t.Fatalf("pong type = %q, want %q", ev.Type, "pong")
+	}
+}
+
+// TestEchoNonJSONTextFallsBackToRaw verifies that non-JSON text is echoed verbatim.
+// The handler tries JSON decode first; if it fails it reflects raw bytes.
+func TestEchoNonJSONTextFallsBackToRaw(t *testing.T) {
+	srv := httptest.NewServer(makeEchoApp(t).Core)
+	defer srv.Close()
+
+	conn := dialEcho(t, srv)
+	defer conn.Close()
+
+	const want = "hello world"
+	if err := conn.WriteText(want); err != nil {
+		t.Fatalf("WriteText: %v", err)
+	}
+
+	_, got, err := conn.ReadMessage()
+	if err != nil {
+		t.Fatalf("ReadMessage: %v", err)
+	}
+	if string(got) != want {
+		t.Fatalf("echo = %q, want %q", got, want)
+	}
+}
+
+// TestEchoUnknownJSONTypeFallsBackToRaw verifies that a JSON text message whose
+// type field is not "ping" is echoed back verbatim rather than silently consumed.
+func TestEchoUnknownJSONTypeFallsBackToRaw(t *testing.T) {
+	srv := httptest.NewServer(makeEchoApp(t).Core)
+	defer srv.Close()
+
+	conn := dialEcho(t, srv)
+	defer conn.Close()
+
+	const want = `{"type":"custom","data":{"key":"value"}}`
+	if err := conn.WriteText(want); err != nil {
+		t.Fatalf("WriteText: %v", err)
+	}
+
+	_, got, err := conn.ReadMessage()
+	if err != nil {
+		t.Fatalf("ReadMessage: %v", err)
+	}
+	if string(got) != want {
+		t.Fatalf("echo = %q, want %q", got, want)
 	}
 }
