@@ -46,25 +46,38 @@
 - `NewSimpleRoomAuth`
 - `SimpleHS256TokenAuth`
 - `NewSimpleHS256TokenAuth`
-- `VerifyJWT`
 - `SecurityConfig`
+- `SecurityMetrics`
+- `SecureRoomAuth`
 - `NewSecureRoomAuth`
+- `RoomAuthorization`
+- `RoomRequestAuthorizer`
+- `ExtractUserInfo`
 - `SendBehavior`
 - `Conn`
-- `NewConnE`
+- `NewConn`
+- `Outbound`
+- `UserInfo`
 - `Dial`
 - `DialOptions`
 - `Hub`
 - `HubConfig`
 - `HubMetrics`
-- `NewHubWithConfigE`
+- `NewHub`
+- `NewHubWithConfig`
 - `BroadcastResult`
 - `ServeWSWithConfig`
 - `ServeRoomFanoutWS`
+- `ValidateRoomName`
+- `MaxRoomNameLength`
 - `MessageValidationConfig`
 - `DefaultMessageValidationConfig`
 - `ValidateTextMessage`
 - `SanitizeForLogging`
+- `ValidationError`
+- `NewValidationError`
+- `CloseError`
+- `NewCloseError`
 - RFC6455 opcode and close-code constants
 - documented websocket error sentinels
 
@@ -93,8 +106,8 @@
 - perform the real Hub join before writing `101 Switching Protocols`; if capacity changes after the pre-check, return a normal HTTP error before upgrade
 - treat `Hub.Stop` worker drain as bounded; `SendBlock` connections without their own timeout use the hub worker fallback deadline instead of blocking indefinitely
 - treat `Hub.Shutdown` as a hard connection close path, not a WebSocket close-frame handshake
-- use `NewConnE` for connection construction with explicit validation errors
-- use `NewHubWithConfigE` for hub configuration with explicit validation errors
+- use `NewConn` for connection construction with explicit validation errors
+- use `NewHubWithConfig` for hub configuration with explicit validation errors
 - treat `SetReadLimit` as a fail-visible mutator; non-positive limits are rejected
 - expect `WriteClose` to return the close-frame write error when the frame cannot be sent
 - use `WriteTimeout` or `Conn.SetWriteTimeout` to bound network frame writes; `SendTimeout` only controls enqueue behavior
@@ -183,7 +196,7 @@ snapshots, no exported API changes, and `realtime` owner sign-off.
 - document shutdown as hard-close unless a future card adds non-blocking close-frame delivery
 - document `WriteClose` as best-effort close-frame delivery followed by TCP close, not a full peer close handshake
 - keep connection constructors and mutable timing setters fail-visible instead of panic-prone
-- keep hub construction error-returning through `NewHubWithConfigE`; do not reintroduce panic convenience constructors
+- keep hub construction error-returning through `NewHubWithConfig`; do not reintroduce panic convenience constructors
 - keep bounded message readers explicit: closing before EOF abandons the message by closing the connection
 - keep full config constructors and join paths error-returning; do not reintroduce compatibility-only bypass helpers
 - keep metrics names precise enough to distinguish unique connections from room registrations

@@ -52,6 +52,7 @@ public_entrypoints:
   - ExtractUserInfo
   - SecurityConfig
   - SecurityMetrics
+  - SecureRoomAuth
   - NewSecureRoomAuth
   - ValidateSecurityConfig
   - ValidateWebSocketKey
@@ -71,9 +72,12 @@ public_entrypoints:
   - Hub
   - HubConfig
   - HubMetrics
+  - NewHub
   - NewHubWithConfig
   - ServeWSWithConfig
   - ServeRoomFanoutWS
+  - ValidateRoomName
+  - MaxRoomNameLength
   - MessageValidationConfig
   - DefaultMessageValidationConfig
   - ValidateTextMessage
@@ -129,6 +133,8 @@ public_entrypoints:
   - ErrNegativeLimit
   - ErrInvalidPingPeriod
   - ErrInvalidPongWait
+  - ValidationError
+  - NewValidationError
   - CloseError
   - NewCloseError
 

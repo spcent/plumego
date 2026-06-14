@@ -2,7 +2,7 @@
 
 Module: `x/websocket`
 
-Inventory status: current as of 2026-05-06
+Inventory status: updated 2026-06-14 (alias removal sync: NewHubE/NewHubWithConfigE/NewConnE removed, method names corrected)
 
 Source snapshot:
 `docs/evidence/extension/snapshots/first-batch/x-websocket-head.snapshot`
@@ -31,21 +31,21 @@ the recorded `beta` evidence.
   `Server.Health`, `Server.Hub`
 - Handler wiring: `ServeWSWithConfig`, `ServeRoomFanoutWS`, `ServerConfig`,
   `Message`, `MessageHandler`
-- Hub lifecycle and fanout: `NewHubE`, `NewHubWithConfigE`, `Hub`,
+- Hub lifecycle and fanout: `NewHub`, `NewHubWithConfig`, `Hub`,
   `HubConfig`, `HubMetrics`, `BroadcastResult`, `Hub.Stop`, `Hub.Shutdown`,
   `Hub.TryJoin`, `Hub.CanJoin`, `Hub.Leave`, `Hub.RemoveConn`,
   `Hub.RangeConns`, `Hub.BroadcastRoom`, `Hub.BroadcastAll`,
   `Hub.TryBroadcastRoom`, `Hub.TryBroadcastAll`, `Hub.Metrics`,
   `Hub.GetRooms`, `Hub.GetRoomCount`, `Hub.GetRoomRegistrationCount`
-- Connection API: `NewConnE`, `Conn`, `Conn.Close`, `Conn.IsClosed`,
-  `Conn.ReadMessage`, `Conn.ReadMessageStream`, `Conn.WriteMessage`,
+- Connection API: `NewConn`, `Conn`, `Conn.Close`, `Conn.IsClosed`,
+  `Conn.ReadMessage`, `Conn.ReadMessageReader`, `Conn.WriteMessage`,
   `Conn.WriteMessageContext`, `Conn.WriteText`, `Conn.WriteBinary`,
   `Conn.WriteJSON`, `Conn.WriteClose`, `Conn.SetReadLimit`,
   `Conn.SetPingPeriod`, `Conn.SetPongWait`, `Conn.GetLastPong`,
   `Conn.SetMetadata`, `Conn.GetMetadata`, `Conn.DeleteMetadata`,
   `Conn.RangeMetadata`
 - Protocol constants: `OpcodeText`, `OpcodeBinary`, close status constants,
-  `DefaultSendQueueSize`, `MaxRoomNameLength`, `RoomPasswordHeader`
+  `DefaultSendQueueSize`, `MaxRoomNameLength`
 - Send behavior: `SendBehavior`, `SendBlock`, `SendDrop`, `SendClose`
 - Validation: `MessageValidationConfig`, `DefaultMessageValidationConfig`,
   `ValidateTextMessage`, `ValidateRoomName`, `ValidateWebSocketKey`
@@ -61,13 +61,13 @@ primitives. They are implemented and tested, but they widen the public surface
 beyond the minimal websocket transport core.
 
 - `NewSimpleRoomAuth`, `SimpleRoomAuth`, `SimpleRoomAuth.SetRoomPassword`,
-  `SimpleRoomAuth.AuthorizeRoom`
+  `SimpleRoomAuth.CheckRoomPassword`
 - `NewSecureRoomAuth`, `SecureRoomAuth`,
-  `SecureRoomAuth.SetRoomPassword`, `SecureRoomAuth.AuthenticateToken`,
-  `SecureRoomAuth.MaxMessageSize`, `SecureRoomAuth.GetMetrics`,
-  `SecureRoomAuth.ResetMetrics`
-- `NewSimpleHS256TokenAuth`, `NewHS256TokenAuth`, `SimpleHS256TokenAuth`,
-  `SimpleHS256TokenAuth.AuthenticateToken`
+  `SecureRoomAuth.SetRoomPassword`, `SecureRoomAuth.CheckRoomPassword`,
+  `SecureRoomAuth.VerifyJWT`, `SecureRoomAuth.MaxMessageSize`,
+  `SecureRoomAuth.GetMetrics`, `SecureRoomAuth.ResetMetrics`
+- `NewSimpleHS256TokenAuth`, `SimpleHS256TokenAuth`,
+  `SimpleHS256TokenAuth.VerifyJWT`
 - `SecurityConfig`, `SecurityMetrics`,
   `ValidateRoomPassword`, `ValidateSecurityConfig`
 - `GenerateSecureSecret`
@@ -79,9 +79,8 @@ stable promise because they look more like helper or diagnostic API than core
 websocket transport.
 
 - Error constructors and structs: `NewCloseError`, `CloseError`,
-  `NewSecurityError`, `SecurityError`, `NewValidationError`,
-  `ValidationError`
-- Utility helpers: `SanitizeForLogging`, `IsTemporary`
+  `NewValidationError`, `ValidationError`
+- Utility helpers: `SanitizeForLogging`
 
 ## Promotion Posture
 
@@ -105,8 +104,8 @@ websocket transport.
   registrars, absolute queued write deadlines, no-copy rejected send paths, and
   stricter disabled-security-event runtime semantics without changing the
   exported symbol count.
-- API contract note: `Conn`/`NewConnE` are server-side primitives that read
-  masked client frames and write unmasked server frames. `ReadMessageStream` is
+- API contract note: `Conn`/`NewConn` are server-side primitives that read
+  masked client frames and write unmasked server frames. `ReadMessageReader` is
   a bounded reader over buffered frames, not a low-memory or zero-copy streaming
   API.
 - `beta` promotion is complete. Release refs `d2c25c3` and `ec70358`, matching

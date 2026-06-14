@@ -111,7 +111,7 @@ const bannedPatterns = [
   {
     packageName: 'websocket',
     pattern: /\bwebsocket\.NewHub\s*\(/,
-    message: 'use websocket.NewHubWithConfigE(...) or websocket.New(...)',
+    message: 'use websocket.NewHubWithConfig(...) or websocket.New(...)',
   },
   {
     packageName: 'middleware',
