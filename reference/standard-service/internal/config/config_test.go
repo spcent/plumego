@@ -285,6 +285,38 @@ func TestLoadEnvCORSAllowedOrigins(t *testing.T) {
 	})
 }
 
+func TestLoadEnvMaxBodyBytes(t *testing.T) {
+	cfg, err := load(
+		[]string{"standard-service"},
+		mapLookup(map[string]string{"APP_MAX_BODY_BYTES": "2097152"}),
+	)
+	if err != nil {
+		t.Fatalf("load config: %v", err)
+	}
+	if cfg.App.MaxBodyBytes != 2097152 {
+		t.Fatalf("MaxBodyBytes = %d, want %d", cfg.App.MaxBodyBytes, 2097152)
+	}
+}
+
+func TestLoadEnvFileViaEnvVar(t *testing.T) {
+	dir := t.TempDir()
+	envFile := filepath.Join(dir, "custom.env")
+	if err := os.WriteFile(envFile, []byte("APP_ADDR=:7777\n"), 0o600); err != nil {
+		t.Fatalf("write env file: %v", err)
+	}
+	// APP_ENV_FILE in the process environment selects which .env file is loaded.
+	cfg, err := load(
+		[]string{"standard-service"},
+		mapLookup(map[string]string{"APP_ENV_FILE": envFile}),
+	)
+	if err != nil {
+		t.Fatalf("load config: %v", err)
+	}
+	if cfg.Core.Addr != ":7777" {
+		t.Fatalf("addr = %q, want %q (APP_ENV_FILE must select the custom env file)", cfg.Core.Addr, ":7777")
+	}
+}
+
 func mapLookup(values map[string]string) func(string) (string, bool) {
 	return func(key string) (string, bool) {
 		value, ok := values[key]

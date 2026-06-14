@@ -548,6 +548,49 @@ func TestAcceptanceInsecureDefaultsWarnCORSWildcard(t *testing.T) {
 	}
 }
 
+// TestAcceptanceReadyzReturnsItemStoreComponent verifies that GET /readyz returns
+// 200 with the item_store component listed as passing. The storeChecker wired in
+// RegisterRoutes always passes (MemoryStore is process-local), so this test pins
+// the documented response shape from README.md § curl examples.
+func TestAcceptanceReadyzReturnsItemStoreComponent(t *testing.T) {
+	a, err := New(config.Defaults())
+	if err != nil {
+		t.Fatalf("new app: %v", err)
+	}
+	if err := a.RegisterRoutes(); err != nil {
+		t.Fatalf("register routes: %v", err)
+	}
+	if err := a.Core.Prepare(); err != nil {
+		t.Fatalf("prepare: %v", err)
+	}
+	srv, err := a.Core.Server()
+	if err != nil {
+		t.Fatalf("server: %v", err)
+	}
+
+	rec := httptest.NewRecorder()
+	srv.Handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/readyz", nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET /readyz: status = %d, want %d", rec.Code, http.StatusOK)
+	}
+
+	var env struct {
+		Data struct {
+			Ready      bool            `json:"ready"`
+			Components map[string]bool `json:"components"`
+		} `json:"data"`
+	}
+	if err := json.NewDecoder(rec.Body).Decode(&env); err != nil {
+		t.Fatalf("decode /readyz response: %v", err)
+	}
+	if !env.Data.Ready {
+		t.Fatal("ready = false, want true")
+	}
+	if !env.Data.Components["item_store"] {
+		t.Fatalf("item_store not present or false in components: %v — storeChecker should always pass", env.Data.Components)
+	}
+}
+
 // TestAcceptanceInsecureDefaultsNoWarnWhenConfigured verifies that no warning
 // is emitted when WriteKey and CORSAllowedOrigins are properly configured.
 func TestAcceptanceInsecureDefaultsNoWarnWhenConfigured(t *testing.T) {
