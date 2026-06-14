@@ -292,6 +292,43 @@ func TestSpansEndpointWithLimitParameter(t *testing.T) {
 	}
 }
 
+func TestRecoveryMiddlewareReturns500OnPanic(t *testing.T) {
+	a, err := New(config.Defaults())
+	if err != nil {
+		t.Fatalf("new app: %v", err)
+	}
+	if err := a.RegisterRoutes(); err != nil {
+		t.Fatalf("register routes: %v", err)
+	}
+	// Inject a panic handler after normal route registration to verify that the
+	// recovery middleware catches panics and returns 500 instead of crashing.
+	if err := a.Core.Get("/panic-test", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		panic("deliberate panic for recovery test")
+	})); err != nil {
+		t.Fatalf("register panic route: %v", err)
+	}
+	if err := a.Core.Prepare(); err != nil {
+		t.Fatalf("prepare app: %v", err)
+	}
+	srv, err := a.Core.Server()
+	if err != nil {
+		t.Fatalf("get server: %v", err)
+	}
+
+	rec := httptest.NewRecorder()
+	srv.Handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/panic-test", nil))
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("GET /panic-test: status = %d, want 500 (recovery middleware should catch panic)", rec.Code)
+	}
+
+	// Server must continue serving normal requests after a recovered panic.
+	rec2 := httptest.NewRecorder()
+	srv.Handler.ServeHTTP(rec2, httptest.NewRequest(http.MethodGet, "/healthz", nil))
+	if rec2.Code != http.StatusOK {
+		t.Fatalf("GET /healthz after recovered panic: status = %d, want 200", rec2.Code)
+	}
+}
+
 func TestStatsEndpointAccumulatesMetricsCorrectly(t *testing.T) {
 	a, err := New(config.Defaults())
 	if err != nil {

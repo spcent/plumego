@@ -1,7 +1,9 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -206,6 +208,45 @@ func TestHealthHandlerReadyWithNoCheckersReturnsOK(t *testing.T) {
 	}
 	if !env.Data.Ready {
 		t.Errorf("ready = %v, want true", env.Data.Ready)
+	}
+}
+
+func TestHealthHandlerReadyWithFailingCheckerReturns503(t *testing.T) {
+	h := HealthHandler{
+		ServiceName: "test-svc",
+		Logger:      discardLogger(),
+		Checkers:    []health.ComponentChecker{errChecker{name: "cache", err: errors.New("connection refused")}},
+	}
+	rec := httptest.NewRecorder()
+	h.Ready(rec, httptest.NewRequest(http.MethodGet, "/readyz", nil))
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("status = %d, want 503 when a component checker fails", rec.Code)
+	}
+}
+
+// errChecker is a ComponentChecker that always returns a fixed error.
+type errChecker struct {
+	name string
+	err  error
+}
+
+func (c errChecker) Name() string                  { return c.name }
+func (c errChecker) Check(_ context.Context) error { return c.err }
+
+func TestHealthHandlerLivenessUnaffectedByReadinessState(t *testing.T) {
+	// Liveness (/healthz) must return 200 regardless of component health.
+	// The liveness probe only signals whether the process is alive and serving
+	// HTTP; orchestrators restart only when liveness fails. Component-level
+	// failures belong in the readiness probe (/readyz).
+	h := HealthHandler{
+		ServiceName: "test-svc",
+		Logger:      discardLogger(),
+		Checkers:    []health.ComponentChecker{errChecker{name: "db", err: errors.New("timeout")}},
+	}
+	rec := httptest.NewRecorder()
+	h.Live(rec, httptest.NewRequest(http.MethodGet, "/healthz", nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET /healthz: status = %d, want 200 even when components are unhealthy", rec.Code)
 	}
 }
 
