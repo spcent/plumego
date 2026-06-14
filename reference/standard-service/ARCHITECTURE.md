@@ -193,9 +193,10 @@ health := handler.HealthHandler{
 }
 ```
 
-The reference wires no checkers because it has no real dependencies. When no
-checkers are registered `GET /readyz` returns 200 immediately, which is correct
-for a stateless service.
+The reference wires `storeChecker{}` — a synthetic probe that always passes —
+to demonstrate the wiring pattern. Replace it with real dependency probes as
+shown above. A service with no external dependencies can omit the `Checkers`
+field entirely; an empty list makes `GET /readyz` return 200 immediately.
 
 ### Route layout — groups and collection + member pairs
 
