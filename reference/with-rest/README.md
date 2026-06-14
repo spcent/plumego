@@ -40,12 +40,12 @@ from Plumego's canonical application shape.
 | `GET` | `/healthz` | Liveness probe |
 | `GET` | `/readyz` | Readiness probe |
 | `GET` | `/api/hello` | Demo greeting endpoint |
-| `GET` | `/api/users` | List users (paginated) |
+| `GET` | `/api/users` | List users |
 | `GET` | `/api/users/:id` | Get user by ID |
 | `POST` | `/api/users` | Create user |
 | `PUT` | `/api/users/:id` | Replace user |
 | `DELETE` | `/api/users/:id` | Delete user |
-| `POST` | `/api/items` | Create item (plain handler with validation) |
+| `POST` | `/api/items` | Create item (plain handler with x/validate.Bind[T]) |
 
 ## Run
 
@@ -66,8 +66,8 @@ curl -s http://localhost:8084/api/users | jq .
 ```
 ```json
 {
-  "data": {
-    "data": [{"id":"u_1","name":"Ada"}],
+  "data": [{"id":"u_1","name":"Ada"}],
+  "meta": {
     "pagination": {"page":1,"page_size":20,"total_items":1,"total_pages":1,"has_next":false,"has_prev":false}
   }
 }
@@ -124,7 +124,14 @@ Not found:
 curl -s http://localhost:8084/api/users/nonexistent | jq .
 ```
 ```json
-{"error":{"type":"resource_not_found","message":"record not found"}}
+{
+  "error": {
+    "code": "RESOURCE_NOT_FOUND",
+    "message": "record not found",
+    "category": "client_error",
+    "type": "resource_not_found"
+  }
+}
 ```
 
 Invalid JSON:
@@ -134,7 +141,14 @@ curl -s -X POST http://localhost:8084/api/items \
   -d '{"name":' | jq .
 ```
 ```json
-{"error":{"type":"bad_request","code":"invalid_json","message":"invalid request body"}}
+{
+  "error": {
+    "code": "INVALID_JSON",
+    "message": "invalid request body",
+    "category": "client_error",
+    "type": "bad_request"
+  }
+}
 ```
 
 Missing required field:
@@ -146,9 +160,10 @@ curl -s -X POST http://localhost:8084/api/items \
 ```json
 {
   "error": {
-    "type": "validation_failure",
-    "code": "validation_error",
+    "code": "VALIDATION_ERROR",
     "message": "validation failed",
+    "category": "validation_error",
+    "type": "validation_failure",
     "details": {
       "fields": [{"field":"Name","tag":"required","message":"Name is required"}]
     }
@@ -164,8 +179,8 @@ go test -race ./...
 ```
 
 Tests cover:
-- `internal/handler` — `CreateItem` handler: valid request, missing required field, malformed JSON
-- `internal/app` — route registration shape, full HTTP round-trips for all user CRUD routes
+- `internal/handler` — `CreateItem` handler: valid request, missing required field (field-level error detail), malformed JSON (invalid_json code)
+- `internal/app` — route registration shape (`app_test.go`); full HTTP round-trips for all user CRUD paths (`routes_http_test.go`): list, get, not-found, create, invalid-JSON, update, update-not-found, delete, delete-not-found
 
 ## How to Extend
 
@@ -175,7 +190,7 @@ Tests cover:
    `FindByID`, `Update`, and `Delete`.
 2. Create a `*rest.DBResourceController[T]` in `app.New` (`internal/app/app.go`).
 3. Register each action explicitly in `RegisterRoutes` (`internal/app/routes.go`).
-4. Add HTTP integration tests in `internal/app/routes_http_test.go`.
+4. Add HTTP round-trip tests in `internal/app/routes_http_test.go` following the existing pattern.
 
 **Add a plain HTTP handler (no x/rest):**
 1. Implement the handler in `internal/handler/`.

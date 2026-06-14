@@ -23,7 +23,6 @@ func (a *App) RegisterRoutes() error {
 	reg.post("/api/users", http.HandlerFunc(a.Users.Create))
 	reg.post("/api/items", a.Items)
 	reg.put("/api/users/:id", http.HandlerFunc(a.Users.Update))
-	reg.patch("/api/users/:id", http.HandlerFunc(a.Users.Patch))
 	reg.delete("/api/users/:id", http.HandlerFunc(a.Users.Delete))
 	return reg.err
 }
@@ -34,7 +33,6 @@ type routeAdder interface {
 	Post(path string, h http.Handler) error
 	Put(path string, h http.Handler) error
 	Delete(path string, h http.Handler) error
-	Patch(path string, h http.Handler) error
 }
 
 // routeReg wraps a routeAdder and records the first registration error.
@@ -51,7 +49,6 @@ func (r *routeReg) get(path string, h http.Handler)    { r.record(r.adder.Get(pa
 func (r *routeReg) post(path string, h http.Handler)   { r.record(r.adder.Post(path, h)) }
 func (r *routeReg) put(path string, h http.Handler)    { r.record(r.adder.Put(path, h)) }
 func (r *routeReg) delete(path string, h http.Handler) { r.record(r.adder.Delete(path, h)) }
-func (r *routeReg) patch(path string, h http.Handler)  { r.record(r.adder.Patch(path, h)) }
 func (r *routeReg) record(err error) {
 	if r.err == nil {
 		r.err = err

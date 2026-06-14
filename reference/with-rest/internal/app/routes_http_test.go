@@ -42,32 +42,32 @@ func TestUsersListSuccess(t *testing.T) {
 		t.Fatalf("status = %d, want 200; body = %s", rec.Code, rec.Body.String())
 	}
 
-	// Outer contract envelope: {"data": PaginatedResponse}
+	// contract.WriteResponse places the slice in "data" and pagination in "meta".
 	var body struct {
-		Data struct {
-			Data []struct {
-				ID   string `json:"id"`
-				Name string `json:"name"`
-			} `json:"data"`
+		Data []struct {
+			ID   string `json:"id"`
+			Name string `json:"name"`
+		} `json:"data"`
+		Meta struct {
 			Pagination struct {
 				TotalItems int64 `json:"total_items"`
 			} `json:"pagination"`
-		} `json:"data"`
+		} `json:"meta"`
 	}
 	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
 		t.Fatalf("decode response: %v; raw = %s", err, rec.Body.String())
 	}
-	if body.Data.Pagination.TotalItems < 1 {
-		t.Fatalf("total_items = %d, want >= 1", body.Data.Pagination.TotalItems)
+	if body.Meta.Pagination.TotalItems < 1 {
+		t.Fatalf("total_items = %d, want >= 1", body.Meta.Pagination.TotalItems)
 	}
 	found := false
-	for _, u := range body.Data.Data {
+	for _, u := range body.Data {
 		if u.ID == "u_1" && u.Name == "Ada" {
 			found = true
 		}
 	}
 	if !found {
-		t.Fatalf("seeded user u_1/Ada not found in list; data = %+v", body.Data.Data)
+		t.Fatalf("seeded user u_1/Ada not found in list; data = %+v", body.Data)
 	}
 }
 
