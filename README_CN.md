@@ -64,14 +64,14 @@ app := plumego.NewWithConfig(cfg)
 | --- | --- | --- |
 | 普通 JSON API | `reference/standard-service` → 仅使用稳定根包 | **GA** |
 | 带 CRUD 约定的 REST 资源 | `reference/with-rest` → `x/rest` | beta |
-| 多租户 SaaS API | `reference/with-tenant` → `x/tenant` | experimental |
+| 多租户 SaaS API | `reference/with-tenant` → `x/tenant` | beta |
 | API 网关或反向代理 | `reference/with-gateway` → `x/gateway` | beta |
 | 实时 WebSocket 功能 | `reference/with-websocket` → `x/websocket` | beta |
 | AI 驱动的服务 | `reference/with-ai` → `x/ai/provider` | experimental |
-| 带消息队列/Webhook 的服务 | `reference/with-messaging` → `x/messaging` | experimental |
+| 带消息队列/Webhook 的服务 | `reference/with-messaging` → `x/messaging` | beta |
 | gRPC + HTTP 混合服务 | `reference/with-rpc` → `x/rpc` | experimental |
 | 可观测性（Prometheus / OpenTelemetry） | `reference/with-observability` → `x/observability` | beta |
-| 租户管理控制台 | `reference/with-tenant-admin` → `x/tenant` | experimental |
+| 租户管理控制台 | `reference/with-tenant-admin` → `x/tenant` | beta |
 
 所有路径都以 `reference/standard-service` 为基础结构；扩展包是显式增量，而不是另一套启动框架。
 
@@ -122,8 +122,9 @@ app := plumego.NewWithConfig(cfg)
 上表中的九个包是**稳定根包**，具备完整的 `v1` 兼容性保证：接口签名、包名称和行为在
 `v1.x` 发布系列内不会发生破坏性变更。
 
-四个 `x/*` 扩展族处于 **beta** 状态——在已引用的发布 ref 范围内 API 稳定，适合生产使用，
-但边缘情况可能仍不完善：`x/gateway`、`x/observability`、`x/rest` 和 `x/websocket`。
+七个 `x/*` 扩展族处于 **beta** 状态——在已引用的发布 ref 范围内 API 稳定，适合生产使用，
+但边缘情况可能仍不完善：`x/frontend`、`x/gateway`、`x/messaging`、`x/observability`、
+`x/rest`、`x/tenant` 和 `x/websocket`。
 
 其余所有 `x/*` 扩展均为 **experimental**：API 可能在任意次要版本中变更，无需事先通知。
 未经显式的项目级稳定化处理，请勿在生产服务中依赖这些扩展。

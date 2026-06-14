@@ -32,9 +32,9 @@ the `v1.x` release series. Breaking changes require a major version bump.
   `specs/extension-beta-evidence.yaml`).
 
 **Experimental at v1.x:**
-`x/ai`, `x/data`, `x/fileapi`, `x/frontend`, `x/messaging`, `x/messaging/mq`,
+`x/ai`, `x/data`, `x/fileapi`, `x/messaging/mq`,
 `x/messaging/pubsub`, `x/messaging/scheduler`, `x/messaging/webhook`,
-`x/openapi`, `x/resilience`, `x/rpc`, `x/tenant`, `x/validate`,
+`x/openapi`, `x/resilience`, `x/rpc`, `x/validate`,
 `x/gateway/discovery`, `x/gateway/ipc`, `x/observability/devtools`,
 `x/observability/ops`
 
@@ -47,7 +47,7 @@ the `v1.x` release series. Breaking changes require a major version bump.
   with no exported API changes and full test coverage at the stable tier.
 
 **Beta at v1.x:**
-`x/gateway`, `x/observability`, `x/rest`, `x/websocket`
+`x/frontend`, `x/gateway`, `x/messaging`, `x/observability`, `x/rest`, `x/tenant`, `x/websocket`
 
 ### `ga` (General Availability)
 
@@ -69,7 +69,7 @@ the `v1.x` release series. Breaking changes require a major version bump.
 
 **Safe to depend on:**
 - All 9 stable root packages — import paths, exported types, functions, and interfaces.
-- Beta extension packages (`x/gateway`, `x/observability`, `x/rest`, `x/websocket`) — production-ready with minor caveats; check the beta evidence doc for cited release refs.
+- Beta extension packages (`x/frontend`, `x/gateway`, `x/messaging`, `x/observability`, `x/rest`, `x/tenant`, `x/websocket`) — production-ready with minor caveats; check the beta evidence doc for cited release refs.
 
 **Do not treat as stable:**
 - Experimental `x/*` extensions — APIs may change in any minor version.
