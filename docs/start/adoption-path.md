@@ -1,100 +1,254 @@
 # Adoption Path
 
-This page is the narrow adoption path for new Plumego users.
+This is the fastest onboarding flow for Plumego. Follow it linearly: 5 minutes → 30 minutes → 1 day.
 
-The first impression should be simple: standard-library HTTP compatibility,
-small stable kernel, explicit wiring, and machine-checkable agent workflow.
-Optional `x/*` packages are capability additions, not alternate bootstraps.
+---
 
-## Migrating From Another Framework
+## Before you start
 
-Read the focused migration guide for your current stack, then return to the
-standard service path:
+**Are you coming from another framework?**
 
-| Current stack | First read |
-| --- | --- |
+Read the migration guide for your current stack first, then come back here:
+
+| From | Guide |
+|------|-------|
 | Gin | `docs/guides/migration/from-gin.md` |
 | Echo | `docs/guides/migration/from-echo.md` |
 | Chi | `docs/guides/migration/from-chi.md` |
-| Existing middleware stack | `docs/guides/migration/middleware-compat.md` |
+| stdlib http.ServeMux | `docs/guides/migration/from-stdmux.md` |
+| Other middleware stack | `docs/guides/migration/middleware-compat.md` |
 
-## 5 Minutes: Run One Standard Service
+Otherwise, continue below.
 
-Read:
+---
 
-1. `docs/start/getting-started.md`
-2. `reference/standard-service/README.md`
+## Timeline: 5 minutes → 30 minutes → 1 day
 
-Use:
+This path takes you from "hello world" to understanding the control plane. Time estimates are realistic if you're familiar with Go and HTTP.
 
-- `core.DefaultConfig`
-- `core.New`
-- `app.Use`
-- `app.Get`
-- `contract.WriteResponse`
-- `contract.WriteError`
+---
 
-Avoid:
+## ⏱️ 5 Minutes: Run Hello World
 
-- `x/*` packages
-- custom response envelopes
-- hidden route registration
+**Goal:** See Plumego work with one route.
 
-Done when a local service responds from one explicit route using
-`http.HandlerFunc`.
+**Steps:**
 
-## 30 Minutes: Add One Capability
+1. **Read the quick intro:** `docs/start/getting-started.md` (2 min read)
+2. **Run the hello-world example:**
+   ```bash
+   cd examples/hello
+   go run main.go
+   ```
+3. **Test it:**
+   ```bash
+   curl http://localhost:8080/ping
+   ```
 
-Keep `reference/standard-service` as the app shape. Add one capability family:
+**What you're learning:**
+- `plumego.New()` creates an app
+- `app.Get()` registers a route
+- `contract.WriteResponse()` sends JSON responses
+- App is a standard `http.Handler`
 
-| Need | First read |
-| --- | --- |
-| CRUD/resource conventions | `docs/modules/x/rest/README.md` |
-| Tenant resolution and isolation | `docs/modules/x/tenant/README.md` |
-| Edge proxy and rewrite | `docs/modules/x/gateway/README.md` |
-| Dynamic service discovery behind gateway or clients | `docs/modules/x/gateway/README.md` (`x/gateway/discovery` section) |
-| WebSocket transport | `docs/modules/x/websocket/README.md` |
-| Messaging flows, queues, and webhook delivery | `docs/modules/x/messaging/README.md` |
-| Inbound webhook verification or outbound webhook transport | `docs/modules/x/messaging/README.md` (`x/messaging/webhook` section) |
-| File upload, download, and temporary URL transport | `docs/modules/x/fileapi/README.md` |
-| Observability exporters | `docs/modules/x/observability/README.md` |
-| Local debug routes, config snapshots, or pprof | `docs/modules/x/observability/devtools/README.md` |
-| Reusable circuit breaker or rate-limit primitives | `docs/modules/x/resilience/README.md` |
-| AI provider/session/tool primitives | `docs/modules/x/ai/README.md` |
-| gRPC service hosting, client pooling, or HTTP-RPC gateway | `docs/modules/x/rpc/README.md` |
-| OpenAPI 3.1 spec generation from route metadata | `docs/modules/x/openapi/README.md` |
+**Key symbols:**
+- `core.New()`
+- `app.Get()`, `app.Post()`, `app.Put()`, `app.Delete()`
+- `contract.WriteResponse()`
+- `contract.WriteError()`
 
-Done when the app still has explicit route wiring and only the selected
-capability family is added.
+**Done when:** You see `{"message":"pong"}` from curl.
 
-## 1 Day: Understand The Control Plane
+---
 
-Read:
+## ⏱️ 30 Minutes: Build a CRUD API
 
-1. `AGENTS.md`
-2. `docs/operations/agent-context-budget.md`
-3. `docs/operations/codex-workflow.md`
-4. `docs/reference/canonical-style-guide.md`
-5. `docs/concepts/agent-first-repo-blueprint.md`
-6. `specs/task-routing.yaml`
-7. `specs/repo.yaml`
-8. `specs/dependency-rules.yaml`
-9. the target module's `module.yaml`
+**Goal:** Understand routing, request binding, error handling, and app structure.
 
-Done when a developer or agent can answer:
+**Steps:**
 
-- which module owns the change
-- which paths are out of scope
-- whether stable public APIs are affected
-- which validation commands must pass
+1. **Copy the standard API example:**
+   ```bash
+   cp -r examples/standard-api my-service
+   cd my-service
+   go run main.go
+   ```
 
-## Messaging Rule
+2. **Test it:**
+   ```bash
+   # Create
+   curl -X POST http://localhost:8080/items \
+     -H "Content-Type: application/json" \
+     -d '{"name":"Item 1"}'
+   
+   # List
+   curl http://localhost:8080/items
+   
+   # Get one
+   curl http://localhost:8080/items/1
+   
+   # Update
+   curl -X PUT http://localhost:8080/items/1 \
+     -H "Content-Type: application/json" \
+     -d '{"name":"Updated"}'
+   
+   # Delete
+   curl -X DELETE http://localhost:8080/items/1
+   ```
 
-When updating README, website, or onboarding docs, present Plumego in this
-order:
+3. **Read the code in this order:**
+   - `examples/standard-api/TUTORIAL.md` — explains each file
+   - `main.go` — entry point and wiring
+   - `internal/config/config.go` — configuration
+   - `internal/app/routes.go` — route registration
+   - `internal/handler/items.go` — handler patterns
 
-1. standard-library compatibility
-2. small stable kernel
-3. explicit reference application path
-4. machine-checkable agent workflow
-5. optional experimental capability catalog
+4. **Try modifying it:**
+   - Add a new route
+   - Change the response format
+   - Add a middleware
+
+**What you're learning:**
+- App structure (`cmd/`, `internal/`, handlers, config)
+- Route registration and grouping
+- Request binding with `contract.BindJSON()`
+- Error handling with `contract.WriteError()`
+- Middleware composition
+- Graceful shutdown
+
+**Key symbols:**
+- `app.Group(prefix string) *RouteGroup`
+- `group.Use(middleware func(http.Handler) http.Handler)`
+- `contract.BindJSON(r, &data)`
+- `contract.Param(r, "id")`
+- `app.Prepare()`, `app.Server()`, `app.Shutdown()`
+
+**Done when:** You can modify the example and add your own endpoints.
+
+---
+
+## ⏱️ 1 Day: Understand the Full Picture
+
+**Goal:** Know the complete architecture, boundaries, and how the control plane works.
+
+**Reading (in order):**
+
+### Part 1: Stable Roots (1 hour)
+Read the READMEs for modules you'll use:
+
+**Essential:**
+- `docs/modules/core/README.md` — app construction
+- `docs/modules/router/README.md` — routing and path params
+- `docs/modules/contract/README.md` — responses and binding
+- `docs/modules/middleware/README.md` — middleware composition
+
+**Pick 2-3 of these depending on your needs:**
+- `docs/modules/security/README.md` — auth and password hashing
+- `docs/modules/store/README.md` — storage contracts
+- `docs/modules/log/README.md` — structured logging
+- `docs/modules/metrics/README.md` — metrics collection
+- `docs/modules/health/README.md` — health checks
+
+### Part 2: Extensions Overview (30 minutes)
+- `docs/start/extension-guide.md` — decision tree for 15 extensions
+- Pick ONE extension that matches your next feature
+- Read that extension's README in `docs/modules/x/*/`
+
+**Common first extensions:**
+- `x/rest` — REST CRUD conventions
+- `x/observability` — Prometheus metrics
+- `x/websocket` — Real-time features
+- `x/tenant` — Multi-tenancy
+
+### Part 3: Design & Standards (30 minutes)
+- `docs/reference/canonical-style-guide.md` — how to structure services
+- `docs/modules/INDEX.md` — module boundaries and ownership
+- `docs/reference/reference-apps.md` — overview of reference implementations
+
+### Part 4: Control Plane (optional, for maintainers/agents)
+If you're maintaining a service or using code agents:
+- `AGENTS.md` — overview of agent workflow
+- `docs/operations/agent-context-budget.md` — what agents need to know
+- `specs/task-routing.yaml` — module ownership map
+- `specs/dependency-rules.yaml` — API boundaries
+
+**What you're learning:**
+- Complete module API surface
+- How to choose extensions
+- Canonical app structure
+- Boundaries between modules
+- Agent-friendly workflow (if needed)
+
+**Done when:** You can:
+- ✅ Explain why Plumego exists and who should use it
+- ✅ Name the 9 stable roots and what each does
+- ✅ Understand module boundaries (what each owns)
+- ✅ Choose an extension for a new feature
+- ✅ Understand the difference between stable/beta/experimental
+- ✅ Build a production service with proper structure
+
+---
+
+## Next Steps After Day 1
+
+**Ready to build a real service?**
+
+1. Use `examples/standard-api` as your template
+2. Follow `docs/start/production-checklist.md` to add production capabilities
+3. Choose 1-2 extensions from `docs/start/extension-guide.md`
+4. Copy the matching reference app (e.g., `reference/with-rest/`)
+5. Check `docs/reference/canonical-style-guide.md` for patterns
+
+**Want to understand the codebase deeply?**
+
+1. Read `docs/concepts/extension-maturity.md` for extension status
+2. Read `docs/reference/api-surface.md` for complete symbol inventory
+3. Read `STABILITY.md` and `COMPATIBILITY.md` for version stability
+
+**Want to contribute or maintain with code agents?**
+
+1. Read `docs/operations/agent-external-reference.md` for agent workflow
+2. Read `AGENTS.md` for the full agent-first model
+3. Familiarize yourself with `specs/task-routing.yaml`
+
+**Want to build an extension?**
+
+1. Read `docs/guides/extending-plumego.md`
+2. Check `docs/start/extension-guide.md` for patterns
+3. Copy a similar extension and adapt it
+
+---
+
+## Messaging Rule (for docs updates)
+
+When writing docs or examples, present Plumego in this order:
+
+1. Standard-library compatibility (stdlib shapes, no magic)
+2. Small stable kernel (9 packages, v1 guarantee)
+3. Explicit reference application path (`reference/standard-service`)
+4. Optional capabilities (extensions are add-ons)
+5. Agent-friendly control plane (specs, tasks, module.yaml)
+
+---
+
+## Common Questions
+
+**Q: How long until I can build a real service?**  
+A: By the end of Day 1, you'll understand enough to start. Most developers are productive after 2-4 hours of focused learning.
+
+**Q: Do I need to learn all 9 stable roots?**  
+A: No. Start with `core`, `router`, `contract`, and `middleware`. Add others as you need them.
+
+**Q: What if I get stuck?**  
+A: Check `docs/start/troubleshooting.md` for common issues, or open an issue on GitHub.
+
+**Q: Should I read all the reference apps?**  
+A: No. Read `reference/standard-service/` first (canonical), then pick 1-2 others that match your use case.
+
+**Q: Is Plumego production-ready?**  
+A: Yes. v1.0+ is GA and recommended for production. See `STABILITY.md` for guarantees.
+
+---
+
+**Time to get started?** Pick a timeline above and begin. Good luck!
+
