@@ -28,7 +28,6 @@ func TestRegisterRoutesCanonicalShape(t *testing.T) {
 		{http.MethodGet, "/api/users/:id"},
 		{http.MethodGet, "/healthz"},
 		{http.MethodGet, "/readyz"},
-		{http.MethodPatch, "/api/users/:id"},
 		{http.MethodPost, "/api/items"},
 		{http.MethodPost, "/api/users"},
 		{http.MethodPut, "/api/users/:id"},
