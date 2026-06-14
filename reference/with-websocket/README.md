@@ -8,9 +8,11 @@ for the canonical app layout.
 
 ## Purpose
 
-Demonstrate WebSocket lifecycle management using `x/websocket`: upgrade, hub
-registration, read loop, safe write path, ping/pong heartbeat, and graceful
-shutdown. The endpoint echoes every message back to the sender.
+Demonstrate WebSocket lifecycle management using `x/websocket`: HTTP upgrade,
+hub registration, read loop, safe write path, JSON message encode/decode,
+ping/pong heartbeat, and graceful shutdown. The endpoint echoes every message
+back to the sender; JSON text frames with `{"type":"ping"}` receive a typed
+`{"type":"pong"}` response.
 
 ## What it demonstrates
 
@@ -19,9 +21,10 @@ shutdown. The endpoint echoes every message back to the sender.
 - Read loop with frame validation (1 MB default message-size limit, UTF-8 enforcement,
   control-character rejection)
 - Safe write path via `conn.WriteMessage` → bounded send queue → `writerPump` goroutine
+- JSON message encode/decode: `message.Decode` / `conn.WriteJSON` in `echoHandler`
+- Graceful close: `conn.WriteClose` signals the peer; `WS.Shutdown` drains all
+  connections before the HTTP server stops
 - Automatic ping/pong heartbeat with pong-wait timeout that closes stale connections
-- Graceful shutdown: `WS.Shutdown` closes all connections and drains the job queue
-  before the HTTP server stops, driven by the caller-owned `context.Context`
 - Signal-driven shutdown (`SIGINT`/`SIGTERM`) via `signal.NotifyContext`
 - Config-precedence chain: `Defaults < .env < process env < flags`
 
@@ -34,6 +37,17 @@ shutdown. The endpoint echoes every message back to the sender.
 - **Persistence, databases, Redis, or external state**
 - **Multi-node or pub/sub coordination**
 - **TLS**: configure `core.AppConfig.TLS` in production
+
+## Layout
+
+```
+main.go
+internal/
+  config/   config.go config_test.go
+  message/  message.go message_test.go   ← typed JSON envelope + pure tests
+  app/      app.go routes.go app_test.go ws_echo_test.go
+  handler/  health.go
+```
 
 ## Configuration
 
@@ -65,6 +79,13 @@ Or with a `.env` file:
 cp env.example .env
 # Edit .env: set WS_SECRET to a value of 32 bytes or more
 go run .
+```
+
+## Tests
+
+```bash
+cd reference/with-websocket
+go test -race -timeout 30s ./...
 ```
 
 ## Manual test
@@ -100,16 +121,28 @@ wscat -c ws://localhost:8084/ws
 
 Type a message and press Enter. The server echoes it back.
 
-**Example session:**
+**Example session (plain text echo):**
 
 ```
 > hello
 < hello
-> {"event":"ping"}
-< {"event":"ping"}
 ```
 
-Text and binary frames are both echoed verbatim.
+**Example session (typed JSON ping/pong):**
+
+```
+> {"type":"ping"}
+< {"type":"pong"}
+```
+
+**Example session (unknown JSON type — echoed verbatim):**
+
+```
+> {"type":"custom","data":{"key":"value"}}
+< {"type":"custom","data":{"key":"value"}}
+```
+
+Binary frames are also echoed verbatim.
 
 **Verify upgrade rejection (non-WebSocket request):**
 
@@ -126,16 +159,39 @@ Client                              Server
   │── GET /ws (Upgrade) ──────────>│  handshake: origin check, key validation
   │                                │  hub.tryJoin → registered in "default" room
   │<── 101 Switching Protocols ────│  writer goroutine + pong monitor started
-  │── text frame ─────────────────>│  read loop → OnMessage → WriteMessage
+  │── {"type":"ping"} ────────────>│  read loop → echoHandler → decode JSON
+  │<── {"type":"pong"} ────────────│  WriteJSON → writerPump drains send queue
+  │── text frame ─────────────────>│  read loop → echoHandler → raw echo
   │<── text frame (echo) ──────────│  writer goroutine drains send queue
   │     (idle)                     │
   │<── ping ───────────────────────│  writerPump sends periodic ping
-  │── pong ─────────────────────────│  pongMonitor resets timeout
+  │── pong ────────────────────────│  pongMonitor resets timeout
+  │── close frame ────────────────>│  read loop returns; cleanup goroutine
+  │                                │  calls hub.RemoveConn
   │                                │
   │  (SIGTERM received)            │  hub.Shutdown closes all connections
-  │<── TCP close ───────────────────│  read loop returns io.EOF, cleanup goroutine
-  │                                │  calls hub.RemoveConn; HTTP server stops
+  │<── TCP close ───────────────────│  HTTP server stops after WS drains
 ```
+
+## Message format
+
+The demo handler (`echoHandler` in `internal/app/app.go`) uses a simple
+JSON envelope defined in `internal/message/message.go`:
+
+```go
+type Event struct {
+    Type string          `json:"type"`
+    Data json.RawMessage `json:"data,omitempty"`
+}
+```
+
+Routing logic:
+
+| Incoming frame    | Condition                  | Response                      |
+|-------------------|----------------------------|-------------------------------|
+| Text (`OpcodeText`) | Valid JSON, `type == "ping"` | `{"type":"pong"}`           |
+| Text (`OpcodeText`) | Non-JSON or other type     | Verbatim echo                 |
+| Binary (`OpcodeBinary`) | Any                    | Verbatim echo                 |
 
 ## Production notes
 
@@ -170,6 +226,12 @@ Client                              Server
    `Authorization: Bearer <token>`.
 4. See `x/websocket/auth.go` for `NewSimpleHS256TokenAuth` and `TokenAuthenticator`.
 
+**Add new message types:**
+
+1. Define a new `type` string constant in `internal/message/message.go`.
+2. Add a case in `echoHandler` in `internal/app/app.go`.
+3. Add a focused integration test in `internal/app/ws_echo_test.go`.
+
 **Broadcast from outside the connection handler:**
 
 1. Store `a.WS.Hub()` in your service layer.
@@ -183,3 +245,9 @@ Remove the `OnMessage` handler from `wsCfg` in `app.go`. Without `OnMessage`,
 `RegisterRoutes` automatically uses `ServeRoomFanoutWS`, which broadcasts each
 client message to everyone in the same room (selected via `?room=` query parameter,
 defaulting to `"default"`).
+
+## Related references
+
+- `reference/standard-service` — canonical layout this extends
+- `x/websocket` — module docs and API reference (`docs/modules/x/websocket/README.md`)
+- `reference/with-gateway` — reverse proxy and upstream routing
