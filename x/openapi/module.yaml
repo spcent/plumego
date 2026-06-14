@@ -1,120 +1,31 @@
 name: x/openapi
-path: x/openapi
-layer: extension
 status: experimental
-suggested_gate_profile: single_module_behavior
 owner: api
 risk: medium
-summary: Route-driven OpenAPI 3.1 document generation for explicit Plumego routes.
-
-entrypoint_reads:
-  - AGENTS.md
-  - docs/reference/canonical-style-guide.md
-  - specs/repo.yaml
-  - specs/task-routing.yaml
-  - specs/dependency-rules.yaml
-  - router/module.yaml
 
 responsibilities:
-  - OpenAPI document model
-  - RouteInfo to OpenAPI path conversion
-  - Optional operation hint merging
-  - Parameter and schema helper constructors
+  - OpenAPI 3.1 spec generation from route metadata
+  - Schema inference from Go types
+  - Spec validation
+  - JSON/YAML serialization
 
-non_goals:
-  - OpenAPI 2.0 generation
-  - Handler reflection
-  - Stable root route annotation ownership
-  - External OpenAPI library dependency
+does_not_own:
+  - Route registration (owned by core/router)
+  - HTTP transport (owned by core)
+  - Document hosting (caller responsibility)
 
 public_entrypoints:
-  - Op
-  - Param
-  - Schema
-  - RequestBody
-  - Response
-  - MediaType
-  - Document
-  - Info
-  - PathItem
-  - Operation
-  - Generator
-  - New
-  - (*Generator).Generate
-  - PathParam
-  - QueryParam
-  - HeaderParam
-  - JSONContent
-  - String
-  - Integer
-  - Boolean
-  - Array
-  - MarshalJSON
-  - MarshalYAML
-  - WriteJSON
-  - WriteYAML
+  - NewGenerator
+  - Generator.Spec
+  - Generator.WriteJSON
+  - Generator.WriteYAML
 
-allowed_imports:
-  - stdlib
-  - router
-  - contract
+validation_commands:
+  - go test -timeout 20s ./x/openapi/...
+  - go vet ./x/openapi/...
 
-forbidden_imports:
-  - core/**
-  - middleware/**
-  - security/**
-  - store/**
-  - x/**
-  - reference/**
-  - cmd/**
+deprecations: []
 
-test_commands:
-  - go test -race -timeout 60s ./...
-  - go test -timeout 20s ./...
-  - go vet ./...
-
-doc_paths:
-  - docs/modules/x/openapi/README.md
-
-change_risks:
-  - route path template regression
-  - operation hint merge regression
-  - serialization drift in downstream cards
-
-stop_conditions:
-  - The change introduces reflection over handlers or stable-root annotations.
-  - The change requires an external OpenAPI dependency.
-  - The change moves OpenAPI generation into router, core, or contract.
-
-review_checklist:
-  - Keep route generation driven by router.RouteInfo
-  - Keep hints optional
-  - Preserve dependency-free OpenAPI document structs
-  - Avoid stable root changes
-
-agent_hints:
-  - Use route names or method/path keys for hints
-  - Keep serialization separate from document generation
-  - Keep CLI wiring in cmd/plumego
-
-task_affinity:
-  openapi_generation: x/openapi/
-  bugfix_triage: x/openapi/
-
-landing_zones:
-  generator: generator.go
-  document: document.go
-  operation: operation.go
-  helpers: helpers.go
-
-docs_sync_contract:
-  on_status_change:
-    - docs/concepts/extension-maturity.md
-    - docs/release/roadmap.md
-    - specs/extension-maturity.yaml
-  on_api_change:
-    - docs/modules/x/openapi/README.md
-    - website/src/content/docs/docs/modules/x-openapi.mdx
-    - website/src/content/docs/zh/docs/modules/x-openapi.mdx
-  on_behavior_change:
-    - docs/modules/x/openapi/README.md
+notes: >
+  OpenAPI 3.1 generator with dependency-free JSON/YAML serialization.
+  No third-party schema validation dependencies.

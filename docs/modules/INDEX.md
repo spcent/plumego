@@ -1,8 +1,57 @@
-# docs/modules — Directory Index
+# docs/modules — Plumego Module Guide
 
-This directory contains module primers for stable roots and extension packages.
+This directory contains module primers for stable roots and extension packages. Use this page to find what you need, understand module boundaries, and plan your learning path.
 
-## Naming Convention
+## Stable Roots at a Glance
+
+These 9 packages are the learning path for Plumego. They have zero external dependencies and carry a full v1 compatibility guarantee.
+
+| Module | Purpose | When to use |
+|--------|---------|------------|
+| **`core`** | App construction, lifecycle, route registration | Starting every Plumego service |
+| **`router`** | Route matching, path params, groups, metadata | Building complex route hierarchies |
+| **`contract`** | Response writers, error builders, binding | Sending responses/errors in every handler |
+| **`middleware`** | Middleware composition + standard packages | Composing cross-cutting concerns |
+| **`security`** | Auth, JWT, passwords, abuse guards | Authentication, authorization, hardening |
+| **`store`** | Storage contracts, in-memory primitives | Interacting with storage systems |
+| **`health`** | Health/readiness models | Reporting service health to orchestrators |
+| **`log`** | Logging interfaces + default logger | Structured logging in your handlers |
+| **`metrics`** | Metrics contracts, collectors | Collecting application metrics |
+
+**Next:** Pick a module from the list below and read its README.
+
+## Module Boundaries
+
+Understanding what each module owns helps you know where to look for what you need.
+
+| Module | Owns | Does NOT own |
+|--------|------|--------------|
+| `core` | App, routes, middleware attachment, lifecycle | Response formatting, storage, business logic |
+| `router` | Route matching, params, groups, metadata | Response building, request binding |
+| `contract` | Success/error responses, request accessors | Validation, business DTO assembly |
+| `middleware` | Transport-layer concerns (logging, recovery, CORS) | Business logic injection, policy branching |
+| `security` | Auth adapters, JWT, password hashing | User/permission stores, business policy |
+| `store` | Storage contracts + in-memory impls | ORM wiring, business repositories |
+| `health` | Health models, status propagation | Business-logic health determination |
+| `log` | Logging interfaces, default logger | Application business logging |
+| `metrics` | Metrics contracts, collectors | What to measure (you decide) |
+
+## Quick Lookup
+
+**"I want to..."** → **Read this module**
+
+- Route requests and handle params → `router/` README
+- Send responses and errors → `contract/` README
+- Add middleware (logging, auth, etc.) → `middleware/` README
+- Handle panics gracefully → `middleware/recovery`
+- Log requests → `middleware/accesslog`
+- Hash passwords → `security/` README
+- Get/set request context → `contract/` README
+- Store data → `store/` README
+- Report health status → `health/` README
+- Export metrics → `metrics/` README
+
+## Directory Structure
 
 Directories use the following naming scheme:
 
