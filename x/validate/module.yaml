@@ -1,29 +1,74 @@
 name: x/validate
+path: x/validate
+layer: extension
 status: experimental
+suggested_gate_profile: single_module_behavior
 owner: api
 risk: medium
+summary: Request validation and binding helpers.
+
+entrypoint_reads:
+  - AGENTS.md
+  - docs/reference/canonical-style-guide.md
+  - specs/repo.yaml
+  - specs/task-routing.yaml
+  - specs/dependency-rules.yaml
+  - docs/modules/x/validate/README.md
 
 responsibilities:
   - Request binding helpers
-  - Explicit validation patterns
-  - Error message translation
+  - Validation error composition
+  - Message translation
 
-does_not_own:
+non_goals:
   - Validation rules (caller responsibility)
   - Response formatting (owned by contract)
   - Middleware composition (owned by middleware)
+  - Tag-based validation frameworks
 
 public_entrypoints:
   - Bind
   - BindJSON
-  - Validator interface
+  - Validator
 
-validation_commands:
-  - go test -timeout 20s ./x/validate/...
+allowed_imports:
+  - stdlib
+  - contract
+
+forbidden_imports:
+  - core/**
+  - router/**
+  - middleware/**
+  - security/**
+  - store/**
+  - x/**
+  - reference/**
+  - cmd/**
+
+test_commands:
+  - go test -race -timeout 20s ./x/validate/...
   - go vet ./x/validate/...
 
-deprecations: []
+doc_paths:
+  - docs/modules/x/validate/README.md
 
-notes: >
-  Validation bridge for explicit Bind/BindJSON call sites.
-  No third-party tag parser or adapter system.
+change_risks:
+  - binding regression
+  - error composition regression
+
+stop_conditions:
+  - Change introduces tag-based validation framework
+  - Change hides validation rules behind implicit registries
+
+review_checklist:
+  - Keep validation explicit (no magic tags)
+  - Keep binding simple and composable
+  - No implicit behavior
+
+agent_hints:
+  - "validate is for helpers, not a validation framework"
+  - "Explicit validation in handlers is better than implicit tag-based magic"
+
+landing_zones:
+  binding: ./
+  errors: errors/

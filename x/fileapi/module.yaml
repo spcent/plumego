@@ -1,15 +1,27 @@
 name: x/fileapi
+path: x/fileapi
+layer: extension
 status: experimental
+suggested_gate_profile: single_module_behavior
 owner: persistence
 risk: medium
+summary: HTTP endpoints for file operations (upload, download, temporary URLs).
+
+entrypoint_reads:
+  - AGENTS.md
+  - docs/reference/canonical-style-guide.md
+  - specs/repo.yaml
+  - specs/task-routing.yaml
+  - specs/dependency-rules.yaml
+  - docs/modules/x/fileapi/README.md
 
 responsibilities:
-  - HTTP endpoints for file operations
-  - File upload/download transport
+  - HTTP file upload transport
+  - HTTP file download transport
   - Temporary URL generation
 
-does_not_own:
-  - Storage implementation (owned by x/data/file or caller)
+non_goals:
+  - File storage implementation (owned by store/file or caller)
   - Access control (middleware responsibility)
   - File system operations (caller responsibility)
 
@@ -17,14 +29,48 @@ public_entrypoints:
   - Handler
   - Upload
   - Download
-  - TempURL
 
-validation_commands:
-  - go test -timeout 20s ./x/fileapi/...
+allowed_imports:
+  - stdlib
+  - contract
+  - store/file
+  - x/data/file
+  - x/tenant
+
+forbidden_imports:
+  - core/**
+  - router/**
+  - middleware/**
+  - security/**
+  - x/ai/**
+  - reference/**
+  - cmd/**
+
+test_commands:
+  - go test -race -timeout 20s ./x/fileapi/...
   - go vet ./x/fileapi/...
 
-deprecations: []
+doc_paths:
+  - docs/modules/x/fileapi/README.md
 
-notes: >
-  HTTP file transport over x/data/file and stable store/file contracts.
-  Requires explicit storage backend wiring.
+change_risks:
+  - upload handler regression
+  - download handler regression
+  - URL generation regression
+
+stop_conditions:
+  - Change introduces file storage implementation
+  - Change couples to specific cloud providers
+
+review_checklist:
+  - Keep storage abstraction clear
+  - Keep HTTP transport independent
+  - Keep access control to middleware
+
+agent_hints:
+  - "fileapi is for HTTP transport; storage is caller-owned"
+  - "Keep upload/download handlers independent of cloud provider"
+
+landing_zones:
+  upload: upload/
+  download: download/

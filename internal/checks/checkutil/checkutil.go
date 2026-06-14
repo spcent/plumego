@@ -44,6 +44,7 @@ var allowedTopLevelDirs = []string{
 	"contract",
 	"core",
 	"docs",
+	"examples",
 	"health",
 	"internal",
 	"log",

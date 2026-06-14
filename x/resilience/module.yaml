@@ -1,28 +1,72 @@
 name: x/resilience
+path: x/resilience
+layer: extension
 status: experimental
+suggested_gate_profile: single_module_behavior
 owner: runtime
 risk: medium
+summary: Reusable fault-tolerance primitives (circuit breaker, rate limiter).
+
+entrypoint_reads:
+  - AGENTS.md
+  - docs/reference/canonical-style-guide.md
+  - specs/repo.yaml
+  - specs/task-routing.yaml
+  - specs/dependency-rules.yaml
+  - docs/modules/x/resilience/README.md
 
 responsibilities:
   - Circuit breaker implementation
   - Rate limiter implementation
-  - Reusable fault-tolerance primitives
+  - Fault-tolerance state management
 
-does_not_own:
+non_goals:
   - Middleware composition (owned by middleware)
-  - Business logic (caller responsibility)
+  - Business logic integration
+  - Service discovery
+  - Health checking (owned by health)
 
 public_entrypoints:
   - CircuitBreaker
-  - RateLimiter
-  - New
+  - TokenBucket
 
-validation_commands:
-  - go test -timeout 20s ./x/resilience/...
+allowed_imports:
+  - stdlib
+  - contract
+  - middleware
+
+forbidden_imports:
+  - core/**
+  - security/**
+  - store/**
+  - x/tenant/**
+  - reference/**
+  - cmd/**
+
+test_commands:
+  - go test -race -timeout 20s ./x/resilience/...
   - go vet ./x/resilience/...
 
-deprecations: []
+doc_paths:
+  - docs/modules/x/resilience/README.md
 
-notes: >
-  Reusable extension-layer circuit breaker and rate-limit primitives.
-  Can be used in middleware or handlers.
+change_risks:
+  - state management regression
+  - concurrency regression
+
+stop_conditions:
+  - Change introduces middleware-specific behavior
+  - Change couples to specific usage patterns
+
+review_checklist:
+  - Keep primitives decoupled from middleware
+  - Keep state management explicit
+  - No hidden globals
+
+agent_hints:
+  - "resilience provides primitives for reuse; don't hardcode specific patterns"
+  - "Circuit breaker and rate limiter should be composable, not opinionated"
+
+landing_zones:
+  circuit_breaker: breaker/
+  rate_limiter: ratelimit/

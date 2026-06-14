@@ -50,7 +50,7 @@ func main() {
 		// Success
 		contract.WriteResponse(w, r, http.StatusCreated, map[string]interface{}{
 			"message": "user created",
-			"user": req,
+			"user":    req,
 		}, nil)
 	}))
 

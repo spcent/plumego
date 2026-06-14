@@ -1,31 +1,73 @@
 name: x/openapi
+path: x/openapi
+layer: extension
 status: experimental
+suggested_gate_profile: single_module_behavior
 owner: api
 risk: medium
+summary: OpenAPI 3.1 spec generation from route metadata.
+
+entrypoint_reads:
+  - AGENTS.md
+  - docs/reference/canonical-style-guide.md
+  - specs/repo.yaml
+  - specs/task-routing.yaml
+  - specs/dependency-rules.yaml
+  - docs/modules/x/openapi/README.md
 
 responsibilities:
-  - OpenAPI 3.1 spec generation from route metadata
+  - OpenAPI 3.1 spec generation
   - Schema inference from Go types
   - Spec validation
   - JSON/YAML serialization
 
-does_not_own:
-  - Route registration (owned by core/router)
+non_goals:
   - HTTP transport (owned by core)
-  - Document hosting (caller responsibility)
+  - Route registration (owned by router)
+  - Document hosting
+  - API design choices
 
 public_entrypoints:
-  - NewGenerator
-  - Generator.Spec
-  - Generator.WriteJSON
-  - Generator.WriteYAML
+  - Generator
+  - Document
 
-validation_commands:
-  - go test -timeout 20s ./x/openapi/...
+allowed_imports:
+  - stdlib
+  - router
+  - contract
+
+forbidden_imports:
+  - core/**
+  - middleware/**
+  - security/**
+  - store/**
+  - x/**
+  - reference/**
+  - cmd/**
+
+test_commands:
+  - go test -race -timeout 20s ./x/openapi/...
   - go vet ./x/openapi/...
 
-deprecations: []
+doc_paths:
+  - docs/modules/x/openapi/README.md
 
-notes: >
-  OpenAPI 3.1 generator with dependency-free JSON/YAML serialization.
-  No third-party schema validation dependencies.
+change_risks:
+  - schema inference regression
+  - spec generation regression
+
+stop_conditions:
+  - Change introduces HTTP transport behavior into openapi
+  - Change hides spec generation behind implicit globals or registries
+
+review_checklist:
+  - Keep spec generation explicit and stateless
+  - Keep transport concerns out
+  - Keep route registration out
+
+agent_hints:
+  - "openapi is for spec generation from route metadata; not for route registration or HTTP transport"
+  - "Schema generation should be explicit; avoid reflection-based magic"
+
+landing_zones:
+  spec_generation: ./

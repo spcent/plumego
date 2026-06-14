@@ -1,29 +1,94 @@
 name: x/rpc
+path: x/rpc
+layer: extension
 status: experimental
+suggested_gate_profile: single_module_behavior
 owner: rpc
 risk: medium
+summary: Optional gRPC server, client, and gateway adapters.
+
+entrypoint_reads:
+  - AGENTS.md
+  - docs/reference/canonical-style-guide.md
+  - specs/repo.yaml
+  - specs/task-routing.yaml
+  - specs/dependency-rules.yaml
+  - docs/modules/x/rpc/README.md
 
 responsibilities:
   - gRPC server hosting
   - gRPC client pooling
   - HTTP-gRPC gateway adapters
 
-does_not_own:
+non_goals:
   - gRPC proto codegen (protoc responsibility)
   - Service implementations (caller responsibility)
-  - TLS setup (caller responsibility)
+  - TLS/security setup (caller responsibility)
+
+subordinate_families:
+  - x/rpc/server
+  - x/rpc/client
+  - x/rpc/gateway
 
 public_entrypoints:
-  - Server
-  - ClientPool
-  - Gateway
+  - server
+  - client
+  - gateway
 
-validation_commands:
+allowed_imports:
+  - stdlib
+  - contract
+  - log
+  - x/observability
+
+forbidden_imports:
+  - core/**
+  - router/**
+  - middleware/**
+  - security/**
+  - store/**
+  - health/**
+  - metrics/**
+  - x/tenant/**
+  - x/ai/**
+  - x/data/**
+  - x/fileapi/**
+  - x/frontend/**
+  - x/gateway/**
+  - x/messaging/**
+  - x/openapi/**
+  - x/resilience/**
+  - x/rest/**
+  - x/websocket/**
+  - reference/**
+  - cmd/**
+
+test_commands:
   - go test -timeout 20s ./x/rpc/...
   - go vet ./x/rpc/...
 
-deprecations: []
+doc_paths:
+  - docs/modules/x/rpc/README.md
 
-notes: >
-  Optional gRPC server, client, and gateway adapters.
-  gRPC integration is caller-owned via explicit wiring.
+change_risks:
+  - server lifecycle regression
+  - client pooling regression
+  - gateway routing regression
+
+stop_conditions:
+  - Change introduces service implementation guidance
+  - Change hides gRPC setup behind implicit conventions
+
+review_checklist:
+  - Keep gRPC setup explicit
+  - Keep client/server lifecycle clear
+  - Keep gateway routing transparent
+
+agent_hints:
+  - "rpc is for adapter wiring; not for service implementation or proto codegen"
+  - "gRPC integration should remain optional and explicit"
+
+landing_zones:
+  server: server/
+  client: client/
+  gateway: gateway/
