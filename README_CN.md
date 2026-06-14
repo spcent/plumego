@@ -144,6 +144,7 @@ Plumego 使用 agent-first 控制面维护仓库：`docs/` 解释架构，`specs
 
 - [`docs/start/getting-started.md`](./docs/start/getting-started.md) —— 最小可运行教程。
 - [`reference/standard-service`](./reference/standard-service) —— 规范应用结构。
+- [`docs/reference/reference-apps.md`](./docs/reference/reference-apps.md) —— 参考应用选择指南。
 - [`docs/reference/canonical-style-guide.md`](./docs/reference/canonical-style-guide.md) —— 处理器、中间件、路由、依赖注入约定。
 - [`docs/modules`](./docs/modules) —— 各包模块导读。
 - [`docs/start/adoption-path.md`](./docs/start/adoption-path.md) —— 5 分钟、30 分钟、1 天采用路径。
