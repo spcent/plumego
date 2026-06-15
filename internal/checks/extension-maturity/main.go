@@ -31,6 +31,28 @@ type maturitySignal struct {
 	CoverageSignal        string
 }
 
+// surfaceCandidateStatus holds the package-level status fields from a
+// surface_candidate entry in extension-beta-evidence.yaml.
+type surfaceCandidateStatus struct {
+	Module        string
+	Surface       string
+	Package       string
+	CurrentStatus string
+}
+
+func (s surfaceCandidateStatus) Label() string {
+	if s.Surface != "" {
+		return s.Module + ":" + s.Surface
+	}
+	return s.Module
+}
+
+var validExtensionStatuses = map[string]bool{
+	"ga":           true,
+	"beta":         true,
+	"experimental": true,
+}
+
 func main() {
 	report := flag.Bool("report", false, "print deterministic dashboard source data")
 	flag.Parse()
@@ -71,16 +93,31 @@ func maturityReport(repoRoot string) ([]string, []string, error) {
 		return nil, nil, err
 	}
 
+	readmeBytes, err := os.ReadFile(filepath.Join(repoRoot, "README.md"))
+	if err != nil {
+		return nil, nil, err
+	}
+
 	content, err := os.ReadFile(filepath.Join(repoRoot, "docs", "concepts", "extension-maturity.md"))
 	if err != nil {
 		return nil, nil, err
 	}
 	dashboard := string(content)
-	candidates, err := readBetaCandidates(filepath.Join(repoRoot, "specs", "extension-beta-evidence.yaml"))
+
+	evidencePath := filepath.Join(repoRoot, "specs", "extension-beta-evidence.yaml")
+	candidates, err := readBetaCandidates(evidencePath)
 	if err != nil {
 		return nil, nil, err
 	}
 	signals, err := readMaturitySignals(filepath.Join(repoRoot, "specs", "extension-maturity.yaml"))
+	if err != nil {
+		return nil, nil, err
+	}
+	completedBeta, err := readCompletedBetaModules(evidencePath)
+	if err != nil {
+		return nil, nil, err
+	}
+	surfaceCands, err := readSurfaceCandidateStatuses(evidencePath)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -91,14 +128,18 @@ func maturityReport(repoRoot string) ([]string, []string, error) {
 	}
 	sort.Strings(paths)
 
+	states := make(map[string]moduleState, len(paths))
 	var report []string
 	var violations []string
+
 	for _, path := range paths {
 		state, err := readModuleState(filepath.Join(repoRoot, path, "module.yaml"))
 		if err != nil {
 			return nil, nil, err
 		}
+		states[path] = state
 		report = append(report, fmt.Sprintf("%s\tstatus=%s\trisk=%s\towner=%s", path, state.Status, state.Risk, state.Owner))
+
 		if state.Name != "" && state.Name != path {
 			violations = append(violations, fmt.Sprintf("%s module.yaml name %q does not match declared path", path, state.Name))
 		}
@@ -127,9 +168,339 @@ func maturityReport(repoRoot string) ([]string, []string, error) {
 		}
 	}
 
+	// Aggregate checks across all extension roots.
+	violations = append(violations, invalidStatusViolations(states)...)
+	violations = append(violations, betaEvidenceViolations(states, completedBeta)...)
+	violations = append(violations, readmeBetaListViolations(string(readmeBytes), states)...)
+	surfaceViolations, err := surfaceCandidateStatusViolations(repoRoot, surfaceCands)
+	if err != nil {
+		return nil, nil, err
+	}
+	violations = append(violations, surfaceViolations...)
+
 	sort.Strings(report)
 	sort.Strings(violations)
 	return report, violations, nil
+}
+
+// invalidStatusViolations reports extension roots whose module.yaml status is
+// not one of the valid values defined in specs/module-manifest.schema.yaml.
+func invalidStatusViolations(states map[string]moduleState) []string {
+	var violations []string
+	for path, state := range states {
+		if !validExtensionStatuses[state.Status] {
+			violations = append(violations, fmt.Sprintf(
+				"%s/module.yaml status %q is not a valid extension status; must be one of: ga, beta, experimental",
+				path, state.Status,
+			))
+		}
+	}
+	return violations
+}
+
+// betaEvidenceViolations reports extension roots that carry status "beta" in
+// module.yaml but have no completed entry in specs/extension-beta-evidence.yaml.
+// A completed entry has current_status "beta", no blockers, and an evidence_doc.
+func betaEvidenceViolations(states map[string]moduleState, completed map[string]bool) []string {
+	var violations []string
+	for path, state := range states {
+		if state.Status != "beta" {
+			continue
+		}
+		if !completed[path] {
+			violations = append(violations, fmt.Sprintf(
+				"%s has status \"beta\" in module.yaml but has no completed entry in specs/extension-beta-evidence.yaml",
+				path,
+			))
+		}
+	}
+	return violations
+}
+
+// readmeBetaListViolations reports drift between the beta extension families
+// listed in README.md and the actual beta modules from their module.yaml files.
+func readmeBetaListViolations(readme string, states map[string]moduleState) []string {
+	listedBeta := parseReadmeBetaModules(readme)
+
+	actualBeta := map[string]bool{}
+	for path, state := range states {
+		if state.Status == "beta" {
+			actualBeta[path] = true
+		}
+	}
+
+	if len(listedBeta) == 0 {
+		return []string{"README.md: beta extension families paragraph not found or lists no x/* modules"}
+	}
+
+	listedSet := map[string]bool{}
+	for _, m := range listedBeta {
+		listedSet[m] = true
+	}
+
+	var violations []string
+	for _, m := range listedBeta {
+		if !actualBeta[m] {
+			violations = append(violations, fmt.Sprintf(
+				"README.md lists %q as a beta extension family but %s/module.yaml status is not beta",
+				m, m,
+			))
+		}
+	}
+	for m := range actualBeta {
+		if !listedSet[m] {
+			violations = append(violations, fmt.Sprintf(
+				"README.md does not list %q but %s/module.yaml status is beta",
+				m, m,
+			))
+		}
+	}
+	return violations
+}
+
+// parseReadmeBetaModules extracts the backtick-quoted x/* module names from the
+// beta extension families paragraph in README.md.
+func parseReadmeBetaModules(content string) []string {
+	lines := strings.Split(content, "\n")
+	var modules []string
+	collecting := false
+
+	for _, line := range lines {
+		if !collecting && strings.Contains(line, "**beta**") && strings.Contains(line, "extension famil") {
+			collecting = true
+		}
+		if !collecting {
+			continue
+		}
+
+		trimmed := strings.TrimSpace(line)
+		if (trimmed == "" || strings.HasPrefix(trimmed, "#")) && len(modules) > 0 {
+			break
+		}
+
+		parts := strings.Split(line, "`")
+		for i := 1; i < len(parts); i += 2 {
+			name := parts[i]
+			if strings.HasPrefix(name, "x/") && !strings.Contains(name, "*") && !strings.Contains(name, " ") && len(name) > 2 {
+				modules = append(modules, name)
+			}
+		}
+	}
+	return modules
+}
+
+// surfaceCandidateStatusViolations reports cases where a surface_candidate in
+// specs/extension-beta-evidence.yaml specifies a package path that has its own
+// module.yaml, but that module.yaml status does not match current_status.
+func surfaceCandidateStatusViolations(repoRoot string, candidates []surfaceCandidateStatus) ([]string, error) {
+	var violations []string
+	for _, cand := range candidates {
+		if cand.Package == "" || cand.CurrentStatus == "" {
+			continue
+		}
+		manifestPath := filepath.Join(repoRoot, filepath.FromSlash(cand.Package), "module.yaml")
+		if _, err := os.Stat(manifestPath); err != nil {
+			if os.IsNotExist(err) {
+				continue
+			}
+			return nil, err
+		}
+		state, err := readModuleState(manifestPath)
+		if err != nil {
+			return nil, err
+		}
+		if state.Status != cand.CurrentStatus {
+			violations = append(violations, fmt.Sprintf(
+				"specs/extension-beta-evidence.yaml surface_candidate %s current_status %q does not match %s/module.yaml status %q",
+				cand.Label(), cand.CurrentStatus, cand.Package, state.Status,
+			))
+		}
+	}
+	return violations, nil
+}
+
+// readCompletedBetaModules reads the candidates and surface_candidates sections
+// of extension-beta-evidence.yaml and returns the set of module paths that have
+// completed beta evidence (current_status "beta", no blockers, evidence_doc present).
+func readCompletedBetaModules(path string) (map[string]bool, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	type betaEntry struct {
+		Module        string
+		CurrentStatus string
+		HasBlockers   bool
+		EvidenceDoc   string
+	}
+
+	var entries []betaEntry
+	var current *betaEntry
+	var currentListKey string
+	inSection := false
+
+	scanner := checkutil.NewLineScanner(file)
+	for scanner.Scan() {
+		raw := strings.TrimRight(scanner.Text(), " \t")
+		trimmed := strings.TrimSpace(raw)
+		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
+			continue
+		}
+		indent := len(raw) - len(strings.TrimLeft(raw, " "))
+
+		if indent == 0 {
+			switch trimmed {
+			case "candidates:", "surface_candidates:":
+				if current != nil {
+					entries = append(entries, *current)
+					current = nil
+				}
+				inSection = true
+				continue
+			default:
+				if inSection {
+					if current != nil {
+						entries = append(entries, *current)
+						current = nil
+					}
+					inSection = false
+				}
+			}
+		}
+		if !inSection {
+			continue
+		}
+
+		if indent == 2 && strings.HasPrefix(trimmed, "- module:") {
+			if current != nil {
+				entries = append(entries, *current)
+			}
+			current = &betaEntry{Module: yamlScalar(trimmed)}
+			currentListKey = ""
+			continue
+		}
+		if current == nil {
+			continue
+		}
+		if indent == 4 {
+			key, value, ok := strings.Cut(trimmed, ":")
+			if !ok {
+				continue
+			}
+			key = strings.TrimSpace(key)
+			value = strings.TrimSpace(value)
+			currentListKey = ""
+			switch key {
+			case "current_status":
+				current.CurrentStatus = trimYAMLValue(value)
+			case "evidence_doc":
+				current.EvidenceDoc = trimYAMLValue(value)
+			case "blockers":
+				parsed := parseInlineList(value)
+				current.HasBlockers = len(parsed) > 0
+				if strings.TrimSpace(value) == "" {
+					currentListKey = key
+				}
+			}
+			continue
+		}
+		if indent == 6 && currentListKey == "blockers" && strings.HasPrefix(trimmed, "- ") {
+			current.HasBlockers = true
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, err
+	}
+	if current != nil {
+		entries = append(entries, *current)
+	}
+
+	completed := map[string]bool{}
+	for _, e := range entries {
+		if e.CurrentStatus == "beta" && !e.HasBlockers && e.EvidenceDoc != "" {
+			completed[e.Module] = true
+		}
+	}
+	return completed, nil
+}
+
+// readSurfaceCandidateStatuses reads the surface_candidates section of
+// extension-beta-evidence.yaml and returns entries that have both a package
+// path and a current_status.
+func readSurfaceCandidateStatuses(path string) ([]surfaceCandidateStatus, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	var candidates []surfaceCandidateStatus
+	var current *surfaceCandidateStatus
+	inSection := false
+
+	scanner := checkutil.NewLineScanner(file)
+	for scanner.Scan() {
+		raw := strings.TrimRight(scanner.Text(), " \t")
+		trimmed := strings.TrimSpace(raw)
+		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
+			continue
+		}
+		indent := len(raw) - len(strings.TrimLeft(raw, " "))
+
+		if indent == 0 {
+			if trimmed == "surface_candidates:" {
+				if current != nil {
+					candidates = append(candidates, *current)
+					current = nil
+				}
+				inSection = true
+				continue
+			}
+			if inSection {
+				if current != nil {
+					candidates = append(candidates, *current)
+					current = nil
+				}
+				inSection = false
+			}
+			continue
+		}
+		if !inSection {
+			continue
+		}
+
+		if indent == 2 && strings.HasPrefix(trimmed, "- module:") {
+			if current != nil {
+				candidates = append(candidates, *current)
+			}
+			current = &surfaceCandidateStatus{Module: yamlScalar(trimmed)}
+			continue
+		}
+		if current == nil || indent != 4 {
+			continue
+		}
+		key, value, ok := strings.Cut(trimmed, ":")
+		if !ok {
+			continue
+		}
+		switch strings.TrimSpace(key) {
+		case "surface":
+			current.Surface = trimYAMLValue(value)
+		case "package":
+			current.Package = trimYAMLValue(value)
+		case "current_status":
+			current.CurrentStatus = trimYAMLValue(value)
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, err
+	}
+	if current != nil {
+		candidates = append(candidates, *current)
+	}
+	return candidates, nil
 }
 
 func readMaturitySignals(path string) (map[string]maturitySignal, error) {

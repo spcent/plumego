@@ -185,7 +185,7 @@ surface_candidates:
     surface: file
     package: x/data/file
     owner: persistence
-    current_status: experimental
+    current_status: beta
     evidence_doc: docs/evidence/extension/x-data.md
     release_refs:
       - b35d4b2269e2f0c36896126c93e0e8905c5d8dbe
@@ -200,7 +200,7 @@ surface_candidates:
     surface: idempotency
     package: x/data/idempotency
     owner: persistence
-    current_status: experimental
+    current_status: beta
     evidence_doc: docs/evidence/extension/x-data.md
     release_refs:
       - b35d4b2269e2f0c36896126c93e0e8905c5d8dbe
