@@ -100,17 +100,49 @@
 Plumego does not provide a hidden "production mode" bundle. Wire the stack
 explicitly in application code so ordering and dependencies stay reviewable.
 
-Recommended baseline order:
+### Recommended middleware order
 
-1. `requestid.Middleware(...)` for correlation.
-2. `recovery.Middleware(recovery.Config{Logger: app.Logger()})` to construct the panic recovery layer and convert panics from downstream middleware and handlers into structured errors.
-3. `bodylimit.Middleware(bodylimit.Config{...})` for request body caps.
+The conceptual ordering from outermost to innermost is:
+
+```
+requestid → recovery → bodylimit → timeout → cors → securityheaders → abuseguard → auth → httpmetrics/tracing → accesslog → handler
+```
+
+Plumego does not provide a RealIP middleware. Applications that need to trust
+`X-Forwarded-For` or `X-Real-IP` for client IP extraction should configure
+an explicit IP extraction strategy (for example, by supplying a custom
+`KeyFunc` to `abuseguard.AbuseGuardConfig`) rather than relying on a generic
+realip middleware. Transport-level client IP helpers are available in
+`middleware/internal/httputil` for middleware authors.
+
+**Recommended baseline order:**
+
+1. `requestid.Middleware(...)` for correlation. Placed outermost so that every
+   subsequent layer — including recovery — can include the request ID in logs.
+2. `recovery.Middleware(recovery.Config{Logger: app.Logger()})` to convert
+   panics from all downstream middleware and handlers into structured errors.
+   Placing it directly after `requestid` ensures request IDs are present in
+   panic logs.
+3. `bodylimit.Middleware(bodylimit.Config{...})` for request body caps before
+   the handler reads the body.
 4. `timeout.Middleware(timeout.Config{...})` for bounded request runtime.
-5. `middleware/securityheaders.Middleware(security.Config{Policy: policy})` for response hardening; invalid custom header policies fail during construction.
-6. `ratelimit.NewAbuseGuard(...).Middleware()` for transport abuse limits when the limiter is middleware-owned.
-7. `auth.Authenticate(...)` and `auth.Authorize(...)` on protected route groups or handlers; both return `(middleware.Middleware, error)` so invalid dependencies fail during startup.
-8. `httpmetrics.Middleware(...)` and `tracing.Middleware(...)` for transport telemetry when needed.
-9. `accesslog.Middleware(accesslog.Config{Logger: app.Logger()})` for logging-only access logs.
+5. `cors.Middleware(cors.Options{...})` for CORS negotiation. Positioned after
+   timeout so that slow preflight requests are also subject to the deadline.
+   Use `cors.StrictDefaultOptions(origin)` as the starting point for
+   production stacks that need explicit origin control.
+6. `securityheaders.Middleware(securityheaders.Config{Policy: policy})` for
+   response hardening. Security headers are applied before the downstream
+   handler writes a body, so they appear on all responses including errors.
+   Invalid custom header policies fail during construction.
+7. `abuseguard.NewAbuseGuard(...).Middleware()` for transport abuse limits when
+   the limiter is middleware-owned.
+8. `auth.Authenticate(...)` and `auth.Authorize(...)` on protected route groups
+   or handlers; both return `(middleware.Middleware, error)` so invalid
+   dependencies fail during startup.
+9. `httpmetrics.Middleware(...)` and `tracing.Middleware(...)` for transport
+   telemetry when needed.
+10. `accesslog.Middleware(accesslog.Config{Logger: app.Logger()})` for
+    logging-only access logs.
 
 Keep `recovery.Middleware(...)` directly after `requestid.Middleware(...)` in
 generated and reference stacks so request IDs are available and all later

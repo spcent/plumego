@@ -67,3 +67,67 @@ func TestSecurityHeadersMiddlewareInvalidSemanticPolicyFailsClosed(t *testing.T)
 		t.Fatal("expected invalid semantic policy error")
 	}
 }
+
+// TestSecurityHeadersMiddlewareDefaultFrameOptions verifies that the default
+// policy sets X-Frame-Options in addition to X-Content-Type-Options.
+func TestSecurityHeadersMiddlewareDefaultFrameOptions(t *testing.T) {
+	mw := mustSecurityHeaders(t, Config{})
+	handler := mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "http://example.com", nil)
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+
+	resp := w.Result()
+	if got := resp.Header.Get("X-Frame-Options"); got == "" {
+		t.Fatal("expected X-Frame-Options to be set by default policy")
+	}
+}
+
+// TestSecurityHeadersMiddlewareAdditionalHeadersApplied verifies that custom
+// headers provided via Policy.Additional are written to the response.
+func TestSecurityHeadersMiddlewareAdditionalHeadersApplied(t *testing.T) {
+	policy := headers.DefaultPolicy()
+	policy.Additional = map[string]string{"X-Custom-Security": "enabled"}
+	mw := mustSecurityHeaders(t, Config{Policy: &policy})
+	handler := mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "http://example.com", nil)
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+
+	resp := w.Result()
+	if got := resp.Header.Get("X-Custom-Security"); got != "enabled" {
+		t.Fatalf("expected X-Custom-Security=enabled, got %q", got)
+	}
+}
+
+// TestSecurityHeadersMiddlewareHeadersSetBeforeHandlerBody verifies that
+// security headers are present in responses even when the handler writes a
+// non-200 status code, confirming the middleware applies them before
+// deferring to the downstream handler.
+func TestSecurityHeadersMiddlewareHeadersSetBeforeHandlerBody(t *testing.T) {
+	mw := mustSecurityHeaders(t, Config{})
+	handler := mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "http://example.com", nil)
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+
+	resp := w.Result()
+	if resp.StatusCode != http.StatusNoContent {
+		t.Fatalf("expected status 204, got %d", resp.StatusCode)
+	}
+	if got := resp.Header.Get("X-Content-Type-Options"); got != "nosniff" {
+		t.Fatalf("expected X-Content-Type-Options=nosniff with 204 response, got %q", got)
+	}
+	if got := resp.Header.Get("X-Frame-Options"); got == "" {
+		t.Fatal("expected X-Frame-Options to be set with 204 response")
+	}
+}

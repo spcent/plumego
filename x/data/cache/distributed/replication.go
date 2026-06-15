@@ -349,10 +349,11 @@ func (dc *DistributedCache) runAsyncReplication(job asyncReplicationJob) {
 	start := time.Now()
 	replicaCtx, cancel := dc.asyncReplicationContext()
 	defer cancel()
-	if err := job.run(replicaCtx); err != nil {
+	err := job.run(replicaCtx)
+	dc.recordReplicationLag(start)
+	if err != nil {
 		dc.recordReplicationFailure()
 	}
-	dc.recordReplicationLag(start)
 }
 
 func (dc *DistributedCache) dropAsyncReplication(job asyncReplicationJob, reason AsyncReplicationDropReason) {
