@@ -107,23 +107,41 @@ func RegisterRoutes(r *router.Router, repository rest.Repository[User]) {
 - keep response and error conventions aligned with `contract`; do not introduce `x/rest`-local error envelopes
 - keep domain validation and business rules outside `x/rest`
 - `RegisterResourceRoutes` returns explicit errors for nil router or controller so app wiring mistakes are visible; empty prefixes normalize to the root route surface
+- `x/rest` is not an ORM — `SQLBuilder` is a query helper, not an active-record layer; column-level SQL safety (filter-key interpolation) depends on `QueryBuilder.WithAllowedFilters` being configured; a `QueryBuilder` without an allowlist passes all filter keys through to SQL
+- `x/rest` is not a validation framework — `DBResourceController.WithValidator` accepts any `interface{ Validate(any) error }`; the validator's error message is never forwarded to the client; only the stable "validation failed" message is exposed
+- `x/rest` does not own route discovery or auto-registration; every resource must be wired explicitly by the calling package
 
 ## Current test coverage
 
-- `RegisterResourceRoutes`: canonical route surface (all 11 routes), `RouteOptions` selective enable/disable, `BaseContextResourceController` wiring, nil router and nil controller errors, empty prefix normalization
+- `RegisterResourceRoutes`: canonical route surface (all 12 routes), `RouteOptions` selective enable/disable, `BaseContextResourceController` wiring, nil router and nil controller errors, empty prefix normalization
+- `RegisterDBResource`: end-to-end registration builds controller, registers routes, and serves a real request
 - `DefaultRouteOptions`: all three flags enabled
-- `BaseResourceController`: all 7 not-implemented methods return HTTP 501 with `contract.CodeNotImplemented`, `Options` sets CORS headers and returns 204, `Head` returns 200, empty `ResourceName` defaults to `"resource"`
+- `DefaultResourceSpec`: canonical name and prefix assignment, `WithPrefix` override
+- `BaseResourceController`: all 8 not-implemented methods (Index, Show, Create, Update, Delete, Patch, BatchCreate, BatchDelete) return HTTP 501 with `contract.CodeNotImplemented`; `Options` sets CORS headers and returns 204; `Head` returns 200; empty `ResourceName` defaults to `"resource"`
 - `DBResourceController.Index`: canonical contract response shape (`{"data": [...], "meta": {"pagination": {...}}}`), repository errors use stable messages, hook errors use safe codes
+- `DBResourceController.Show`: empty ID returns 400 `CodeRequired`; non-`ErrNoRows` repository error returns 500 `CodeInternalError` with internal message omitted; `sql.ErrNoRows` returns 404 `CodeResourceNotFound`
+- `DBResourceController.Create`: invalid JSON returns 400 `CodeInvalidRequest`; repository error returns 500 with internal message omitted; validation error returns 422 `CodeValidationError`; `BeforeCreate` hook rejection returns 4xx (not 5xx) with hook message omitted
+- `DBResourceController.Update`: empty ID returns 400 `CodeRequired`; `sql.ErrNoRows` returns 404; `BeforeUpdate` hook rejection returns 4xx with hook message omitted
+- `DBResourceController.Delete`: empty ID returns 400 `CodeRequired`; `sql.ErrNoRows` returns 404; success returns 204; `BeforeDelete` hook rejection returns 4xx with hook message omitted
+- `ApplyResourceSpec` / nil controller: nil controller is a no-op (no panic)
+- `BaseContextResourceController.ParseQueryParams`: nil receiver returns a safe default (no panic)
+- `DBResourceController.ApplySpec`: nil receiver is a no-op (no panic)
+- `NewDBResource`: empty `ResourceSpec{}` normalizes safely (name defaulted, controller non-nil)
 - `ResourceSpec` / `ApplyResourceSpec`: controller defaults preservation, spec-driven query normalization, legacy sort field filtering
-- `NewPaginationMeta`: first-page (HasPrev=false, HasNext=true), last-page (HasNext=false), zero-item (TotalPages=0, no navigation)
-- `QueryBuilder`: page-size clamping to max, invalid page input uses default (page=1), page=0 treated as default, unknown sort field filtered out, unknown filter field filtered out, descending sort prefix (`-`) parsing
+- `NewPaginationMeta`: first-page (HasPrev=false, HasNext=true), last-page (HasNext=false), zero-item (TotalPages=0, no navigation), zero/negative pageSize returns without panic, single-exact-page (HasNext=false, HasPrev=false), exact divisor (no extra page)
+- `QueryBuilder`: page-size clamping to max; invalid, zero, and negative page and page_size input use defaults; unknown sort field filtered out; bare-dash sort (`-`) filtered out (no empty-field `SortField`); unknown filter field filtered out; descending sort prefix (`-`) parsing; `q=` fallback when `search=` is absent; `search=` takes precedence over `q=`; `fields=` and `include=` comma list parsing; explicit `offset=` respected
 
 ## Beta readiness
 
 `x/rest` satisfies the current coverage and boundary portions of
 `docs/reference/extension-stability-policy.md`: documented route registration,
-controller defaults, query parsing, pagination, invalid-argument behavior, and
-not-implemented negative paths have focused tests.
+controller defaults, query parsing, pagination, nil-receiver safety, hook and
+transformer error paths, invalid-argument rejection, and not-implemented negative
+paths all have focused tests.
+
+Two fixes applied during production-trust hardening:
+- `NewPaginationMeta` now guards against `pageSize ≤ 0` to prevent division-by-zero
+- `QueryBuilder.Parse` now filters bare-dash sort inputs (`sort=-`) that produced an empty-field `SortField` when no sort allowlist was configured
 
 The module is beta. The beta evidence in `docs/evidence/extension/x-rest.md`
 records two release refs, matching API snapshots, no exported API changes, and
