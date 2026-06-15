@@ -384,3 +384,151 @@ func TestAllowedInList(t *testing.T) {
 		})
 	}
 }
+
+func TestConfigPolicyEvaluator_DenyMethod(t *testing.T) {
+	mgr := NewInMemoryConfigManager()
+	mgr.SetTenantConfig(Config{
+		TenantID: "method-tenant",
+		Policy: PolicyConfig{
+			AllowedMethods: []string{"GET"},
+		},
+	})
+
+	evaluator := NewConfigPolicyEvaluator(mgr)
+	ctx := t.Context()
+
+	result, err := evaluator.Evaluate(ctx, "method-tenant", PolicyRequest{
+		Method: "POST",
+	})
+
+	if err != ErrPolicyDenied {
+		t.Errorf("expected ErrPolicyDenied, got %v", err)
+	}
+	if result.Allowed {
+		t.Error("expected denied for disallowed method")
+	}
+	if result.Reason != "method not allowed" {
+		t.Errorf("reason = %q, want 'method not allowed'", result.Reason)
+	}
+}
+
+func TestConfigPolicyEvaluator_AllowMethod(t *testing.T) {
+	mgr := NewInMemoryConfigManager()
+	mgr.SetTenantConfig(Config{
+		TenantID: "method-tenant",
+		Policy: PolicyConfig{
+			AllowedMethods: []string{"GET", "POST"},
+		},
+	})
+
+	evaluator := NewConfigPolicyEvaluator(mgr)
+	ctx := t.Context()
+
+	for _, method := range []string{"GET", "POST"} {
+		result, err := evaluator.Evaluate(ctx, "method-tenant", PolicyRequest{Method: method})
+		if err != nil {
+			t.Errorf("method %q: unexpected error %v", method, err)
+		}
+		if !result.Allowed {
+			t.Errorf("method %q: expected allowed", method)
+		}
+	}
+
+	denied, err := evaluator.Evaluate(ctx, "method-tenant", PolicyRequest{Method: "DELETE"})
+	if err != ErrPolicyDenied {
+		t.Errorf("DELETE: expected ErrPolicyDenied, got %v", err)
+	}
+	if denied.Allowed {
+		t.Error("DELETE: expected denied")
+	}
+}
+
+func TestConfigPolicyEvaluator_DenyPath(t *testing.T) {
+	mgr := NewInMemoryConfigManager()
+	mgr.SetTenantConfig(Config{
+		TenantID: "path-tenant",
+		Policy: PolicyConfig{
+			AllowedPaths: []string{"/api/v1/*"},
+		},
+	})
+
+	evaluator := NewConfigPolicyEvaluator(mgr)
+	ctx := t.Context()
+
+	result, err := evaluator.Evaluate(ctx, "path-tenant", PolicyRequest{
+		Path: "/admin/users",
+	})
+
+	if err != ErrPolicyDenied {
+		t.Errorf("expected ErrPolicyDenied, got %v", err)
+	}
+	if result.Allowed {
+		t.Error("expected denied for path outside allowed prefix")
+	}
+	if result.Reason != "path not allowed" {
+		t.Errorf("reason = %q, want 'path not allowed'", result.Reason)
+	}
+}
+
+func TestConfigPolicyEvaluator_AllowPathPrefix(t *testing.T) {
+	mgr := NewInMemoryConfigManager()
+	mgr.SetTenantConfig(Config{
+		TenantID: "path-tenant",
+		Policy: PolicyConfig{
+			AllowedPaths: []string{"/api/v1/*", "/health"},
+		},
+	})
+
+	evaluator := NewConfigPolicyEvaluator(mgr)
+	ctx := t.Context()
+
+	allowed := []string{"/api/v1/users", "/api/v1/orders/42", "/health"}
+	for _, p := range allowed {
+		result, err := evaluator.Evaluate(ctx, "path-tenant", PolicyRequest{Path: p})
+		if err != nil {
+			t.Errorf("path %q: unexpected error %v", p, err)
+		}
+		if !result.Allowed {
+			t.Errorf("path %q: expected allowed", p)
+		}
+	}
+
+	denied := []string{"/admin", "/api/v2/users", "/healthz"}
+	for _, p := range denied {
+		result, err := evaluator.Evaluate(ctx, "path-tenant", PolicyRequest{Path: p})
+		if err != ErrPolicyDenied {
+			t.Errorf("path %q: expected ErrPolicyDenied, got %v", p, err)
+		}
+		if result.Allowed {
+			t.Errorf("path %q: expected denied", p)
+		}
+	}
+}
+
+func TestPathAllowed_Variants(t *testing.T) {
+	tests := []struct {
+		name     string
+		allowed  []string
+		path     string
+		expected bool
+	}{
+		{"empty list allows all", nil, "/anything", true},
+		{"empty path allowed", []string{"/api/*"}, "", true},
+		{"exact match", []string{"/health"}, "/health", true},
+		{"exact mismatch", []string{"/health"}, "/healthz", false},
+		{"prefix match", []string{"/api/*"}, "/api/users", true},
+		{"prefix mismatch", []string{"/api/*"}, "/apiold/users", false},
+		{"prefix only matches from slash", []string{"/api/v1/*"}, "/api/v1/", true},
+		{"multiple patterns first matches", []string{"/a/*", "/b/*"}, "/a/x", true},
+		{"multiple patterns second matches", []string{"/a/*"}, "/b/x", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := pathAllowed(tt.allowed, tt.path)
+			if result != tt.expected {
+				t.Errorf("pathAllowed(%v, %q) = %v, want %v", tt.allowed, tt.path, result, tt.expected)
+			}
+		})
+	}
+}
