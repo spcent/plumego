@@ -6,7 +6,7 @@ Operational guide for AI coding agents in `github.com/spcent/plumego`. Go 1.26+;
 
 Read path: `AGENTS.md` → matching `specs/task-routing.yaml` entry → its `start_with` files → target `<module>/module.yaml` → extra docs only when preflight identifies a concrete need. Conflict order: (1) security/boundary rules here → (2) `docs/reference/canonical-style-guide.md` → (3) machine-readable specs → (4) existing local patterns.
 
-Docs: `docs/operations/` (codex-workflow, agent-context-budget = context packages, agent-code-quality-rules §6 = gate profiles), `docs/reference/canonical-style-guide.md`, `docs/concepts/` (boundaries, extension-maturity). Specs under `specs/`: `task-routing.yaml`, `checks.yaml`, `dependency-rules.yaml`, `extension-taxonomy.yaml`, `module-manifest.schema.yaml`, `stop-condition-handlers.yaml`, `specs/agent-quality-rules.yaml`, `change-recipes/`. Canonical wiring: `reference/standard-service`.
+Docs: `docs/operations/` (gate profiles, workflow, context packages), `docs/reference/canonical-style-guide.md`, `docs/concepts/` (boundaries, extension maturity). Specs: `specs/` (`task-routing.yaml`, `dependency-rules.yaml`, `stop-condition-handlers.yaml`, `change-recipes/`). Canonical wiring: `reference/standard-service`.
 
 CLI: `go run ./cmd/plumego --help` (agent-assist, validation runners, codegen, dev server, scaffold, task bundling); `make bundle TASK=<recipe> MODULE=<path>`.
 
@@ -29,7 +29,7 @@ Extensions (`x/`): **beta** (production-ready, caveats) = `frontend gateway mess
 
 Landing zones: kernel/lifecycle/transport/auth/storage → stable root; product capability/protocol/feature → `x/*`; app wiring/DI/bootstrap → `reference/standard-service`; workflow/specs/quality → `docs/` or `specs/`; plans/sequencing → `tasks/`. New library code lives under a stable root or `x/*`; no new broad top-level roots (`ai`, `tenant`, `net`, `pubsub`, `rest`, `validator`, `utils`, `frontend`).
 
-Reference starts (`reference/`): JSON API→`standard-service`; hardened prod (auth/tracing/metrics/tenant)→`production-service`; REST CRUD→`with-rest`; multi-tenant→`with-tenant`; tenant admin→`with-tenant-admin`; LLM/AI→`with-ai`; WebSocket→`with-websocket`; gRPC→`with-rpc`; events/pubsub→`with-events`; messaging→`with-messaging`; webhooks→`with-webhook`; reverse proxy→`with-gateway`; embedded assets→`with-frontend`; health/metrics→`with-ops`; observability stack→`with-observability`; benchmarking→`benchmark`. Full map: `specs/task-routing.yaml`.
+Reference starts (`reference/`): JSON API→`standard-service`; hardened prod→`production-service`; REST CRUD→`with-rest`; multi-tenant→`with-tenant`; LLM/AI→`with-ai`; WebSocket→`with-websocket`; gRPC→`with-rpc`; observability→`with-observability`. Full map: `specs/task-routing.yaml`.
 
 Boundaries: `middleware` is transport-only (no service injection, DTO assembly, or domain-policy branching); tenant logic + session lifecycle → `x/tenant` (not middleware/store/contract); observability wiring (tracing, metrics export) → `x/observability` (not contract).
 
@@ -58,7 +58,7 @@ Baseline boundary/manifest checks (`go run ./internal/checks/<name>`): `dependen
 
 ## 7. Docs Sync
 
-Update docs only for behavior/API/config/security/lifecycle/boundary changes; document implemented behavior only. Targets: `README.md`, `README_CN.md`, `AGENTS.md`, `docs/operations/agent-context-budget.md`, `env.example`, affected `docs/modules/` primers (stable roots bare e.g. `core/`; extensions mirror import paths e.g. `x/ai/`, `x/data/cache/` — see `docs/modules/INDEX.md`), `docs/concepts/extension-maturity.md`, `docs/release/roadmap.md`, `docs/evidence/stable-api/`.
+Update docs only for behavior/API/config/security/lifecycle/boundary changes; document implemented behavior only. Targets: `README.md`, `README_CN.md`, `AGENTS.md`, `docs/operations/agent-context-budget.md`, `env.example`, affected `docs/modules/` primers (see `docs/modules/INDEX.md` for naming), `docs/concepts/extension-maturity.md`, `docs/release/roadmap.md`, `docs/evidence/stable-api/`.
 
 Run `make website-sync` after editing these sources, then commit the generated files (all under `website/src/generated/`) together:
 

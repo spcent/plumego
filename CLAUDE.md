@@ -10,8 +10,8 @@ Entry point for all agent types (Claude Code, Codex, Cursor, …); delegates to 
 
 - **Stable roots (GA):** `core router contract middleware security store health log metrics` — stdlib-only, no `x/*` imports
 - **Extensions:** 14 `x/*` (beta + experimental) — see AGENTS §3
-- **Reference apps:** `reference/*` (16, own `go.mod`); **use-cases:** `workerfleet cloud-vault dbadmin guardus mini-saas-api` (own `go.mod`)
-- **CLI:** `cmd/plumego` · **Validation:** `internal/checks/` (11 programs, via `make gates`) · **Docs site:** `website/` (Astro, `make website-sync`)
+- **Reference apps:** `reference/*` (own `go.mod`); **use-cases:** `workerfleet cloud-vault dbadmin guardus mini-saas-api` (own `go.mod`)
+- **CLI:** `cmd/plumego` · **Validation:** `internal/checks/` · **Docs site:** `website/`
 
 ### Key commands
 
