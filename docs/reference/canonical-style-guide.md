@@ -132,66 +132,7 @@ func registerRoutes(app *core.App) error {
 
 ### Error-accumulating registration (canonical for multi-route tables)
 
-The inline `if err := app.Get(...); err != nil { return err }` form above is
-canonical for very small route tables. Once a service has more than a few
-routes, the per-line error checks dominate the file and bury the route map. The
-canonical way to keep the table visually flat while still returning the first
-registration error is a small local accumulator wrapper:
-
-```go
-// routeAdder is the minimal interface shared by *core.App and *core.RouteGroup.
-type routeAdder interface {
-    Get(path string, h http.Handler) error
-    Post(path string, h http.Handler) error
-    Put(path string, h http.Handler) error
-    Patch(path string, h http.Handler) error
-    Delete(path string, h http.Handler) error
-}
-
-// routeReg wraps a routeAdder and retains the first registration error.
-type routeReg struct {
-    adder routeAdder
-    err   error
-}
-
-func newRouteReg(adder routeAdder) *routeReg { return &routeReg{adder: adder} }
-
-func (r *routeReg) get(path string, h http.Handler)  { r.record(r.adder.Get(path, h)) }
-func (r *routeReg) post(path string, h http.Handler) { r.record(r.adder.Post(path, h)) }
-// … put / patch / delete follow the same one-line shape …
-
-func (r *routeReg) record(err error) {
-    if r.err == nil {
-        r.err = err
-    }
-}
-```
-
-```go
-func (a *App) RegisterRoutes() error {
-    root := newRouteReg(a.Core)
-    root.get("/healthz", http.HandlerFunc(health.Live))
-    root.get("/readyz", http.HandlerFunc(health.Ready))
-    if root.err != nil {
-        return root.err
-    }
-
-    v1 := newRouteReg(a.Core.Group("/api/v1"))
-    v1.get("/items", http.HandlerFunc(items.List))
-    v1.post("/items", writeGuard(http.HandlerFunc(items.Create)))
-    v1.get("/items/:id", http.HandlerFunc(items.GetByID))
-    return v1.err
-}
-```
-
-This is a **sanctioned canonical pattern**, not a forbidden "new registration
-idiom". It preserves one method + one path + one handler per line, returns the
-first error to the caller, stays grep-friendly, and adds no reflection,
-discovery, annotation routing, or hidden policy. Retaining only the first error
-is correct: route-registration failures (duplicate path, nil handler) are
-programming mistakes that surface one at a time. `reference/standard-service`
-(`internal/app/routes.go`) is the canonical implementation — copy that wrapper
-rather than inventing a per-app variant.
+For large route tables, the per-line `if err != nil { return err }` form buries the route map. Use a small local `routeReg` accumulator that wraps a `routeAdder` interface and retains the first error, exposing lowercase `get`/`post`/… forwarders — keeping one method + one path + one handler per line while still returning the first registration error to the caller. This is a **sanctioned canonical pattern** — no reflection, discovery, or hidden policy. See `reference/standard-service/internal/app/routes.go` for the canonical implementation; copy it, don't reinvent.
 
 ---
 
@@ -372,63 +313,21 @@ Rules:
 
 ---
 
-## 14. Prompt Contracts for AI Agents
+## 14. AI Agent Rules
 
-High-quality agent tasks should specify:
+Tasks must state: goal, in-scope paths, out-of-scope paths, owning module, API/dependency policy, required tests, validation commands, done definition.
 
-- goal
-- in-scope paths
-- out-of-scope paths
-- owning module or entrypoint
-- public API and dependency policy
-- required tests
-- validation commands
-- done definition
+Ambiguous/broad tasks: analysis-only pass first; split into small reversible cards; no edits until scope is explicit.
 
-When the request is ambiguous or broad:
+Exported symbol changes: enumerate callers with `rg`, migrate all in one change, verify zero residual references.
 
-- first run an analysis-only pass
-- split large work into small reversible cards
-- delay code edits until module ownership and scope are explicit
+Reviews: findings first, no code changes unless requested; prioritize boundaries, regressions, concurrency, missing tests.
 
-When the task changes or removes an exported symbol:
-
-- enumerate callers first with `rg`
-- update every caller in the same change
-- verify zero residual references before handoff
-
-Review requests are different from implementation requests:
-
-- findings first
-- no code changes unless explicitly requested
-- prioritize boundaries, regressions, concurrency, and missing tests
-
-## 15. Rules for AI Agents
-
-Default behavior:
-- Prefer stdlib-shaped solutions
-- Follow this guide over package convenience APIs when both are possible
-- Preserve existing canonical patterns when editing nearby files
-- Treat broad bucket names (`utils`, `validator`, `rest`, `pubsub`, `tenant`) as migration debt, not expansion targets
+Default: prefer stdlib; follow this guide over convenience APIs; preserve canonical patterns; treat `utils`/`validator`/`rest`/`pubsub`/`tenant` as migration debt.
 
 ## 16. Agent-First Repo Rules
 
-- Start app-structure work from `reference/standard-service`
-- Keep each change centered on one primary module when possible
-- Prefer adding a new focused extension package over widening a stable root
-- Do not introduce new catch-all middleware buckets or protocol family roots
-- Keep scaffolds, docs, and the reference app synchronized
-- Avoid hidden context-based dependency flow
-- Avoid new wrapper abstractions unless justified
-
-Do not introduce:
-- New response helper families
-- New handler signatures
-- New route registration idioms beyond the sanctioned accumulator wrapper (§5) — no reflection, annotation, or discovery routing
-- New service locator patterns
-- New implicit DTO flow through middleware
-- New business logic inside middleware
-- New package roles that blur core boundaries
+Start from `reference/standard-service`. Center each change on one primary module. Prefer a new focused extension package over widening a stable root. Keep scaffolds, docs, and the reference app synchronized. Avoid hidden context-based dependency flow and unjustified wrapper abstractions. See §21 for the full forbidden-patterns list.
 
 ---
 
@@ -562,102 +461,7 @@ Conflict rule: if existing code conflicts with this guide — preserve behavior 
 
 ## 20. Canonical Examples
 
-### Create endpoint
-
-```go
-package handlers
-
-import (
-    "encoding/json"
-    "net/http"
-
-    "github.com/spcent/plumego/contract"
-)
-
-type CreateUserRequest struct {
-    Name  string `json:"name"`
-    Email string `json:"email"`
-}
-
-type CreateUserResponse struct {
-    ID string `json:"id"`
-}
-
-type UserService interface {
-    Create(name, email string) (string, error)
-}
-
-type UserHandler struct {
-    Service UserService
-}
-
-func (h UserHandler) Create(w http.ResponseWriter, r *http.Request) {
-    var req CreateUserRequest
-    if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-        _ = contract.WriteError(w, r, contract.NewErrorBuilder().
-            Type(contract.TypeValidation).
-            Code("invalid_json").
-            Message("invalid request body").
-            Build())
-        return
-    }
-
-    if req.Name == "" {
-        _ = contract.WriteError(w, r, contract.NewErrorBuilder().
-            Type(contract.TypeRequired).
-            Code("missing_name").
-            Message("name is required").
-            Build())
-        return
-    }
-
-    id, err := h.Service.Create(req.Name, req.Email)
-    if err != nil {
-        _ = contract.WriteError(w, r, contract.NewErrorBuilder().
-            Type(contract.TypeInternal).
-            Code("create_user_failed").
-            Message("failed to create user").
-            Build())
-        return
-    }
-
-    _ = contract.WriteResponse(w, r, http.StatusCreated, CreateUserResponse{ID: id}, nil)
-}
-```
-
-### Route wiring
-
-```go
-func registerRoutes(app *core.App, userHandler handlers.UserHandler) error {
-    if err := app.Post("/users", userHandler.Create); err != nil {
-        return err
-    }
-    return nil
-}
-```
-
-### Test
-
-```go
-func TestCreateUser(t *testing.T) {
-    app := core.New(core.DefaultConfig(), core.AppDependencies{})
-    h := handlers.UserHandler{Service: stubUserService{ID: "u_123"}}
-    if err := app.Post("/users", h.Create); err != nil {
-        t.Fatal(err)
-    }
-
-    body := strings.NewReader(`{"name":"alice","email":"a@example.com"}`)
-    req := httptest.NewRequest(http.MethodPost, "/users", body)
-    req.Header.Set("Content-Type", "application/json")
-    rec := httptest.NewRecorder()
-
-    app.ServeHTTP(rec, req)
-
-    if rec.Code != http.StatusCreated {
-        t.Fatalf("expected 201, got %d", rec.Code)
-    }
-}
-```
+See `reference/standard-service` (`internal/handler/`, `internal/app/routes.go`, `internal/handler/handler_test.go`) for the canonical create-endpoint, route-wiring, and test implementations.
 
 ---
 
@@ -707,16 +511,14 @@ Canonical classifications:
   design. Keeping one requires local docs or deprecation-inventory coverage and
   a safe constructor beside it.
 
-Current inventory decision:
+Current inventory:
 
-| Pattern | Examples | Classification | Follow-up rule |
-|---|---|---|---|
-| Cannot-fail `New` | `core.New`, `router.NewRouter`, `metrics.NewNoopCollector` | canonical | Keep narrow and dependency-explicit |
-| Error-returning `New` | `store/kv.NewKVStore`, `x/frontend.NewMountFS`, `x/data/rw.New` | canonical | Prefer for new fallible constructors |
-| `New` panic wrapper plus `NewE` safe path | `x/gateway.New/NewE`, `x/messaging/mq.NewInProcBroker/NewInProcBrokerE`, `x/messaging.NewSMSPrometheusExporter/NewSMSPrometheusExporterE`, `x/observability.NewPrometheusExporter/NewPrometheusExporterE` | legacy-compatible | Do not remove casually; migrate call sites only in module-owned cards |
-| Extension family aliases | `x/gateway.NewGateway/NewGatewayE` | app-facing compatibility | Keep while experimental family entrypoints remain documented |
-| Fallible middleware constructor | `middleware/accesslog.Middleware(Config)`, `middleware/recovery.Middleware(Config)`, `middleware/securityheaders.Middleware(Config)` | canonical | Return `(middleware.Middleware, error)` when construction depends on injected dependencies or policy validation |
+| Pattern | Example | Classification |
+|---|---|---|
+| Cannot-fail `New` | `core.New`, `router.NewRouter` | canonical |
+| Error-returning `New` | `store/kv.NewKVStore`, `x/data/rw.New` | canonical — prefer for new fallible constructors |
+| `New` + `NewE` pair | `x/gateway.New/NewE`, `x/messaging/mq.NewInProcBroker/NewInProcBrokerE` | legacy-compatible — migrate only in module-owned cards |
+| Extension family alias | `x/gateway.NewGateway/NewGatewayE` | app-facing compatibility |
+| Fallible middleware | `middleware/accesslog.Middleware(Config)` | canonical — return `(..., error)` when construction can fail |
 
-Do not run repo-wide constructor renames as drive-by cleanup. Each migration must
-name the owning module, public API compatibility policy, docs impact, and tests
-before changing exported symbols.
+Do not run repo-wide constructor renames as drive-by cleanup; each migration must name the owning module, API compatibility policy, docs impact, and tests.

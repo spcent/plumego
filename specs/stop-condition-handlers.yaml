@@ -20,10 +20,6 @@ handlers:
       - Document the ambiguity in the task card's Open Questions section.
     escalation: Create tasks/cards/blocked/<id>-ownership.md with the two candidate modules and why each could own the behavior.
     unblock_by: human_review
-    docs:
-      - specs/task-routing.yaml
-      - specs/package-hotspots.yaml
-      - specs/repo.yaml
 
   stable_root_requires_x_import:
     description: >
@@ -36,10 +32,6 @@ handlers:
       - Prefer option: move the feature to the owning x/* family; pass the behavior into the stable root via constructor injection or interface.
     escalation: Record in the milestone spec's Open Questions section. Do not widen the stable root.
     unblock_by: rfc_or_scope_reduction
-    docs:
-      - docs/concepts/core-boundary.md
-      - docs/concepts/extension-boundary.md
-      - specs/dependency-rules.yaml
     recipe: specs/change-recipes/new-extension-module.yaml
 
   unapproved_public_api_change:
@@ -51,9 +43,6 @@ handlers:
       - Record the required API shape in the task card's Open Questions section.
     escalation: Create tasks/cards/blocked/<id>-api.md describing the change and its callers.
     unblock_by: explicit_approval_in_task_card
-    docs:
-      - AGENTS.md
-      - specs/change-recipes/symbol-change.yaml
     recipe: specs/change-recipes/symbol-change.yaml
 
   unapproved_new_dependency:
@@ -65,9 +54,6 @@ handlers:
       - If no stdlib alternative exists, document the dependency, its version, and the justification.
     escalation: Create tasks/cards/blocked/<id>-dep.md with dependency name, version, alternatives considered, and justification.
     unblock_by: explicit_approval_in_task_card
-    docs:
-      - AGENTS.md
-      - CLAUDE.md
 
   broad_task_no_acceptance_criteria:
     description: The task is broad or vague and lacks concrete acceptance criteria or validation commands.
@@ -78,8 +64,6 @@ handlers:
       - Propose splitting the task into an analysis card and one or more implementation cards.
     escalation: Write the analysis report to tasks/cards/blocked/<id>-analysis.md and halt.
     unblock_by: human_review
-    docs:
-      - specs/change-recipes/analysis-only.yaml
     recipe: specs/change-recipes/analysis-only.yaml
 
   spec_manifest_pattern_conflict:
@@ -94,10 +78,6 @@ handlers:
       - If the conflict involves a security or boundary rule, halt and escalate.
     escalation: Create tasks/cards/blocked/<id>-conflict.md listing each conflicting source and the proposed resolution.
     unblock_by: human_review
-    docs:
-      - AGENTS.md
-      - docs/reference/canonical-style-guide.md
-      - specs/repo.yaml
 
   feature_catalog_in_stable_root:
     description: >
@@ -110,9 +90,6 @@ handlers:
       - The stable root should receive at most a thin interface addition to contract/ if truly needed.
     escalation: Record the proposed x/* target in the task card before implementing.
     unblock_by: scope_confirmed_in_task_card
-    docs:
-      - docs/concepts/core-boundary.md
-      - docs/concepts/extension-boundary.md
     recipe: specs/change-recipes/new-extension-module.yaml
 
   hidden_registration_attempt:
@@ -125,9 +102,6 @@ handlers:
       - If a registry is truly needed, scope it as a value type passed through constructor, not a global.
     escalation: None — this is a design violation. Redesign before implementing.
     unblock_by: design_change
-    docs:
-      - AGENTS.md
-      - docs/reference/canonical-style-guide.md
 
   auth_policy_in_transport_middleware:
     description: >
@@ -140,10 +114,6 @@ handlers:
       - Wire auth policy as a separate middleware returned from x/tenant or security, not inside middleware/.
     escalation: Record the policy behavior in the task card with the proposed owning module.
     unblock_by: scope_confirmed_in_task_card
-    docs:
-      - middleware/module.yaml
-      - x/tenant/module.yaml
-      - docs/concepts/core-boundary.md
 
   missing_tests_for_behavior_change:
     description: A behavior change has no associated tests, or the test scope is insufficient.
@@ -154,6 +124,3 @@ handlers:
       - Use internal/testutil/ for shared test helpers; do not duplicate fixtures.
     escalation: None — tests must accompany behavior changes. Do not push without tests.
     unblock_by: tests_added
-    docs:
-      - AGENTS.md
-      - specs/agent-quality-rules.yaml
