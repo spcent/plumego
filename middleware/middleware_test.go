@@ -112,6 +112,15 @@ func TestChainLen(t *testing.T) {
 	}
 }
 
+// TestChainBuildEmptyChainPassesThrough verifies that an empty chain with no
+// middlewares built around a handler calls the handler directly.
+func TestChainBuildEmptyChainPassesThrough(t *testing.T) {
+	var tr trace
+	chain := NewChain()
+	serve(chain.Build(tracingHandler(&tr, "handler")))
+	tr.assertEqual(t, "handler")
+}
+
 // TestChainBuildTwiceProducesIdenticalOrder verifies that calling Build
 // multiple times on the same chain produces the same execution order.
 func TestChainBuildTwiceProducesIdenticalOrder(t *testing.T) {
