@@ -20,6 +20,15 @@ func immutableAppError(operation, action string, params map[string]any) error {
 	return wrapCoreError(fmt.Errorf("cannot %s after app has been prepared", action), operation, params)
 }
 
+// validateMutableState returns an error if state is not PreparationStateMutable.
+// Call while holding the app mutex so the state read is consistent with callers.
+func validateMutableState(state PreparationState, operation, action string, params map[string]any) error {
+	if state != PreparationStateMutable {
+		return immutableAppError(operation, action, params)
+	}
+	return nil
+}
+
 func wrapCoreError(err error, operation string, params map[string]any) error {
 	if err == nil {
 		return nil
