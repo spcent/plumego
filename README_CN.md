@@ -12,6 +12,34 @@ Plumego 是一个基于 Go 标准库构建的小型 HTTP 工具包，把 `net/ht
 稳定表面刻意保持收敛。先从 `core`、`router`、`contract` 和 `middleware`
 开始；只有在职责需要时，再加入 `security`、`store`、`health`、`log` 和 `metrics`。
 
+## 为什么选择 Plumego
+
+适合需要比原生 `http.ServeMux` 更多结构、但又不想引入大型框架模型的 Go 服务。
+
+**选择 Plumego 如果你：**
+- 希望理解 HTTP 服务器装配的每一行代码
+- 更喜欢标准库的设计思路和模式
+- 期望你的服务能稳定维护多年
+- 使用代码代理（Claude、Codex）辅助开发
+- 看重小型、可测试、易重构的代码而非便利性
+
+**Plumego 不是：**
+- 「Gin/Echo 替代品」（我们互补于标准库，而非与框架竞争）
+- 最快的选项（Fiber 追求原始吞吐量；我们优化清晰性）
+- 「电池内置」框架（标准库优先是我们的设计）
+- 面向零装配代码的框架（如果你想 `plumego.Handlers{ "POST /users": createUser }`，你需要其他框架）
+
+| 工具包 | 定位 | 最佳用途 |
+|--------|------|---------|
+| `http.ServeMux` | 最小路由 | 学习、微小服务 |
+| **Plumego** | **标准库之上的薄层** | **可维护的生产服务** |
+| Chi | 轻量路由 | 函数构造器风格 |
+| Gin | 快速 + 便利 | 快速原型开发 |
+| Echo | 功能丰富 | 全功能应用 |
+| Fiber | 高性能 | 最大吞吐量 |
+
+详见 [`docs/start/POSITIONING.md`](./docs/start/POSITIONING.md) 了解设计哲学和何时选择 Plumego。
+
 ## 快速开始
 
 `main.go`：
@@ -129,8 +157,8 @@ app := plumego.NewWithConfig(cfg)
 其余所有 `x/*` 扩展均为 **experimental**：API 可能在任意次要版本中变更，无需事先通知。
 未经显式的项目级稳定化处理，请勿在生产服务中依赖这些扩展。
 
-完整兼容性策略、SemVer 预期和晋级标准，请参阅
-[`docs/reference/extension-stability-policy.md`](./docs/reference/extension-stability-policy.md)。
+完整兼容性详见 [`STABILITY.md`](./STABILITY.md)、版本升级路径见 [`COMPATIBILITY.md`](./COMPATIBILITY.md)，
+晋级标准见 [`docs/reference/extension-stability-policy.md`](./docs/reference/extension-stability-policy.md)。
 
 ## Agent-First Design
 
@@ -143,11 +171,24 @@ Plumego 使用 agent-first 控制面维护仓库：`docs/` 解释架构，`specs
 
 ## 获取帮助
 
-- [`docs/start/getting-started.md`](./docs/start/getting-started.md) —— 最小可运行教程。
-- [`reference/standard-service`](./reference/standard-service) —— 规范应用结构。
-- [`docs/reference/reference-apps.md`](./docs/reference/reference-apps.md) —— 参考应用选择指南。
-- [`docs/reference/canonical-style-guide.md`](./docs/reference/canonical-style-guide.md) —— 处理器、中间件、路由、依赖注入约定。
-- [`docs/modules`](./docs/modules) —— 各包模块导读。
+**初次使用？**
+- [`docs/start/POSITIONING.md`](./docs/start/POSITIONING.md) —— 为什么选择 Plumego 以及何时使用
+- [`docs/start/getting-started.md`](./docs/start/getting-started.md) —— 最小可运行教程
+- [`docs/start/adoption-path.md`](./docs/start/adoption-path.md) —— 5 分钟、30 分钟、1 天的采用路径
+
+**构建应用？**
+- [`reference/standard-service`](./reference/standard-service) —— 规范应用结构
+- [`docs/reference/canonical-style-guide.md`](./docs/reference/canonical-style-guide.md) —— 处理器、中间件、路由约定
+- [`docs/reference/reference-apps.md`](./docs/reference/reference-apps.md) —— 参考应用选择指南
+
+**选择技术？**
+- [`STABILITY.md`](./STABILITY.md) —— 哪些内容在 v1 中稳定
+- [`COMPATIBILITY.md`](./COMPATIBILITY.md) —— 版本升级和迁移路径
+- [`docs/modules`](./docs/modules) —— 各包模块导读
+
+**遇到问题？**
+- [`docs/start/troubleshooting.md`](./docs/start/troubleshooting.md) —— 常见问题和解决方案
+- [`docs/evidence/benchmarks/README.md`](./docs/evidence/benchmarks/README.md) —— 与 Chi、Gin、Echo 的性能对比
 - [`docs/start/adoption-path.md`](./docs/start/adoption-path.md) —— 5 分钟、30 分钟、1 天采用路径。
 - [`docs/start/troubleshooting.md`](./docs/start/troubleshooting.md) —— 路由冻结、中间件顺序、JWT 错误、生命周期问题。
 - [`docs/evidence/benchmarks/README.md`](./docs/evidence/benchmarks/README.md) —— 与 Chi、Gin、Echo 的性能对比。

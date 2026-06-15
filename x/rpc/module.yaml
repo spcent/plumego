@@ -5,7 +5,7 @@ status: experimental
 suggested_gate_profile: single_module_behavior
 owner: rpc
 risk: medium
-summary: Dependency-free RPC transport interfaces and lifecycle helpers for Plumego services.
+summary: Optional gRPC server, client, and gateway adapters.
 
 entrypoint_reads:
   - AGENTS.md
@@ -13,32 +13,27 @@ entrypoint_reads:
   - specs/repo.yaml
   - specs/task-routing.yaml
   - specs/dependency-rules.yaml
+  - docs/modules/x/rpc/README.md
+
+responsibilities:
+  - gRPC server hosting
+  - gRPC client pooling
+  - HTTP-gRPC gateway adapters
+
+non_goals:
+  - gRPC proto codegen (protoc responsibility)
+  - Service implementations (caller responsibility)
+  - TLS/security setup (caller responsibility)
 
 subordinate_families:
   - x/rpc/server
   - x/rpc/client
   - x/rpc/gateway
 
-responsibilities:
-  - RPC server lifecycle wrappers
-  - RPC client connection helpers
-  - HTTP-to-RPC gateway adapters
-  - Optional RPC transport integration patterns
-
-non_goals:
-  - Core app bootstrap ownership
-  - Stable root-package entrypoints
-  - Service discovery registration
-  - Business-specific RPC service definitions
-
 public_entrypoints:
   - server
   - client
   - gateway
-
-doc_paths:
-  - docs/modules/x/rpc/README.md
-  - reference/with-rpc
 
 allowed_imports:
   - stdlib
@@ -52,49 +47,48 @@ forbidden_imports:
   - middleware/**
   - security/**
   - store/**
+  - health/**
+  - metrics/**
   - x/tenant/**
   - x/ai/**
+  - x/data/**
+  - x/fileapi/**
+  - x/frontend/**
+  - x/gateway/**
+  - x/messaging/**
+  - x/openapi/**
+  - x/resilience/**
+  - x/rest/**
+  - x/websocket/**
   - reference/**
   - cmd/**
 
 test_commands:
-  - go test -race -timeout 60s ./...
-  - go test -timeout 20s ./...
-  - go vet ./...
+  - go test -timeout 20s ./x/rpc/...
+  - go vet ./x/rpc/...
 
-review_checklist:
-  - Keep concrete RPC dependencies outside x/rpc
-  - Preserve explicit lifecycle control
-  - Do not require stable roots to know RPC internals
-  - Keep service registration explicit
+doc_paths:
+  - docs/modules/x/rpc/README.md
 
-agent_hints:
-  - Use x/rpc only for optional RPC transport contracts
-  - Keep concrete gRPC, Connect, or other transport wiring in user applications or adapters
-  - Do not add hidden service registries or globals
+change_risks:
+  - server lifecycle regression
+  - client pooling regression
+  - gateway routing regression
 
 stop_conditions:
-  - The change introduces concrete gRPC or Connect binaries directly into x/rpc
-  - The change adds service-registry globals or init() side-effect registration
-  - The change requires stable roots to import x/rpc
+  - Change introduces service implementation guidance
+  - Change hides gRPC setup behind implicit conventions
 
-task_affinity:
-  rpc: x/rpc/
-  bugfix_triage: x/rpc/
+review_checklist:
+  - Keep gRPC setup explicit
+  - Keep client/server lifecycle clear
+  - Keep gateway routing transparent
+
+agent_hints:
+  - "rpc is for adapter wiring; not for service implementation or proto codegen"
+  - "gRPC integration should remain optional and explicit"
 
 landing_zones:
   server: server/
   client: client/
   gateway: gateway/
-
-docs_sync_contract:
-  on_status_change:
-    - docs/concepts/extension-maturity.md
-    - docs/release/roadmap.md
-    - specs/extension-maturity.yaml
-  on_api_change:
-    - docs/modules/x/rpc/README.md
-    - website/src/content/docs/docs/modules/x-rpc.mdx
-    - website/src/content/docs/zh/docs/modules/x-rpc.mdx
-  on_behavior_change:
-    - docs/modules/x/rpc/README.md

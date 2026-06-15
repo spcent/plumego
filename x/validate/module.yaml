@@ -5,7 +5,7 @@ status: experimental
 suggested_gate_profile: single_module_behavior
 owner: api
 risk: medium
-summary: Explicit request binding and validation helpers for application handlers.
+summary: Request validation and binding helpers.
 
 entrypoint_reads:
   - AGENTS.md
@@ -13,25 +13,23 @@ entrypoint_reads:
   - specs/repo.yaml
   - specs/task-routing.yaml
   - specs/dependency-rules.yaml
+  - docs/modules/x/validate/README.md
 
 responsibilities:
-  - JSON request binding
-  - Explicit validator invocation
-  - Validation error adaptation to contract API errors
+  - Request binding helpers
+  - Validation error composition
+  - Message translation
 
 non_goals:
-  - Validation tag parsing
-  - Third-party validator ownership
-  - Middleware or route registration
-  - Stable contract binding behavior
+  - Validation rules (caller responsibility)
+  - Response formatting (owned by contract)
+  - Middleware composition (owned by middleware)
+  - Tag-based validation frameworks
 
 public_entrypoints:
-  - Validator
-  - ValidationError
-  - ValidationError.Error
-  - ValidationError.Unwrap
-  - BindJSON
   - Bind
+  - BindJSON
+  - Validator
 
 allowed_imports:
   - stdlib
@@ -48,51 +46,29 @@ forbidden_imports:
   - cmd/**
 
 test_commands:
-  - go test -race -timeout 60s ./...
-  - go test -timeout 20s ./...
-  - go vet ./...
+  - go test -race -timeout 20s ./x/validate/...
+  - go vet ./x/validate/...
 
 doc_paths:
   - docs/modules/x/validate/README.md
 
 change_risks:
-  - decode-before-validation regression
-  - validation error classification regression
-  - accidental validator dependency creep
+  - binding regression
+  - error composition regression
 
 stop_conditions:
-  - The change introduces a validation tag language or reflection-based parser.
-  - The change requires a third-party validation dependency in the core package.
-  - The change turns validation into implicit middleware or route registration.
+  - Change introduces tag-based validation framework
+  - Change hides validation rules behind implicit registries
 
 review_checklist:
-  - Keep validation explicit at call sites
-  - Preserve net/http request compatibility
-  - Do not add third-party dependencies in this module
-  - Return contract-shaped validation errors
+  - Keep validation explicit (no magic tags)
+  - Keep binding simple and composable
+  - No implicit behavior
 
 agent_hints:
-  - "validate vs security/input: this package handles request binding and validation wiring (Bind/BindJSON + Validator interface); security/input handles field-type validators (email, URL, phone, token format)"
-  - Decode JSON before calling validators; keep adapters in subordinate packages
-  - Prefer contract.NewErrorBuilder for API errors; do not add third-party validation dependencies here
-
-task_affinity:
-  validation: x/validate/
-  bugfix_triage: x/validate/
+  - "validate is for helpers, not a validation framework"
+  - "Explicit validation in handlers is better than implicit tag-based magic"
 
 landing_zones:
-  bind: bind.go
-  validator: validator.go
-  errors: errors.go
-
-docs_sync_contract:
-  on_status_change:
-    - docs/concepts/extension-maturity.md
-    - docs/release/roadmap.md
-    - specs/extension-maturity.yaml
-  on_api_change:
-    - docs/modules/x/validate/README.md
-    - website/src/content/docs/docs/modules/x-validate.mdx
-    - website/src/content/docs/zh/docs/modules/x-validate.mdx
-  on_behavior_change:
-    - docs/modules/x/validate/README.md
+  binding: ./
+  errors: errors/

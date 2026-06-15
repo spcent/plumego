@@ -5,33 +5,33 @@ status: experimental
 suggested_gate_profile: single_module_behavior
 owner: runtime
 risk: medium
-summary: Reusable resilience primitives and adapters that do not belong to stable security or a single feature family.
+summary: Reusable fault-tolerance primitives (circuit breaker, rate limiter).
 
 entrypoint_reads:
   - AGENTS.md
   - docs/reference/canonical-style-guide.md
-  - docs/concepts/agent-first-repo-blueprint.md
   - specs/repo.yaml
   - specs/task-routing.yaml
   - specs/dependency-rules.yaml
   - docs/modules/x/resilience/README.md
 
 responsibilities:
-  - Circuit breaker primitives
-  - Rate limiter primitives
-  - Reusable resilience middleware adapters
+  - Circuit breaker implementation
+  - Rate limiter implementation
+  - Fault-tolerance state management
 
 non_goals:
-  - Stable root entrypoints
-  - App bootstrap ownership
-  - Feature-specific retry or provider orchestration
-  - Security policy ownership
+  - Middleware composition (owned by middleware)
+  - Business logic integration
+  - Service discovery
+  - Health checking (owned by health)
 
 public_entrypoints:
-  - circuitbreaker
-  - ratelimit
+  - CircuitBreaker
+  - TokenBucket
 
 allowed_imports:
+  - stdlib
   - contract
   - middleware
 
@@ -40,56 +40,33 @@ forbidden_imports:
   - security/**
   - store/**
   - x/tenant/**
+  - reference/**
+  - cmd/**
 
 test_commands:
-  - go test -race -timeout 60s ./x/resilience/...
-  - go test -timeout 20s ./x/resilience/...
+  - go test -race -timeout 20s ./x/resilience/...
   - go vet ./x/resilience/...
 
 doc_paths:
   - docs/modules/x/resilience/README.md
-  - docs/concepts/x-ai-resilience-boundary.md
-  - docs/concepts/ratelimit-layers.md
 
 change_risks:
-  - breaker threshold regression
-  - adapter behavior regression
-  - failure-path regression
+  - state management regression
+  - concurrency regression
 
 stop_conditions:
-  - The change introduces app bootstrap ownership, security policy ownership, or feature-specific workflow orchestration into x/resilience
-  - The change hides circuit breaker state or adapter behavior behind globals or implicit registration
-  - The change requires stable security or middleware to absorb reusable resilience ownership
-  - The change turns x/resilience into a catch-all runtime policy package
+  - Change introduces middleware-specific behavior
+  - Change couples to specific usage patterns
 
 review_checklist:
-  - Keep resilience components reusable across extension families
-  - Avoid hidden globals
-  - Keep transport adapters explicit
-  - Keep circuit-breaker state and thresholds reviewable
-  - Keep feature-specific resilience orchestration, including AI provider fallback, in owning extensions
+  - Keep primitives decoupled from middleware
+  - Keep state management explicit
+  - No hidden globals
 
 agent_hints:
-  - "Rate-limit layer guide: docs/concepts/ratelimit-layers.md — HTTP abuse guard → middleware/abuseguard; extension token bucket → x/resilience/ratelimit; per-tenant policy → x/tenant/core"
-  - Put reusable circuit breaking and rate limiting here instead of in stable security or feature-specific packages; keep feature-specific orchestration (e.g. AI fallback) in the owning extension
-  - Keep adapters explicit rather than wrapping failures behind hidden middleware magic
-
-task_affinity:
-  resilience: x/resilience/
-  bugfix_triage: x/resilience/
+  - "resilience provides primitives for reuse; don't hardcode specific patterns"
+  - "Circuit breaker and rate limiter should be composable, not opinionated"
 
 landing_zones:
-  circuit_breaker: circuitbreaker/
-  rate_limit: ratelimit/
-
-docs_sync_contract:
-  on_status_change:
-    - docs/concepts/extension-maturity.md
-    - docs/release/roadmap.md
-    - specs/extension-maturity.yaml
-  on_api_change:
-    - docs/modules/x/resilience/README.md
-    - website/src/content/docs/docs/modules/x-resilience.mdx
-    - website/src/content/docs/zh/docs/modules/x-resilience.mdx
-  on_behavior_change:
-    - docs/modules/x/resilience/README.md
+  circuit_breaker: breaker/
+  rate_limiter: ratelimit/

@@ -5,7 +5,7 @@ status: experimental
 suggested_gate_profile: single_module_behavior
 owner: api
 risk: medium
-summary: Route-driven OpenAPI 3.1 document generation for explicit Plumego routes.
+summary: OpenAPI 3.1 spec generation from route metadata.
 
 entrypoint_reads:
   - AGENTS.md
@@ -13,46 +13,23 @@ entrypoint_reads:
   - specs/repo.yaml
   - specs/task-routing.yaml
   - specs/dependency-rules.yaml
-  - router/module.yaml
+  - docs/modules/x/openapi/README.md
 
 responsibilities:
-  - OpenAPI document model
-  - RouteInfo to OpenAPI path conversion
-  - Optional operation hint merging
-  - Parameter and schema helper constructors
+  - OpenAPI 3.1 spec generation
+  - Schema inference from Go types
+  - Spec validation
+  - JSON/YAML serialization
 
 non_goals:
-  - OpenAPI 2.0 generation
-  - Handler reflection
-  - Stable root route annotation ownership
-  - External OpenAPI library dependency
+  - HTTP transport (owned by core)
+  - Route registration (owned by router)
+  - Document hosting
+  - API design choices
 
 public_entrypoints:
-  - Op
-  - Param
-  - Schema
-  - RequestBody
-  - Response
-  - MediaType
-  - Document
-  - Info
-  - PathItem
-  - Operation
   - Generator
-  - New
-  - (*Generator).Generate
-  - PathParam
-  - QueryParam
-  - HeaderParam
-  - JSONContent
-  - String
-  - Integer
-  - Boolean
-  - Array
-  - MarshalJSON
-  - MarshalYAML
-  - WriteJSON
-  - WriteYAML
+  - Document
 
 allowed_imports:
   - stdlib
@@ -69,52 +46,28 @@ forbidden_imports:
   - cmd/**
 
 test_commands:
-  - go test -race -timeout 60s ./...
-  - go test -timeout 20s ./...
-  - go vet ./...
+  - go test -race -timeout 20s ./x/openapi/...
+  - go vet ./x/openapi/...
 
 doc_paths:
   - docs/modules/x/openapi/README.md
 
 change_risks:
-  - route path template regression
-  - operation hint merge regression
-  - serialization drift in downstream cards
+  - schema inference regression
+  - spec generation regression
 
 stop_conditions:
-  - The change introduces reflection over handlers or stable-root annotations.
-  - The change requires an external OpenAPI dependency.
-  - The change moves OpenAPI generation into router, core, or contract.
+  - Change introduces HTTP transport behavior into openapi
+  - Change hides spec generation behind implicit globals or registries
 
 review_checklist:
-  - Keep route generation driven by router.RouteInfo
-  - Keep hints optional
-  - Preserve dependency-free OpenAPI document structs
-  - Avoid stable root changes
+  - Keep spec generation explicit and stateless
+  - Keep transport concerns out
+  - Keep route registration out
 
 agent_hints:
-  - Use route names or method/path keys for hints
-  - Keep serialization separate from document generation
-  - Keep CLI wiring in cmd/plumego
-
-task_affinity:
-  openapi_generation: x/openapi/
-  bugfix_triage: x/openapi/
+  - "openapi is for spec generation from route metadata; not for route registration or HTTP transport"
+  - "Schema generation should be explicit; avoid reflection-based magic"
 
 landing_zones:
-  generator: generator.go
-  document: document.go
-  operation: operation.go
-  helpers: helpers.go
-
-docs_sync_contract:
-  on_status_change:
-    - docs/concepts/extension-maturity.md
-    - docs/release/roadmap.md
-    - specs/extension-maturity.yaml
-  on_api_change:
-    - docs/modules/x/openapi/README.md
-    - website/src/content/docs/docs/modules/x-openapi.mdx
-    - website/src/content/docs/zh/docs/modules/x-openapi.mdx
-  on_behavior_change:
-    - docs/modules/x/openapi/README.md
+  spec_generation: ./

@@ -5,34 +5,30 @@ status: experimental
 suggested_gate_profile: single_module_behavior
 owner: persistence
 risk: medium
-summary: HTTP transport layer for tenant-aware file operations, composing x/data/file implementations behind stable store/file contracts.
+summary: HTTP endpoints for file operations (upload, download, temporary URLs).
 
 entrypoint_reads:
   - AGENTS.md
   - docs/reference/canonical-style-guide.md
-  - docs/concepts/agent-first-repo-blueprint.md
   - specs/repo.yaml
   - specs/task-routing.yaml
   - specs/dependency-rules.yaml
   - docs/modules/x/fileapi/README.md
 
 responsibilities:
-  - HTTP transport layer for file upload, download, info, URL, delete, list
-  - Tenant extraction from request context
-  - Multipart form parsing and request validation
-  - Streaming file delivery
+  - HTTP file upload transport
+  - HTTP file download transport
+  - Temporary URL generation
 
 non_goals:
-  - Storage interface definitions (store/file)
-  - Tenant-aware storage implementations (x/data/file)
-  - Business repositories
-  - App bootstrap or route registration policy
+  - File storage implementation (owned by store/file or caller)
+  - Access control (middleware responsibility)
+  - File system operations (caller responsibility)
 
 public_entrypoints:
   - Handler
-  - NewHandler
-  - WithUserID
-  - UserIDFromContext
+  - Upload
+  - Download
 
 allowed_imports:
   - stdlib
@@ -46,58 +42,35 @@ forbidden_imports:
   - router/**
   - middleware/**
   - security/**
-  - examples/**
+  - x/ai/**
   - reference/**
-  - templates/**
   - cmd/**
 
 test_commands:
-  - go test -race -timeout 60s ./x/fileapi/...
-  - go test -timeout 20s ./x/fileapi/...
+  - go test -race -timeout 20s ./x/fileapi/...
   - go vet ./x/fileapi/...
 
 doc_paths:
   - docs/modules/x/fileapi/README.md
 
 change_risks:
-  - upload validation regression
-  - streaming delivery regression
-  - tenant extraction regression
+  - upload handler regression
+  - download handler regression
+  - URL generation regression
 
 stop_conditions:
-  - The change introduces storage interface ownership, tenant-aware storage implementations, or business repositories into x/fileapi
-  - The change weakens tenant extraction, request validation, or contract.WriteError usage in handlers
-  - The change hides route registration or backend selection policy inside library code
-  - The change requires stable roots to absorb tenant-aware file transport behavior
+  - Change introduces file storage implementation
+  - Change couples to specific cloud providers
 
 review_checklist:
-  - Tenant extraction must come from context, never from request body or path
-  - All handler methods must use contract.WriteError for error responses
-  - No business logic in handlers; delegate to Storage and MetadataManager
-  - Keep multipart parsing, streaming, and backend selection reviewable
-  - Keep route registration explicit in app wiring
+  - Keep storage abstraction clear
+  - Keep HTTP transport independent
+  - Keep access control to middleware
 
 agent_hints:
-  - Wire `Handler.Upload`, `Download`, `GetInfo`, `GetURL`, `Delete`, and `List` explicitly in your application's routes.go
-  - Inject tenant middleware before file routes and attach tenant identity with `x/tenant/core.WithTenantID`
-  - Use `x/fileapi.WithUserID` when upload handlers need uploader identity in context, and keep backend selection, tenant path policy, and metadata persistence in `x/data/file` or app wiring rather than handlers
-
-task_affinity:
-  file_api: x/fileapi/
-  bugfix_triage: x/fileapi/
+  - "fileapi is for HTTP transport; storage is caller-owned"
+  - "Keep upload/download handlers independent of cloud provider"
 
 landing_zones:
-  handler: handler.go
-  context: context.go
-
-docs_sync_contract:
-  on_status_change:
-    - docs/concepts/extension-maturity.md
-    - docs/release/roadmap.md
-    - specs/extension-maturity.yaml
-  on_api_change:
-    - docs/modules/x/fileapi/README.md
-    - website/src/content/docs/docs/modules/x-fileapi.mdx
-    - website/src/content/docs/zh/docs/modules/x-fileapi.mdx
-  on_behavior_change:
-    - docs/modules/x/fileapi/README.md
+  upload: upload/
+  download: download/
