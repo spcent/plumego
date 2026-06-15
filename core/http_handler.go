@@ -71,17 +71,15 @@ func (a *App) serverConfigSnapshot() (AppConfig, error) {
 	cfg := a.config
 	routerConfigured := a.router != nil
 	middlewareConfigured := a.middlewareChain != nil
-	if cfg == nil {
-		a.mu.RUnlock()
-		return AppConfig{}, wrapCoreError(fmt.Errorf("app config not configured"), operationPrepareServer, nil)
-	}
-	config := *cfg
 	a.mu.RUnlock()
 
+	if cfg == nil {
+		return AppConfig{}, wrapCoreError(fmt.Errorf("app config not configured"), operationPrepareServer, nil)
+	}
 	if !routerConfigured || !middlewareConfigured {
 		return AppConfig{}, wrapCoreError(fmt.Errorf("router or middleware chain not configured"), operationPrepareServer, nil)
 	}
-	return config, nil
+	return *cfg, nil
 }
 
 func (a *App) preparedHandlerSnapshot() (http.Handler, error) {
