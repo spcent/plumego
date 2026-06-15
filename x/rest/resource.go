@@ -262,6 +262,9 @@ func (qb *QueryBuilder) Parse(r *http.Request) *QueryParams {
 			if desc {
 				field = field[1:]
 			}
+			if field == "" {
+				continue
+			}
 			if len(qb.allowedSorts) > 0 && !qb.allowedSorts[field] {
 				continue
 			}
@@ -322,7 +325,11 @@ type PaginationMeta struct {
 }
 
 // NewPaginationMeta builds PaginationMeta from page, page size, and total item count.
+// A pageSize ≤ 0 is treated as 1 to avoid division-by-zero.
 func NewPaginationMeta(page, pageSize int, totalItems int64) *PaginationMeta {
+	if pageSize <= 0 {
+		pageSize = 1
+	}
 	totalPages := int((totalItems + int64(pageSize) - 1) / int64(pageSize))
 	if totalPages < 0 {
 		totalPages = 0

@@ -81,6 +81,7 @@ func TestBaseResourceController_AllMethodsReturn501(t *testing.T) {
 		name string
 		fn   func(http.ResponseWriter, *http.Request)
 	}{
+		{"Index", c.Index},
 		{"Show", c.Show},
 		{"Create", c.Create},
 		{"Update", c.Update},
