@@ -744,6 +744,61 @@ func TestPreparedServerCanServeTLSViaPublicPath(t *testing.T) {
 	}
 }
 
+// TestServerFieldsReflectAppConfig verifies that every AppConfig field that
+// has a corresponding http.Server field is correctly transferred by Prepare.
+func TestServerFieldsReflectAppConfig(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Addr = ":7171"
+	cfg.ReadTimeout = 11 * time.Second
+	cfg.ReadHeaderTimeout = 4 * time.Second
+	cfg.WriteTimeout = 22 * time.Second
+	cfg.IdleTimeout = 33 * time.Second
+	cfg.MaxHeaderBytes = 1 << 19 // 512 KiB — different from the 1 MiB default
+	cfg.HTTP2Enabled = false
+
+	app := New(cfg, AppDependencies{})
+	mustRegisterRoute(t, app.Get("/fields", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})))
+
+	if err := app.Prepare(); err != nil {
+		t.Fatalf("Prepare returned error: %v", err)
+	}
+	srv, err := app.Server()
+	if err != nil {
+		t.Fatalf("Server returned error: %v", err)
+	}
+
+	if srv.Addr != ":7171" {
+		t.Errorf("Addr = %q, want :7171", srv.Addr)
+	}
+	if srv.ReadTimeout != 11*time.Second {
+		t.Errorf("ReadTimeout = %v, want 11s", srv.ReadTimeout)
+	}
+	if srv.ReadHeaderTimeout != 4*time.Second {
+		t.Errorf("ReadHeaderTimeout = %v, want 4s", srv.ReadHeaderTimeout)
+	}
+	if srv.WriteTimeout != 22*time.Second {
+		t.Errorf("WriteTimeout = %v, want 22s", srv.WriteTimeout)
+	}
+	if srv.IdleTimeout != 33*time.Second {
+		t.Errorf("IdleTimeout = %v, want 33s", srv.IdleTimeout)
+	}
+	if srv.MaxHeaderBytes != 1<<19 {
+		t.Errorf("MaxHeaderBytes = %d, want %d", srv.MaxHeaderBytes, 1<<19)
+	}
+	if srv.Handler == nil {
+		t.Error("Handler is nil after Prepare")
+	}
+	if srv.ConnState == nil {
+		t.Error("ConnState (connection tracker hook) is nil after Prepare")
+	}
+	// HTTP2Enabled=false installs an empty TLSNextProto map to disable HTTP/2.
+	if srv.TLSNextProto == nil {
+		t.Error("TLSNextProto override is nil when HTTP2Enabled is false")
+	}
+}
+
 // TestConnectionTracker tests connection tracking and draining
 func TestConnectionTracker(t *testing.T) {
 	t.Run("new connection tracker with default interval", func(t *testing.T) {
