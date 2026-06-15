@@ -6,7 +6,7 @@ Operational guide for AI coding agents in `github.com/spcent/plumego`. Go 1.26+;
 
 Read path: `AGENTS.md` → matching `specs/task-routing.yaml` entry → its `start_with` files → target `<module>/module.yaml` → extra docs only when preflight identifies a concrete need. Conflict order: (1) security/boundary rules here → (2) `docs/reference/canonical-style-guide.md` → (3) machine-readable specs → (4) existing local patterns.
 
-Docs: `docs/operations/` (gate profiles, workflow, context packages), `docs/reference/canonical-style-guide.md`, `docs/concepts/` (boundaries, extension maturity). Specs: `specs/` (`task-routing.yaml`, `dependency-rules.yaml`, `stop-condition-handlers.yaml`, `change-recipes/`). Canonical wiring: `reference/standard-service`.
+Docs: `docs/operations/` (gate profiles, workflow, context packages), `docs/reference/canonical-style-guide.md`, `docs/concepts/` (boundaries, extension maturity). Specs: `specs/task-routing.yaml`, `specs/dependency-rules.yaml`, `specs/stop-condition-handlers.yaml`, `specs/agent-quality-rules.yaml`, `specs/change-recipes/`. Canonical wiring: `reference/standard-service`.
 
 CLI: `go run ./cmd/plumego --help` (agent-assist, validation runners, codegen, dev server, scaffold, task bundling); `make bundle TASK=<recipe> MODULE=<path>`.
 
