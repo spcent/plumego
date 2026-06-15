@@ -24,10 +24,7 @@ The preflight template is in `AGENTS.md §4`. Stop in analysis-only mode when ow
 
 ### `core`
 
-- Keep lifecycle order explicit.
-- Return route registration errors.
-- Attach middleware visibly.
-- Keep shutdown controllable.
+- Keep lifecycle explicit: return registration errors, attach middleware visibly, keep shutdown controllable.
 - Do not turn `core` into a feature catalog.
 
 ### `router`
@@ -38,12 +35,7 @@ The preflight template is in `AGENTS.md §4`. Stop in analysis-only mode when ow
 
 ### `contract`
 
-- Preserve error-code and response-shape stability.
-- Keep `contract` limited to transport primitives.
-- Use `With{Type}` and `{Type}FromContext` accessor pairs.
-- Use unexported zero-value struct context keys inlined at call sites.
-- Do not add new response helper families or specific `NewXxxError` helpers.
-- Remove deprecated symbols after caller migration.
+Transport primitives only; preserve error-code and response-shape stability. Full accessor, error-construction, response-write, and deprecation rules: `docs/reference/canonical-style-guide.md §17`.
 
 ### `middleware`
 
