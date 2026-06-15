@@ -91,10 +91,17 @@
 Current example-backed and test-backed coverage includes:
 
 - principal-first and custom-extractor resolution flows
+- extractor error treated as missing tenant → fail closed (401) at the resolve layer
+- `AllowMissing` opt-in passthrough and `OnMissing` custom callback
+- resolve hook (`Hooks.OnResolve`) invoked with correct `TenantID` and `Source`
+- invalid tenant ID format rejected at resolve (400) before policy/quota run
+- unknown tenant (resolved but absent from config) denied at policy layer (403)
+- HTTP method and URL path restriction in `ConfigPolicyEvaluator`, including trailing-`*` prefix patterns
 - fail-closed tenant store/db scoping behavior and misconfiguration handling
 - quota exhaustion with `Retry-After` and remaining-budget headers
 - canonical policy-deny responses and tenant-scoped rate-limit isolation
 - end-to-end middleware chain (resolve → policy → quota → ratelimit) including tenant isolation verification
+- integration-level: extractor failure → 401; invalid format → 400; unknown tenant → 403
 
 ## Beta readiness
 
