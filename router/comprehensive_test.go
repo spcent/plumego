@@ -9,12 +9,12 @@ import (
 // TestHTTPMethodMatching tests all HTTP methods and fallback behavior comprehensively.
 func TestHTTPMethodMatching(t *testing.T) {
 	tests := []struct {
-		name           string
+		name              string
 		registeredMethods []string
-		requestMethod  string
-		path           string
-		expectMatch    bool
-		expectStatus   int
+		requestMethod     string
+		path              string
+		expectMatch       bool
+		expectStatus      int
 	}{
 		// Exact method matches
 		{name: "GET matches GET", registeredMethods: []string{"GET"}, requestMethod: "GET", path: "/", expectMatch: true, expectStatus: 200},
@@ -120,12 +120,12 @@ func TestPathNormalizationEdgeCases(t *testing.T) {
 // TestParameterExtractionComprehensive tests parameter extraction in various scenarios.
 func TestParameterExtractionComprehensive(t *testing.T) {
 	tests := []struct {
-		name           string
-		routePath      string
-		requestPath    string
-		paramName      string
-		expectedValue  string
-		shouldMatch    bool
+		name          string
+		routePath     string
+		requestPath   string
+		paramName     string
+		expectedValue string
+		shouldMatch   bool
 	}{
 		// Single parameters
 		{name: "single param at end", routePath: "/users/:id", requestPath: "/users/123", paramName: "id", expectedValue: "123", shouldMatch: true},
@@ -183,10 +183,10 @@ func TestParameterExtractionComprehensive(t *testing.T) {
 // TestRouteMatchingPriority tests static > param > wildcard priority.
 func TestRouteMatchingPriority(t *testing.T) {
 	tests := []struct {
-		name           string
-		routePaths     map[string]string // path -> response
-		requestPath    string
-		expectedResp   string
+		name         string
+		routePaths   map[string]string // path -> response
+		requestPath  string
+		expectedResp string
 	}{
 		{
 			name: "static beats param",
@@ -219,7 +219,7 @@ func TestRouteMatchingPriority(t *testing.T) {
 		{
 			name: "param specific beats wildcard",
 			routePaths: map[string]string{
-				"/api/v1/*path":   "wildcard",
+				"/api/v1/*path":     "wildcard",
 				"/api/v1/users/*id": "param-wildcard",
 			},
 			requestPath:  "/api/v1/users/123/posts",
