@@ -24,26 +24,6 @@ state, and coverage state come from `specs/extension-maturity.yaml`. For beta
 candidates, it also verifies the evidence link and blocker text against
 `specs/extension-beta-evidence.yaml`.
 
-## Publishing Extensions
-
-Community-authored extensions use the separate contract in
-[`docs/guides/extension-authoring.md`](../guides/extension-authoring.md). That guide covers
-`community-extension.yaml`, `plumego add`, explicit constructor ownership, and
-the compatibility checklist for modules published outside this repository. This
-dashboard remains the maturity view for first-party `x/*` families.
-
-## Release History
-
-`x/rest`, `x/websocket`, `x/gateway`, and `x/observability` were promoted to
-beta at d2c25c3–ec70358. All four modules showed no exported API changes across
-both release refs. At v1.1.0, `x/tenant` was promoted to beta, and selected
-surfaces under `x/ai` and `x/data` gained beta evidence without promoting their
-root families. The same release promoted `x/frontend` and the app-facing
-`x/messaging` service while leaving subordinate messaging primitives
-experimental. Release-backed API snapshots are recorded in
-`docs/evidence/extension/snapshots/`. Remaining `x/*` modules retain
-`experimental` status until their own release evidence is complete.
-
 ## Selected Beta Surfaces
 
 Selected subpackage surfaces may carry their own `module.yaml` without
