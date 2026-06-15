@@ -263,8 +263,22 @@ func validateCandidate(repoRoot string, roots map[string]struct{}, cand candidat
 		}
 		if cand.CurrentStatus == "" {
 			violations = append(violations, fmt.Sprintf("%s missing current_status", label))
-		} else if manifest.Status != cand.CurrentStatus {
-			violations = append(violations, fmt.Sprintf("%s status mismatch: evidence %q, module.yaml %q", label, cand.CurrentStatus, manifest.Status))
+		} else {
+			// When the package path differs from the module root and has its own
+			// module.yaml, validate current_status against the package manifest.
+			// This covers promoted sub-packages (e.g. x/data/file within x/data).
+			statusManifest := manifest
+			if cand.Package != "" && cand.Package != cand.Module {
+				pkgManifestPath := filepath.Join(repoRoot, filepath.FromSlash(cand.Package), "module.yaml")
+				if pkgManifest, pkgErr := readModuleManifest(pkgManifestPath); pkgErr == nil {
+					statusManifest = pkgManifest
+				} else if !os.IsNotExist(pkgErr) {
+					return nil, pkgErr
+				}
+			}
+			if statusManifest.Status != cand.CurrentStatus {
+				violations = append(violations, fmt.Sprintf("%s status mismatch: evidence %q, module.yaml %q", label, cand.CurrentStatus, statusManifest.Status))
+			}
 		}
 	} else if cand.Subpackage == "" {
 		if cand.CurrentStatus == "" {
