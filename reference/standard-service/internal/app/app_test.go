@@ -611,3 +611,124 @@ func TestAcceptanceInsecureDefaultsNoWarnWhenConfigured(t *testing.T) {
 		t.Error("CORSAllowedOrigins should be configured")
 	}
 }
+
+// TestAcceptanceItemsCRUDSmoke exercises the full Create → Get → List → Update → Delete
+// lifecycle through the router and middleware stack via httptest.NewServer.
+//
+// This test complements the handler unit tests (which use httptest.NewRequest and bypass
+// the router) by proving that the router dispatch, path-parameter extraction, middleware
+// ordering, and domain layer all work together correctly through the actual HTTP server.
+func TestAcceptanceItemsCRUDSmoke(t *testing.T) {
+	a, err := New(config.Defaults())
+	if err != nil {
+		t.Fatalf("new app: %v", err)
+	}
+	if err := a.RegisterRoutes(); err != nil {
+		t.Fatalf("register routes: %v", err)
+	}
+	if err := a.Core.Prepare(); err != nil {
+		t.Fatalf("prepare: %v", err)
+	}
+	srv, err := a.Core.Server()
+	if err != nil {
+		t.Fatalf("server: %v", err)
+	}
+	ts := httptest.NewServer(srv.Handler)
+	defer ts.Close()
+
+	client := ts.Client()
+
+	// POST /api/v1/items → 201 with the created item including a non-empty id.
+	body := strings.NewReader(`{"name":"smoke-widget","description":"a widget for smoke testing"}`)
+	resp, err := client.Post(ts.URL+"/api/v1/items", "application/json", body)
+	if err != nil {
+		t.Fatalf("POST /api/v1/items: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusCreated {
+		t.Fatalf("POST /api/v1/items: status = %d, want %d", resp.StatusCode, http.StatusCreated)
+	}
+	var createEnv struct {
+		Data struct {
+			ID string `json:"id"`
+		} `json:"data"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&createEnv); err != nil {
+		t.Fatalf("POST /api/v1/items: decode response: %v", err)
+	}
+	id := createEnv.Data.ID
+	if id == "" {
+		t.Fatal("POST /api/v1/items: response missing id")
+	}
+
+	// GET /api/v1/items/:id → 200 with the created item.
+	resp, err = client.Get(ts.URL + "/api/v1/items/" + id)
+	if err != nil {
+		t.Fatalf("GET /api/v1/items/%s: %v", id, err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("GET /api/v1/items/%s: status = %d, want %d", id, resp.StatusCode, http.StatusOK)
+	}
+
+	// GET /api/v1/items → 200 with at least one item and meta.total ≥ 1.
+	resp, err = client.Get(ts.URL + "/api/v1/items")
+	if err != nil {
+		t.Fatalf("GET /api/v1/items: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("GET /api/v1/items: status = %d, want %d", resp.StatusCode, http.StatusOK)
+	}
+	var listEnv struct {
+		Meta struct {
+			Total int `json:"total"`
+		} `json:"meta"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&listEnv); err != nil {
+		t.Fatalf("GET /api/v1/items: decode response: %v", err)
+	}
+	if listEnv.Meta.Total < 1 {
+		t.Fatalf("GET /api/v1/items: meta.total = %d, want ≥ 1", listEnv.Meta.Total)
+	}
+
+	// PUT /api/v1/items/:id → 200 with the updated item.
+	req, err := http.NewRequest(http.MethodPut, ts.URL+"/api/v1/items/"+id,
+		strings.NewReader(`{"name":"smoke-widget-renamed","description":"renamed widget"}`))
+	if err != nil {
+		t.Fatalf("build PUT request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err = client.Do(req)
+	if err != nil {
+		t.Fatalf("PUT /api/v1/items/%s: %v", id, err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("PUT /api/v1/items/%s: status = %d, want %d", id, resp.StatusCode, http.StatusOK)
+	}
+
+	// DELETE /api/v1/items/:id → 204 with no body.
+	req, err = http.NewRequest(http.MethodDelete, ts.URL+"/api/v1/items/"+id, nil)
+	if err != nil {
+		t.Fatalf("build DELETE request: %v", err)
+	}
+	resp, err = client.Do(req)
+	if err != nil {
+		t.Fatalf("DELETE /api/v1/items/%s: %v", id, err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusNoContent {
+		t.Fatalf("DELETE /api/v1/items/%s: status = %d, want %d", id, resp.StatusCode, http.StatusNoContent)
+	}
+
+	// GET /api/v1/items/:id after delete → 404.
+	resp, err = client.Get(ts.URL + "/api/v1/items/" + id)
+	if err != nil {
+		t.Fatalf("GET deleted /api/v1/items/%s: %v", id, err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("GET deleted /api/v1/items/%s: status = %d, want %d", id, resp.StatusCode, http.StatusNotFound)
+	}
+}

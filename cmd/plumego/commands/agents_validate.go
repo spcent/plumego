@@ -234,17 +234,25 @@ func detectModules(changedFiles []string) (primary string, multi bool) {
 
 // moduleFromFilePath extracts the module prefix from a repo-relative path.
 //
-//	"middleware/timeout/timeout.go" → "middleware"
-//	"x/tenant/resolver.go"         → "x/tenant"
-//	"specs/gate-profiles.yaml"     → "specs"
+//	"middleware/timeout/timeout.go"                         → "middleware"
+//	"x/tenant/resolver.go"                                 → "x/tenant"
+//	"reference/standard-service/internal/app/app_test.go"  → "reference/standard-service"
+//	"use-cases/workerfleet/main.go"                        → "use-cases/workerfleet"
+//	"specs/gate-profiles.yaml"                             → "specs"
 func moduleFromFilePath(path string) string {
 	path = filepath.ToSlash(path)
 	parts := strings.SplitN(path, "/", 3)
 	if len(parts) == 0 || parts[0] == "" {
 		return ""
 	}
-	if parts[0] == "x" && len(parts) >= 2 {
-		return "x/" + parts[1]
+	// x/*, reference/*, and use-cases/* each contain nested go.mod boundaries
+	// at the second directory level — return a two-level module identifier so
+	// the gate profile runs tests from within the correct sub-module directory.
+	switch parts[0] {
+	case "x", "reference", "use-cases":
+		if len(parts) >= 2 {
+			return parts[0] + "/" + parts[1]
+		}
 	}
 	return parts[0]
 }

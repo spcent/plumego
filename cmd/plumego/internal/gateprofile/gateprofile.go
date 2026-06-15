@@ -121,6 +121,19 @@ func matchGlob(pattern, path string) bool {
 }
 
 func fallbackProfile(module string) Profile {
+	// reference/* and use-cases/* live in nested go.mod directories that cannot
+	// be tested via "./reference/..." from the root module. Use "go -C <dir>" to
+	// change into the module directory before running — supported since Go 1.21.
+	if strings.Contains(module, "/") {
+		return Profile{
+			Description: "nested module (fallback)",
+			Commands: []string{
+				"go test -race -timeout 60s -C " + module + " ./...",
+				"go test -timeout 20s -C " + module + " ./...",
+				"go vet -C " + module + " ./...",
+			},
+		}
+	}
 	arg := "./" + module + "/..."
 	if module == "" {
 		arg = "./..."
