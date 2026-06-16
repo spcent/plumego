@@ -1,6 +1,6 @@
 # dbadmin
 
-A local-first, security-focused database management workbench for developers. Manage MySQL, SQLite, Redis, MongoDB, and Elasticsearch from a single modern web interface.
+A local-first, security-focused database management workbench for developers. Manage MySQL, PostgreSQL, SQLite, Redis, MongoDB, and Elasticsearch from a single modern web interface.
 
 ## Overview
 
@@ -18,6 +18,7 @@ As a Plumego use-case app, dbadmin demonstrates how to build a production-scale 
 | Database | Features | Status |
 |----------|----------|--------|
 | **MySQL** | Browse tables, execute queries, view/edit rows, DDL operations, import/export | ✅ Stable |
+| **PostgreSQL** | Browse schemas/tables, execute queries, view/edit rows, DDL (CREATE/ALTER/DROP TABLE), import/export | ✅ Stable |
 | **SQLite** | All MySQL features + file upload/download, schema inspection | ✅ Stable |
 | **Redis** | Browse keys by type, execute commands, command history, TTL management, batch operations | ✅ Stable |
 | **MongoDB** | Browse collections, query with filters, aggregation pipelines, explain plans | ✅ Stable |
@@ -33,14 +34,16 @@ As a Plumego use-case app, dbadmin demonstrates how to build a production-scale 
 - **Import/Export**: CSV, JSON, SQL dump formats for data migration
 - **Schema Inspection**: View table structure, indexes, foreign keys, mappings
 - **Operational Diagnostics**: Health, readiness, runtime, and connection-pool endpoints for local troubleshooting
-- **Admin Controls**: Active operation cancellation, connection runtime closing, audit events, and a single-user `admin`/`readonly` role
+- **Admin Controls**: Active operation cancellation, connection runtime closing, audit events, and multi-user `admin`/`readonly` roles
 
 ### Security & Safety
 - **Read-only Mode**: Block all write operations per connection
 - **Dangerous Operation Detection**: Intercept DROP, DELETE, FLUSH, and other destructive commands
 - **Confirmation Dialogs**: Require explicit confirmation before executing dangerous operations
 - **Credential Redaction**: Passwords and API keys redacted in all logs and API responses
-- **Session Management**: HttpOnly cookie-based authentication with automatic timeout, login rate limiting, and same-origin checks for unsafe requests
+- **Session Management**: HttpOnly cookie-based authentication with automatic timeout, login rate limiting, same-origin checks for unsafe requests, and self-service bulk session revocation
+- **Multi-user Accounts**: Configure multiple named users with independent `admin`/`readonly` roles via `DBADMIN_USERS`
+- **IP Allowlisting**: Restrict the login endpoint and all protected routes to a configured set of CIDRs/IPs via `DBADMIN_ALLOWED_IPS`
 - **Input Validation**: SQL injection prevention and command injection protection
 - **Bounded Execution**: Configurable SQL, Redis, MongoDB, Elasticsearch, and resource-list timeouts
 - **SQL Query Cancellation**: Cancel active SQL queries from the UI when cancellation is enabled
@@ -150,9 +153,11 @@ For a guided multi-database demo, see [docs/demo-playbook.md](docs/demo-playbook
 |----------|---------|-------------|
 | `APP_ADDR` | `127.0.0.1:8080` | Server listen address |
 | `DBADMIN_DATA_DIR` | `./data` | Directory for sessions, history, and uploads |
-| `DBADMIN_USER` | `admin` | Admin username |
-| `DBADMIN_PASSWORD` | required | Admin password |
+| `DBADMIN_USER` | `admin` | Admin username (single-user mode; ignored when `DBADMIN_USERS` is set) |
+| `DBADMIN_PASSWORD` | required | Admin password (single-user mode; ignored when `DBADMIN_USERS` is set) |
 | `DBADMIN_ROLE` | `admin` | Single-user role: `admin` or `readonly` |
+| `DBADMIN_USERS` | unset | JSON array for multi-user mode: `[{"username":"alice","password":"...","role":"admin"}]`. Overrides `DBADMIN_USER`/`DBADMIN_PASSWORD`/`DBADMIN_ROLE` when set |
+| `DBADMIN_ALLOWED_IPS` | unset | Comma-separated CIDRs/IPs allowed to reach the login endpoint and all protected routes, e.g. `10.0.0.0/8,192.168.1.50`. Empty allows all |
 | `DBADMIN_ALLOW_DEFAULT_PASSWORD` | `false` | Demo-only override that permits `admin/admin` |
 | `DBADMIN_SESSION_TTL` | `24h` | Session timeout duration |
 | `DBADMIN_ENCRYPTION_KEY` | unset | 32-byte hex key for credential encryption; required before saving passwords, API keys, or Mongo URIs with embedded credentials |
@@ -163,7 +168,7 @@ For a guided multi-database demo, see [docs/demo-playbook.md](docs/demo-playbook
 | `DBADMIN_ES_QUERY_TIMEOUT_SECONDS` | `30` | Maximum Elasticsearch operation time in seconds |
 | `DBADMIN_RESOURCE_LIST_TIMEOUT_SECONDS` | `30` | Maximum unified resource-tree listing time in seconds |
 | `DBADMIN_AUDIT_RETENTION_DAYS` | `90` | Local audit event retention period in days |
-| `DBADMIN_AUDIT_MAX_EVENTS` | `500` | Maximum local audit events retained |
+| `DBADMIN_AUDIT_MAX_EVENTS` | `10000` | Maximum local audit events retained |
 
 ### Configuration File
 
@@ -185,7 +190,11 @@ DBADMIN_MONGO_QUERY_TIMEOUT_SECONDS=30
 DBADMIN_ES_QUERY_TIMEOUT_SECONDS=30
 DBADMIN_RESOURCE_LIST_TIMEOUT_SECONDS=30
 DBADMIN_AUDIT_RETENTION_DAYS=90
-DBADMIN_AUDIT_MAX_EVENTS=500
+DBADMIN_AUDIT_MAX_EVENTS=10000
+# Optional: multi-user mode (overrides DBADMIN_USER/PASSWORD/ROLE above)
+# DBADMIN_USERS=[{"username":"alice","password":"alice-secret","role":"admin"},{"username":"bob","password":"bob-secret","role":"readonly"}]
+# Optional: restrict access to a set of CIDRs/IPs
+# DBADMIN_ALLOWED_IPS=10.0.0.0/8,192.168.1.50
 ```
 
 Generate a secure encryption key:
