@@ -292,6 +292,11 @@ func (a *App) RegisterRoutes() error {
 	// Elasticsearch operations — ES-specific route group.
 	protected.get("/api/connections/:id/es/info", guard(http.HandlerFunc(esH.ClusterInfo)))
 	protected.get("/api/connections/:id/es/indices", guard(http.HandlerFunc(esH.ListIndices)))
+	protected.post("/api/connections/:id/es/indices", guard(http.HandlerFunc(esH.CreateIndex)))
+	protected.delete("/api/connections/:id/es/indices", guard(http.HandlerFunc(esH.DeleteIndex)))
+	protected.get("/api/connections/:id/es/templates", guard(http.HandlerFunc(esH.ListTemplates)))
+	protected.post("/api/connections/:id/es/templates", guard(http.HandlerFunc(esH.CreateTemplate)))
+	protected.delete("/api/connections/:id/es/templates", guard(http.HandlerFunc(esH.DeleteTemplate)))
 	protected.get("/api/connections/:id/es/index/mapping", guard(http.HandlerFunc(esH.GetMapping)))
 	protected.get("/api/connections/:id/es/index/settings", guard(http.HandlerFunc(esH.GetSettings)))
 	protected.post("/api/connections/:id/es/search", guard(http.HandlerFunc(esH.Search)))
