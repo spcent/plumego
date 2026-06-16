@@ -33,6 +33,7 @@ As a Plumego use-case app, dbadmin demonstrates how to build a production-scale 
 - **Import/Export**: CSV, JSON, SQL dump formats for data migration
 - **Schema Inspection**: View table structure, indexes, foreign keys, mappings
 - **Operational Diagnostics**: Health, readiness, runtime, and connection-pool endpoints for local troubleshooting
+- **API Documentation**: Machine-readable OpenAPI 3.0 spec at `GET /openapi.json` / `GET /openapi.yaml`, with an interactive Swagger UI page at `GET /docs` — see [API Documentation](#api-documentation)
 - **Admin Controls**: Active operation cancellation, connection runtime closing, audit events, and a single-user `admin`/`readonly` role
 
 ### Security & Safety
@@ -51,6 +52,15 @@ As a Plumego use-case app, dbadmin demonstrates how to build a production-scale 
 - **Internationalization**: English and Chinese (简体中文) support
 - **Query History**: Searchable history with execution time and result counts
 - **Keyboard Shortcuts**: Efficient navigation and execution (Ctrl/Cmd+Enter)
+
+## API Documentation
+
+dbadmin's REST API is documented as a static OpenAPI 3.0 spec, served alongside the app:
+
+- `GET /openapi.json` / `GET /openapi.yaml` — the machine-readable spec (public, no auth)
+- `GET /docs` — an interactive Swagger UI page backed by the spec above (public, no auth)
+
+The spec covers every route registered in `internal/app/routes.go`: path, method, whether a session cookie is required, and which routes are blocked for the `readonly` role or for read-only connections. Source: `internal/handler/openapi.yaml` (and its generated `openapi.json` sibling).
 
 ## Quick Start
 

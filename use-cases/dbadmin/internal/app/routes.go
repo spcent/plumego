@@ -69,6 +69,8 @@ func (a *App) RegisterRoutes() error {
 		return err
 	}
 
+	docsH := handler.DocsHandler{}
+
 	// Public routes — no auth required.
 	root := newRouteReg(a.Core)
 	root.get("/healthz", http.HandlerFunc(healthH.Live))
@@ -76,6 +78,9 @@ func (a *App) RegisterRoutes() error {
 	root.get("/pool-stats", http.HandlerFunc(poolStatsH.GetAllStats))
 	root.get("/pool-stats/sql", http.HandlerFunc(poolStatsH.GetSQLPoolStats))
 	root.get("/runtime-stats", http.HandlerFunc(runtimeStatsH.GetStats))
+	root.get("/openapi.json", http.HandlerFunc(docsH.SpecJSON))
+	root.get("/openapi.yaml", http.HandlerFunc(docsH.SpecYAML))
+	root.get("/docs", http.HandlerFunc(docsH.UI))
 	sameOriginMw := handler.SameOriginMiddleware(a.Core.Logger())
 	root.post("/api/auth/login", sameOriginMw(http.HandlerFunc(authH.Login)))
 	if root.err != nil {

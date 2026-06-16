@@ -1,0 +1,813 @@
+openapi: 3.0.3
+info:
+  title: dbadmin API
+  description: >
+    REST API for dbadmin, a local-first multi-database admin tool covering
+    MySQL, SQLite, Redis, MongoDB, and Elasticsearch.
+
+    Authentication: most endpoints require a valid session, established via
+    `POST /api/auth/login` and presented as an HttpOnly session cookie on
+    subsequent requests. Endpoints marked "auth: none" are public. Unsafe
+    methods (POST/PUT/PATCH/DELETE) additionally require a same-origin
+    request, and are rejected outright for sessions with the `readonly` role
+    (except `POST /api/auth/logout`). Per-connection read-only mode can
+    further block writes on specific connections regardless of session role.
+  version: "1.0.0"
+externalDocs:
+  description: dbadmin README
+  url: https://github.com/spcent/plumego/tree/main/use-cases/dbadmin
+security:
+  - sessionCookie: []
+components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: dbadmin_session
+      description: HttpOnly session cookie issued by POST /api/auth/login.
+  schemas:
+    Error:
+      type: object
+      description: Canonical error envelope returned by contract.WriteError.
+      properties:
+        error:
+          type: object
+          properties:
+            type:
+              type: string
+            code:
+              type: string
+            message:
+              type: string
+            details:
+              type: object
+              additionalProperties: true
+    Connection:
+      type: object
+      description: A saved database connection profile. Secrets are write-only and redacted on read.
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        type:
+          type: string
+          enum: [mysql, sqlite, redis, mongodb, elasticsearch]
+        host:
+          type: string
+        port:
+          type: integer
+        username:
+          type: string
+        database:
+          type: string
+        readOnly:
+          type: boolean
+          description: When true, all write operations on this connection are blocked server-side.
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required: [id, name, type]
+    QueryRequest:
+      type: object
+      description: SQL query execution request.
+      properties:
+        sql:
+          type: string
+        params:
+          type: array
+          items: {}
+      required: [sql]
+    QueryResult:
+      type: object
+      description: SQL query execution result.
+      properties:
+        columns:
+          type: array
+          items:
+            type: string
+        rows:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        rowsAffected:
+          type: integer
+        durationMs:
+          type: integer
+        truncated:
+          type: boolean
+  parameters:
+    ConnectionId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string }
+      description: Saved connection id.
+    Db:
+      name: db
+      in: path
+      required: true
+      schema: { type: string }
+      description: Database/schema name.
+    Table:
+      name: table
+      in: path
+      required: true
+      schema: { type: string }
+      description: Table name.
+    DbIndex:
+      name: dbIndex
+      in: path
+      required: true
+      schema: { type: string }
+      description: Redis logical database index.
+tags:
+  - name: Health
+    description: Liveness, readiness, and operational diagnostics. Public, no auth.
+  - name: Auth
+    description: Login, logout, and session info.
+  - name: Audit
+    description: Local audit event log.
+  - name: Connections
+    description: Saved connection CRUD, test, and runtime control.
+  - name: Resources
+    description: Unified, driver-agnostic resource tree (databases, tables, views, ...).
+  - name: Inspect
+    description: SQL schema introspection (structure, columns, indexes, foreign keys).
+  - name: Rows
+    description: SQL row CRUD.
+  - name: DDL
+    description: SQL table DDL (CREATE/ALTER/DROP TABLE).
+  - name: Export/Import
+    description: Table-level data export and import.
+  - name: SQL Console
+    description: Ad hoc SQL execution and query history.
+  - name: Query Control
+    description: Cancel running SQL queries / non-SQL operations.
+  - name: SQLite
+    description: SQLite file upload/download.
+  - name: Redis
+    description: Redis key browsing, command execution, batch ops, history.
+  - name: MongoDB
+    description: MongoDB collection/document queries and management.
+  - name: Elasticsearch
+    description: Elasticsearch index/document management and search.
+paths:
+  /healthz:
+    get:
+      tags: [Health]
+      summary: "Liveness probe (auth: none)."
+      responses:
+        "200": { description: Service is alive. }
+  /readyz:
+    get:
+      tags: [Health]
+      summary: "Readiness probe across all configured datasource connections (auth: none)."
+      responses:
+        "200": { description: All components ready. }
+        "503": { description: One or more components are not ready. }
+  /pool-stats:
+    get:
+      tags: [Health]
+      summary: "Aggregate connection-pool stats across all drivers (auth: none)."
+      responses:
+        "200": { description: Pool statistics. }
+  /pool-stats/sql:
+    get:
+      tags: [Health]
+      summary: "SQL-only connection-pool stats (auth: none)."
+      responses:
+        "200": { description: SQL pool statistics. }
+  /runtime-stats:
+    get:
+      tags: [Health]
+      summary: "Process runtime stats, e.g. uptime, goroutines (auth: none)."
+      responses:
+        "200": { description: Runtime statistics. }
+  /openapi.json:
+    get:
+      tags: [Health]
+      summary: "This OpenAPI 3.0 specification, JSON form (auth: none)."
+      responses:
+        "200": { description: OpenAPI document. }
+  /openapi.yaml:
+    get:
+      tags: [Health]
+      summary: "This OpenAPI 3.0 specification, YAML form (auth: none)."
+      responses:
+        "200": { description: OpenAPI document. }
+  /docs:
+    get:
+      tags: [Health]
+      summary: "Interactive Swagger UI page for this API (auth: none)."
+      responses:
+        "200": { description: HTML page. }
+
+  /api/auth/login:
+    post:
+      tags: [Auth]
+      summary: "Log in with username/password (auth: none; same-origin enforced; rate-limited)."
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                username: { type: string }
+                password: { type: string }
+              required: [username, password]
+      responses:
+        "200": { description: Session established. }
+        "401": { description: Invalid credentials. }
+  /api/auth/logout:
+    post:
+      tags: [Auth]
+      summary: "Log out the current session (auth: session cookie; allowed for readonly role)."
+      responses: { "200": { description: Logged out. } }
+  /api/auth/me:
+    get:
+      tags: [Auth]
+      summary: "Get the current authenticated user (auth: session cookie)."
+      responses: { "200": { description: Current user. } }
+
+  /api/audit/events:
+    get:
+      tags: [Audit]
+      summary: "List local audit events (auth: session cookie)."
+      responses: { "200": { description: Audit events. } }
+  /api/audit/export:
+    get:
+      tags: [Audit]
+      summary: "Export audit events as JSON or NDJSON (auth: session cookie)."
+      responses: { "200": { description: Exported audit data. } }
+
+  /api/connections:
+    get:
+      tags: [Connections]
+      summary: "List saved connections (auth: session cookie)."
+      responses:
+        "200":
+          description: Connection list.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Connection" }
+    post:
+      tags: [Connections]
+      summary: "Create a saved connection (auth: session cookie; write, blocked for readonly role)."
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/Connection" }
+      responses:
+        "201":
+          description: Created connection.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Connection" }
+  /api/connections/{id}:
+    get:
+      tags: [Connections]
+      summary: "Get one saved connection (auth: session cookie)."
+      parameters: [{ $ref: "#/components/parameters/ConnectionId" }]
+      responses:
+        "200":
+          description: Connection.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Connection" }
+    put:
+      tags: [Connections]
+      summary: "Update a saved connection (auth: session cookie; write, blocked for readonly role)."
+      parameters: [{ $ref: "#/components/parameters/ConnectionId" }]
+      responses: { "200": { description: Updated connection. } }
+    delete:
+      tags: [Connections]
+      summary: "Delete a saved connection (auth: session cookie; write, blocked for readonly role)."
+      parameters: [{ $ref: "#/components/parameters/ConnectionId" }]
+      responses: { "204": { description: Deleted. } }
+  /api/connections/{id}/test:
+    post:
+      tags: [Connections]
+      summary: "Test connectivity for a saved connection (auth: session cookie; write, blocked for readonly role)."
+      parameters: [{ $ref: "#/components/parameters/ConnectionId" }]
+      responses: { "200": { description: Test result. } }
+  /api/connections/{id}/runtime:
+    delete:
+      tags: [Connections]
+      summary: "Close the live runtime/pool for a connection without deleting it (auth: session cookie; write, blocked for readonly role)."
+      parameters: [{ $ref: "#/components/parameters/ConnectionId" }]
+      responses: { "200": { description: Runtime closed. } }
+
+  /api/pool-stats:
+    get:
+      tags: [Connections]
+      summary: "Aggregate connection-pool stats (protected variant; auth: session cookie)."
+      responses: { "200": { description: Pool statistics. } }
+  /api/pool-stats/sql:
+    get:
+      tags: [Connections]
+      summary: "SQL-only connection-pool stats (protected variant; auth: session cookie)."
+      responses: { "200": { description: SQL pool statistics. } }
+
+  /api/connections/{id}/resources:
+    get:
+      tags: [Resources]
+      summary: "List child resource nodes (databases, tables, views, ...) under a connection or parent node (auth: session cookie)."
+      parameters:
+        - { $ref: "#/components/parameters/ConnectionId" }
+        - name: parentId
+          in: query
+          schema: { type: string }
+          description: Opaque path of the parent node; omit for the root level.
+      responses: { "200": { description: Resource node list. } }
+
+  /api/conn/{id}/db/{db}/schema-doc:
+    get:
+      tags: [Inspect]
+      summary: "Generate a human-readable schema document for a database (auth: session cookie)."
+      parameters:
+        - { $ref: "#/components/parameters/ConnectionId" }
+        - { $ref: "#/components/parameters/Db" }
+      responses: { "200": { description: Schema document. } }
+  /api/conn/{id}/db/{db}/tables/{table}/structure:
+    get:
+      tags: [Inspect]
+      summary: "Get full table structure (columns, indexes, keys) (auth: session cookie)."
+      parameters:
+        - { $ref: "#/components/parameters/ConnectionId" }
+        - { $ref: "#/components/parameters/Db" }
+        - { $ref: "#/components/parameters/Table" }
+      responses: { "200": { description: Table structure. } }
+  /api/conn/{id}/db/{db}/tables/{table}/columns:
+    get:
+      tags: [Inspect]
+      summary: "List columns for a table (auth: session cookie)."
+      parameters:
+        - { $ref: "#/components/parameters/ConnectionId" }
+        - { $ref: "#/components/parameters/Db" }
+        - { $ref: "#/components/parameters/Table" }
+      responses: { "200": { description: Column list. } }
+  /api/conn/{id}/db/{db}/tables/{table}/indexes:
+    get:
+      tags: [Inspect]
+      summary: "List indexes for a table (auth: session cookie)."
+      parameters:
+        - { $ref: "#/components/parameters/ConnectionId" }
+        - { $ref: "#/components/parameters/Db" }
+        - { $ref: "#/components/parameters/Table" }
+      responses: { "200": { description: Index list. } }
+  /api/conn/{id}/db/{db}/tables/{table}/foreign-keys:
+    get:
+      tags: [Inspect]
+      summary: "List foreign keys for a table (auth: session cookie)."
+      parameters:
+        - { $ref: "#/components/parameters/ConnectionId" }
+        - { $ref: "#/components/parameters/Db" }
+        - { $ref: "#/components/parameters/Table" }
+      responses: { "200": { description: Foreign key list. } }
+
+  /api/conn/{id}/db/{db}/tables/{table}/rows:
+    get:
+      tags: [Rows]
+      summary: "List rows from a table, paginated/filterable (auth: session cookie)."
+      parameters:
+        - { $ref: "#/components/parameters/ConnectionId" }
+        - { $ref: "#/components/parameters/Db" }
+        - { $ref: "#/components/parameters/Table" }
+      responses: { "200": { description: Row page. } }
+    post:
+      tags: [Rows]
+      summary: "Insert a row (auth: session cookie; write, blocked for readonly role or read-only connection)."
+      parameters:
+        - { $ref: "#/components/parameters/ConnectionId" }
+        - { $ref: "#/components/parameters/Db" }
+        - { $ref: "#/components/parameters/Table" }
+      responses: { "201": { description: Inserted row. } }
+    patch:
+      tags: [Rows]
+      summary: "Update a row by primary key (auth: session cookie; write, blocked for readonly role or read-only connection)."
+      parameters:
+        - { $ref: "#/components/parameters/ConnectionId" }
+        - { $ref: "#/components/parameters/Db" }
+        - { $ref: "#/components/parameters/Table" }
+      responses: { "200": { description: Updated row. } }
+    delete:
+      tags: [Rows]
+      summary: "Delete a row by primary key (auth: session cookie; write, blocked for readonly role or read-only connection)."
+      parameters:
+        - { $ref: "#/components/parameters/ConnectionId" }
+        - { $ref: "#/components/parameters/Db" }
+        - { $ref: "#/components/parameters/Table" }
+      responses: { "200": { description: Deleted. } }
+
+  /api/conn/{id}/db/{db}/tables:
+    post:
+      tags: [DDL]
+      summary: "Create a table (CREATE TABLE) (auth: session cookie; write, blocked for readonly role or read-only connection)."
+      parameters:
+        - { $ref: "#/components/parameters/ConnectionId" }
+        - { $ref: "#/components/parameters/Db" }
+      responses: { "201": { description: Table created. } }
+  /api/conn/{id}/db/{db}/tables/{table}:
+    put:
+      tags: [DDL]
+      summary: "Alter a table (ALTER TABLE) (auth: session cookie; write, blocked for readonly role or read-only connection)."
+      parameters:
+        - { $ref: "#/components/parameters/ConnectionId" }
+        - { $ref: "#/components/parameters/Db" }
+        - { $ref: "#/components/parameters/Table" }
+      responses: { "200": { description: Table altered. } }
+    delete:
+      tags: [DDL]
+      summary: "Drop a table (DROP TABLE) (auth: session cookie; write, blocked for readonly role or read-only connection)."
+      parameters:
+        - { $ref: "#/components/parameters/ConnectionId" }
+        - { $ref: "#/components/parameters/Db" }
+        - { $ref: "#/components/parameters/Table" }
+      responses: { "200": { description: Table dropped. } }
+
+  /api/conn/{id}/db/{db}/tables/{table}/export:
+    get:
+      tags: [Export/Import]
+      summary: "Export table data as CSV/JSON/SQL (auth: session cookie)."
+      parameters:
+        - { $ref: "#/components/parameters/ConnectionId" }
+        - { $ref: "#/components/parameters/Db" }
+        - { $ref: "#/components/parameters/Table" }
+        - name: format
+          in: query
+          schema: { type: string, enum: [csv, json, sql] }
+      responses: { "200": { description: Exported file. } }
+  /api/conn/{id}/db/{db}/import:
+    post:
+      tags: [Export/Import]
+      summary: "Import data into a database from CSV/JSON/SQL (auth: session cookie; write, blocked for readonly role or read-only connection)."
+      parameters:
+        - { $ref: "#/components/parameters/ConnectionId" }
+        - { $ref: "#/components/parameters/Db" }
+      responses: { "200": { description: Import result. } }
+
+  /api/conn/{id}/db/{db}/query:
+    post:
+      tags: [SQL Console]
+      summary: "Execute an ad hoc SQL statement (auth: session cookie; destructive statements require confirmation; write statements blocked for readonly role or read-only connection)."
+      parameters:
+        - { $ref: "#/components/parameters/ConnectionId" }
+        - { $ref: "#/components/parameters/Db" }
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/QueryRequest" }
+      responses:
+        "200":
+          description: Query result.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/QueryResult" }
+  /api/conn/{id}/history:
+    get:
+      tags: [SQL Console]
+      summary: "List SQL query history for a connection (auth: session cookie)."
+      parameters: [{ $ref: "#/components/parameters/ConnectionId" }]
+      responses: { "200": { description: History entries. } }
+    delete:
+      tags: [SQL Console]
+      summary: "Clear all SQL query history for a connection (auth: session cookie; write, blocked for readonly role)."
+      parameters: [{ $ref: "#/components/parameters/ConnectionId" }]
+      responses: { "200": { description: History cleared. } }
+  /api/conn/{id}/history/{entryId}:
+    delete:
+      tags: [SQL Console]
+      summary: "Delete one SQL query history entry (auth: session cookie; write, blocked for readonly role)."
+      parameters:
+        - { $ref: "#/components/parameters/ConnectionId" }
+        - name: entryId
+          in: path
+          required: true
+          schema: { type: string }
+      responses: { "200": { description: Entry deleted. } }
+
+  /api/queries/cancel:
+    post:
+      tags: [Query Control]
+      summary: "Cancel an active SQL query (auth: session cookie; only when query cancellation is enabled; write, blocked for readonly role)."
+      responses: { "200": { description: Cancellation requested. } }
+  /api/queries/active:
+    get:
+      tags: [Query Control]
+      summary: "List currently active SQL queries (auth: session cookie; only when query cancellation is enabled)."
+      responses: { "200": { description: Active query list. } }
+  /api/operations/cancel:
+    post:
+      tags: [Query Control]
+      summary: "Cancel an active non-SQL operation (auth: session cookie; only when query cancellation is enabled; write, blocked for readonly role)."
+      responses: { "200": { description: Cancellation requested. } }
+  /api/operations/active:
+    get:
+      tags: [Query Control]
+      summary: "List currently active non-SQL operations (auth: session cookie; only when query cancellation is enabled)."
+      responses: { "200": { description: Active operation list. } }
+
+  /api/conn/{id}/redis/databases:
+    get:
+      tags: [Redis]
+      summary: "List Redis logical databases (auth: session cookie)."
+      parameters: [{ $ref: "#/components/parameters/ConnectionId" }]
+      responses: { "200": { description: Database list. } }
+  /api/conn/{id}/redis/{dbIndex}/keys:
+    get:
+      tags: [Redis]
+      summary: "List/scan keys in a Redis database (auth: session cookie)."
+      parameters:
+        - { $ref: "#/components/parameters/ConnectionId" }
+        - { $ref: "#/components/parameters/DbIndex" }
+      responses: { "200": { description: Key list. } }
+  /api/conn/{id}/redis/{dbIndex}/key:
+    get:
+      tags: [Redis]
+      summary: "Get a Redis key's value and metadata (auth: session cookie)."
+      parameters:
+        - { $ref: "#/components/parameters/ConnectionId" }
+        - { $ref: "#/components/parameters/DbIndex" }
+      responses: { "200": { description: Key value. } }
+    delete:
+      tags: [Redis]
+      summary: "Delete a Redis key (auth: session cookie; write, blocked for readonly role or read-only connection)."
+      parameters:
+        - { $ref: "#/components/parameters/ConnectionId" }
+        - { $ref: "#/components/parameters/DbIndex" }
+      responses: { "200": { description: Key deleted. } }
+  /api/conn/{id}/redis/{dbIndex}/key/ttl:
+    patch:
+      tags: [Redis]
+      summary: "Set TTL on a Redis key (auth: session cookie; write, blocked for readonly role or read-only connection)."
+      parameters:
+        - { $ref: "#/components/parameters/ConnectionId" }
+        - { $ref: "#/components/parameters/DbIndex" }
+      responses: { "200": { description: TTL updated. } }
+  /api/conn/{id}/redis/{dbIndex}/command:
+    post:
+      tags: [Redis]
+      summary: "Execute a raw Redis command (auth: session cookie; destructive commands require confirmation; write commands blocked for readonly role or read-only connection)."
+      parameters:
+        - { $ref: "#/components/parameters/ConnectionId" }
+        - { $ref: "#/components/parameters/DbIndex" }
+      responses: { "200": { description: Command result. } }
+  /api/conn/{id}/redis/{dbIndex}/batch-preview:
+    post:
+      tags: [Redis]
+      summary: "Preview a batch key operation before executing it (auth: session cookie; write, blocked for readonly role)."
+      parameters:
+        - { $ref: "#/components/parameters/ConnectionId" }
+        - { $ref: "#/components/parameters/DbIndex" }
+      responses: { "200": { description: Batch preview. } }
+  /api/conn/{id}/redis/{dbIndex}/batch-delete:
+    post:
+      tags: [Redis]
+      summary: "Delete multiple Redis keys in one confirmed request (auth: session cookie; write, blocked for readonly role or read-only connection)."
+      parameters:
+        - { $ref: "#/components/parameters/ConnectionId" }
+        - { $ref: "#/components/parameters/DbIndex" }
+      responses: { "200": { description: Batch delete result. } }
+  /api/conn/{id}/redis/{dbIndex}/export:
+    get:
+      tags: [Redis]
+      summary: "Export Redis keys (auth: session cookie)."
+      parameters:
+        - { $ref: "#/components/parameters/ConnectionId" }
+        - { $ref: "#/components/parameters/DbIndex" }
+      responses: { "200": { description: Exported keys. } }
+  /api/conn/{id}/redis/{dbIndex}/import:
+    post:
+      tags: [Redis]
+      summary: "Import Redis keys (auth: session cookie; write, blocked for readonly role or read-only connection)."
+      parameters:
+        - { $ref: "#/components/parameters/ConnectionId" }
+        - { $ref: "#/components/parameters/DbIndex" }
+      responses: { "200": { description: Import result. } }
+  /api/conn/{id}/redis/history:
+    get:
+      tags: [Redis]
+      summary: "List Redis command history (auth: session cookie)."
+      parameters: [{ $ref: "#/components/parameters/ConnectionId" }]
+      responses: { "200": { description: History entries. } }
+    delete:
+      tags: [Redis]
+      summary: "Clear all Redis command history (auth: session cookie; write, blocked for readonly role)."
+      parameters: [{ $ref: "#/components/parameters/ConnectionId" }]
+      responses: { "200": { description: History cleared. } }
+  /api/conn/{id}/redis/history/{entryId}:
+    delete:
+      tags: [Redis]
+      summary: "Delete one Redis command history entry (auth: session cookie; write, blocked for readonly role)."
+      parameters:
+        - { $ref: "#/components/parameters/ConnectionId" }
+        - name: entryId
+          in: path
+          required: true
+          schema: { type: string }
+      responses: { "200": { description: Entry deleted. } }
+
+  /api/sqlite/upload:
+    post:
+      tags: [SQLite]
+      summary: "Upload a SQLite database file (auth: session cookie; write, blocked for readonly role)."
+      responses: { "200": { description: Upload result. } }
+  /api/conn/{id}/sqlite/download:
+    get:
+      tags: [SQLite]
+      summary: "Download the SQLite database file for a connection (auth: session cookie)."
+      parameters: [{ $ref: "#/components/parameters/ConnectionId" }]
+      responses: { "200": { description: SQLite file. } }
+
+  /api/connections/{id}/mongo/databases:
+    get:
+      tags: [MongoDB]
+      summary: "List MongoDB databases (auth: session cookie)."
+      parameters: [{ $ref: "#/components/parameters/ConnectionId" }]
+      responses: { "200": { description: Database list. } }
+  /api/connections/{id}/mongo/collections:
+    get:
+      tags: [MongoDB]
+      summary: "List collections in a database (auth: session cookie)."
+      parameters: [{ $ref: "#/components/parameters/ConnectionId" }]
+      responses: { "200": { description: Collection list. } }
+  /api/connections/{id}/mongo/documents/query:
+    post:
+      tags: [MongoDB]
+      summary: "Query documents with a filter (auth: session cookie)."
+      parameters: [{ $ref: "#/components/parameters/ConnectionId" }]
+      responses: { "200": { description: Matching documents. } }
+  /api/connections/{id}/mongo/indexes:
+    get:
+      tags: [MongoDB]
+      summary: "List indexes on a collection (auth: session cookie)."
+      parameters: [{ $ref: "#/components/parameters/ConnectionId" }]
+      responses: { "200": { description: Index list. } }
+  /api/connections/{id}/mongo/documents:
+    post:
+      tags: [MongoDB]
+      summary: "Insert a document (auth: session cookie; write, blocked for readonly role or read-only connection)."
+      parameters: [{ $ref: "#/components/parameters/ConnectionId" }]
+      responses: { "201": { description: Inserted document. } }
+    patch:
+      tags: [MongoDB]
+      summary: "Update a document (auth: session cookie; write, blocked for readonly role or read-only connection)."
+      parameters: [{ $ref: "#/components/parameters/ConnectionId" }]
+      responses: { "200": { description: Updated document. } }
+    delete:
+      tags: [MongoDB]
+      summary: "Delete a document (auth: session cookie; write, blocked for readonly role or read-only connection)."
+      parameters: [{ $ref: "#/components/parameters/ConnectionId" }]
+      responses: { "200": { description: Deleted. } }
+  /api/connections/{id}/mongo/aggregate:
+    post:
+      tags: [MongoDB]
+      summary: "Run an aggregation pipeline (auth: session cookie)."
+      parameters: [{ $ref: "#/components/parameters/ConnectionId" }]
+      responses: { "200": { description: Aggregation result. } }
+  /api/connections/{id}/mongo/explain:
+    post:
+      tags: [MongoDB]
+      summary: "Get the query execution plan for a query (auth: session cookie)."
+      parameters: [{ $ref: "#/components/parameters/ConnectionId" }]
+      responses: { "200": { description: Explain plan. } }
+  /api/connections/{id}/mongo/schema:
+    get:
+      tags: [MongoDB]
+      summary: "Sample a collection to infer its schema (auth: session cookie)."
+      parameters: [{ $ref: "#/components/parameters/ConnectionId" }]
+      responses: { "200": { description: Inferred schema sample. } }
+  /api/connections/{id}/mongo/stats:
+    get:
+      tags: [MongoDB]
+      summary: "Get collection statistics (auth: session cookie)."
+      parameters: [{ $ref: "#/components/parameters/ConnectionId" }]
+      responses: { "200": { description: Collection stats. } }
+  /api/connections/{id}/mongo/export:
+    get:
+      tags: [MongoDB]
+      summary: "Export documents (auth: session cookie)."
+      parameters: [{ $ref: "#/components/parameters/ConnectionId" }]
+      responses: { "200": { description: Exported documents. } }
+  /api/connections/{id}/mongo/import:
+    post:
+      tags: [MongoDB]
+      summary: "Import documents (auth: session cookie; write, blocked for readonly role or read-only connection)."
+      parameters: [{ $ref: "#/components/parameters/ConnectionId" }]
+      responses: { "200": { description: Import result. } }
+  /api/mongo/objectid/{id}/parse:
+    get:
+      tags: [MongoDB]
+      summary: "Parse a MongoDB ObjectId into its component fields (auth: session cookie)."
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses: { "200": { description: Parsed ObjectId. } }
+  /api/connections/{id}/mongo/history:
+    get:
+      tags: [MongoDB]
+      summary: "List MongoDB query/pipeline history (auth: session cookie)."
+      parameters: [{ $ref: "#/components/parameters/ConnectionId" }]
+      responses: { "200": { description: History entries. } }
+    delete:
+      tags: [MongoDB]
+      summary: "Clear all MongoDB history (auth: session cookie; write, blocked for readonly role)."
+      parameters: [{ $ref: "#/components/parameters/ConnectionId" }]
+      responses: { "200": { description: History cleared. } }
+  /api/connections/{id}/mongo/history/{entryId}:
+    delete:
+      tags: [MongoDB]
+      summary: "Delete one MongoDB history entry (auth: session cookie; write, blocked for readonly role)."
+      parameters:
+        - { $ref: "#/components/parameters/ConnectionId" }
+        - name: entryId
+          in: path
+          required: true
+          schema: { type: string }
+      responses: { "200": { description: Entry deleted. } }
+
+  /api/connections/{id}/es/info:
+    get:
+      tags: [Elasticsearch]
+      summary: "Get cluster info/health (auth: session cookie)."
+      parameters: [{ $ref: "#/components/parameters/ConnectionId" }]
+      responses: { "200": { description: Cluster info. } }
+  /api/connections/{id}/es/indices:
+    get:
+      tags: [Elasticsearch]
+      summary: "List indices (auth: session cookie)."
+      parameters: [{ $ref: "#/components/parameters/ConnectionId" }]
+      responses: { "200": { description: Index list. } }
+  /api/connections/{id}/es/index/mapping:
+    get:
+      tags: [Elasticsearch]
+      summary: "Get an index's field mappings (auth: session cookie)."
+      parameters: [{ $ref: "#/components/parameters/ConnectionId" }]
+      responses: { "200": { description: Mappings. } }
+  /api/connections/{id}/es/index/settings:
+    get:
+      tags: [Elasticsearch]
+      summary: "Get an index's settings (auth: session cookie)."
+      parameters: [{ $ref: "#/components/parameters/ConnectionId" }]
+      responses: { "200": { description: Settings. } }
+  /api/connections/{id}/es/search:
+    post:
+      tags: [Elasticsearch]
+      summary: "Run a DSL search query (auth: session cookie)."
+      parameters: [{ $ref: "#/components/parameters/ConnectionId" }]
+      responses: { "200": { description: Search results. } }
+  /api/connections/{id}/es/document:
+    get:
+      tags: [Elasticsearch]
+      summary: "Get a document by id (auth: session cookie)."
+      parameters: [{ $ref: "#/components/parameters/ConnectionId" }]
+      responses: { "200": { description: Document. } }
+    delete:
+      tags: [Elasticsearch]
+      summary: "Delete a document by id (auth: session cookie; write, blocked for readonly role or read-only connection)."
+      parameters: [{ $ref: "#/components/parameters/ConnectionId" }]
+      responses: { "200": { description: Deleted. } }
+  /api/connections/{id}/es/export:
+    get:
+      tags: [Elasticsearch]
+      summary: "Export documents from an index (auth: session cookie)."
+      parameters: [{ $ref: "#/components/parameters/ConnectionId" }]
+      responses: { "200": { description: Exported documents. } }
+  /api/connections/{id}/es/import:
+    post:
+      tags: [Elasticsearch]
+      summary: "Import documents into an index (auth: session cookie; write, blocked for readonly role or read-only connection)."
+      parameters: [{ $ref: "#/components/parameters/ConnectionId" }]
+      responses: { "200": { description: Import result. } }
+  /api/connections/{id}/es/history:
+    get:
+      tags: [Elasticsearch]
+      summary: "List Elasticsearch query history (auth: session cookie)."
+      parameters: [{ $ref: "#/components/parameters/ConnectionId" }]
+      responses: { "200": { description: History entries. } }
+    delete:
+      tags: [Elasticsearch]
+      summary: "Clear all Elasticsearch query history (auth: session cookie; write, blocked for readonly role)."
+      parameters: [{ $ref: "#/components/parameters/ConnectionId" }]
+      responses: { "200": { description: History cleared. } }
+  /api/connections/{id}/es/history/{entryId}:
+    delete:
+      tags: [Elasticsearch]
+      summary: "Delete one Elasticsearch history entry (auth: session cookie; write, blocked for readonly role)."
+      parameters:
+        - { $ref: "#/components/parameters/ConnectionId" }
+        - name: entryId
+          in: path
+          required: true
+          schema: { type: string }
+      responses: { "200": { description: Entry deleted. } }
