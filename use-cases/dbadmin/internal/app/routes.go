@@ -77,6 +77,7 @@ func (a *App) RegisterRoutes() error {
 	root.get("/pool-stats", http.HandlerFunc(poolStatsH.GetAllStats))
 	root.get("/pool-stats/sql", http.HandlerFunc(poolStatsH.GetSQLPoolStats))
 	root.get("/runtime-stats", http.HandlerFunc(runtimeStatsH.GetStats))
+	root.get("/metrics", a.Metrics.Handler())
 	sameOriginMw := handler.SameOriginMiddleware(a.Core.Logger())
 	ipMw := handler.IPAllowlistMiddleware(a.Cfg.App.AllowedIPs, a.Core.Logger())
 	root.post("/api/auth/login", ipMw(sameOriginMw(http.HandlerFunc(authH.Login))))

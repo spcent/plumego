@@ -11,7 +11,6 @@ import (
 
 	"github.com/spcent/plumego/core"
 	plumelog "github.com/spcent/plumego/log"
-	"github.com/spcent/plumego/metrics"
 	"github.com/spcent/plumego/middleware/accesslog"
 	"github.com/spcent/plumego/middleware/bodylimit"
 	"github.com/spcent/plumego/middleware/cors"
@@ -21,6 +20,7 @@ import (
 	midsecurity "github.com/spcent/plumego/middleware/securityheaders"
 	"github.com/spcent/plumego/middleware/timeout"
 	kvstore "github.com/spcent/plumego/store/kv"
+	"github.com/spcent/plumego/x/observability"
 
 	"dbadmin/internal/config"
 	"dbadmin/internal/datasource"
@@ -62,6 +62,7 @@ type App struct {
 	OperationRegistry *handler.OperationRegistry
 	StartTime         time.Time           // Track app start time for uptime monitoring
 	Users             []config.UserConfig // resolved user list (from cfg.App.ResolveUsers())
+	Metrics           *observability.PrometheusCollector
 }
 
 // New constructs the App with all middleware and shared dependencies wired.
@@ -136,6 +137,8 @@ func New(cfg config.Config) (*App, error) {
 	}
 	timeoutMw := timeout.Middleware(timeout.Config{Timeout: 60 * time.Second})
 
+	metricsCollector := observability.NewPrometheusCollector("dbadmin")
+
 	if err := coreApp.Use(
 		requestid.Middleware(),
 		securityMw,
@@ -146,7 +149,7 @@ func New(cfg config.Config) (*App, error) {
 			MaxBytes: cfg.App.MaxBodyBytes,
 			Logger:   coreApp.Logger(),
 		}),
-		httpmetrics.Middleware(metrics.NewNoopCollector()),
+		httpmetrics.Middleware(metricsCollector),
 		timeoutMw,
 	); err != nil {
 		return nil, fmt.Errorf("register middleware: %w", err)
@@ -188,6 +191,7 @@ func New(cfg config.Config) (*App, error) {
 		OperationRegistry: handler.NewOperationRegistry(),
 		StartTime:         time.Now(),
 		Users:             cfg.App.ResolveUsers(),
+		Metrics:           metricsCollector,
 	}, nil
 }
 
