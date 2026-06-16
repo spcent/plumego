@@ -24,11 +24,11 @@
     "check:css": "node ./scripts/check-css-selectors.mjs"
   },
   "devDependencies": {
-    "@astrojs/check": "latest",
-    "@astrojs/mdx": "latest",
-    "@astrojs/sitemap": "latest",
-    "@astrojs/starlight": "latest",
-    "astro": "latest",
+    "@astrojs/check": "0.9.9",
+    "@astrojs/mdx": "6.0.3",
+    "@astrojs/sitemap": "3.7.3",
+    "@astrojs/starlight": "0.40.0",
+    "astro": "6.4.7",
     "typescript": "^6.0.3"
   }
 }
