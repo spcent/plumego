@@ -55,8 +55,12 @@ type Connection struct {
 	FilePath string     `json:"file_path,omitempty"` // for SQLite
 	Options  string     `json:"options,omitempty"`   // extra DSN params
 	// Redis-specific fields (used when Driver = "redis")
-	RedisDBIndex int  `json:"redis_db_index,omitempty"` // logical DB index 0-15, default 0
-	TLSEnabled   bool `json:"tls_enabled,omitempty"`    // use TLS/SSL
+	RedisDBIndex            int      `json:"redis_db_index,omitempty"`             // logical DB index 0-15, default 0
+	TLSEnabled              bool     `json:"tls_enabled,omitempty"`                // use TLS/SSL
+	RedisMode               string   `json:"redis_mode,omitempty"`                 // "" (standalone, default), "cluster", "sentinel"
+	RedisClusterAddrs       []string `json:"redis_cluster_addrs,omitempty"`        // cluster node addresses ["host:port", ...], used when RedisMode = "cluster"
+	RedisSentinelAddrs      []string `json:"redis_sentinel_addrs,omitempty"`       // sentinel addresses ["host:port", ...], used when RedisMode = "sentinel"
+	RedisSentinelMasterName string   `json:"redis_sentinel_master_name,omitempty"` // sentinel master group name, used when RedisMode = "sentinel"
 
 	// SQL-specific TLS fields (MySQL and PostgreSQL)
 	SQLTLSMode       string `json:"sql_tls_mode,omitempty"`        // disable, require, verify-ca, verify-full
