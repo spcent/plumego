@@ -208,6 +208,8 @@ func (a *App) RegisterRoutes() error {
 	protected.post("/api/conn/:id/db/:db/tables/:table/rows", guard(http.HandlerFunc(rowH.Create)))
 	protected.patch("/api/conn/:id/db/:db/tables/:table/rows", guard(http.HandlerFunc(rowH.Update)))
 	protected.delete("/api/conn/:id/db/:db/tables/:table/rows", guard(http.HandlerFunc(rowH.Delete)))
+	protected.post("/api/connections/:id/db/:db/tables/:table/rows/bulk-delete", guard(http.HandlerFunc(rowH.BulkDelete)))
+	protected.post("/api/connections/:id/db/:db/tables/:table/rows/bulk-update", guard(http.HandlerFunc(rowH.BulkUpdate)))
 
 	// DDL operations.
 	protected.post("/api/conn/:id/db/:db/tables", guard(http.HandlerFunc(ddlH.CreateTable)))
