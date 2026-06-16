@@ -95,13 +95,15 @@ func (h ExportHandler) Export(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("X-Export-Row-Limit", strconv.Itoa(limit))
 
+	maskedSet := maskedColumnSet(conn.MaskedColumns)
+
 	switch format {
 	case "sql":
-		h.exportSQL(w, r, rows, cols, conn, dbName, table, ts, includeSchema, includeData, limit)
+		h.exportSQL(w, r, rows, cols, conn, dbName, table, ts, includeSchema, includeData, limit, maskedSet)
 	case "xlsx":
-		h.exportXLSX(w, r, rows, cols, table, ts, includeData, limit)
+		h.exportXLSX(w, r, rows, cols, table, ts, includeData, limit, maskedSet)
 	default:
-		h.exportCSV(w, r, rows, cols, table, ts, includeData, limit)
+		h.exportCSV(w, r, rows, cols, table, ts, includeData, limit, maskedSet)
 	}
 }
 
@@ -109,7 +111,7 @@ func (h ExportHandler) exportCSV(w http.ResponseWriter, r *http.Request, rows in
 	Next() bool
 	Scan(...any) error
 	Err() error
-}, cols []string, table, ts string, includeData bool, limit int) {
+}, cols []string, table, ts string, includeData bool, limit int, maskedSet map[string]bool) {
 	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
 	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s_%s.csv"`, table, ts))
 	cw := csv.NewWriter(w)
@@ -135,8 +137,9 @@ func (h ExportHandler) exportCSV(w http.ResponseWriter, r *http.Request, rows in
 			h.Logger.Warn("csv scan", plumelog.Fields{"error": err.Error()})
 			continue
 		}
+		maskedVals := maskRow(cols, vals, maskedSet)
 		record := make([]string, len(cols))
-		for i, v := range vals {
+		for i, v := range maskedVals {
 			switch t := v.(type) {
 			case nil:
 				record[i] = ""
@@ -160,7 +163,7 @@ func (h ExportHandler) exportSQL(w http.ResponseWriter, r *http.Request, rows in
 	Next() bool
 	Scan(...any) error
 	Err() error
-}, cols []string, conn *connection.Connection, dbName, table, ts string, includeSchema, includeData bool, limit int) {
+}, cols []string, conn *connection.Connection, dbName, table, ts string, includeSchema, includeData bool, limit int, maskedSet map[string]bool) {
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s_%s.sql"`, table, ts))
 
@@ -213,8 +216,9 @@ func (h ExportHandler) exportSQL(w http.ResponseWriter, r *http.Request, rows in
 		if err := rows.Scan(ptrs...); err != nil {
 			continue
 		}
+		maskedVals := maskRow(cols, vals, maskedSet)
 		valStrs := make([]string, len(cols))
-		for i, v := range vals {
+		for i, v := range maskedVals {
 			switch t := v.(type) {
 			case nil:
 				valStrs[i] = "NULL"
@@ -242,7 +246,7 @@ func (h ExportHandler) exportXLSX(w http.ResponseWriter, r *http.Request, rows i
 	Next() bool
 	Scan(...any) error
 	Err() error
-}, cols []string, table, ts string, includeData bool, limit int) {
+}, cols []string, table, ts string, includeData bool, limit int, maskedSet map[string]bool) {
 	w.Header().Set("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s_%s.xlsx"`, table, ts))
 
@@ -280,7 +284,8 @@ func (h ExportHandler) exportXLSX(w http.ResponseWriter, r *http.Request, rows i
 			h.Logger.Warn("xlsx scan", plumelog.Fields{"error": err.Error()})
 			continue
 		}
-		for i, v := range vals {
+		maskedVals := maskRow(cols, vals, maskedSet)
+		for i, v := range maskedVals {
 			cell, _ := excelize.CoordinatesToCellName(i+1, rowIdx)
 			switch t := v.(type) {
 			case nil:

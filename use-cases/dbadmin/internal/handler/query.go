@@ -311,6 +311,8 @@ func (h QueryHandler) Execute(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		maskRowMaps(resultRows, maskedColumnSet(conn.MaskedColumns))
+
 		durationMs := time.Since(start).Milliseconds()
 		_ = h.recordHistory(connID, req.Database, originalSQL, durationMs, "")
 		h.logSlowQuery(connID, req.Database, originalSQL, durationMs)

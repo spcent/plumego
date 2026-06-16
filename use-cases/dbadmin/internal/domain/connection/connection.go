@@ -82,6 +82,7 @@ type Connection struct {
 	ESInsecureSkipTLS bool     `json:"es_insecure_skip_tls,omitempty"` // skip TLS verification
 
 	Readonly         bool      `json:"readonly,omitempty"`          // disallow all write operations
+	MaskedColumns    []string  `json:"masked_columns,omitempty"`    // column names (case-insensitive) masked in query/row results and exports
 	SavePassword     bool      `json:"save_password,omitempty"`     // persist password to disk
 	UploadedFile     bool      `json:"uploaded_file,omitempty"`     // file_path is a server-managed temp file
 	OriginalFilename string    `json:"original_filename,omitempty"` // user's original upload filename
