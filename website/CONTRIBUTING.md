@@ -79,12 +79,10 @@ The `slug` must match the file path relative to `src/content/docs/` and without 
 ## Running the content checkers
 
 ```bash
-pnpm check:docs-api   # verifies API symbols referenced in docs exist in the Go source
-pnpm check:css        # verifies CSS selectors are not broken
-pnpm check            # runs sync + both checks + Astro type-check
+pnpm check            # runs sync, content/API checks, translation-lag check, and Astro type-check
 ```
 
-The `prebuild` and `precheck` scripts run `pnpm sync` automatically. Run `pnpm sync` manually to regenerate facts after changing specs, README, or roadmap.
+The `dev`, `build`, and `check` scripts run `pnpm sync` automatically. Run `pnpm sync` manually to regenerate facts after changing specs, README, or roadmap.
 
 ---
 
