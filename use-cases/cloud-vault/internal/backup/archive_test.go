@@ -612,7 +612,7 @@ func TestService_ListBackups(t *testing.T) {
 
 	backupDir := filepath.Join(tmpDir, "backups")
 	repo := NewRepository(backupDir)
-	svc := NewService(repo, dbPath, "local", "", "", "1.0.0")
+	svc := NewService(repo, dbPath, "local", "", "", "1.0.0", nil)
 	ctx := context.Background()
 
 	// Initially empty.
@@ -654,7 +654,7 @@ func TestService_GetBackupPath(t *testing.T) {
 
 	backupDir := filepath.Join(tmpDir, "backups")
 	repo := NewRepository(backupDir)
-	svc := NewService(repo, dbPath, "local", "", "", "1.0.0")
+	svc := NewService(repo, dbPath, "local", "", "", "1.0.0", nil)
 	ctx := context.Background()
 
 	bk, err := svc.CreateBackup(ctx, false)
@@ -680,7 +680,7 @@ func TestService_GetBackupPath(t *testing.T) {
 // TestService_GetBackupPath_InvalidName verifies invalid name is rejected.
 func TestService_GetBackupPath_InvalidName(t *testing.T) {
 	repo := NewRepository(t.TempDir())
-	svc := NewService(repo, "", "", "", "", "1.0.0")
+	svc := NewService(repo, "", "", "", "", "1.0.0", nil)
 
 	_, err := svc.GetBackupPath("../evil.zip")
 	if err == nil {
@@ -699,7 +699,7 @@ func TestService_DeleteBackup(t *testing.T) {
 
 	backupDir := filepath.Join(tmpDir, "backups")
 	repo := NewRepository(backupDir)
-	svc := NewService(repo, dbPath, "local", "", "", "1.0.0")
+	svc := NewService(repo, dbPath, "local", "", "", "1.0.0", nil)
 	ctx := context.Background()
 
 	bk, err := svc.CreateBackup(ctx, false)
@@ -723,7 +723,7 @@ func TestService_DeleteBackup(t *testing.T) {
 // TestService_DeleteBackup_NotFound verifies error for nonexistent backup.
 func TestService_DeleteBackup_NotFound(t *testing.T) {
 	repo := NewRepository(t.TempDir())
-	svc := NewService(repo, "", "", "", "", "1.0.0")
+	svc := NewService(repo, "", "", "", "", "1.0.0", nil)
 	ctx := context.Background()
 
 	err := svc.DeleteBackup(ctx, "missing.zip")
@@ -743,7 +743,7 @@ func TestService_RestoreBackup_Integration(t *testing.T) {
 
 	backupDir := filepath.Join(tmpDir, "backups")
 	repo := NewRepository(backupDir)
-	svc := NewService(repo, dbPath, "local", "", "", "1.0.0")
+	svc := NewService(repo, dbPath, "local", "", "", "1.0.0", nil)
 	ctx := context.Background()
 
 	bk, err := svc.CreateBackup(ctx, false)

@@ -8,16 +8,33 @@ import (
 	"github.com/spcent/plumego/contract"
 	plumelog "github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/router"
+
+	"cloud-vault/internal/audit"
+	"cloud-vault/internal/auth"
 )
 
 // Handler handles HTTP requests for the tag resource.
 type Handler struct {
 	svc    *Service
 	logger plumelog.StructuredLogger
+	audit  *audit.Logger
 }
 
-func NewHandler(svc *Service, logger plumelog.StructuredLogger) *Handler {
-	return &Handler{svc: svc, logger: logger}
+func NewHandler(svc *Service, logger plumelog.StructuredLogger, auditLogger *audit.Logger) *Handler {
+	return &Handler{svc: svc, logger: logger, audit: auditLogger}
+}
+
+// logAudit records a tag mutation, using the authenticated user from the
+// request context as the actor. It never blocks or fails the request.
+func (h *Handler) logAudit(r *http.Request, action, tagID string, detail map[string]any) {
+	if h.audit == nil {
+		return
+	}
+	var actorID string
+	if u := auth.UserFromContext(r.Context()); u != nil {
+		actorID = u.ID
+	}
+	h.audit.Log(r.Context(), actorID, audit.ClientIP(r), action, audit.ResourceTag, tagID, detail)
 }
 
 // ListTags handles GET /api/v1/tags
@@ -41,6 +58,7 @@ func (h *Handler) CreateTag(w http.ResponseWriter, r *http.Request) {
 		h.writeErr(w, r, err)
 		return
 	}
+	h.logAudit(r, audit.ActionCreate, result.ID, map[string]any{"name": result.Name})
 	h.writeOK(w, r, http.StatusCreated, result)
 }
 
@@ -56,6 +74,7 @@ func (h *Handler) UpdateTag(w http.ResponseWriter, r *http.Request) {
 		h.writeErr(w, r, err)
 		return
 	}
+	h.logAudit(r, audit.ActionUpdate, id, nil)
 	h.writeOK(w, r, http.StatusOK, result)
 }
 
@@ -66,6 +85,7 @@ func (h *Handler) DeleteTag(w http.ResponseWriter, r *http.Request) {
 		h.writeErr(w, r, err)
 		return
 	}
+	h.logAudit(r, audit.ActionDelete, id, nil)
 	w.WriteHeader(http.StatusNoContent)
 }
 

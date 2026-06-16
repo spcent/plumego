@@ -20,6 +20,7 @@ var migrations = []migration{
 	{version: 6, up: migrate006},
 	{version: 7, up: migrate007},
 	{version: 8, up: migrate008},
+	{version: 9, up: migrate009},
 }
 
 // Migrate applies all pending migrations in ascending version order.
@@ -582,6 +583,26 @@ ALTER TABLE document_ai_summaries_new RENAME TO document_ai_summaries;
 -- Recreate index
 CREATE INDEX IF NOT EXISTS idx_document_ai_summaries_document_id
   ON document_ai_summaries(document_id);
+`)
+	return err
+}
+
+// migrate009 adds the audit_events table for data mutation audit logging.
+func migrate009(tx *sql.Tx) error {
+	_, err := tx.Exec(`
+CREATE TABLE IF NOT EXISTS audit_events (
+  id            TEXT PRIMARY KEY,
+  actor_id      TEXT,
+  actor_ip      TEXT,
+  action        TEXT NOT NULL,
+  resource_type TEXT NOT NULL,
+  resource_id   TEXT NOT NULL,
+  detail_json   TEXT,
+  created_at    TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_audit_events_resource   ON audit_events(resource_type, resource_id);
+CREATE INDEX IF NOT EXISTS idx_audit_events_actor      ON audit_events(actor_id);
+CREATE INDEX IF NOT EXISTS idx_audit_events_created_at ON audit_events(created_at DESC);
 `)
 	return err
 }

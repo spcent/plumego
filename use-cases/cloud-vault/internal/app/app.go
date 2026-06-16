@@ -11,6 +11,7 @@ import (
 	"github.com/spcent/plumego/core"
 	plumelog "github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/metrics"
+	"github.com/spcent/plumego/middleware"
 	"github.com/spcent/plumego/middleware/accesslog"
 	"github.com/spcent/plumego/middleware/bodylimit"
 	"github.com/spcent/plumego/middleware/cors"
@@ -21,6 +22,7 @@ import (
 	"github.com/spcent/plumego/middleware/timeout"
 
 	"cloud-vault/internal/ai"
+	"cloud-vault/internal/audit"
 	"cloud-vault/internal/auth"
 	"cloud-vault/internal/backup"
 	"cloud-vault/internal/collection"
@@ -29,6 +31,9 @@ import (
 	"cloud-vault/internal/diagnostics"
 	"cloud-vault/internal/document"
 	"cloud-vault/internal/importer"
+	"cloud-vault/internal/middleware/compress"
+	"cloud-vault/internal/middleware/csrf"
+	"cloud-vault/internal/middleware/ratelimit"
 	"cloud-vault/internal/organize"
 	"cloud-vault/internal/search"
 	"cloud-vault/internal/storage"
@@ -55,6 +60,7 @@ type App struct {
 	Backup         *backup.Handler
 	Update         *update.Handler
 	Diagnostics    *diagnostics.Handler
+	Audit          *audit.Handler
 	updateService  *update.Service
 	authService    *auth.Service
 	authMiddleware func(http.Handler) http.Handler
@@ -96,10 +102,10 @@ func New(cfg config.Config) (*App, error) {
 
 	maxBodyBytes := cfg.App.MaxUploadSizeMB * 1024 * 1024
 
-	if err := app.Use(
+	mwChain := []middleware.Middleware{
 		requestid.Middleware(),
 		securityMw,
-		cors.Middleware(cors.CORSOptions{}),
+		cors.Middleware(cors.CORSOptions{AllowedOrigins: cfg.CORS.AllowedOrigins}),
 		recoveryMw,
 		accesslogMw,
 		bodylimit.Middleware(bodylimit.Config{
@@ -107,10 +113,25 @@ func New(cfg config.Config) (*App, error) {
 			Logger:   app.Logger(),
 		}),
 		httpmetrics.Middleware(metrics.NewNoopCollector()),
+		compress.Middleware,
+		csrf.Middleware,
 		timeoutMw,
-	); err != nil {
+	}
+	if cfg.RateLimit.Enabled {
+		mwChain = append(mwChain, ratelimit.Middleware(ratelimit.Config{
+			RequestsPerSecond: cfg.RateLimit.RequestsPerSecond,
+			Burst:             cfg.RateLimit.Burst,
+		}))
+	}
+
+	if err := app.Use(mwChain...); err != nil {
 		return nil, fmt.Errorf("register middleware: %w", err)
 	}
+
+	// Audit logger (release hardening) — constructed early so resource
+	// handlers below can record mutation events.
+	auditLogger := audit.NewLogger(db.DB)
+	auditHandler := audit.NewHandler(auditLogger, app.Logger())
 
 	// Document handler.
 	docRepo := document.NewSQLiteRepository(db)
@@ -118,12 +139,12 @@ func New(cfg config.Config) (*App, error) {
 		Policy:     cfg.App.VersionPolicy,
 		KeepLatest: cfg.App.VersionKeepLatest,
 	})
-	docs := document.NewHandler(docSvc, app.Logger())
+	docs := document.NewHandler(docSvc, app.Logger(), auditLogger)
 
 	// Tag handler.
 	tagRepo := tag.NewSQLiteRepository(db)
 	tagSvc := tag.NewService(tagRepo)
-	tags := tag.NewHandler(tagSvc, app.Logger())
+	tags := tag.NewHandler(tagSvc, app.Logger(), auditLogger)
 
 	// Importer handler.
 	importRepo := importer.NewRepository(db)
@@ -159,7 +180,7 @@ func New(cfg config.Config) (*App, error) {
 	// Collection handler (V0.4).
 	collectionRepo := collection.NewRepository(db)
 	collectionSvc := collection.NewService(collectionRepo)
-	collectionHandler := collection.NewHandler(collectionSvc, app.Logger())
+	collectionHandler := collection.NewHandler(collectionSvc, app.Logger(), auditLogger)
 
 	// AI handler (V0.5).
 	aiRepo := ai.NewRepository(db.DB)
@@ -221,7 +242,11 @@ func New(cfg config.Config) (*App, error) {
 	// Backup handler (V0.8).
 	backupDir := filepath.Join(filepath.Dir(cfg.DB.Path), "backups")
 	backupRepo := backup.NewRepository(backupDir)
-	backupSvc := backup.NewService(backupRepo, cfg.DB.Path, cfg.Storage.Provider, cfg.Local.Root, "", cfg.App.Version)
+	var backupEncryptionKey []byte
+	if cfg.Backup.EncryptionEnabled {
+		backupEncryptionKey = backup.DeriveEncryptionKey(cfg.Backup.EncryptionKey)
+	}
+	backupSvc := backup.NewService(backupRepo, cfg.DB.Path, cfg.Storage.Provider, cfg.Local.Root, "", cfg.App.Version, backupEncryptionKey)
 	backupHandler := backup.NewHandler(backupSvc, filepath.Dir(cfg.DB.Path), app.Logger())
 
 	// Update handler (V1.0).
@@ -263,6 +288,7 @@ func New(cfg config.Config) (*App, error) {
 		Backup:         backupHandler,
 		Update:         updateHandler,
 		Diagnostics:    diagnosticsHandler,
+		Audit:          auditHandler,
 		updateService:  updateSvc,
 		authService:    authService,
 		authMiddleware: authMiddleware,

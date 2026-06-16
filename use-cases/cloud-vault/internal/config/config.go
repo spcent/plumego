@@ -12,19 +12,44 @@ import (
 
 // Config holds all application configuration.
 type Config struct {
-	Core     core.AppConfig
-	App      AppConfig
-	DB       DBConfig
-	Storage  StorageConfig
-	Local    LocalConfig
-	Qiniu    QiniuConfig
-	Import   ImportConfig
-	Search   SearchConfig
-	Organize OrganizeConfig
-	AI       AIConfig
-	Auth     AuthConfig
-	Desktop  DesktopConfig
-	Update   UpdateConfig
+	Core      core.AppConfig
+	App       AppConfig
+	DB        DBConfig
+	Storage   StorageConfig
+	Local     LocalConfig
+	Qiniu     QiniuConfig
+	Import    ImportConfig
+	Search    SearchConfig
+	Organize  OrganizeConfig
+	AI        AIConfig
+	Auth      AuthConfig
+	Desktop   DesktopConfig
+	Update    UpdateConfig
+	CORS      CORSConfig
+	RateLimit RateLimitConfig
+	Backup    BackupConfig
+}
+
+// CORSConfig controls cross-origin request handling.
+type CORSConfig struct {
+	// AllowedOrigins lists exact origins allowed for cross-origin requests.
+	// Use ["*"] for development only. Empty means same-origin only (most restrictive).
+	AllowedOrigins []string
+}
+
+// RateLimitConfig controls the global per-IP rate limiter.
+type RateLimitConfig struct {
+	Enabled           bool
+	RequestsPerSecond float64
+	Burst             int
+}
+
+// BackupConfig controls V0.8 backup behaviour.
+type BackupConfig struct {
+	EncryptionEnabled bool
+	// EncryptionKey must be at least 32 characters when encryption is enabled.
+	// Only the first 32 bytes are used as the AES-256 key.
+	EncryptionKey string
 }
 
 // AppConfig holds app-local configuration.
@@ -150,17 +175,35 @@ type AuthConfig struct {
 
 // tomlConfig mirrors Config for TOML deserialization with struct tags.
 type tomlConfig struct {
-	Server   tomlServer   `toml:"server"`
-	App      tomlApp      `toml:"app"`
-	Database tomlDB       `toml:"database"`
-	Storage  tomlStorage  `toml:"storage"`
-	Import   tomlImport   `toml:"import"`
-	Search   tomlSearch   `toml:"search"`
-	Organize tomlOrganize `toml:"organize"`
-	AI       tomlAI       `toml:"ai"`
-	Auth     tomlAuth     `toml:"auth"`
-	Desktop  tomlDesktop  `toml:"desktop"`
-	Update   tomlUpdate   `toml:"update"`
+	Server    tomlServer    `toml:"server"`
+	App       tomlApp       `toml:"app"`
+	Database  tomlDB        `toml:"database"`
+	Storage   tomlStorage   `toml:"storage"`
+	Import    tomlImport    `toml:"import"`
+	Search    tomlSearch    `toml:"search"`
+	Organize  tomlOrganize  `toml:"organize"`
+	AI        tomlAI        `toml:"ai"`
+	Auth      tomlAuth      `toml:"auth"`
+	Desktop   tomlDesktop   `toml:"desktop"`
+	Update    tomlUpdate    `toml:"update"`
+	CORS      tomlCORS      `toml:"cors"`
+	RateLimit tomlRateLimit `toml:"rate_limit"`
+	Backup    tomlBackup    `toml:"backup"`
+}
+
+type tomlCORS struct {
+	AllowedOrigins []string `toml:"allowed_origins"`
+}
+
+type tomlRateLimit struct {
+	Enabled           bool    `toml:"enabled"`
+	RequestsPerSecond float64 `toml:"requests_per_second"`
+	Burst             int     `toml:"burst"`
+}
+
+type tomlBackup struct {
+	EncryptionEnabled bool   `toml:"encryption_enabled"`
+	EncryptionKey     string `toml:"encryption_key"`
 }
 
 type tomlServer struct {
@@ -367,6 +410,17 @@ func Defaults() Config {
 			UpdateURL:        "",
 			CheckIntervalMin: 1440, // 24 hours
 			Channel:          "stable",
+		},
+		CORS: CORSConfig{
+			AllowedOrigins: []string{},
+		},
+		RateLimit: RateLimitConfig{
+			Enabled:           true,
+			RequestsPerSecond: 60,
+			Burst:             120,
+		},
+		Backup: BackupConfig{
+			EncryptionEnabled: false,
 		},
 	}
 }
@@ -617,6 +671,26 @@ func applyTOML(cfg *Config, tc *tomlConfig) {
 	if tc.Update.Channel != "" {
 		cfg.Update.Channel = tc.Update.Channel
 	}
+
+	// CORS
+	if len(tc.CORS.AllowedOrigins) > 0 {
+		cfg.CORS.AllowedOrigins = tc.CORS.AllowedOrigins
+	}
+
+	// RateLimit
+	cfg.RateLimit.Enabled = tc.RateLimit.Enabled
+	if tc.RateLimit.RequestsPerSecond > 0 {
+		cfg.RateLimit.RequestsPerSecond = tc.RateLimit.RequestsPerSecond
+	}
+	if tc.RateLimit.Burst > 0 {
+		cfg.RateLimit.Burst = tc.RateLimit.Burst
+	}
+
+	// Backup
+	cfg.Backup.EncryptionEnabled = tc.Backup.EncryptionEnabled
+	if tc.Backup.EncryptionKey != "" {
+		cfg.Backup.EncryptionKey = tc.Backup.EncryptionKey
+	}
 }
 
 // Validate returns an error if cfg is unusable.
@@ -758,6 +832,24 @@ func applyEnvOverrides(cfg *Config, lookupEnv func(string) (string, bool)) {
 	str("UPDATE_URL", &cfg.Update.UpdateURL)
 	intf("UPDATE_CHECK_INTERVAL_MIN", &cfg.Update.CheckIntervalMin)
 	str("UPDATE_CHANNEL", &cfg.Update.Channel)
+
+	// CORS: comma-separated list of allowed origins
+	if v, ok := lookupEnv("CORS_ALLOWED_ORIGINS"); ok && strings.TrimSpace(v) != "" {
+		cfg.CORS.AllowedOrigins = splitAndTrim(v, ",")
+	}
+
+	// Rate limit
+	boolf("RATE_LIMIT_ENABLED", &cfg.RateLimit.Enabled)
+	if v, ok := lookupEnv("RATE_LIMIT_RPS"); ok {
+		if f, err := parseFloat64(strings.TrimSpace(v)); err == nil && f > 0 {
+			cfg.RateLimit.RequestsPerSecond = f
+		}
+	}
+	intf("RATE_LIMIT_BURST", &cfg.RateLimit.Burst)
+
+	// Backup encryption
+	boolf("BACKUP_ENCRYPTION_ENABLED", &cfg.Backup.EncryptionEnabled)
+	str("BACKUP_ENCRYPTION_KEY", &cfg.Backup.EncryptionKey)
 }
 
 func applyFlags(cfg *Config, args []string) error {
@@ -876,4 +968,52 @@ func parseBool(s string) (bool, error) {
 	default:
 		return false, fmt.Errorf("invalid bool: %q", s)
 	}
+}
+
+// parseFloat64 parses a float64 from a string.
+func parseFloat64(s string) (float64, error) {
+	if s == "" {
+		return 0, fmt.Errorf("empty string")
+	}
+	var result float64
+	neg := false
+	hasDot := false
+	fraction := 0.1
+	i := 0
+	if s[0] == '-' {
+		neg = true
+		i = 1
+	}
+	for ; i < len(s); i++ {
+		c := s[i]
+		if c == '.' && !hasDot {
+			hasDot = true
+			continue
+		}
+		if c < '0' || c > '9' {
+			return 0, fmt.Errorf("invalid float64: %q", s)
+		}
+		if hasDot {
+			result += float64(c-'0') * fraction
+			fraction *= 0.1
+		} else {
+			result = result*10 + float64(c-'0')
+		}
+	}
+	if neg {
+		result = -result
+	}
+	return result, nil
+}
+
+// splitAndTrim splits s by sep, trims whitespace, and drops empty parts.
+func splitAndTrim(s, sep string) []string {
+	parts := strings.Split(s, sep)
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if t := strings.TrimSpace(p); t != "" {
+			out = append(out, t)
+		}
+	}
+	return out
 }

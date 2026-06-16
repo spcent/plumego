@@ -27,9 +27,7 @@ func checkDatabase(ctx context.Context, db *sql.DB) string {
 }
 
 func checkStorage(ctx context.Context, store storage.ObjectStorage) string {
-	// Probe with a key that should not exist; error on Exists itself = problem.
-	_, err := store.Exists(ctx, ".health-probe")
-	if err != nil {
+	if err := store.Ping(ctx); err != nil {
 		return StatusWarning
 	}
 	return StatusOK

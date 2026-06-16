@@ -2,6 +2,11 @@ package backup
 
 import (
 	"archive/zip"
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/pbkdf2"
+	"crypto/rand"
+	"crypto/sha256"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -13,6 +18,27 @@ import (
 	_ "modernc.org/sqlite"
 )
 
+// pbkdf2Salt is a fixed, application-specific salt for backup encryption key
+// derivation. It is not a secret; it exists only to avoid using a bare hash
+// of the passphrase as the AES key (e.g. against rainbow-table-style attacks
+// on the passphrase itself), and to keep DeriveEncryptionKey deterministic
+// across encrypt/decrypt without needing to persist a per-backup salt.
+var pbkdf2Salt = []byte("cloud-vault-backup-encryption-v1")
+
+const pbkdf2Iterations = 600_000
+
+// DeriveEncryptionKey derives a fixed 32-byte AES-256 key from passphrase
+// using PBKDF2-HMAC-SHA256, regardless of the input string's length.
+func DeriveEncryptionKey(passphrase string) []byte {
+	key, err := pbkdf2.Key(sha256.New, passphrase, pbkdf2Salt, pbkdf2Iterations, 32)
+	if err != nil {
+		// Only fails for invalid key-length/iteration arguments, which are
+		// fixed constants above, so this is unreachable.
+		panic(fmt.Sprintf("derive encryption key: %v", err))
+	}
+	return key
+}
+
 // ArchiveOptions configures backup archive creation.
 type ArchiveOptions struct {
 	BackupPath      string
@@ -22,6 +48,8 @@ type ArchiveOptions struct {
 	IncludeConfig   bool
 	ConfigPath      string // path to config.toml
 	AppVersion      string
+	// EncryptionKey enables AES-256-GCM encryption when set (must be exactly 32 bytes).
+	EncryptionKey []byte
 }
 
 // CreateArchive creates a backup zip archive.
@@ -101,7 +129,64 @@ func CreateArchive(opts ArchiveOptions) (*BackupManifest, error) {
 		return nil, fmt.Errorf("write manifest: %w", err)
 	}
 
+	// Optionally encrypt the backup in-place.
+	if len(opts.EncryptionKey) > 0 {
+		if err := encryptFile(opts.BackupPath, opts.EncryptionKey); err != nil {
+			return nil, fmt.Errorf("encrypt backup: %w", err)
+		}
+		manifest.Encrypted = true
+	}
+
 	return manifest, nil
+}
+
+// encryptFile encrypts a file in-place using AES-256-GCM.
+// The encrypted format is: 12-byte nonce || GCM ciphertext.
+func encryptFile(path string, key []byte) error {
+	plaintext, err := os.ReadFile(path)
+	if err != nil {
+		return fmt.Errorf("read file: %w", err)
+	}
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return fmt.Errorf("create cipher: %w", err)
+	}
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return fmt.Errorf("create GCM: %w", err)
+	}
+	nonce := make([]byte, gcm.NonceSize())
+	if _, err := rand.Read(nonce); err != nil {
+		return fmt.Errorf("generate nonce: %w", err)
+	}
+	ciphertext := gcm.Seal(nonce, nonce, plaintext, nil)
+	return os.WriteFile(path, ciphertext, 0600)
+}
+
+// DecryptBackup decrypts a backup file previously encrypted with encryptFile.
+// key must be exactly 32 bytes (AES-256). The decrypted ZIP is written to dst.
+func DecryptBackup(src, dst string, key []byte) error {
+	data, err := os.ReadFile(src)
+	if err != nil {
+		return fmt.Errorf("read encrypted backup: %w", err)
+	}
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return fmt.Errorf("create cipher: %w", err)
+	}
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return fmt.Errorf("create GCM: %w", err)
+	}
+	if len(data) < gcm.NonceSize() {
+		return fmt.Errorf("encrypted backup too short")
+	}
+	nonce, ciphertext := data[:gcm.NonceSize()], data[gcm.NonceSize():]
+	plaintext, err := gcm.Open(nil, nonce, ciphertext, nil)
+	if err != nil {
+		return fmt.Errorf("decrypt backup: wrong key or corrupted data")
+	}
+	return os.WriteFile(dst, plaintext, 0600)
 }
 
 // createDatabaseSnapshot creates a consistent snapshot of the SQLite database.

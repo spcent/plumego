@@ -9,6 +9,7 @@ const STATUS_FILTERS = [
   { value: 'running', label: 'Running' },
   { value: 'completed', label: 'Completed' },
   { value: 'failed', label: 'Failed' },
+  { value: 'dead_letter', label: 'Dead Letter' },
 ] as const
 
 const TYPE_LABELS: Record<string, string> = {
@@ -22,7 +23,7 @@ function taskTone(status: string): 'neutral' | 'accent' | 'success' | 'warning' 
   if (status === 'pending') return 'warning'
   if (status === 'running') return 'accent'
   if (status === 'completed') return 'success'
-  if (status === 'failed') return 'danger'
+  if (status === 'failed' || status === 'dead_letter') return 'danger'
   return 'neutral'
 }
 

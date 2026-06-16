@@ -36,11 +36,21 @@ func ValidateConfig(cfg Config) error {
 	validateStorage(cfg, v)
 	validateAuth(cfg, v)
 	validateAI(cfg, v)
+	validateBackup(cfg, v)
 
 	if len(v.Errors) > 0 {
 		return v
 	}
 	return nil
+}
+
+func validateBackup(cfg Config, v *ValidationError) {
+	if !cfg.Backup.EncryptionEnabled {
+		return
+	}
+	key := strings.TrimSpace(cfg.Backup.EncryptionKey)
+	v.add(key == "", "backup.encryption_key is required when backup.encryption_enabled=true")
+	v.add(key != "" && len(key) < 32, "backup.encryption_key must be at least 32 characters")
 }
 
 func validateServer(cfg Config, v *ValidationError) {
@@ -151,6 +161,12 @@ func Warnings(cfg Config) []string {
 	var w []string
 	if cfg.Auth.Enabled && !cfg.Auth.SecureCookie {
 		w = append(w, "secure_cookie=false is only recommended for local development; set secure_cookie=true behind HTTPS")
+	}
+	if cfg.Auth.Enabled && len(cfg.CORS.AllowedOrigins) == 0 {
+		w = append(w, "CORS allowed origins not configured; defaulting to same-origin only (set CORS_ALLOWED_ORIGINS or cors.allowed_origins in config.toml)")
+	}
+	if !cfg.Backup.EncryptionEnabled {
+		w = append(w, "backup encryption is disabled; backup ZIP files contain plaintext data (set backup.encryption_enabled=true and backup.encryption_key)")
 	}
 	return w
 }

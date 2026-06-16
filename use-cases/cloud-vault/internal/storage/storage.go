@@ -15,4 +15,6 @@ type ObjectStorage interface {
 	Get(ctx context.Context, key string) (io.ReadCloser, error)
 	Delete(ctx context.Context, key string) error
 	Exists(ctx context.Context, key string) (bool, error)
+	// Ping verifies connectivity to the storage backend.
+	Ping(ctx context.Context) error
 }

@@ -8,17 +8,34 @@ import (
 	"github.com/spcent/plumego/contract"
 	plumelog "github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/router"
+
+	"cloud-vault/internal/audit"
+	"cloud-vault/internal/auth"
 )
 
 // Handler exposes collection HTTP endpoints.
 type Handler struct {
 	svc    *Service
 	logger plumelog.StructuredLogger
+	audit  *audit.Logger
 }
 
 // NewHandler constructs a Handler.
-func NewHandler(svc *Service, logger plumelog.StructuredLogger) *Handler {
-	return &Handler{svc: svc, logger: logger}
+func NewHandler(svc *Service, logger plumelog.StructuredLogger, auditLogger *audit.Logger) *Handler {
+	return &Handler{svc: svc, logger: logger, audit: auditLogger}
+}
+
+// logAudit records a collection mutation, using the authenticated user from
+// the request context as the actor. It never blocks or fails the request.
+func (h *Handler) logAudit(r *http.Request, action, collectionID string, detail map[string]any) {
+	if h.audit == nil {
+		return
+	}
+	var actorID string
+	if u := auth.UserFromContext(r.Context()); u != nil {
+		actorID = u.ID
+	}
+	h.audit.Log(r.Context(), actorID, audit.ClientIP(r), action, audit.ResourceCollection, collectionID, detail)
 }
 
 // List handles GET /api/v1/collections
@@ -42,6 +59,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		h.badRequest(w, r, err.Error())
 		return
 	}
+	h.logAudit(r, audit.ActionCreate, c.ID, map[string]any{"name": c.Name})
 	h.ok(w, r, http.StatusCreated, c)
 }
 
@@ -72,6 +90,7 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 		h.badRequest(w, r, err.Error())
 		return
 	}
+	h.logAudit(r, audit.ActionUpdate, id, nil)
 	h.ok(w, r, http.StatusOK, c)
 }
 
@@ -82,6 +101,7 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 		h.handleErr(w, r, err)
 		return
 	}
+	h.logAudit(r, audit.ActionDelete, id, nil)
 	w.WriteHeader(http.StatusNoContent)
 }
 

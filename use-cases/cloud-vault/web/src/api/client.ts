@@ -26,7 +26,11 @@ function shouldRedirectToLogin(path: string, status: number) {
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(path, {
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Requested-With': 'XMLHttpRequest',
+      ...options?.headers,
+    },
     ...options,
   })
 

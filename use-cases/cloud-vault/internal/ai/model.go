@@ -10,11 +10,12 @@ const (
 
 // Task status constants.
 const (
-	TaskStatusPending   = "pending"
-	TaskStatusRunning   = "running"
-	TaskStatusCompleted = "completed"
-	TaskStatusFailed    = "failed"
-	TaskStatusCancelled = "cancelled"
+	TaskStatusPending    = "pending"
+	TaskStatusRunning    = "running"
+	TaskStatusCompleted  = "completed"
+	TaskStatusFailed     = "failed"
+	TaskStatusCancelled  = "cancelled"
+	TaskStatusDeadLetter = "dead_letter"
 )
 
 // AITask represents a queued or completed AI job.

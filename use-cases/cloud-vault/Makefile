@@ -1,6 +1,6 @@
 WAILS_BIN ?= $(shell command -v wails 2>/dev/null || printf "%s/bin/wails" "$$(go env GOPATH)")
 
-.PHONY: dev web-dev web-build server-build server-build-v1 desktop-assets desktop-dev desktop-build desktop-package desktop-clean build run clean tidy test test-go test-web test-e2e doctor bench release release-v1 release-v1-test restore backup
+.PHONY: dev web-dev web-build server-build server-build-v1 desktop-assets desktop-dev desktop-build desktop-package desktop-clean build run clean tidy test test-go test-web test-e2e doctor bench release release-v1 release-v1-test restore backup vuln
 
 # Run the frontend Vite dev server (proxies API to :8080)
 dev:
@@ -109,5 +109,10 @@ backup:
 
 # Print restore usage
 restore:
-	@echo "Usage: ./bin/markdown-vault restore --file <backup.zip> --data-dir ./data"
-	@echo "Or:    go run ./cmd/server restore --file <backup.zip> --data-dir ./data"
+	@echo "Usage: ./bin/markdown-vault restore --file <backup.zip> --data-dir ./data [--key <encryption-key>]"
+	@echo "Or:    go run ./cmd/server restore --file <backup.zip> --data-dir ./data [--key <encryption-key>]"
+
+# Scan Go dependencies for known vulnerabilities (installs govulncheck if missing)
+vuln:
+	@command -v govulncheck >/dev/null 2>&1 || go install golang.org/x/vuln/cmd/govulncheck@latest
+	govulncheck ./...

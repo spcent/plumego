@@ -13,10 +13,13 @@ type Service struct {
 	storageRoot     string
 	configPath      string
 	appVersion      string
+	encryptionKey   []byte // nil means no encryption
 }
 
 // NewService creates a new backup service.
-func NewService(repo *Repository, databasePath, storageProvider, storageRoot, configPath, appVersion string) *Service {
+// encryptionKey is optional; when non-nil, backups are AES-256-GCM encrypted.
+// The caller is responsible for ensuring it is exactly 32 bytes.
+func NewService(repo *Repository, databasePath, storageProvider, storageRoot, configPath, appVersion string, encryptionKey []byte) *Service {
 	return &Service{
 		repo:            repo,
 		databasePath:    databasePath,
@@ -24,6 +27,7 @@ func NewService(repo *Repository, databasePath, storageProvider, storageRoot, co
 		storageRoot:     storageRoot,
 		configPath:      configPath,
 		appVersion:      appVersion,
+		encryptionKey:   encryptionKey,
 	}
 }
 
@@ -44,6 +48,7 @@ func (s *Service) CreateBackup(ctx context.Context, includeConfig bool) (*Backup
 		IncludeConfig:   includeConfig,
 		ConfigPath:      s.configPath,
 		AppVersion:      s.appVersion,
+		EncryptionKey:   s.encryptionKey,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("create backup: %w", err)
@@ -111,7 +116,8 @@ func (s *Service) RestoreBackup(ctx context.Context, name string, dataDir string
 
 	backupPath := s.repo.Path(name)
 	return Restore(RestoreOptions{
-		BackupPath: backupPath,
-		DataDir:    dataDir,
+		BackupPath:    backupPath,
+		DataDir:       dataDir,
+		EncryptionKey: s.encryptionKey,
 	})
 }

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/qiniu/go-sdk/v7/auth"
@@ -113,4 +114,19 @@ func (s *QiniuStorage) Exists(_ context.Context, key string) (bool, error) {
 		return false, nil
 	}
 	return true, nil
+}
+
+// Ping verifies connectivity to the Qiniu bucket. A "not found" response (612)
+// means the bucket is reachable; any other error indicates a connectivity problem.
+func (s *QiniuStorage) Ping(_ context.Context) error {
+	manager := qstorage.NewBucketManager(s.mac, s.qcfg)
+	_, err := manager.Stat(s.config.Bucket, ".ping-probe")
+	if err == nil {
+		return nil
+	}
+	// Qiniu returns error code 612 for "not found" — that means the bucket is accessible.
+	if strings.Contains(err.Error(), "612") || strings.Contains(err.Error(), "no such file") {
+		return nil
+	}
+	return fmt.Errorf("qiniu connectivity check: %w", err)
 }

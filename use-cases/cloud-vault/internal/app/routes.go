@@ -154,6 +154,9 @@ func (a *App) RegisterRoutes() error {
 	v1.delete("/system/backups/:name", a.requireAuth(http.HandlerFunc(a.Backup.DeleteBackup)))
 	v1.post("/system/restore", a.requireAuth(http.HandlerFunc(a.Backup.RestoreBackup)))
 
+	// Audit log (protected, read-only).
+	v1.get("/audit", a.requireAuth(http.HandlerFunc(a.Audit.List)))
+
 	// V0.5: AI — static sub-paths before :id to avoid ambiguity (protected).
 	v1.post("/ai/tasks/summary", a.requireAuth(http.HandlerFunc(a.AI.EnqueueSummary)))
 	v1.post("/ai/tasks/qa", a.requireAuth(http.HandlerFunc(a.AI.EnqueueQA)))

@@ -43,9 +43,9 @@ func printUsage() {
 	fmt.Printf(`Cloud Vault %s
 
 Usage:
-  cloud-vault                          Start the server
-  cloud-vault restore --file <zip>     Restore from backup
-  cloud-vault help                     Show this help
+  cloud-vault                                       Start the server
+  cloud-vault restore --file <zip> [--key <key>]    Restore from backup
+  cloud-vault help                                  Show this help
 
 `, version.Version)
 }
@@ -58,7 +58,7 @@ func printVersion() {
 }
 
 func runRestore() error {
-	var file, dataDir string
+	var file, dataDir, key string
 	for i := 2; i < len(os.Args); i++ {
 		switch os.Args[i] {
 		case "--file", "-f":
@@ -71,6 +71,11 @@ func runRestore() error {
 				dataDir = os.Args[i+1]
 				i++
 			}
+		case "--key", "-k":
+			if i+1 < len(os.Args) {
+				key = os.Args[i+1]
+				i++
+			}
 		}
 	}
 
@@ -80,8 +85,16 @@ func runRestore() error {
 	if dataDir == "" {
 		dataDir = "./data"
 	}
+	if key == "" {
+		key = os.Getenv("BACKUP_ENCRYPTION_KEY")
+	}
 
-	return backup.RestoreCLI(file, dataDir)
+	var encryptionKey []byte
+	if key != "" {
+		encryptionKey = backup.DeriveEncryptionKey(key)
+	}
+
+	return backup.RestoreCLI(file, dataDir, encryptionKey)
 }
 
 func run() error {

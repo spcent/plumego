@@ -202,7 +202,7 @@ func TestService_CreateBackup(t *testing.T) {
 
 	backupDir := filepath.Join(tmpDir, "backups")
 	repo := NewRepository(backupDir)
-	svc := NewService(repo, dbPath, "local", objectsDir, "", "0.8.0")
+	svc := NewService(repo, dbPath, "local", objectsDir, "", "0.8.0", nil)
 
 	ctx := context.Background()
 	backup, err := svc.CreateBackup(ctx, false)
