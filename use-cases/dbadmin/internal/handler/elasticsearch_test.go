@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 )
 
@@ -56,6 +57,93 @@ func TestValidateIndexName_tooLong(t *testing.T) {
 	}
 	if err := validateIndexName(long, false); err == nil {
 		t.Errorf("validateIndexName should error for name > 255 chars")
+	}
+}
+
+// --- validateESIndexName ---
+
+func TestValidateESIndexName_valid(t *testing.T) {
+	valid := []string{
+		"my-index",
+		"logs-2024",
+		"user_data",
+		"products",
+		"a",
+	}
+	for _, name := range valid {
+		if err := validateESIndexName(name); err != nil {
+			t.Errorf("validateESIndexName(%q) error=%v, want nil", name, err)
+		}
+	}
+}
+
+func TestValidateESIndexName_invalid(t *testing.T) {
+	cases := []struct {
+		name   string
+		reason string
+	}{
+		{"", "empty name"},
+		{"Logs", "uppercase"},
+		{"-logs", "starts with dash"},
+		{"_logs", "starts with underscore"},
+		{"+logs", "starts with plus"},
+		{"my index", "contains space"},
+		{"my..index", "contains double dots"},
+		{"my/index", "contains slash"},
+		{"my*index", "contains wildcard"},
+		{"my:index", "contains colon"},
+	}
+	for _, c := range cases {
+		if err := validateESIndexName(c.name); err == nil {
+			t.Errorf("validateESIndexName(%q) should error for %s", c.name, c.reason)
+		}
+	}
+}
+
+func TestValidateESIndexName_tooLong(t *testing.T) {
+	long := strings.Repeat("a", 256)
+	if err := validateESIndexName(long); err == nil {
+		t.Errorf("validateESIndexName should error for name > 255 chars")
+	}
+}
+
+// --- buildCreateIndexBody ---
+
+func TestBuildCreateIndexBody_empty(t *testing.T) {
+	body, err := buildCreateIndexBody("", "")
+	if err != nil {
+		t.Fatalf("buildCreateIndexBody error=%v, want nil", err)
+	}
+	if body != nil {
+		t.Errorf("buildCreateIndexBody(\"\", \"\")=%s, want nil", body)
+	}
+}
+
+func TestBuildCreateIndexBody_settingsAndMappings(t *testing.T) {
+	settings := `{"number_of_shards": 1}`
+	mappings := `{"properties": {"name": {"type": "keyword"}}}`
+	body, err := buildCreateIndexBody(settings, mappings)
+	if err != nil {
+		t.Fatalf("buildCreateIndexBody error=%v, want nil", err)
+	}
+	var decoded map[string]any
+	if err := json.Unmarshal(body, &decoded); err != nil {
+		t.Fatalf("json.Unmarshal error=%v", err)
+	}
+	if _, ok := decoded["settings"]; !ok {
+		t.Errorf("expected settings key in body")
+	}
+	if _, ok := decoded["mappings"]; !ok {
+		t.Errorf("expected mappings key in body")
+	}
+}
+
+func TestBuildCreateIndexBody_invalidJSON(t *testing.T) {
+	if _, err := buildCreateIndexBody("{invalid", ""); err == nil {
+		t.Errorf("buildCreateIndexBody should error for invalid settings JSON")
+	}
+	if _, err := buildCreateIndexBody("", "{invalid"); err == nil {
+		t.Errorf("buildCreateIndexBody should error for invalid mappings JSON")
 	}
 }
 
