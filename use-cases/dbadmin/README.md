@@ -20,9 +20,9 @@ As a Plumego use-case app, dbadmin demonstrates how to build a production-scale 
 | **MySQL** | Browse tables, execute queries, view/edit rows, DDL operations, import/export | ✅ Stable |
 | **PostgreSQL** | Browse schemas/tables, execute queries, view/edit rows, DDL (CREATE/ALTER/DROP TABLE), import/export | ✅ Stable |
 | **SQLite** | All MySQL features + file upload/download, schema inspection | ✅ Stable |
-| **Redis** | Browse keys by type, execute commands, command history, TTL management, batch operations | ✅ Stable |
-| **MongoDB** | Browse collections, query with filters, aggregation pipelines, explain plans | ✅ Stable |
-| **Elasticsearch** | Browse indices, DSL queries, document CRUD, import/export, cluster health, mappings | ✅ Stable |
+| **Redis** | Browse keys by type, execute commands, command history, TTL management, batch operations, standalone/Cluster/Sentinel modes | ✅ Stable |
+| **MongoDB** | Browse collections, query with filters, aggregation pipelines, explain plans, collection and index management | ✅ Stable |
+| **Elasticsearch** | Browse indices, DSL queries, document CRUD, import/export, cluster health, mappings, index and index-template management | ✅ Stable |
 
 ## Features
 
@@ -33,6 +33,9 @@ As a Plumego use-case app, dbadmin demonstrates how to build a production-scale 
 - **Data Manipulation**: View, edit, insert, delete with confirmation dialogs for dangerous operations
 - **Import/Export**: CSV, JSON, SQL dump formats for data migration
 - **Schema Inspection**: View table structure, indexes, foreign keys, mappings
+- **MongoDB Collection/Index Management**: Create and drop collections and indexes (compound, unique, sparse) per connection
+- **Elasticsearch Index/Template Management**: Create and delete indices and index templates, with configurable settings and mappings
+- **Redis Cluster & Sentinel**: Configure a connection for standalone, Cluster, or Sentinel-backed failover topologies
 - **Operational Diagnostics**: Health, readiness, runtime, and connection-pool endpoints for local troubleshooting
 - **Prometheus Metrics**: `/metrics` endpoint exposing HTTP request counts, latency histograms, and uptime in Prometheus text exposition format
 - **Admin Controls**: Active operation cancellation, connection runtime closing, audit events, and multi-user `admin`/`readonly` roles
