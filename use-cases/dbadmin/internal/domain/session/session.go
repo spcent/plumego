@@ -2,11 +2,13 @@
 package session
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	kvstore "github.com/spcent/plumego/store/kv"
@@ -82,6 +84,49 @@ func (s *Store) Delete(token string) error {
 		return fmt.Errorf("delete session: %w", err)
 	}
 	return nil
+}
+
+// ListByUser returns all session tokens belonging to user.
+func (s *Store) ListByUser(user string) ([]string, error) {
+	keys, err := s.kv.KeysContext(context.Background())
+	if err != nil {
+		return nil, fmt.Errorf("list session keys: %w", err)
+	}
+	tokens := make([]string, 0)
+	for _, key := range keys {
+		if !strings.HasPrefix(key, tokenKeyPrefix) {
+			continue
+		}
+		token := strings.TrimPrefix(key, tokenKeyPrefix)
+		sess, err := s.Get(token)
+		if err != nil {
+			if errors.Is(err, ErrNotFound) {
+				continue
+			}
+			return nil, err
+		}
+		if sess.User == user {
+			tokens = append(tokens, token)
+		}
+	}
+	return tokens, nil
+}
+
+// DeleteAllByUser deletes all sessions belonging to user and returns the
+// number of sessions deleted.
+func (s *Store) DeleteAllByUser(user string) (int, error) {
+	tokens, err := s.ListByUser(user)
+	if err != nil {
+		return 0, err
+	}
+	deleted := 0
+	for _, token := range tokens {
+		if err := s.Delete(token); err != nil {
+			return deleted, err
+		}
+		deleted++
+	}
+	return deleted, nil
 }
 
 func generateToken() (string, error) {
