@@ -29,6 +29,7 @@ import (
 	"dbadmin/internal/domain/connection"
 	"dbadmin/internal/domain/eshistory"
 	"dbadmin/internal/domain/history"
+	"dbadmin/internal/domain/mfa"
 	"dbadmin/internal/domain/mongohistory"
 	"dbadmin/internal/domain/redishistory"
 	"dbadmin/internal/domain/session"
@@ -43,6 +44,7 @@ type App struct {
 	Core              *core.App
 	Cfg               config.Config
 	SessionStore      *session.Store
+	MFAStore          *mfa.Store
 	ConnectionStore   *connection.Store
 	HistoryStore      *history.Store
 	MongoHistoryStore *mongohistory.Store
@@ -74,6 +76,13 @@ func New(cfg config.Config) (*App, error) {
 	})
 	if err != nil {
 		return nil, fmt.Errorf("create session KV store: %w", err)
+	}
+
+	mfaKV, err := kvstore.NewKVStore(kvstore.Options{
+		DataDir: cfg.App.DataDir + "/mfa",
+	})
+	if err != nil {
+		return nil, fmt.Errorf("create mfa KV store: %w", err)
 	}
 
 	connKV, err := kvstore.NewKVStore(kvstore.Options{
@@ -168,6 +177,7 @@ func New(cfg config.Config) (*App, error) {
 		Core:              coreApp,
 		Cfg:               cfg,
 		SessionStore:      session.NewStore(sessKV, cfg.App.SessionTTL),
+		MFAStore:          mfa.NewStore(mfaKV),
 		ConnectionStore:   connStore,
 		HistoryStore:      history.NewStore(histKV),
 		MongoHistoryStore: mongohistory.NewStore(mongoHistKV),

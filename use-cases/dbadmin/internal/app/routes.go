@@ -59,6 +59,7 @@ func (a *App) RegisterRoutes() error {
 		Users:         a.Users,
 		SessionTTL:    a.Cfg.App.SessionTTL,
 		Sessions:      a.SessionStore,
+		MFA:           a.MFAStore,
 		LoginLimiter:  handler.NewLoginLimiter(5, 15*time.Minute),
 		Logger:        a.Core.Logger(),
 	}
@@ -81,6 +82,7 @@ func (a *App) RegisterRoutes() error {
 	sameOriginMw := handler.SameOriginMiddleware(a.Core.Logger())
 	ipMw := handler.IPAllowlistMiddleware(a.Cfg.App.AllowedIPs, a.Core.Logger())
 	root.post("/api/auth/login", ipMw(sameOriginMw(http.HandlerFunc(authH.Login))))
+	root.post("/api/auth/mfa/verify", ipMw(sameOriginMw(http.HandlerFunc(authH.MFAVerify))))
 	if root.err != nil {
 		return root.err
 	}
@@ -182,6 +184,10 @@ func (a *App) RegisterRoutes() error {
 	protected.get("/api/auth/me", guard(http.HandlerFunc(authH.Me)))
 	protected.post("/api/auth/sessions/revoke", guard(http.HandlerFunc(authH.RevokeAllSessions)))
 	protected.get("/api/auth/users", guard(http.HandlerFunc(authH.ListUsers)))
+	protected.get("/api/auth/mfa", guard(http.HandlerFunc(authH.MFAStatus)))
+	protected.post("/api/auth/mfa/enroll", guard(http.HandlerFunc(authH.MFAEnroll)))
+	protected.post("/api/auth/mfa/confirm", guard(http.HandlerFunc(authH.MFAConfirm)))
+	protected.post("/api/auth/mfa/disable", guard(http.HandlerFunc(authH.MFADisable)))
 	protected.get("/api/audit/events", guard(http.HandlerFunc(auditH.List)))
 	protected.get("/api/audit/export", guard(http.HandlerFunc(auditH.Export)))
 

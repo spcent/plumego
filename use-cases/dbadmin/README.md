@@ -50,6 +50,7 @@ As a Plumego use-case app, dbadmin demonstrates how to build a production-scale 
 - **Confirmation Dialogs**: Require explicit confirmation before executing dangerous operations
 - **Credential Redaction**: Passwords and API keys redacted in all logs and API responses
 - **Session Management**: HttpOnly cookie-based authentication with automatic timeout, login rate limiting, same-origin checks for unsafe requests, and self-service bulk session revocation
+- **Optional TOTP MFA**: Per-user time-based one-time-password second factor (RFC 6238) for login, enrolled and managed via `/api/auth/mfa/*` endpoints
 - **Multi-user Accounts**: Configure multiple named users with independent `admin`/`readonly` roles via `DBADMIN_USERS`
 - **IP Allowlisting**: Restrict the login endpoint and all protected routes to a configured set of CIDRs/IPs via `DBADMIN_ALLOWED_IPS`
 - **Input Validation**: SQL injection prevention and command injection protection
@@ -227,6 +228,7 @@ use-cases/dbadmin/
 │   ├── domain/         # Business logic
 │   │   ├── connection/ # Connection CRUD and encryption
 │   │   ├── session/    # Session management
+│   │   ├── mfa/        # TOTP MFA enrollment and login challenges
 │   │   ├── history/    # Query history (SQL)
 │   │   ├── redishistory/ # Command history (Redis)
 │   │   ├── mongohistory/ # Query history (MongoDB)
@@ -324,6 +326,7 @@ If deploying to production:
 - **Read-only Mode**: Block all write operations per connection
 - **Audit Export**: Local audit events include role, request ID, source address, RBAC denial reason, and JSON/NDJSON export support
 - **Session Timeout**: Automatic logout after configurable inactivity period
+- **Optional TOTP MFA**: Enroll a TOTP secret (`POST /api/auth/mfa/enroll`), confirm it with a 6-digit code (`POST /api/auth/mfa/confirm`) to enable it, and disable it again with your password (`POST /api/auth/mfa/disable`); once enabled, `POST /api/auth/login` returns a short-lived challenge token instead of a session, which must be completed with a TOTP code via `POST /api/auth/mfa/verify`
 - **Input Validation**: SQL injection and command injection prevention
 - **Secure Cookies**: HttpOnly and SameSite attributes on session cookies; Secure is set for HTTPS and trusted HTTPS reverse-proxy requests
 
