@@ -37,6 +37,7 @@ As a Plumego use-case app, dbadmin demonstrates how to build a production-scale 
 
 ### Security & Safety
 - **Read-only Mode**: Block all write operations per connection
+- **Sensitive Column Masking**: Configure a per-connection list of column names (e.g. `password`, `ssn`, `api_key`) that are redacted as `***MASKED***` in query results, row browsing, and exports — display/export-time only, the underlying data is untouched
 - **Dangerous Operation Detection**: Intercept DROP, DELETE, FLUSH, and other destructive commands
 - **Confirmation Dialogs**: Require explicit confirmation before executing dangerous operations
 - **Credential Redaction**: Passwords and API keys redacted in all logs and API responses

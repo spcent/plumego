@@ -199,6 +199,8 @@ func (h RowHandler) List(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	maskRowMaps(result, maskedColumnSet(conn.MaskedColumns))
+
 	logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusOK, rowsResponse{
 		Rows:            result,
 		Total:           total,
