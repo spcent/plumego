@@ -27,7 +27,7 @@ export default function AccountPage() {
     try {
       const res = await fetch('/api/v1/auth/me', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
         body: JSON.stringify({
           display_name: displayName,
           email,

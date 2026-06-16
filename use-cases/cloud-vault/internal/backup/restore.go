@@ -13,6 +13,9 @@ import (
 type RestoreOptions struct {
 	BackupPath string
 	DataDir    string
+	// EncryptionKey decrypts the backup before extraction when set. It is
+	// ignored if the backup is not AES-256-GCM encrypted.
+	EncryptionKey []byte
 }
 
 // Restore extracts a backup archive to the data directory.
@@ -22,8 +25,24 @@ func Restore(opts RestoreOptions) error {
 		return err
 	}
 
+	zipPath := opts.BackupPath
+	if len(opts.EncryptionKey) > 0 {
+		decrypted, err := os.CreateTemp("", "cloud-vault-restore-decrypted-*.zip")
+		if err != nil {
+			return fmt.Errorf("create temp decrypted file: %w", err)
+		}
+		decryptedPath := decrypted.Name()
+		decrypted.Close()
+		defer os.Remove(decryptedPath)
+
+		if err := DecryptBackup(opts.BackupPath, decryptedPath, opts.EncryptionKey); err != nil {
+			return fmt.Errorf("decrypt backup: %w", err)
+		}
+		zipPath = decryptedPath
+	}
+
 	// Open the zip file
-	zr, err := zip.OpenReader(opts.BackupPath)
+	zr, err := zip.OpenReader(zipPath)
 	if err != nil {
 		return fmt.Errorf("open backup zip: %w", err)
 	}
@@ -111,8 +130,9 @@ func extractFile(f *zip.File, dataDir string) error {
 	return nil
 }
 
-// RestoreCLI implements the CLI restore subcommand.
-func RestoreCLI(backupFile, dataDir string) error {
+// RestoreCLI implements the CLI restore subcommand. encryptionKey decrypts
+// the backup before extraction when set (required for encrypted backups).
+func RestoreCLI(backupFile, dataDir string, encryptionKey []byte) error {
 	// Validate the backup file exists
 	if _, err := os.Stat(backupFile); os.IsNotExist(err) {
 		return fmt.Errorf("backup file not found: %s", backupFile)
@@ -135,8 +155,9 @@ func RestoreCLI(backupFile, dataDir string) error {
 
 	// Extract to temp directory
 	if err := Restore(RestoreOptions{
-		BackupPath: backupFile,
-		DataDir:    tmpDir,
+		BackupPath:    backupFile,
+		DataDir:       tmpDir,
+		EncryptionKey: encryptionKey,
 	}); err != nil {
 		return fmt.Errorf("extract backup: %w", err)
 	}

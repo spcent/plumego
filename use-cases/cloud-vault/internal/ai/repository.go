@@ -134,7 +134,7 @@ func (r *Repository) FailTask(id, errMsg string, retry bool) error {
 		return err
 	}
 	_, err := r.db.Exec(`UPDATE ai_tasks
-		SET status='failed', error_message=?, finished_at=?, updated_at=?
+		SET status='dead_letter', error_message=?, finished_at=?, updated_at=?
 		WHERE id=?`, errMsg, n, n, id)
 	return err
 }

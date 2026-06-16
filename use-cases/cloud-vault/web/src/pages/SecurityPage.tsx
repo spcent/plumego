@@ -54,7 +54,7 @@ export default function SecurityPage() {
     try {
       const res = await fetch('/api/v1/auth/change-password', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
         body: JSON.stringify({
           current_password: currentPassword,
           new_password: newPassword,
@@ -75,6 +75,7 @@ export default function SecurityPage() {
     try {
       const res = await fetch(`/api/v1/auth/sessions/${sessionId}`, {
         method: 'DELETE',
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
       })
       if (!res.ok) throw new Error('Failed to revoke session')
       await fetchSessions()
@@ -87,6 +88,7 @@ export default function SecurityPage() {
     try {
       const res = await fetch('/api/v1/auth/sessions/revoke-all', {
         method: 'POST',
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
       })
       if (!res.ok) throw new Error('Failed to revoke all sessions')
       await logout()

@@ -15,6 +15,7 @@ type BackupManifest struct {
 	ObjectCount       int       `json:"object_count"`
 	DatabaseSizeBytes int64     `json:"database_size_bytes"`
 	ConfigSnapshot    bool      `json:"config_snapshot"`
+	Encrypted         bool      `json:"encrypted"`
 }
 
 // BackupInfo represents a backup file in the backup directory.

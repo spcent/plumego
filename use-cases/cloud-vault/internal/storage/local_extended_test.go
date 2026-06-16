@@ -245,7 +245,10 @@ func TestLocalStorage_Root(t *testing.T) {
 
 	key := "some/file.md"
 	expected := filepath.Join(root, filepath.FromSlash(key))
-	got := store.keyPath(key)
+	got, err := store.keyPath(key)
+	if err != nil {
+		t.Fatalf("keyPath(%q) returned error: %v", key, err)
+	}
 	if got != expected {
 		t.Errorf("keyPath(%q) = %q, want %q", key, got, expected)
 	}

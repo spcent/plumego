@@ -43,14 +43,40 @@ func (w *Worker) processOne(ctx context.Context) {
 		return
 	}
 
-	w.logger.Info("ai worker: processing task", plumelog.Fields{"id": task.ID, "type": task.TaskType})
+	w.logger.Info("ai worker: processing task", plumelog.Fields{"id": task.ID, "type": task.TaskType, "retry": task.RetryCount})
 
 	err = w.svc.ProcessTask(ctx, task)
 	if err != nil {
-		w.logger.Error("ai worker: task failed", plumelog.Fields{"id": task.ID, "err": err.Error()})
 		retry := task.RetryCount < w.maxRetries
+		w.logger.Error("ai worker: task failed", plumelog.Fields{
+			"id":          task.ID,
+			"err":         err.Error(),
+			"retry_count": task.RetryCount,
+			"will_retry":  retry,
+		})
 		if ferr := w.svc.repo.FailTask(task.ID, err.Error(), retry); ferr != nil {
 			w.logger.Error("ai worker: fail task record", plumelog.Fields{"err": ferr.Error()})
+		}
+		if retry {
+			// Exponential backoff: 2^retryCount seconds, capped at 60s.
+			backoff := time.Duration(1<<uint(task.RetryCount)) * time.Second
+			if backoff > 60*time.Second {
+				backoff = 60 * time.Second
+			}
+			w.logger.Info("ai worker: backing off before retry", plumelog.Fields{
+				"id":              task.ID,
+				"backoff_seconds": backoff.Seconds(),
+			})
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(backoff):
+			}
+		} else {
+			w.logger.Warn("ai worker: task moved to dead letter", plumelog.Fields{
+				"id":   task.ID,
+				"type": task.TaskType,
+			})
 		}
 		return
 	}

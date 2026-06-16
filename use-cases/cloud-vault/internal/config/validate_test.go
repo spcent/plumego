@@ -268,6 +268,8 @@ func TestWarnings(t *testing.T) {
 	}
 
 	cfg.Auth.SecureCookie = true
+	cfg.CORS.AllowedOrigins = []string{"https://example.com"}
+	cfg.Backup.EncryptionEnabled = true
 	w = Warnings(cfg)
 	if len(w) != 0 {
 		t.Errorf("Warnings() expected no warnings, got %v", w)
