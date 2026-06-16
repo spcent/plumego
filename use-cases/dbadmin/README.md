@@ -17,8 +17,8 @@ As a Plumego use-case app, dbadmin demonstrates how to build a production-scale 
 
 | Database | Features | Status |
 |----------|----------|--------|
-| **MySQL** | Browse tables, execute queries, view/edit rows, DDL operations, import/export | ✅ Stable |
-| **PostgreSQL** | Browse schemas/tables, execute queries, view/edit rows, DDL (CREATE/ALTER/DROP TABLE), import/export | ✅ Stable |
+| **MySQL** | Browse tables, execute queries, view/edit rows, DDL operations (incl. views), bulk row update/delete, import/export (CSV/JSON/SQL/XLSX) | ✅ Stable |
+| **PostgreSQL** | Browse schemas/tables, execute queries, view/edit rows, DDL (CREATE/ALTER/DROP TABLE, views), bulk row update/delete, import/export (CSV/JSON/SQL/XLSX) | ✅ Stable |
 | **SQLite** | All MySQL features + file upload/download, schema inspection | ✅ Stable |
 | **Redis** | Browse keys by type, execute commands, command history, TTL management, batch operations, standalone/Cluster/Sentinel modes | ✅ Stable |
 | **MongoDB** | Browse collections, query with filters, aggregation pipelines, explain plans, collection and index management | ✅ Stable |
@@ -31,7 +31,9 @@ As a Plumego use-case app, dbadmin demonstrates how to build a production-scale 
 - **Resource Browsing**: Tree view of databases, tables, collections, indices, and keys
 - **Query Execution**: Syntax-highlighted editors with server-side SQL, Redis, MongoDB, and Elasticsearch history plus result formatting
 - **Data Manipulation**: View, edit, insert, delete with confirmation dialogs for dangerous operations
-- **Import/Export**: CSV, JSON, SQL dump formats for data migration
+- **Import/Export**: CSV, JSON, SQL dump, and XLSX formats for data migration
+- **Bulk Row Operations**: Update or delete multiple SQL rows by primary key in a single confirmed request
+- **SQL View Management**: Create and drop views (`CREATE VIEW`/`DROP VIEW`) per connection
 - **Schema Inspection**: View table structure, indexes, foreign keys, mappings
 - **MongoDB Collection/Index Management**: Create and drop collections and indexes (compound, unique, sparse) per connection
 - **Elasticsearch Index/Template Management**: Create and delete indices and index templates, with configurable settings and mappings
@@ -56,7 +58,7 @@ As a Plumego use-case app, dbadmin demonstrates how to build a production-scale 
 - **Modern UI**: Responsive design with Tailwind CSS
 - **Dark Mode**: Automatic theme switching based on system preferences
 - **Internationalization**: English and Chinese (简体中文) support
-- **Query History**: Searchable history with execution time and result counts
+- **Query History**: Searchable history with execution time and result counts, filterable by query text, error status, and database
 - **Keyboard Shortcuts**: Efficient navigation and execution (Ctrl/Cmd+Enter)
 
 ## Quick Start
