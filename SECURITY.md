@@ -6,10 +6,9 @@ The following versions of this project are actively maintained and receive secur
 
 | Version | Supported          |
 | ------- | ----------------- |
-| 1.5.x   | ✅                 |
-| 1.4.x   | ✅                 |
-| 1.3.x   | ❌                 |
-| < 1.3   | ❌                 |
+| 1.2.x   | ✅                 |
+| 1.1.x   | ✅                 |
+| < 1.0   | ❌                 |
 
 ## Reporting a Vulnerability
 
