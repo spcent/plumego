@@ -245,11 +245,25 @@ func validateConnection(c *connection.Connection) error {
 			return fmt.Errorf("file_path is required for sqlite")
 		}
 	case connection.DriverRedis:
-		if c.Host == "" {
-			return fmt.Errorf("host is required for redis")
-		}
-		if c.Port == 0 {
-			c.Port = 6379
+		switch c.RedisMode {
+		case "cluster":
+			if len(c.RedisClusterAddrs) == 0 {
+				return fmt.Errorf("redis_cluster_addrs is required for redis cluster mode")
+			}
+		case "sentinel":
+			if len(c.RedisSentinelAddrs) == 0 {
+				return fmt.Errorf("redis_sentinel_addrs is required for redis sentinel mode")
+			}
+			if c.RedisSentinelMasterName == "" {
+				return fmt.Errorf("redis_sentinel_master_name is required for redis sentinel mode")
+			}
+		default:
+			if c.Host == "" {
+				return fmt.Errorf("host is required for redis")
+			}
+			if c.Port == 0 {
+				c.Port = 6379
+			}
 		}
 		if c.RedisDBIndex < 0 || c.RedisDBIndex > 15 {
 			return fmt.Errorf("redis_db_index must be 0-15")

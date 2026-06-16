@@ -23,21 +23,23 @@ type poolKey struct {
 	dbIndex int
 }
 
-// Manager holds open *redis.Client instances keyed by (connID, dbIndex).
+// Manager holds open redis.UniversalClient instances keyed by (connID, dbIndex).
+// UniversalClient is satisfied by *redis.Client (standalone and sentinel
+// failover clients) and *redis.ClusterClient (cluster mode).
 type Manager struct {
 	mu      sync.RWMutex
-	clients map[poolKey]*redis.Client
+	clients map[poolKey]redis.UniversalClient
 }
 
 // NewManager creates an empty Manager.
 func NewManager() *Manager {
-	return &Manager{clients: make(map[poolKey]*redis.Client)}
+	return &Manager{clients: make(map[poolKey]redis.UniversalClient)}
 }
 
 // Open returns a cached client for the given connection and DB index,
 // creating one on first call. The client is owned by the Manager; callers
 // must not close it.
-func (m *Manager) Open(c *connection.Connection, dbIndex int) (*redis.Client, error) {
+func (m *Manager) Open(c *connection.Connection, dbIndex int) (redis.UniversalClient, error) {
 	key := poolKey{connID: c.ID, dbIndex: dbIndex}
 
 	m.mu.Lock()
@@ -59,7 +61,7 @@ func (m *Manager) Open(c *connection.Connection, dbIndex int) (*redis.Client, er
 	ctx := context.Background()
 	cfg := retry.DefaultConfig()
 
-	cl, err := retry.WithResult[*redis.Client](ctx, cfg, func() (*redis.Client, error) {
+	cl, err := retry.WithResult[redis.UniversalClient](ctx, cfg, func() (redis.UniversalClient, error) {
 		client, err := m.build(c, dbIndex)
 		if err != nil {
 			return nil, err
@@ -120,7 +122,7 @@ func (m *Manager) CloseAll() {
 
 // Get returns the cached client for the given connID and dbIndex, or
 // ErrNoClient if none exists.
-func (m *Manager) Get(connID string, dbIndex int) (*redis.Client, error) {
+func (m *Manager) Get(connID string, dbIndex int) (redis.UniversalClient, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	if cl, ok := m.clients[poolKey{connID: connID, dbIndex: dbIndex}]; ok {
@@ -136,9 +138,33 @@ func (m *Manager) Count() int {
 	return len(m.clients)
 }
 
-// build constructs a new *redis.Client for the given connection config.
-// The password is never written to logs or error strings.
-func (m *Manager) build(c *connection.Connection, dbIndex int) (*redis.Client, error) {
+// buildTLSConfig returns a *tls.Config for the connection's target host when
+// TLS is enabled, or nil otherwise. Shared by every mode's client builder so
+// behavior stays identical across standalone, cluster, and sentinel modes.
+func buildTLSConfig(c *connection.Connection) *tls.Config {
+	if !c.TLSEnabled {
+		return nil
+	}
+	return &tls.Config{ServerName: c.Host}
+}
+
+// build constructs a new redis.UniversalClient for the given connection
+// config, dispatching on c.RedisMode. The password is never written to logs
+// or error strings.
+func (m *Manager) build(c *connection.Connection, dbIndex int) (redis.UniversalClient, error) {
+	switch c.RedisMode {
+	case "cluster":
+		return buildClusterClient(c)
+	case "sentinel":
+		return buildSentinelClient(c, dbIndex)
+	default:
+		return buildStandaloneClient(c, dbIndex)
+	}
+}
+
+// buildStandaloneClient builds a *redis.Client for standalone mode
+// ("" or "standalone"). Unchanged from prior single-mode behavior.
+func buildStandaloneClient(c *connection.Connection, dbIndex int) (redis.UniversalClient, error) {
 	if c.Host == "" {
 		return nil, fmt.Errorf("redis: host is required")
 	}
@@ -149,13 +175,46 @@ func (m *Manager) build(c *connection.Connection, dbIndex int) (*redis.Client, e
 	addr := fmt.Sprintf("%s:%d", c.Host, port)
 
 	opts := &redis.Options{
-		Addr:     addr,
-		Password: c.Password,
-		DB:       dbIndex,
+		Addr:      addr,
+		Password:  c.Password,
+		DB:        dbIndex,
+		TLSConfig: buildTLSConfig(c),
 	}
-	if c.TLSEnabled {
-		opts.TLSConfig = &tls.Config{ServerName: c.Host}
+	return redis.NewClient(opts), nil
+}
+
+// buildClusterClient builds a *redis.ClusterClient for cluster mode.
+// Redis Cluster does not support SELECT / the standalone DB-index concept,
+// so dbIndex is intentionally ignored here — every key lives in the single
+// cluster-wide keyspace (DB 0).
+func buildClusterClient(c *connection.Connection) (redis.UniversalClient, error) {
+	if len(c.RedisClusterAddrs) == 0 {
+		return nil, fmt.Errorf("redis: cluster addrs are required")
 	}
-	cl := redis.NewClient(opts)
-	return cl, nil
+	opts := &redis.ClusterOptions{
+		Addrs:     c.RedisClusterAddrs,
+		Password:  c.Password,
+		TLSConfig: buildTLSConfig(c),
+	}
+	return redis.NewClusterClient(opts), nil
+}
+
+// buildSentinelClient builds a failover *redis.Client for sentinel mode,
+// connecting via the Sentinel-monitored master group identified by
+// RedisSentinelMasterName.
+func buildSentinelClient(c *connection.Connection, dbIndex int) (redis.UniversalClient, error) {
+	if len(c.RedisSentinelAddrs) == 0 {
+		return nil, fmt.Errorf("redis: sentinel addrs are required")
+	}
+	if c.RedisSentinelMasterName == "" {
+		return nil, fmt.Errorf("redis: sentinel master name is required")
+	}
+	opts := &redis.FailoverOptions{
+		MasterName:    c.RedisSentinelMasterName,
+		SentinelAddrs: c.RedisSentinelAddrs,
+		Password:      c.Password,
+		DB:            dbIndex,
+		TLSConfig:     buildTLSConfig(c),
+	}
+	return redis.NewFailoverClient(opts), nil
 }
