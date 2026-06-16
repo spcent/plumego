@@ -15,6 +15,7 @@ import (
 
 	"dbadmin/internal/dbmanager"
 	mysqlinspect "dbadmin/internal/dbmanager/mysql"
+	postgresinspect "dbadmin/internal/dbmanager/postgres"
 	sqliteinspect "dbadmin/internal/dbmanager/sqlite"
 	"dbadmin/internal/domain/connection"
 )
@@ -67,6 +68,8 @@ func (h ExportHandler) Export(w http.ResponseWriter, r *http.Request) {
 	switch conn.Driver {
 	case connection.DriverMySQL:
 		tableFQN = fmt.Sprintf("%s.%s", quoteIdent(dbName, conn.Driver), quoteIdent(table, conn.Driver))
+	case connection.DriverPostgres:
+		tableFQN = postgresTableFQN(dbName, table)
 	default:
 		tableFQN = quoteIdent(table, conn.Driver)
 	}
@@ -162,15 +165,21 @@ func (h ExportHandler) exportSQL(w http.ResponseWriter, r *http.Request, rows in
 	switch conn.Driver {
 	case connection.DriverMySQL:
 		tableFQN = fmt.Sprintf("%s.%s", quoteIdent(dbName, conn.Driver), quoteIdent(table, conn.Driver))
+	case connection.DriverPostgres:
+		tableFQN = postgresTableFQN(dbName, table)
 	default:
 		tableFQN = quoteIdent(table, conn.Driver)
 	}
 
 	var ins dbmanager.Inspector
-	if conn.Driver == connection.DriverMySQL {
+	switch conn.Driver {
+	case connection.DriverMySQL:
 		db, _ := h.Manager.Open(r.Context(), conn)
 		ins = mysqlinspect.New(db)
-	} else {
+	case connection.DriverPostgres:
+		db, _ := h.Manager.Open(r.Context(), conn)
+		ins = postgresinspect.New(db)
+	default:
 		db, _ := h.Manager.Open(r.Context(), conn)
 		ins = sqliteinspect.New(db)
 	}
