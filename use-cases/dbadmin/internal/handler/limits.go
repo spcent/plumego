@@ -20,6 +20,7 @@ const (
 	MaxMongoQueryLimit        = 500
 	MaxESSearchSize           = 500
 	MaxBulkImportDocuments    = 10_000
+	MaxBulkRowOperationRows   = 1_000
 	DefaultRedisExportKeys    = 1_000
 	MaxRedisExportKeys        = 10_000
 	MaxRedisContainerEntries  = 10_000

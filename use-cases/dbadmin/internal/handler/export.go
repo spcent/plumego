@@ -9,6 +9,8 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/xuri/excelize/v2"
+
 	"github.com/spcent/plumego/contract"
 	plumelog "github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/router"
@@ -96,6 +98,8 @@ func (h ExportHandler) Export(w http.ResponseWriter, r *http.Request) {
 	switch format {
 	case "sql":
 		h.exportSQL(w, r, rows, cols, conn, dbName, table, ts, includeSchema, includeData, limit)
+	case "xlsx":
+		h.exportXLSX(w, r, rows, cols, table, ts, includeData, limit)
 	default:
 		h.exportCSV(w, r, rows, cols, table, ts, includeData, limit)
 	}
@@ -231,6 +235,72 @@ func (h ExportHandler) exportSQL(w http.ResponseWriter, r *http.Request, rows in
 			strings.Join(quotedCols, ", "),
 			strings.Join(valStrs, ", "))
 		n++
+	}
+}
+
+func (h ExportHandler) exportXLSX(w http.ResponseWriter, r *http.Request, rows interface {
+	Next() bool
+	Scan(...any) error
+	Err() error
+}, cols []string, table, ts string, includeData bool, limit int) {
+	w.Header().Set("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s_%s.xlsx"`, table, ts))
+
+	f := excelize.NewFile()
+	defer func() { _ = f.Close() }()
+	const sheet = "Sheet1"
+
+	for i, col := range cols {
+		cell, _ := excelize.CoordinatesToCellName(i+1, 1)
+		_ = f.SetCellValue(sheet, cell, col)
+	}
+
+	if !includeData {
+		if err := f.Write(w); err != nil {
+			h.Logger.Warn("xlsx write", plumelog.Fields{"error": err.Error()})
+		}
+		return
+	}
+
+	vals := make([]any, len(cols))
+	ptrs := make([]any, len(cols))
+	for i := range vals {
+		ptrs[i] = &vals[i]
+	}
+	n := 0
+	rowIdx := 2 // row 1 is the header
+	for rows.Next() {
+		if n >= limit {
+			cell, _ := excelize.CoordinatesToCellName(1, rowIdx)
+			_ = f.SetCellValue(sheet, cell,
+				fmt.Sprintf("[export truncated at %d rows — refine the query or increase ?limit= up to %d]", limit, MaxExportRows))
+			break
+		}
+		if err := rows.Scan(ptrs...); err != nil {
+			h.Logger.Warn("xlsx scan", plumelog.Fields{"error": err.Error()})
+			continue
+		}
+		for i, v := range vals {
+			cell, _ := excelize.CoordinatesToCellName(i+1, rowIdx)
+			switch t := v.(type) {
+			case nil:
+				_ = f.SetCellValue(sheet, cell, "")
+			case []byte:
+				if utf8.Valid(t) {
+					_ = f.SetCellValue(sheet, cell, string(t))
+				} else {
+					_ = f.SetCellValue(sheet, cell, fmt.Sprintf("<BLOB %d bytes>", len(t)))
+				}
+			default:
+				_ = f.SetCellValue(sheet, cell, fmt.Sprintf("%v", t))
+			}
+		}
+		n++
+		rowIdx++
+	}
+
+	if err := f.Write(w); err != nil {
+		h.Logger.Warn("xlsx write", plumelog.Fields{"error": err.Error()})
 	}
 }
 

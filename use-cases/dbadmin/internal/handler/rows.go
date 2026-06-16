@@ -57,6 +57,23 @@ type deleteRequest struct {
 	Confirm    bool           `json:"confirm"`
 }
 
+type bulkDeleteRequest struct {
+	PrimaryKeyColumn string `json:"primary_key_column"`
+	Values           []any  `json:"values"`
+	Confirm          bool   `json:"confirm"`
+}
+
+type bulkUpdateRequest struct {
+	PrimaryKeyColumn string         `json:"primary_key_column"`
+	Values           []any          `json:"values"`
+	Set              map[string]any `json:"set"`
+	Confirm          bool           `json:"confirm"`
+}
+
+type bulkRowsResponse struct {
+	RowsAffected int64 `json:"rowsAffected"`
+}
+
 // List returns paginated rows from a table.
 // Query params: page, pageSize (max 500), sortColumn, sortDirection (asc|desc),
 // filters (JSON []filterCondition), selectedColumns (comma-separated).
@@ -363,6 +380,139 @@ func (h RowHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// BulkDelete deletes all rows matching primary_key_column IN (values).
+// Body: {"primary_key_column":"id","values":[1,2,3],"confirm":true}.
+// The number of values is capped at MaxBulkRowOperationRows.
+func (h RowHandler) BulkDelete(w http.ResponseWriter, r *http.Request) {
+	db, conn, tableFQN, err := h.openTable(r)
+	if err != nil {
+		h.writeErr(w, r, err)
+		return
+	}
+	if guardReadonly(conn, w, r, h.Logger) {
+		return
+	}
+	var req bulkDeleteRequest
+	if !decodeJSONLimited(w, r, h.Logger, &req) {
+		return
+	}
+	if !req.Confirm {
+		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+			Type(contract.TypeBadRequest).Message("confirm required: set confirm=true in request body").Build()))
+		return
+	}
+	pkCol := sanitizeIdentifier(req.PrimaryKeyColumn)
+	if pkCol == "" {
+		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+			Type(contract.TypeBadRequest).Message("primary_key_column is required").Build()))
+		return
+	}
+	if len(req.Values) == 0 {
+		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+			Type(contract.TypeBadRequest).Message("values is required").Build()))
+		return
+	}
+	if len(req.Values) > MaxBulkRowOperationRows {
+		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+			Type(contract.TypeBadRequest).
+			Message(fmt.Sprintf("values is limited to %d rows", MaxBulkRowOperationRows)).Build()))
+		return
+	}
+
+	whereSQL, whereArgs := buildWhereInClause(pkCol, req.Values, conn.Driver, 1)
+	q := fmt.Sprintf("DELETE FROM %s%s", tableFQN, whereSQL)
+
+	res, err := db.ExecContext(r.Context(), q, whereArgs...)
+	if err != nil {
+		h.Logger.Error("bulk delete rows", plumelog.Fields{"error": err.Error()})
+		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+			Type(contract.TypeInternal).Message("failed to delete rows").
+			Detail("error", err.Error()).Build()))
+		return
+	}
+	n, _ := res.RowsAffected()
+	logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusOK, bulkRowsResponse{RowsAffected: n}, nil))
+}
+
+// BulkUpdate sets the same column values for every row matching
+// primary_key_column IN (values).
+// Body: {"primary_key_column":"id","values":[1,2,3],"set":{"col":val},"confirm":true}.
+// The number of values is capped at MaxBulkRowOperationRows.
+func (h RowHandler) BulkUpdate(w http.ResponseWriter, r *http.Request) {
+	db, conn, tableFQN, err := h.openTable(r)
+	if err != nil {
+		h.writeErr(w, r, err)
+		return
+	}
+	if guardReadonly(conn, w, r, h.Logger) {
+		return
+	}
+	var req bulkUpdateRequest
+	if !decodeJSONLimited(w, r, h.Logger, &req) {
+		return
+	}
+	if !req.Confirm {
+		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+			Type(contract.TypeBadRequest).Message("confirm required: set confirm=true in request body").Build()))
+		return
+	}
+	pkCol := sanitizeIdentifier(req.PrimaryKeyColumn)
+	if pkCol == "" {
+		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+			Type(contract.TypeBadRequest).Message("primary_key_column is required").Build()))
+		return
+	}
+	if len(req.Values) == 0 {
+		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+			Type(contract.TypeBadRequest).Message("values is required").Build()))
+		return
+	}
+	if len(req.Values) > MaxBulkRowOperationRows {
+		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+			Type(contract.TypeBadRequest).
+			Message(fmt.Sprintf("values is limited to %d rows", MaxBulkRowOperationRows)).Build()))
+		return
+	}
+	if len(req.Set) == 0 {
+		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+			Type(contract.TypeBadRequest).Message("set is required").Build()))
+		return
+	}
+
+	// Cannot update the primary key column itself via bulk update.
+	delete(req.Set, pkCol)
+	if len(req.Set) == 0 {
+		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+			Type(contract.TypeBadRequest).Message("no non-PK fields to update").Build()))
+		return
+	}
+
+	setCols, setVals := sortedColumnsValues(req.Set)
+	for _, c := range setCols {
+		if sanitizeIdentifier(c) != c {
+			logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+				Type(contract.TypeBadRequest).Message("invalid set column name: "+c).Build()))
+			return
+		}
+	}
+
+	whereSQL, whereArgs := buildWhereInClause(pkCol, req.Values, conn.Driver, len(setCols)+1)
+	q := fmt.Sprintf("UPDATE %s SET %s%s",
+		tableFQN, buildUpdateSetClause(conn.Driver, setCols), whereSQL)
+	args := append(setVals, whereArgs...)
+
+	res, err := db.ExecContext(r.Context(), q, args...)
+	if err != nil {
+		h.Logger.Error("bulk update rows", plumelog.Fields{"error": err.Error()})
+		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+			Type(contract.TypeInternal).Message("failed to update rows").
+			Detail("error", err.Error()).Build()))
+		return
+	}
+	n, _ := res.RowsAffected()
+	logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusOK, bulkRowsResponse{RowsAffected: n}, nil))
+}
+
 // openTable resolves and opens the DB connection and returns the fully-qualified table name.
 func (h RowHandler) openTable(r *http.Request) (*sql.DB, *connection.Connection, string, error) {
 	connID := router.Param(r, "id")
@@ -481,6 +631,22 @@ func buildWhereFromPK(pkMap map[string]any, driver connection.DriverType, startN
 		args[i] = pkMap[k]
 	}
 	return " WHERE " + strings.Join(parts, " AND "), args, nil
+}
+
+// buildWhereInClause builds a parameterized "WHERE col IN (?, ?, ...)" clause
+// for the given column and values, using the connection driver's placeholder
+// style. startN is the 1-based index of the first placeholder (follows any
+// SET params in an UPDATE). The caller must validate col is a safe identifier
+// before calling this function.
+func buildWhereInClause(col string, values []any, driver connection.DriverType, startN int) (string, []any) {
+	placeholders := make([]string, len(values))
+	for i := range values {
+		placeholders[i] = nthPlaceholder(driver, startN+i)
+	}
+	where := fmt.Sprintf(" WHERE %s IN (%s)", quoteIdent(col, driver), strings.Join(placeholders, ", "))
+	args := make([]any, len(values))
+	copy(args, values)
+	return where, args
 }
 
 func quoteIdent(name string, driver connection.DriverType) string {
