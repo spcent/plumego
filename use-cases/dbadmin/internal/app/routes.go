@@ -186,6 +186,8 @@ func (a *App) RegisterRoutes() error {
 	protected.delete("/api/connections/:id", guard(http.HandlerFunc(connH.Delete)))
 	protected.post("/api/connections/:id/test", guard(http.HandlerFunc(connH.Test)))
 	protected.delete("/api/connections/:id/runtime", guard(http.HandlerFunc(connH.CloseRuntime)))
+	protected.get("/api/connections/export", guard(http.HandlerFunc(connH.Export)))
+	protected.post("/api/connections/import", guard(http.HandlerFunc(connH.Import)))
 	protected.get("/api/pool-stats", guard(http.HandlerFunc(poolStatsH.GetAllStats)))
 	protected.get("/api/pool-stats/sql", guard(http.HandlerFunc(poolStatsH.GetSQLPoolStats)))
 
