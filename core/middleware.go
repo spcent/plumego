@@ -11,9 +11,8 @@ func (a *App) Use(middlewares ...middleware.Middleware) error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
-	state := a.preparationState
-	if state != PreparationStateMutable {
-		return immutableAppError(operationUseMiddleware, "add middleware", nil)
+	if err := validateMutableState(a.preparationState, operationUseMiddleware, "add middleware", nil); err != nil {
+		return err
 	}
 
 	chain := a.middlewareChain

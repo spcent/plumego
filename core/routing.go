@@ -16,9 +16,8 @@ func (a *App) registerRoute(method, path string, handler http.Handler, opts ...r
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
-	state := a.preparationState
-	if state != PreparationStateMutable {
-		return immutableAppError(operationAddRoute, "register route", params)
+	if err := validateMutableState(a.preparationState, operationAddRoute, "register route", params); err != nil {
+		return err
 	}
 	if handler == nil {
 		return wrapCoreError(contract.ErrHandlerNil, operationAddRoute, params)
@@ -154,11 +153,14 @@ func (g *RouteGroup) addRoute(method, path string, handler http.Handler, opts ..
 	g.app.mu.Lock()
 	defer g.app.mu.Unlock()
 
-	if g.app.preparationState != PreparationStateMutable {
-		return immutableAppError(operationAddRoute, "register route", params)
+	if err := validateMutableState(g.app.preparationState, operationAddRoute, "register route", params); err != nil {
+		return err
 	}
 	if handler == nil {
 		return wrapCoreError(contract.ErrHandlerNil, operationAddRoute, params)
+	}
+	if g.r == nil {
+		return wrapCoreError(fmt.Errorf("router not configured"), operationAddRoute, nil)
 	}
 	return g.r.AddRoute(method, path, handler, opts...)
 }
