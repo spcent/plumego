@@ -41,6 +41,7 @@ As a Plumego use-case app, dbadmin demonstrates how to build a production-scale 
 - **Redis Cluster & Sentinel**: Configure a connection for standalone, Cluster, or Sentinel-backed failover topologies
 - **Operational Diagnostics**: Health, readiness, runtime, and connection-pool endpoints for local troubleshooting
 - **Prometheus Metrics**: `/metrics` endpoint exposing HTTP request counts, latency histograms, and uptime in Prometheus text exposition format
+- **API Documentation**: Machine-readable OpenAPI 3.0 spec at `GET /openapi.json` / `GET /openapi.yaml`, with an interactive Swagger UI page at `GET /docs` — see [API Documentation](#api-documentation)
 - **Admin Controls**: Active operation cancellation, connection runtime closing, audit events, and multi-user `admin`/`readonly` roles
 
 ### Security & Safety
@@ -63,6 +64,15 @@ As a Plumego use-case app, dbadmin demonstrates how to build a production-scale 
 - **Internationalization**: English and Chinese (简体中文) support
 - **Query History**: Searchable history with execution time and result counts, filterable by query text, error status, and database
 - **Keyboard Shortcuts**: Efficient navigation and execution (Ctrl/Cmd+Enter)
+
+## API Documentation
+
+dbadmin's REST API is documented as a static OpenAPI 3.0 spec, served alongside the app:
+
+- `GET /openapi.json` / `GET /openapi.yaml` — the machine-readable spec (public, no auth)
+- `GET /docs` — an interactive Swagger UI page backed by the spec above (public, no auth)
+
+The spec covers every route registered in `internal/app/routes.go`: path, method, whether a session cookie is required, and which routes are blocked for the `readonly` role or for read-only connections. Source: `internal/handler/openapi.yaml` (and its generated `openapi.json` sibling).
 
 ## Quick Start
 
