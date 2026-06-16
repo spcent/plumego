@@ -268,6 +268,95 @@ func TestParseJSONFilter_invalid(t *testing.T) {
 	}
 }
 
+// --- validateIndexFieldName ---
+
+func TestValidateIndexFieldName_valid(t *testing.T) {
+	valid := []string{"email", "user_id", "created_at", "address.city"}
+	for _, name := range valid {
+		if err := validateIndexFieldName(name); err != nil {
+			t.Errorf("validateIndexFieldName(%q) error=%v, want nil", name, err)
+		}
+	}
+}
+
+func TestValidateIndexFieldName_invalid(t *testing.T) {
+	cases := []string{"", "$where", string(rune(0))}
+	for _, name := range cases {
+		if err := validateIndexFieldName(name); err == nil {
+			t.Errorf("validateIndexFieldName(%q) should error", name)
+		}
+	}
+}
+
+// --- parseIndexKeys ---
+
+func TestParseIndexKeys_valid(t *testing.T) {
+	keys, err := parseIndexKeys(`[{"field":"email","order":1},{"field":"created_at","order":-1}]`)
+	if err != nil {
+		t.Fatalf("parseIndexKeys error=%v", err)
+	}
+	if len(keys) != 2 {
+		t.Fatalf("parseIndexKeys len=%d, want 2", len(keys))
+	}
+	if keys[0].Key != "email" || keys[0].Value != 1 {
+		t.Errorf("keys[0]=%+v, want {email 1}", keys[0])
+	}
+	if keys[1].Key != "created_at" || keys[1].Value != -1 {
+		t.Errorf("keys[1]=%+v, want {created_at -1}", keys[1])
+	}
+}
+
+func TestParseIndexKeys_preservesOrder(t *testing.T) {
+	// Order matters for compound indexes; verify the array order is preserved
+	// exactly rather than being subject to map non-determinism.
+	keys, err := parseIndexKeys(`[{"field":"z","order":1},{"field":"a","order":1},{"field":"m","order":1}]`)
+	if err != nil {
+		t.Fatalf("parseIndexKeys error=%v", err)
+	}
+	want := []string{"z", "a", "m"}
+	for i, k := range keys {
+		if k.Key != want[i] {
+			t.Errorf("keys[%d].Key=%q, want %q", i, k.Key, want[i])
+		}
+	}
+}
+
+func TestParseIndexKeys_empty(t *testing.T) {
+	if _, err := parseIndexKeys(""); err == nil {
+		t.Error("parseIndexKeys(\"\") should error")
+	}
+	if _, err := parseIndexKeys("[]"); err == nil {
+		t.Error("parseIndexKeys([]) should error")
+	}
+}
+
+func TestParseIndexKeys_invalidJSON(t *testing.T) {
+	if _, err := parseIndexKeys("{not valid"); err == nil {
+		t.Error("parseIndexKeys should error on invalid JSON")
+	}
+}
+
+func TestParseIndexKeys_invalidOrder(t *testing.T) {
+	if _, err := parseIndexKeys(`[{"field":"email","order":2}]`); err == nil {
+		t.Error("parseIndexKeys should error when order is not 1 or -1")
+	}
+}
+
+func TestParseIndexKeys_invalidFieldName(t *testing.T) {
+	if _, err := parseIndexKeys(`[{"field":"$where","order":1}]`); err == nil {
+		t.Error("parseIndexKeys should error on $-prefixed field name")
+	}
+	if _, err := parseIndexKeys(`[{"field":"","order":1}]`); err == nil {
+		t.Error("parseIndexKeys should error on empty field name")
+	}
+}
+
+func TestParseIndexKeys_duplicateField(t *testing.T) {
+	if _, err := parseIndexKeys(`[{"field":"email","order":1},{"field":"email","order":-1}]`); err == nil {
+		t.Error("parseIndexKeys should error on duplicate field")
+	}
+}
+
 // --- getSortedKeys ---
 
 func TestGetSortedKeys(t *testing.T) {
