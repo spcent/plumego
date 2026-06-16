@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"crypto/aes"
 	"crypto/cipher"
+	"crypto/pbkdf2"
 	"crypto/rand"
 	"crypto/sha256"
 	"database/sql"
@@ -17,11 +18,25 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-// DeriveEncryptionKey hashes passphrase down to a fixed 32-byte AES-256 key,
-// regardless of the input string's length.
+// pbkdf2Salt is a fixed, application-specific salt for backup encryption key
+// derivation. It is not a secret; it exists only to avoid using a bare hash
+// of the passphrase as the AES key (e.g. against rainbow-table-style attacks
+// on the passphrase itself), and to keep DeriveEncryptionKey deterministic
+// across encrypt/decrypt without needing to persist a per-backup salt.
+var pbkdf2Salt = []byte("cloud-vault-backup-encryption-v1")
+
+const pbkdf2Iterations = 600_000
+
+// DeriveEncryptionKey derives a fixed 32-byte AES-256 key from passphrase
+// using PBKDF2-HMAC-SHA256, regardless of the input string's length.
 func DeriveEncryptionKey(passphrase string) []byte {
-	sum := sha256.Sum256([]byte(passphrase))
-	return sum[:]
+	key, err := pbkdf2.Key(sha256.New, passphrase, pbkdf2Salt, pbkdf2Iterations, 32)
+	if err != nil {
+		// Only fails for invalid key-length/iteration arguments, which are
+		// fixed constants above, so this is unreachable.
+		panic(fmt.Sprintf("derive encryption key: %v", err))
+	}
+	return key
 }
 
 // ArchiveOptions configures backup archive creation.
