@@ -269,6 +269,12 @@ func (a *App) RegisterRoutes() error {
 	protected.patch("/api/connections/:id/mongo/documents", guard(http.HandlerFunc(mongoH.UpdateDocument)))
 	protected.delete("/api/connections/:id/mongo/documents", guard(http.HandlerFunc(mongoH.DeleteDocument)))
 
+	// MongoDB collection and index management (DDL-equivalent operations).
+	protected.post("/api/connections/:id/mongo/collections", guard(http.HandlerFunc(mongoH.CreateCollection)))
+	protected.delete("/api/connections/:id/mongo/collections", guard(http.HandlerFunc(mongoH.DropCollection)))
+	protected.post("/api/connections/:id/mongo/indexes/create", guard(http.HandlerFunc(mongoH.CreateIndex)))
+	protected.delete("/api/connections/:id/mongo/indexes", guard(http.HandlerFunc(mongoH.DropIndex)))
+
 	// MongoDB P1 - Advanced features
 	protected.post("/api/connections/:id/mongo/aggregate", guard(http.HandlerFunc(mongoH.Aggregate)))
 	protected.post("/api/connections/:id/mongo/explain", guard(http.HandlerFunc(mongoH.ExplainQuery)))

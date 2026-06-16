@@ -2109,6 +2109,413 @@ func (h MongoDBHandler) ParseObjectId(w http.ResponseWriter, r *http.Request) {
 	}, nil))
 }
 
+// --- CreateCollection --------------------------------------------------------
+
+// CreateCollection creates a new MongoDB collection.
+// POST /api/connections/:id/mongo/collections
+func (h MongoDBHandler) CreateCollection(w http.ResponseWriter, r *http.Request) {
+	connID := router.Param(r, "id")
+
+	var req struct {
+		Database   string `json:"database"`
+		Collection string `json:"collection"`
+		Capped     bool   `json:"capped"`
+		Size       int64  `json:"size"`
+	}
+
+	if !decodeJSONLimited(w, r, h.Logger, &req) {
+		return
+	}
+
+	if err := validateName(req.Database); err != nil {
+		h.badRequest(w, r, "invalid database name: "+err.Error())
+		return
+	}
+
+	if err := validateName(req.Collection); err != nil {
+		h.badRequest(w, r, "invalid collection name: "+err.Error())
+		return
+	}
+
+	if req.Capped && req.Size <= 0 {
+		h.badRequest(w, r, "size is required and must be > 0 when capped is true")
+		return
+	}
+
+	conn, err := h.openClient(connID)
+	if err != nil {
+		if err == connection.ErrNotFound {
+			h.connNotFound(w, r)
+		} else {
+			h.internalErr(w, r, err)
+		}
+		return
+	}
+
+	if conn.Driver != connection.DriverMongoDB {
+		h.badRequest(w, r, "connection is not MongoDB")
+		return
+	}
+
+	if conn.Readonly {
+		h.readonly(w, r)
+		return
+	}
+
+	client, err := h.MongoManager.Open(conn)
+	if err != nil {
+		h.internalErr(w, r, err)
+		return
+	}
+
+	ctx, cancel := h.timeout(r.Context())
+	defer cancel()
+	operationID := h.registerOperation(cancel, "ddl", connID, req.Database+"."+req.Collection, "create collection")
+	defer h.unregisterOperation(operationID)
+
+	opts := options.CreateCollection()
+	if req.Capped {
+		opts.SetCapped(true).SetSizeInBytes(req.Size)
+	}
+
+	if err := client.Database(req.Database).CreateCollection(ctx, req.Collection, opts); err != nil {
+		h.Logger.Error("create collection failed", plumelog.Fields{
+			"connection_id": connID,
+			"database":      req.Database,
+			"collection":    req.Collection,
+			"error":         err.Error(),
+		})
+		h.internalErr(w, r, err)
+		return
+	}
+
+	logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusCreated, map[string]any{
+		"database":   req.Database,
+		"collection": req.Collection,
+		"status":     "created",
+	}, nil))
+}
+
+// --- DropCollection ------------------------------------------------------------
+
+// DropCollection drops a MongoDB collection. Requires confirm=true.
+// DELETE /api/connections/:id/mongo/collections
+func (h MongoDBHandler) DropCollection(w http.ResponseWriter, r *http.Request) {
+	connID := router.Param(r, "id")
+
+	var req struct {
+		Database   string `json:"database"`
+		Collection string `json:"collection"`
+		Confirm    bool   `json:"confirm"`
+	}
+
+	if !decodeJSONLimited(w, r, h.Logger, &req) {
+		return
+	}
+
+	if !req.Confirm {
+		h.badRequest(w, r, "confirm=true is required")
+		return
+	}
+
+	if err := validateName(req.Database); err != nil {
+		h.badRequest(w, r, "invalid database name: "+err.Error())
+		return
+	}
+
+	if err := validateName(req.Collection); err != nil {
+		h.badRequest(w, r, "invalid collection name: "+err.Error())
+		return
+	}
+
+	conn, err := h.openClient(connID)
+	if err != nil {
+		if err == connection.ErrNotFound {
+			h.connNotFound(w, r)
+		} else {
+			h.internalErr(w, r, err)
+		}
+		return
+	}
+
+	if conn.Driver != connection.DriverMongoDB {
+		h.badRequest(w, r, "connection is not MongoDB")
+		return
+	}
+
+	if conn.Readonly {
+		h.readonly(w, r)
+		return
+	}
+
+	client, err := h.MongoManager.Open(conn)
+	if err != nil {
+		h.internalErr(w, r, err)
+		return
+	}
+
+	ctx, cancel := h.timeout(r.Context())
+	defer cancel()
+	operationID := h.registerOperation(cancel, "ddl", connID, req.Database+"."+req.Collection, "drop collection")
+	defer h.unregisterOperation(operationID)
+
+	if err := client.Database(req.Database).Collection(req.Collection).Drop(ctx); err != nil {
+		h.Logger.Error("drop collection failed", plumelog.Fields{
+			"connection_id": connID,
+			"database":      req.Database,
+			"collection":    req.Collection,
+			"error":         err.Error(),
+		})
+		h.internalErr(w, r, err)
+		return
+	}
+
+	logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusOK, map[string]any{
+		"database":   req.Database,
+		"collection": req.Collection,
+		"status":     "dropped",
+	}, nil))
+}
+
+// indexKeyField describes one field of a compound index key, supplied as a
+// JSON array element to preserve key order (a JSON object's key order is not
+// guaranteed in Go's encoding/json, so an ordered array is required instead).
+type indexKeyField struct {
+	Field string `json:"field"`
+	Order int    `json:"order"`
+}
+
+// validateIndexFieldName rejects empty names, embedded NUL bytes, and the
+// "$"-prefixed operator namespace, mirroring the rules MongoDB itself
+// applies to field names used as index keys.
+func validateIndexFieldName(name string) error {
+	if name == "" || strings.ContainsRune(name, 0) || strings.HasPrefix(name, "$") {
+		return fmt.Errorf("field name %q is not allowed", name)
+	}
+	return nil
+}
+
+// parseIndexKeys validates and converts a JSON array of {field, order}
+// objects into an ordered bson.D suitable for mongo.IndexModel.Keys.
+func parseIndexKeys(keysJSON string) (bson.D, error) {
+	if strings.TrimSpace(keysJSON) == "" {
+		return nil, fmt.Errorf("keys is required")
+	}
+	var fields []indexKeyField
+	if err := json.Unmarshal([]byte(keysJSON), &fields); err != nil {
+		return nil, fmt.Errorf("invalid keys JSON: %w", err)
+	}
+	if len(fields) == 0 {
+		return nil, fmt.Errorf("keys must contain at least one field")
+	}
+	keys := make(bson.D, 0, len(fields))
+	seen := make(map[string]bool, len(fields))
+	for _, f := range fields {
+		if err := validateIndexFieldName(f.Field); err != nil {
+			return nil, err
+		}
+		if seen[f.Field] {
+			return nil, fmt.Errorf("duplicate field %q in keys", f.Field)
+		}
+		seen[f.Field] = true
+		if f.Order != 1 && f.Order != -1 {
+			return nil, fmt.Errorf("order for field %q must be 1 or -1", f.Field)
+		}
+		keys = append(keys, bson.E{Key: f.Field, Value: f.Order})
+	}
+	return keys, nil
+}
+
+// --- CreateIndex ---------------------------------------------------------------
+
+// CreateIndex creates an index on a MongoDB collection.
+// POST /api/connections/:id/mongo/indexes/create
+func (h MongoDBHandler) CreateIndex(w http.ResponseWriter, r *http.Request) {
+	connID := router.Param(r, "id")
+
+	var req struct {
+		Database   string `json:"database"`
+		Collection string `json:"collection"`
+		Keys       string `json:"keys"` // JSON array of {field, order}
+		Unique     bool   `json:"unique"`
+		Sparse     bool   `json:"sparse"`
+		Name       string `json:"name"`
+	}
+
+	if !decodeJSONLimited(w, r, h.Logger, &req) {
+		return
+	}
+
+	if err := validateName(req.Database); err != nil {
+		h.badRequest(w, r, "invalid database name: "+err.Error())
+		return
+	}
+
+	if err := validateName(req.Collection); err != nil {
+		h.badRequest(w, r, "invalid collection name: "+err.Error())
+		return
+	}
+
+	keys, err := parseIndexKeys(req.Keys)
+	if err != nil {
+		h.badRequest(w, r, err.Error())
+		return
+	}
+
+	conn, err := h.openClient(connID)
+	if err != nil {
+		if err == connection.ErrNotFound {
+			h.connNotFound(w, r)
+		} else {
+			h.internalErr(w, r, err)
+		}
+		return
+	}
+
+	if conn.Driver != connection.DriverMongoDB {
+		h.badRequest(w, r, "connection is not MongoDB")
+		return
+	}
+
+	if conn.Readonly {
+		h.readonly(w, r)
+		return
+	}
+
+	client, err := h.MongoManager.Open(conn)
+	if err != nil {
+		h.internalErr(w, r, err)
+		return
+	}
+
+	ctx, cancel := h.timeout(r.Context())
+	defer cancel()
+	operationID := h.registerOperation(cancel, "ddl", connID, req.Database+"."+req.Collection, "create index")
+	defer h.unregisterOperation(operationID)
+
+	idxOpts := options.Index().SetUnique(req.Unique).SetSparse(req.Sparse)
+	if req.Name != "" {
+		idxOpts.SetName(req.Name)
+	}
+
+	model := mongo.IndexModel{
+		Keys:    keys,
+		Options: idxOpts,
+	}
+
+	indexName, err := client.Database(req.Database).Collection(req.Collection).Indexes().CreateOne(ctx, model)
+	if err != nil {
+		h.Logger.Error("create index failed", plumelog.Fields{
+			"connection_id": connID,
+			"database":      req.Database,
+			"collection":    req.Collection,
+			"error":         err.Error(),
+		})
+		h.internalErr(w, r, err)
+		return
+	}
+
+	logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusCreated, map[string]any{
+		"database":   req.Database,
+		"collection": req.Collection,
+		"name":       indexName,
+		"status":     "created",
+	}, nil))
+}
+
+// --- DropIndex -----------------------------------------------------------------
+
+// DropIndex drops an index from a MongoDB collection. Requires confirm=true.
+// DELETE /api/connections/:id/mongo/indexes
+func (h MongoDBHandler) DropIndex(w http.ResponseWriter, r *http.Request) {
+	connID := router.Param(r, "id")
+
+	var req struct {
+		Database   string `json:"database"`
+		Collection string `json:"collection"`
+		Name       string `json:"name"`
+		Confirm    bool   `json:"confirm"`
+	}
+
+	if !decodeJSONLimited(w, r, h.Logger, &req) {
+		return
+	}
+
+	if !req.Confirm {
+		h.badRequest(w, r, "confirm=true is required")
+		return
+	}
+
+	if err := validateName(req.Database); err != nil {
+		h.badRequest(w, r, "invalid database name: "+err.Error())
+		return
+	}
+
+	if err := validateName(req.Collection); err != nil {
+		h.badRequest(w, r, "invalid collection name: "+err.Error())
+		return
+	}
+
+	if req.Name == "" {
+		h.badRequest(w, r, "index name is required")
+		return
+	}
+	if req.Name == "_id_" {
+		h.badRequest(w, r, `the default "_id_" index cannot be dropped`)
+		return
+	}
+
+	conn, err := h.openClient(connID)
+	if err != nil {
+		if err == connection.ErrNotFound {
+			h.connNotFound(w, r)
+		} else {
+			h.internalErr(w, r, err)
+		}
+		return
+	}
+
+	if conn.Driver != connection.DriverMongoDB {
+		h.badRequest(w, r, "connection is not MongoDB")
+		return
+	}
+
+	if conn.Readonly {
+		h.readonly(w, r)
+		return
+	}
+
+	client, err := h.MongoManager.Open(conn)
+	if err != nil {
+		h.internalErr(w, r, err)
+		return
+	}
+
+	ctx, cancel := h.timeout(r.Context())
+	defer cancel()
+	operationID := h.registerOperation(cancel, "ddl", connID, req.Database+"."+req.Collection, "drop index")
+	defer h.unregisterOperation(operationID)
+
+	if _, err := client.Database(req.Database).Collection(req.Collection).Indexes().DropOne(ctx, req.Name); err != nil {
+		h.Logger.Error("drop index failed", plumelog.Fields{
+			"connection_id": connID,
+			"database":      req.Database,
+			"collection":    req.Collection,
+			"name":          req.Name,
+			"error":         err.Error(),
+		})
+		h.internalErr(w, r, err)
+		return
+	}
+
+	logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusOK, map[string]any{
+		"database":   req.Database,
+		"collection": req.Collection,
+		"name":       req.Name,
+		"status":     "dropped",
+	}, nil))
+}
+
 // ListHistory returns the aggregation pipeline history for a connection.
 // GET /api/connections/:id/mongo/history
 func (h MongoDBHandler) ListHistory(w http.ResponseWriter, r *http.Request) {
