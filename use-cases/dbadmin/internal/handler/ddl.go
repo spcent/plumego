@@ -238,6 +238,132 @@ func (h DDLHandler) DropTable(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+type createViewRequest struct {
+	Name  string `json:"name"`
+	Query string `json:"query"`
+}
+
+// maxViewQueryLen bounds the size of a CREATE VIEW query body. The body is
+// not parsed or validated beyond length/non-empty checks — it is trusted
+// user-supplied SQL, the same trust model applied to CreateTable's column DDL.
+const maxViewQueryLen = 20000
+
+// CreateView executes CREATE VIEW.
+func (h DDLHandler) CreateView(w http.ResponseWriter, r *http.Request) {
+	db, conn, dbName, err := h.openDB(r)
+	if err != nil {
+		h.writeConnErr(w, r, err)
+		return
+	}
+	if guardReadonly(conn, w, r, h.Logger) {
+		return
+	}
+	var req createViewRequest
+	if !decodeJSONLimited(w, r, h.Logger, &req) {
+		return
+	}
+	if req.Name == "" {
+		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+			Type(contract.TypeValidation).Message("name is required").Build()))
+		return
+	}
+	if err := validateIdentifierName(req.Name); err != nil {
+		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+			Type(contract.TypeValidation).Message("invalid view name: "+err.Error()).Build()))
+		return
+	}
+	query := strings.TrimSpace(req.Query)
+	if query == "" {
+		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+			Type(contract.TypeValidation).Message("query is required").Build()))
+		return
+	}
+	if len(query) > maxViewQueryLen {
+		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+			Type(contract.TypeValidation).Message(fmt.Sprintf("query too long (max %d chars)", maxViewQueryLen)).Build()))
+		return
+	}
+	var fqn string
+	switch conn.Driver {
+	case connection.DriverMySQL:
+		fqn = fmt.Sprintf("%s.%s", quoteIdent(dbName, conn.Driver), quoteIdent(req.Name, conn.Driver))
+	default:
+		fqn = quoteIdent(req.Name, conn.Driver)
+	}
+	ddl := "CREATE VIEW " + fqn + " AS " + query
+	// codeql[go/sql-injection]: the view name is validated by validateIdentifierName
+	// and quoted via quoteIdent above; the query body is the user-supplied SELECT
+	// statement defining the view, accepted under the same trust model as
+	// CreateTable's column DDL (this is an explicit DB admin operation).
+	if _, err := db.ExecContext(r.Context(), ddl); err != nil {
+		h.Logger.Error("create view", plumelog.Fields{"error": err.Error()})
+		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+			Type(contract.TypeInternal).Message("failed to create view").
+			Detail("error", err.Error()).Build()))
+		return
+	}
+	logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusCreated,
+		map[string]string{"view": req.Name, "status": "created"}, nil))
+}
+
+// DropView executes DROP VIEW. Requires ?confirm=true to prevent accidental drops.
+func (h DDLHandler) DropView(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Query().Get("confirm") != "true" {
+		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+			Type(contract.TypeBadRequest).Message("confirm required: add ?confirm=true").Build()))
+		return
+	}
+	db, conn, dbName, err := h.openDB(r)
+	if err != nil {
+		h.writeConnErr(w, r, err)
+		return
+	}
+	if guardReadonly(conn, w, r, h.Logger) {
+		return
+	}
+	view := router.Param(r, "view")
+	if err := validateIdentifierName(view); err != nil {
+		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+			Type(contract.TypeValidation).Message("invalid view name: "+err.Error()).Build()))
+		return
+	}
+	var fqn string
+	switch conn.Driver {
+	case connection.DriverMySQL:
+		fqn = fmt.Sprintf("%s.%s", quoteIdent(dbName, conn.Driver), quoteIdent(view, conn.Driver))
+	default:
+		fqn = quoteIdent(view, conn.Driver)
+	}
+	// codeql[go/sql-injection]: DROP VIEW uses a view name validated by
+	// validateIdentifierName and quoted via quoteIdent.
+	if _, err := db.ExecContext(r.Context(), "DROP VIEW IF EXISTS "+fqn); err != nil {
+		h.Logger.Error("drop view", plumelog.Fields{"error": err.Error()})
+		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+			Type(contract.TypeInternal).Message("failed to drop view").
+			Detail("error", err.Error()).Build()))
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// validateIdentifierName rejects names that contain SQL statement terminators
+// or comment markers, mirroring validateColumnType's blocklist approach. The
+// name is later passed through quoteIdent for driver-specific escaping.
+func validateIdentifierName(s string) error {
+	if s == "" {
+		return fmt.Errorf("name is required")
+	}
+	if len(s) > 64 {
+		return fmt.Errorf("name too long (max 64 chars)")
+	}
+	for _, bad := range []string{";", "--", "/*", "*/", "\x00"} {
+		if strings.Contains(s, bad) {
+			return fmt.Errorf("name contains unsafe characters")
+		}
+	}
+	return nil
+}
+
 func (h DDLHandler) openDB(r *http.Request) (*sql.DB, *connection.Connection, string, error) {
 	connID := router.Param(r, "id")
 	conn, err := h.Connections.Get(connID)

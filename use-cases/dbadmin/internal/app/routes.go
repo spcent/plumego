@@ -222,6 +222,8 @@ func (a *App) RegisterRoutes() error {
 	protected.post("/api/conn/:id/db/:db/tables", guard(http.HandlerFunc(ddlH.CreateTable)))
 	protected.put("/api/conn/:id/db/:db/tables/:table", guard(http.HandlerFunc(ddlH.AlterTable)))
 	protected.delete("/api/conn/:id/db/:db/tables/:table", guard(http.HandlerFunc(ddlH.DropTable)))
+	protected.post("/api/conn/:id/db/:db/views", guard(http.HandlerFunc(ddlH.CreateView)))
+	protected.delete("/api/conn/:id/db/:db/views/:view", guard(http.HandlerFunc(ddlH.DropView)))
 
 	// Export and Import.
 	protected.get("/api/conn/:id/db/:db/tables/:table/export", guard(http.HandlerFunc(exportH.Export)))
