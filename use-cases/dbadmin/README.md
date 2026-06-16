@@ -28,6 +28,7 @@ As a Plumego use-case app, dbadmin demonstrates how to build a production-scale 
 
 ### Core Capabilities
 - **Connection Management**: Save, test, and organize connections with optional credential encryption
+- **Connection Config Import/Export**: Export all saved connections as a JSON document (with secrets redacted) and re-import them on another instance
 - **Resource Browsing**: Tree view of databases, tables, collections, indices, and keys
 - **Query Execution**: Syntax-highlighted editors with server-side SQL, Redis, MongoDB, and Elasticsearch history plus result formatting
 - **Data Manipulation**: View, edit, insert, delete with confirmation dialogs for dangerous operations
