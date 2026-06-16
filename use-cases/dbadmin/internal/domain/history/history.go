@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	kvstore "github.com/spcent/plumego/store/kv"
@@ -56,6 +57,49 @@ func (s *Store) List(connID string) ([]Entry, error) {
 		return nil, err
 	}
 	return entries, nil
+}
+
+// SearchOptions filters the results returned by Search.
+type SearchOptions struct {
+	Query    string // substring match against Entry.SQL (case-insensitive)
+	HasError *bool  // nil = don't filter; true = only entries with Error != ""; false = only entries with Error == ""
+	Database string // exact match against Entry.Database, empty = don't filter
+	Limit    int    // max entries to return, 0 = use existing maxPerConn default
+}
+
+// Search returns history entries for a connection, most recent first,
+// filtered according to opts. It builds on List, so it inherits the
+// existing per-connection cap of maxPerConn entries.
+func (s *Store) Search(connID string, opts SearchOptions) ([]Entry, error) {
+	entries, err := s.List(connID)
+	if err != nil {
+		return nil, err
+	}
+	query := strings.ToLower(strings.TrimSpace(opts.Query))
+	limit := opts.Limit
+	if limit <= 0 {
+		limit = maxPerConn
+	}
+	filtered := make([]Entry, 0, len(entries))
+	for _, e := range entries {
+		if query != "" && !strings.Contains(strings.ToLower(e.SQL), query) {
+			continue
+		}
+		if opts.HasError != nil {
+			hasErr := e.Error != ""
+			if hasErr != *opts.HasError {
+				continue
+			}
+		}
+		if opts.Database != "" && e.Database != opts.Database {
+			continue
+		}
+		filtered = append(filtered, e)
+		if len(filtered) >= limit {
+			break
+		}
+	}
+	return filtered, nil
 }
 
 // Delete removes a single history entry by ID for the given connection.

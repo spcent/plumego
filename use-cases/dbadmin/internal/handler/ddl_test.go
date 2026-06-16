@@ -113,6 +113,41 @@ func TestValidateEngine_invalid(t *testing.T) {
 	}
 }
 
+// --- validateIdentifierName ---
+
+func TestValidateIdentifierName_valid(t *testing.T) {
+	cases := []string{"users", "my_view", "View2", "users_archive"}
+	for _, name := range cases {
+		if err := validateIdentifierName(name); err != nil {
+			t.Errorf("validateIdentifierName(%q) returned unexpected error: %v", name, err)
+		}
+	}
+}
+
+func TestValidateIdentifierName_invalid(t *testing.T) {
+	cases := []struct {
+		in  string
+		msg string
+	}{
+		{"", "required"},
+		{"v; DROP TABLE users", "unsafe"},
+		{"v -- comment", "unsafe"},
+		{"v /* evil */", "unsafe"},
+		{strings.Repeat("x", 65), "too long"},
+		{"v\x00name", "unsafe"},
+	}
+	for _, c := range cases {
+		err := validateIdentifierName(c.in)
+		if err == nil {
+			t.Errorf("validateIdentifierName(%q) = nil, want error containing %q", c.in, c.msg)
+			continue
+		}
+		if !strings.Contains(err.Error(), c.msg) {
+			t.Errorf("validateIdentifierName(%q) error = %q, want to contain %q", c.in, err.Error(), c.msg)
+		}
+	}
+}
+
 // --- buildAlterTable rename ---
 
 func TestBuildAlterTable_renameMySQL(t *testing.T) {
