@@ -157,6 +157,8 @@ func (h DDLHandler) DropTable(w http.ResponseWriter, r *http.Request) {
 	switch conn.Driver {
 	case connection.DriverMySQL:
 		fqn = fmt.Sprintf("`%s`.`%s`", dbName, table)
+	case connection.DriverPostgres:
+		fqn = postgresTableFQN(dbName, table)
 	default:
 		fqn = fmt.Sprintf(`"%s"`, table)
 	}
@@ -194,11 +196,23 @@ func (h DDLHandler) writeConnErr(w http.ResponseWriter, r *http.Request, err err
 		Detail("error", err.Error()).Build()))
 }
 
+// postgresTableFQN builds a schema-qualified, quoted PostgreSQL table
+// reference. An empty schema is omitted, relying on the connection's
+// search_path (defaults to "public").
+func postgresTableFQN(schema, table string) string {
+	if schema == "" {
+		return fmt.Sprintf(`"%s"`, table)
+	}
+	return fmt.Sprintf(`"%s"."%s"`, schema, table)
+}
+
 func buildCreateTable(dbName string, req createTableRequest, driver connection.DriverType) string {
 	var sb strings.Builder
 	switch driver {
 	case connection.DriverMySQL:
 		sb.WriteString(fmt.Sprintf("CREATE TABLE %s.%s (\n", quoteIdent(dbName, driver), quoteIdent(req.Name, driver)))
+	case connection.DriverPostgres:
+		sb.WriteString(fmt.Sprintf("CREATE TABLE %s (\n", postgresTableFQN(dbName, req.Name)))
 	default:
 		sb.WriteString(fmt.Sprintf("CREATE TABLE %s (\n", quoteIdent(req.Name, driver)))
 	}
@@ -303,6 +317,23 @@ func buildAlterTable(dbName, table string, req alterTableRequest, driver connect
 		if req.RenameTable != "" {
 			stmts = append(stmts, fmt.Sprintf("RENAME TABLE %s TO %s.%s",
 				fqn, quoteIdent(dbName, driver), quoteIdent(req.RenameTable, driver)))
+		}
+	case connection.DriverPostgres:
+		// PostgreSQL supports ADD COLUMN, DROP COLUMN, and RENAME TO in standard SQL.
+		fqn := postgresTableFQN(dbName, table)
+		var parts []string
+		for _, col := range req.AddColumns {
+			parts = append(parts, fmt.Sprintf("ADD COLUMN %s %s", quoteIdent(col.Name, driver), col.Type))
+		}
+		for _, col := range req.DropColumns {
+			parts = append(parts, fmt.Sprintf("DROP COLUMN %s", quoteIdent(col, driver)))
+		}
+		if len(parts) > 0 {
+			stmts = append(stmts, fmt.Sprintf("ALTER TABLE %s %s", fqn, strings.Join(parts, ", ")))
+		}
+		if req.RenameTable != "" {
+			stmts = append(stmts, fmt.Sprintf("ALTER TABLE %s RENAME TO %s",
+				fqn, quoteIdent(req.RenameTable, driver)))
 		}
 	default:
 		// SQLite: only ADD COLUMN and RENAME TABLE are supported.

@@ -7,6 +7,8 @@ replace github.com/spcent/plumego => ../..
 require (
 	github.com/elastic/go-elasticsearch/v8 v8.19.6
 	github.com/go-sql-driver/mysql v1.10.0
+	github.com/google/uuid v1.6.0
+	github.com/lib/pq v1.12.3
 	github.com/redis/go-redis/v9 v9.20.0
 	github.com/spcent/plumego v0.0.0-00010101000000-000000000000
 	go.mongodb.org/mongo-driver v1.17.9
@@ -21,7 +23,6 @@ require (
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
-	github.com/google/uuid v1.6.0 // indirect
 	github.com/klauspost/compress v1.16.7 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/montanaflynn/stats v0.7.1 // indirect

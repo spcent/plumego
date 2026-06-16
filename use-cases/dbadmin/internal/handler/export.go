@@ -15,6 +15,7 @@ import (
 
 	"dbadmin/internal/dbmanager"
 	mysqlinspect "dbadmin/internal/dbmanager/mysql"
+	postgresinspect "dbadmin/internal/dbmanager/postgres"
 	sqliteinspect "dbadmin/internal/dbmanager/sqlite"
 	"dbadmin/internal/domain/connection"
 )
@@ -67,6 +68,12 @@ func (h ExportHandler) Export(w http.ResponseWriter, r *http.Request) {
 	switch conn.Driver {
 	case connection.DriverMySQL:
 		tableFQN = fmt.Sprintf("`%s`.`%s`", dbName, table)
+	case connection.DriverPostgres:
+		if dbName != "" {
+			tableFQN = fmt.Sprintf(`"%s"."%s"`, dbName, table)
+		} else {
+			tableFQN = fmt.Sprintf(`"%s"`, table)
+		}
 	default:
 		tableFQN = fmt.Sprintf(`"%s"`, table)
 	}
@@ -162,15 +169,25 @@ func (h ExportHandler) exportSQL(w http.ResponseWriter, r *http.Request, rows in
 	switch conn.Driver {
 	case connection.DriverMySQL:
 		tableFQN = fmt.Sprintf("`%s`.`%s`", dbName, table)
+	case connection.DriverPostgres:
+		if dbName != "" {
+			tableFQN = fmt.Sprintf(`"%s"."%s"`, dbName, table)
+		} else {
+			tableFQN = fmt.Sprintf(`"%s"`, table)
+		}
 	default:
 		tableFQN = fmt.Sprintf(`"%s"`, table)
 	}
 
 	var ins dbmanager.Inspector
-	if conn.Driver == connection.DriverMySQL {
+	switch conn.Driver {
+	case connection.DriverMySQL:
 		db, _ := h.Manager.Open(conn)
 		ins = mysqlinspect.New(db)
-	} else {
+	case connection.DriverPostgres:
+		db, _ := h.Manager.Open(conn)
+		ins = postgresinspect.New(db)
+	default:
 		db, _ := h.Manager.Open(conn)
 		ins = sqliteinspect.New(db)
 	}

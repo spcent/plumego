@@ -240,6 +240,16 @@ func validateConnection(c *connection.Connection) error {
 		if c.Port == 0 {
 			c.Port = 3306
 		}
+	case connection.DriverPostgres:
+		if c.Host == "" {
+			return fmt.Errorf("host is required for postgres")
+		}
+		if c.Port == 0 {
+			c.Port = 5432
+		}
+		if c.Database == "" {
+			c.Database = "postgres"
+		}
 	case connection.DriverSQLite:
 		if c.FilePath == "" {
 			return fmt.Errorf("file_path is required for sqlite")
@@ -272,7 +282,7 @@ func validateConnection(c *connection.Connection) error {
 			c.ESNodes = []string{fmt.Sprintf("http://%s:%d", c.Host, c.Port)}
 		}
 	default:
-		return fmt.Errorf("driver must be 'mysql', 'sqlite', 'redis', 'mongodb', or 'elasticsearch'")
+		return fmt.Errorf("driver must be 'mysql', 'postgres', 'sqlite', 'redis', 'mongodb', or 'elasticsearch'")
 	}
 	return nil
 }

@@ -23,8 +23,9 @@ import (
 type DriverType string
 
 const (
-	DriverMySQL  DriverType = "mysql"
-	DriverSQLite DriverType = "sqlite"
+	DriverMySQL    DriverType = "mysql"
+	DriverPostgres DriverType = "postgres"
+	DriverSQLite   DriverType = "sqlite"
 
 	DriverRedis         DriverType = "redis"         // supported: save/load config; driver not yet implemented
 	DriverMongoDB       DriverType = "mongodb"       // supported: save/load config; driver not yet implemented
@@ -56,6 +57,11 @@ type Connection struct {
 	// Redis-specific fields (used when Driver = "redis")
 	RedisDBIndex int  `json:"redis_db_index,omitempty"` // logical DB index 0-15, default 0
 	TLSEnabled   bool `json:"tls_enabled,omitempty"`    // use TLS/SSL
+
+	// SQL-specific TLS fields (MySQL and PostgreSQL)
+	SQLTLSMode       string `json:"sql_tls_mode,omitempty"`        // disable, require, verify-ca, verify-full
+	SQLTLSSkipVerify bool   `json:"sql_tls_skip_verify,omitempty"` // skip TLS certificate verification
+	SQLTLSCAFile     string `json:"sql_tls_ca_file,omitempty"`     // path to CA certificate file
 
 	// MongoDB-specific fields (used when Driver = "mongodb")
 	MongoURI        string `json:"mongo_uri,omitempty"`         // mongodb://host:port or mongodb+srv:// connection string
