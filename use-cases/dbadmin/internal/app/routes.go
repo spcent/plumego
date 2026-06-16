@@ -56,6 +56,7 @@ func (a *App) RegisterRoutes() error {
 		AdminUser:     a.Cfg.App.AdminUser,
 		AdminPassword: a.Cfg.App.AdminPassword,
 		AdminRole:     a.Cfg.App.AdminRole,
+		Users:         a.Users,
 		SessionTTL:    a.Cfg.App.SessionTTL,
 		Sessions:      a.SessionStore,
 		LoginLimiter:  handler.NewLoginLimiter(5, 15*time.Minute),
@@ -77,7 +78,8 @@ func (a *App) RegisterRoutes() error {
 	root.get("/pool-stats/sql", http.HandlerFunc(poolStatsH.GetSQLPoolStats))
 	root.get("/runtime-stats", http.HandlerFunc(runtimeStatsH.GetStats))
 	sameOriginMw := handler.SameOriginMiddleware(a.Core.Logger())
-	root.post("/api/auth/login", sameOriginMw(http.HandlerFunc(authH.Login)))
+	ipMw := handler.IPAllowlistMiddleware(a.Cfg.App.AllowedIPs, a.Core.Logger())
+	root.post("/api/auth/login", ipMw(sameOriginMw(http.HandlerFunc(authH.Login))))
 	if root.err != nil {
 		return root.err
 	}
@@ -170,11 +172,15 @@ func (a *App) RegisterRoutes() error {
 	// Protected routes — all require a valid session cookie.
 	roleMw := handler.RoleMiddleware(a.Cfg.App.AdminRole, a.Core.Logger())
 	auditMw := handler.AuditMiddleware(a.AuditStore, a.Cfg.App.AdminRole, a.Core.Logger())
-	guard := func(h http.Handler) http.Handler { return sameOriginMw(authMw(auditMw(roleMw(h)))) }
+	guard := func(h http.Handler) http.Handler {
+		return ipMw(sameOriginMw(authMw(auditMw(roleMw(h)))))
+	}
 
 	protected := newRouteReg(a.Core)
 	protected.post("/api/auth/logout", guard(http.HandlerFunc(authH.Logout)))
 	protected.get("/api/auth/me", guard(http.HandlerFunc(authH.Me)))
+	protected.post("/api/auth/sessions/revoke", guard(http.HandlerFunc(authH.RevokeAllSessions)))
+	protected.get("/api/auth/users", guard(http.HandlerFunc(authH.ListUsers)))
 	protected.get("/api/audit/events", guard(http.HandlerFunc(auditH.List)))
 	protected.get("/api/audit/export", guard(http.HandlerFunc(auditH.Export)))
 

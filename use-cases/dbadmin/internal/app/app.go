@@ -60,7 +60,8 @@ type App struct {
 	UploadDir         string
 	QueryRegistry     *handler.QueryRegistry
 	OperationRegistry *handler.OperationRegistry
-	StartTime         time.Time // Track app start time for uptime monitoring
+	StartTime         time.Time           // Track app start time for uptime monitoring
+	Users             []config.UserConfig // resolved user list (from cfg.App.ResolveUsers())
 }
 
 // New constructs the App with all middleware and shared dependencies wired.
@@ -186,6 +187,7 @@ func New(cfg config.Config) (*App, error) {
 		QueryRegistry:     handler.NewQueryRegistry(),
 		OperationRegistry: handler.NewOperationRegistry(),
 		StartTime:         time.Now(),
+		Users:             cfg.App.ResolveUsers(),
 	}, nil
 }
 

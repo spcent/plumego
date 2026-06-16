@@ -14,19 +14,23 @@ import (
 	plumelog "github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/security/authn"
 
+	"dbadmin/internal/config"
 	dbauthn "dbadmin/internal/domain/authn"
 	"dbadmin/internal/domain/session"
 )
 
 // AuthHandler handles login, logout, and current-user endpoints.
 type AuthHandler struct {
+	// Legacy single-user fields (kept for backward compat, used when Users is nil)
 	AdminUser     string
 	AdminPassword string
 	AdminRole     string
-	SessionTTL    time.Duration
-	Sessions      *session.Store
-	LoginLimiter  *LoginLimiter
-	Logger        plumelog.StructuredLogger
+	// Users, when non-empty, takes precedence over AdminUser/AdminPassword/AdminRole.
+	Users        []config.UserConfig
+	SessionTTL   time.Duration
+	Sessions     *session.Store
+	LoginLimiter *LoginLimiter
+	Logger       plumelog.StructuredLogger
 }
 
 type loginRequest struct {
@@ -57,7 +61,8 @@ func (h AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 			Build()))
 		return
 	}
-	if !secureEqual(req.Username, h.AdminUser) || !secureEqual(req.Password, h.AdminPassword) {
+	user, ok := h.findUser(req.Username, req.Password)
+	if !ok {
 		if h.LoginLimiter != nil {
 			h.LoginLimiter.RecordFailure(remote)
 		}
@@ -70,7 +75,7 @@ func (h AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	if h.LoginLimiter != nil {
 		h.LoginLimiter.Reset(remote)
 	}
-	token, err := h.Sessions.Create(req.Username)
+	token, err := h.Sessions.Create(user.Username)
 	if err != nil {
 		h.Logger.Error("create session", plumelog.Fields{"error": err.Error()})
 		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
@@ -88,7 +93,35 @@ func (h AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		SameSite: http.SameSiteLaxMode,
 		MaxAge:   int(h.sessionTTL().Seconds()),
 	})
-	logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusOK, meResponse{User: req.Username, Role: h.role()}, nil))
+	logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusOK, meResponse{User: user.Username, Role: h.roleForUser(user.Username)}, nil))
+}
+
+// findUser looks up a user by username and password. When h.Users is set it
+// takes precedence; otherwise it falls back to the legacy single-user fields.
+func (h AuthHandler) findUser(username, password string) (config.UserConfig, bool) {
+	if len(h.Users) > 0 {
+		var match config.UserConfig
+		found := false
+		for _, u := range h.Users {
+			if secureEqual(username, u.Username) {
+				match = u
+				found = true
+			}
+		}
+		if !found {
+			// Still perform a comparison to keep timing consistent.
+			secureEqual(password, "")
+			return config.UserConfig{}, false
+		}
+		if !secureEqual(password, match.Password) {
+			return config.UserConfig{}, false
+		}
+		return match, true
+	}
+	if !secureEqual(username, h.AdminUser) || !secureEqual(password, h.AdminPassword) {
+		return config.UserConfig{}, false
+	}
+	return config.UserConfig{Username: h.AdminUser, Password: h.AdminPassword, Role: h.AdminRole}, true
 }
 
 func (h AuthHandler) sessionTTL() time.Duration {
@@ -103,6 +136,20 @@ func (h AuthHandler) role() string {
 		return "admin"
 	}
 	return h.AdminRole
+}
+
+// roleForUser resolves the role for username, checking h.Users first and
+// falling back to the legacy single-user AdminRole.
+func (h AuthHandler) roleForUser(username string) string {
+	for _, u := range h.Users {
+		if u.Username == username {
+			return u.Role
+		}
+	}
+	if h.AdminRole != "" {
+		return h.AdminRole
+	}
+	return "admin"
 }
 
 // Logout deletes the session and clears the cookie.
@@ -134,7 +181,51 @@ func (h AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 			Build()))
 		return
 	}
-	logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusOK, meResponse{User: principal.Subject, Role: h.role()}, nil))
+	logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusOK, meResponse{User: principal.Subject, Role: h.roleForUser(principal.Subject)}, nil))
+}
+
+// RevokeAllSessions deletes all sessions belonging to the current user and
+// clears their session cookie.
+func (h AuthHandler) RevokeAllSessions(w http.ResponseWriter, r *http.Request) {
+	principal := authn.PrincipalFromContext(r.Context())
+	if principal == nil {
+		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+			Type(contract.TypeUnauthorized).
+			Message("not authenticated").
+			Build()))
+		return
+	}
+	count, err := h.Sessions.DeleteAllByUser(principal.Subject)
+	if err != nil {
+		h.Logger.Error("revoke sessions", plumelog.Fields{"error": err.Error()})
+		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+			Type(contract.TypeInternal).
+			Message("failed to revoke sessions").
+			Build()))
+		return
+	}
+	http.SetCookie(w, &http.Cookie{
+		Name:     dbauthn.CookieName(),
+		Value:    "",
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   secureCookie(r),
+		MaxAge:   -1,
+	})
+	logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusOK, map[string]any{"status": "ok", "revoked": count}, nil))
+}
+
+// ListUsers returns the configured users (username and role only).
+func (h AuthHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
+	type userInfo struct {
+		Username string `json:"username"`
+		Role     string `json:"role"`
+	}
+	users := make([]userInfo, 0, len(h.Users))
+	for _, u := range h.Users {
+		users = append(users, userInfo{Username: u.Username, Role: u.Role})
+	}
+	logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusOK, users, nil))
 }
 
 func secureEqual(a, b string) bool {
