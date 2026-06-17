@@ -291,10 +291,7 @@ func (h DDLHandler) CreateView(w http.ResponseWriter, r *http.Request) {
 		fqn = quoteIdent(req.Name, conn.Driver)
 	}
 	ddl := "CREATE VIEW " + fqn + " AS " + query
-	// codeql[go/sql-injection]: the view name is validated by validateIdentifierName
-	// and quoted via quoteIdent above; the query body is the user-supplied SELECT
-	// statement defining the view, accepted under the same trust model as
-	// CreateTable's column DDL (this is an explicit DB admin operation).
+	// codeql[go/sql-injection] name is identifier-validated+quoted; query body is intentional admin-authored SQL (same model as query execution)
 	if _, err := db.ExecContext(r.Context(), ddl); err != nil {
 		h.Logger.Error("create view", plumelog.Fields{"error": err.Error()})
 		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
@@ -334,8 +331,7 @@ func (h DDLHandler) DropView(w http.ResponseWriter, r *http.Request) {
 	default:
 		fqn = quoteIdent(view, conn.Driver)
 	}
-	// codeql[go/sql-injection]: DROP VIEW uses a view name validated by
-	// validateIdentifierName and quoted via quoteIdent.
+	// codeql[go/sql-injection] name is identifier-validated+quoted; DROP VIEW does not accept user data in value position
 	if _, err := db.ExecContext(r.Context(), "DROP VIEW IF EXISTS "+fqn); err != nil {
 		h.Logger.Error("drop view", plumelog.Fields{"error": err.Error()})
 		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
