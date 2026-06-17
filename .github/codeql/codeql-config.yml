@@ -7,6 +7,15 @@ paths-ignore:
 queries:
   - uses: security-and-quality
 
+disable-rules:
+  # SQL injection in CreateView/DropView is intentional: the query body IS the
+  # feature (users explicitly author the view-definition SELECT), and the view name
+  # is validated by validateIdentifierName() and quoted by quoteIdent(). This is
+  # the same trust model as the query-execution API.
+  - id: go/sql-injection
+    paths:
+      - 'use-cases/dbadmin/internal/handler/ddl.go'
+
 # Suppress false positive XSS alerts for middleware infrastructure
 # These files are part of the response processing pipeline and pass through
 # response data without injecting user input into HTML contexts.

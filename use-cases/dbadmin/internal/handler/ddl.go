@@ -291,7 +291,7 @@ func (h DDLHandler) CreateView(w http.ResponseWriter, r *http.Request) {
 		fqn = quoteIdent(req.Name, conn.Driver)
 	}
 	ddl := "CREATE VIEW " + fqn + " AS " + query
-	if _, err := db.ExecContext(r.Context(), ddl); err != nil { // codeql[go/sql-injection-builtin]
+	if _, err := db.ExecContext(r.Context(), ddl); err != nil {
 		h.Logger.Error("create view", plumelog.Fields{"error": err.Error()})
 		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeInternal).Message("failed to create view").
