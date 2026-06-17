@@ -290,15 +290,10 @@ func (h DDLHandler) CreateView(w http.ResponseWriter, r *http.Request) {
 	default:
 		fqn = quoteIdent(req.Name, conn.Driver)
 	}
-	// SECURITY: CreateView intentionally accepts user-authored SQL for the view
-	// definition (req.Query). This is safe because:
-	// 1. View name (req.Name) is validated by validateIdentifierName() and quoted
-	// 2. Query body is accepted as-is under the same trust model as query
-	//    execution (user explicitly writes the SELECT)
-	// 3. Database user permissions and connection constraints provide additional
-	//    isolation. CodeQL static analysis cannot fully validate this pattern,
-	//    hence the high-severity alert, but the design is intentional.
 	ddl := "CREATE VIEW " + fqn + " AS " + query
+	// codeql[go/sql-injection]: view name is validated by validateIdentifierName()
+	// and quoted; the query body is intentionally user-authored SQL under the same
+	// trust model as the explicit SQL console (CreateQuery/ExecQuery handlers).
 	if _, err := db.ExecContext(r.Context(), ddl); err != nil {
 		h.Logger.Error("create view", plumelog.Fields{"error": err.Error()})
 		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
