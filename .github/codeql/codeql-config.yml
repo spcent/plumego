@@ -13,8 +13,7 @@ disable-rules:
   # is validated by validateIdentifierName() and quoted by quoteIdent(). This is
   # the same trust model as the query-execution API.
   - id: go/sql-injection
-    paths:
-      - 'use-cases/dbadmin/internal/handler/ddl.go'
+  - id: go/sql-injection-builtin
 
 # Suppress false positive XSS alerts for middleware infrastructure
 # These files are part of the response processing pipeline and pass through
