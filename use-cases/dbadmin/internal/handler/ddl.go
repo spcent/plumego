@@ -291,10 +291,10 @@ func (h DDLHandler) CreateView(w http.ResponseWriter, r *http.Request) {
 		fqn = quoteIdent(req.Name, conn.Driver)
 	}
 	ddl := "CREATE VIEW " + fqn + " AS " + query
-	// codeql[go/sql-injection]: view name is validated by validateIdentifierName()
-	// and quoted; the query body is intentionally user-authored SQL under the same
-	// trust model as the explicit SQL console (CreateQuery/ExecQuery handlers).
-	if _, err := db.ExecContext(r.Context(), ddl); err != nil {
+	// codeql[go/sql-injection]: view name validated+quoted by validateIdentifierName
+	// and quoteIdent; query body is intentionally user-authored SQL under the same
+	// trust model as CreateQuery/ExecQuery which also accept raw user SQL directly.
+	if _, err := db.ExecContext(r.Context(), ddl); err != nil { // lgtm[go/sql-injection]
 		h.Logger.Error("create view", plumelog.Fields{"error": err.Error()})
 		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeInternal).Message("failed to create view").
