@@ -109,9 +109,9 @@ type SaveResult struct {
 // ListResult is the paginated list response.
 type ListResult struct {
 	Items      []Summary `json:"items"`
-	Total      int64     `json:"total"`   // -1 in keyset-cursor mode (total not computed)
+	Total      int64     `json:"total"` // -1 in keyset-cursor mode (total not computed)
 	Limit      int       `json:"limit"`
-	Offset     int       `json:"offset"`  // only meaningful in offset mode
+	Offset     int       `json:"offset"`                // only meaningful in offset mode
 	NextCursor string    `json:"next_cursor,omitempty"` // pass as after_id for the next page
 	HasMore    bool      `json:"has_more"`
 }
