@@ -71,7 +71,7 @@ func (a *RedisAdapter) Close(_ context.Context, _ *Session) error {
 // ListResources returns a ResourceNode for each Redis database (0-15) with
 // their key counts. The sidebar renders these as db0, db1, … db15.
 func (a *RedisAdapter) ListResources(ctx context.Context, sess *Session, parent *ResourceRef) ([]ResourceNode, error) {
-	cl, ok := sess.Handle.(*redis.Client)
+	cl, ok := sess.Handle.(redis.UniversalClient)
 	if !ok {
 		return nil, fmt.Errorf("redis adapter: unexpected handle type %T", sess.Handle)
 	}

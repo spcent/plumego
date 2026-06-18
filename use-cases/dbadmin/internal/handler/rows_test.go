@@ -384,3 +384,39 @@ func TestBuildUpdateSetClause_single(t *testing.T) {
 		t.Errorf("got %q, want %q", got, want)
 	}
 }
+
+// --- buildWhereInClause ---
+
+func TestBuildWhereInClause_mysql(t *testing.T) {
+	where, args := buildWhereInClause("id", []any{1, 2, 3}, connection.DriverMySQL, 1)
+	want := " WHERE `id` IN (?, ?, ?)"
+	if where != want {
+		t.Errorf("where: got %q, want %q", where, want)
+	}
+	if len(args) != 3 || args[0] != 1 || args[1] != 2 || args[2] != 3 {
+		t.Errorf("args: got %v, want [1 2 3]", args)
+	}
+}
+
+func TestBuildWhereInClause_sqlite_startN(t *testing.T) {
+	// Simulate UPDATE: SET has 2 columns, so WHERE starts at ?3
+	where, args := buildWhereInClause("id", []any{5, 7}, connection.DriverSQLite, 3)
+	want := ` WHERE "id" IN (?3, ?4)`
+	if where != want {
+		t.Errorf("where: got %q, want %q", where, want)
+	}
+	if len(args) != 2 || args[0] != 5 || args[1] != 7 {
+		t.Errorf("args: got %v, want [5 7]", args)
+	}
+}
+
+func TestBuildWhereInClause_single(t *testing.T) {
+	where, args := buildWhereInClause("user_id", []any{42}, connection.DriverMySQL, 1)
+	want := " WHERE `user_id` IN (?)"
+	if where != want {
+		t.Errorf("where: got %q, want %q", where, want)
+	}
+	if len(args) != 1 || args[0] != 42 {
+		t.Errorf("args: got %v, want [42]", args)
+	}
+}

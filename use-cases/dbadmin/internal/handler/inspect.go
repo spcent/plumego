@@ -11,6 +11,7 @@ import (
 
 	"dbadmin/internal/dbmanager"
 	mysqlinspect "dbadmin/internal/dbmanager/mysql"
+	postgresinspect "dbadmin/internal/dbmanager/postgres"
 	sqliteinspect "dbadmin/internal/dbmanager/sqlite"
 	"dbadmin/internal/domain/connection"
 )
@@ -36,6 +37,8 @@ func (h InspectHandler) openInspector(r *http.Request) (dbmanager.Inspector, *co
 	switch conn.Driver {
 	case connection.DriverMySQL:
 		return mysqlinspect.New(db), conn, nil
+	case connection.DriverPostgres:
+		return postgresinspect.New(db), conn, nil
 	case connection.DriverSQLite:
 		return sqliteinspect.New(db), conn, nil
 	default:

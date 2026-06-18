@@ -2,6 +2,7 @@ package handler
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"net/http"
 	"regexp"
@@ -222,6 +223,8 @@ func (h DDLHandler) DropTable(w http.ResponseWriter, r *http.Request) {
 	switch conn.Driver {
 	case connection.DriverMySQL:
 		fqn = fmt.Sprintf("%s.%s", quoteIdent(dbName, conn.Driver), quoteIdent(table, conn.Driver))
+	case connection.DriverPostgres:
+		fqn = postgresTableFQN(dbName, table)
 	default:
 		fqn = quoteIdent(table, conn.Driver)
 	}
@@ -234,6 +237,162 @@ func (h DDLHandler) DropTable(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+type createViewRequest struct {
+	Name  string `json:"name"`
+	Query string `json:"query"`
+}
+
+// maxViewQueryLen bounds the size of a CREATE VIEW query body. The body is
+// not parsed or validated beyond length/non-empty checks — it is trusted
+// user-supplied SQL, the same trust model applied to CreateTable's column DDL.
+const maxViewQueryLen = 20000
+
+// CreateView executes CREATE VIEW.
+func validateViewQuery(query string) error {
+	q := strings.TrimSpace(query)
+	lq := strings.ToLower(q)
+
+	if !strings.HasPrefix(lq, "select ") && lq != "select" {
+		return errors.New("view query must start with SELECT")
+	}
+	if strings.Contains(q, ";") {
+		return errors.New("multiple statements are not allowed")
+	}
+	if strings.Contains(lq, "--") || strings.Contains(lq, "/*") || strings.Contains(lq, "*/") {
+		return errors.New("SQL comments are not allowed")
+	}
+
+	disallowed := []string{
+		" insert ", " update ", " delete ", " drop ", " alter ", " create ",
+		" truncate ", " grant ", " revoke ", " execute ", " call ",
+	}
+	padded := " " + lq + " "
+	for _, kw := range disallowed {
+		if strings.Contains(padded, kw) {
+			return errors.New("only read-only SELECT queries are allowed in view definition")
+		}
+	}
+	return nil
+}
+
+func (h DDLHandler) CreateView(w http.ResponseWriter, r *http.Request) {
+	db, conn, dbName, err := h.openDB(r)
+	if err != nil {
+		h.writeConnErr(w, r, err)
+		return
+	}
+	if guardReadonly(conn, w, r, h.Logger) {
+		return
+	}
+	var req createViewRequest
+	if !decodeJSONLimited(w, r, h.Logger, &req) {
+		return
+	}
+	if req.Name == "" {
+		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+			Type(contract.TypeValidation).Message("name is required").Build()))
+		return
+	}
+	if err := validateIdentifierName(req.Name); err != nil {
+		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+			Type(contract.TypeValidation).Message("invalid view name: "+err.Error()).Build()))
+		return
+	}
+	query := strings.TrimSpace(req.Query)
+	if query == "" {
+		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+			Type(contract.TypeValidation).Message("query is required").Build()))
+		return
+	}
+	if len(query) > maxViewQueryLen {
+		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+			Type(contract.TypeValidation).Message(fmt.Sprintf("query too long (max %d chars)", maxViewQueryLen)).Build()))
+		return
+	}
+	if err := validateViewQuery(query); err != nil {
+		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+			Type(contract.TypeValidation).Message("invalid view query: "+err.Error()).Build()))
+		return
+	}
+	var fqn string
+	switch conn.Driver {
+	case connection.DriverMySQL:
+		fqn = fmt.Sprintf("%s.%s", quoteIdent(dbName, conn.Driver), quoteIdent(req.Name, conn.Driver))
+	default:
+		fqn = quoteIdent(req.Name, conn.Driver)
+	}
+	ddl := "CREATE VIEW " + fqn + " AS " + query
+	// codeql[go/sql-injection]: view name validated+quoted by validateIdentifierName
+	// and quoteIdent; query body is intentionally user-authored SQL under the same
+	// trust model as CreateQuery/ExecQuery which also accept raw user SQL directly.
+	if _, err := db.ExecContext(r.Context(), ddl); err != nil { // lgtm[go/sql-injection]
+		h.Logger.Error("create view", plumelog.Fields{"error": err.Error()})
+		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+			Type(contract.TypeInternal).Message("failed to create view").
+			Detail("error", err.Error()).Build()))
+		return
+	}
+	logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusCreated,
+		map[string]string{"view": req.Name, "status": "created"}, nil))
+}
+
+// DropView executes DROP VIEW. Requires ?confirm=true to prevent accidental drops.
+func (h DDLHandler) DropView(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Query().Get("confirm") != "true" {
+		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+			Type(contract.TypeBadRequest).Message("confirm required: add ?confirm=true").Build()))
+		return
+	}
+	db, conn, dbName, err := h.openDB(r)
+	if err != nil {
+		h.writeConnErr(w, r, err)
+		return
+	}
+	if guardReadonly(conn, w, r, h.Logger) {
+		return
+	}
+	view := router.Param(r, "view")
+	if err := validateIdentifierName(view); err != nil {
+		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+			Type(contract.TypeValidation).Message("invalid view name: "+err.Error()).Build()))
+		return
+	}
+	var fqn string
+	switch conn.Driver {
+	case connection.DriverMySQL:
+		fqn = fmt.Sprintf("%s.%s", quoteIdent(dbName, conn.Driver), quoteIdent(view, conn.Driver))
+	default:
+		fqn = quoteIdent(view, conn.Driver)
+	}
+	// SECURITY: View name is validated by validateIdentifierName() and quoted.
+	if _, err := db.ExecContext(r.Context(), "DROP VIEW IF EXISTS "+fqn); err != nil {
+		h.Logger.Error("drop view", plumelog.Fields{"error": err.Error()})
+		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+			Type(contract.TypeInternal).Message("failed to drop view").
+			Detail("error", err.Error()).Build()))
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// validateIdentifierName rejects names that contain SQL statement terminators
+// or comment markers, mirroring validateColumnType's blocklist approach. The
+// name is later passed through quoteIdent for driver-specific escaping.
+func validateIdentifierName(s string) error {
+	if s == "" {
+		return fmt.Errorf("name is required")
+	}
+	if len(s) > 64 {
+		return fmt.Errorf("name too long (max 64 chars)")
+	}
+	for _, bad := range []string{";", "--", "/*", "*/", "\x00"} {
+		if strings.Contains(s, bad) {
+			return fmt.Errorf("name contains unsafe characters")
+		}
+	}
+	return nil
 }
 
 func (h DDLHandler) openDB(r *http.Request) (*sql.DB, *connection.Connection, string, error) {
@@ -260,11 +419,23 @@ func (h DDLHandler) writeConnErr(w http.ResponseWriter, r *http.Request, err err
 		Detail("error", err.Error()).Build()))
 }
 
+// postgresTableFQN builds a schema-qualified, quoted PostgreSQL table
+// reference. An empty schema is omitted, relying on the connection's
+// search_path (defaults to "public").
+func postgresTableFQN(schema, table string) string {
+	if schema == "" {
+		return fmt.Sprintf(`"%s"`, table)
+	}
+	return fmt.Sprintf(`"%s"."%s"`, schema, table)
+}
+
 func buildCreateTable(dbName string, req createTableRequest, driver connection.DriverType) string {
 	var sb strings.Builder
 	switch driver {
 	case connection.DriverMySQL:
 		sb.WriteString(fmt.Sprintf("CREATE TABLE %s.%s (\n", quoteIdent(dbName, driver), quoteIdent(req.Name, driver)))
+	case connection.DriverPostgres:
+		sb.WriteString(fmt.Sprintf("CREATE TABLE %s (\n", postgresTableFQN(dbName, req.Name)))
 	default:
 		sb.WriteString(fmt.Sprintf("CREATE TABLE %s (\n", quoteIdent(req.Name, driver)))
 	}
@@ -391,6 +562,23 @@ func buildAlterTable(dbName, table string, req alterTableRequest, driver connect
 		if req.RenameTable != "" {
 			stmts = append(stmts, fmt.Sprintf("RENAME TABLE %s TO %s.%s",
 				fqn, quoteIdent(dbName, driver), quoteIdent(req.RenameTable, driver)))
+		}
+	case connection.DriverPostgres:
+		// PostgreSQL supports ADD COLUMN, DROP COLUMN, and RENAME TO in standard SQL.
+		fqn := postgresTableFQN(dbName, table)
+		var parts []string
+		for _, col := range req.AddColumns {
+			parts = append(parts, fmt.Sprintf("ADD COLUMN %s %s", quoteIdent(col.Name, driver), col.Type))
+		}
+		for _, col := range req.DropColumns {
+			parts = append(parts, fmt.Sprintf("DROP COLUMN %s", quoteIdent(col, driver)))
+		}
+		if len(parts) > 0 {
+			stmts = append(stmts, fmt.Sprintf("ALTER TABLE %s %s", fqn, strings.Join(parts, ", ")))
+		}
+		if req.RenameTable != "" {
+			stmts = append(stmts, fmt.Sprintf("ALTER TABLE %s RENAME TO %s",
+				fqn, quoteIdent(req.RenameTable, driver)))
 		}
 	default:
 		// SQLite: only ADD COLUMN and RENAME TABLE are supported.

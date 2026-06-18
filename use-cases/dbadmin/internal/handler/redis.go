@@ -66,7 +66,7 @@ var forbiddenCommands = map[string]bool{
 
 // --- helpers -----------------------------------------------------------------
 
-func (h RedisHandler) openClient(connID string, dbIndex int) (*connection.Connection, *redis.Client, error) {
+func (h RedisHandler) openClient(connID string, dbIndex int) (*connection.Connection, redis.UniversalClient, error) {
 	conn, err := h.Connections.Get(connID)
 	if err != nil {
 		return nil, nil, err
@@ -873,7 +873,7 @@ func (h RedisHandler) ExportKeys(w http.ResponseWriter, r *http.Request) {
 	logWriteErr(h.Logger, json.NewEncoder(w).Encode(payload))
 }
 
-func (h RedisHandler) redisExportItem(ctx context.Context, cl *redis.Client, key string) (redisExportItem, error) {
+func (h RedisHandler) redisExportItem(ctx context.Context, cl redis.UniversalClient, key string) (redisExportItem, error) {
 	keyType, err := cl.Type(ctx, key).Result()
 	if err != nil {
 		return redisExportItem{}, err
@@ -980,7 +980,7 @@ func (h RedisHandler) ImportKeys(w http.ResponseWriter, r *http.Request) {
 	}, nil))
 }
 
-func importRedisItem(ctx context.Context, cl *redis.Client, item redisExportItem) error {
+func importRedisItem(ctx context.Context, cl redis.UniversalClient, item redisExportItem) error {
 	if strings.TrimSpace(item.Key) == "" {
 		return fmt.Errorf("key is required")
 	}

@@ -56,8 +56,10 @@ func (a *App) RegisterRoutes() error {
 		AdminUser:     a.Cfg.App.AdminUser,
 		AdminPassword: a.Cfg.App.AdminPassword,
 		AdminRole:     a.Cfg.App.AdminRole,
+		Users:         a.Users,
 		SessionTTL:    a.Cfg.App.SessionTTL,
 		Sessions:      a.SessionStore,
+		MFA:           a.MFAStore,
 		LoginLimiter:  handler.NewLoginLimiter(5, 15*time.Minute),
 		Logger:        a.Core.Logger(),
 	}
@@ -69,6 +71,8 @@ func (a *App) RegisterRoutes() error {
 		return err
 	}
 
+	docsH := handler.DocsHandler{}
+
 	// Public routes — no auth required.
 	root := newRouteReg(a.Core)
 	root.get("/healthz", http.HandlerFunc(healthH.Live))
@@ -76,8 +80,14 @@ func (a *App) RegisterRoutes() error {
 	root.get("/pool-stats", http.HandlerFunc(poolStatsH.GetAllStats))
 	root.get("/pool-stats/sql", http.HandlerFunc(poolStatsH.GetSQLPoolStats))
 	root.get("/runtime-stats", http.HandlerFunc(runtimeStatsH.GetStats))
+	root.get("/metrics", a.Metrics.Handler())
+	root.get("/openapi.json", http.HandlerFunc(docsH.SpecJSON))
+	root.get("/openapi.yaml", http.HandlerFunc(docsH.SpecYAML))
+	root.get("/docs", http.HandlerFunc(docsH.UI))
 	sameOriginMw := handler.SameOriginMiddleware(a.Core.Logger())
-	root.post("/api/auth/login", sameOriginMw(http.HandlerFunc(authH.Login)))
+	ipMw := handler.IPAllowlistMiddleware(a.Cfg.App.AllowedIPs, a.Core.Logger())
+	root.post("/api/auth/login", ipMw(sameOriginMw(http.HandlerFunc(authH.Login))))
+	root.post("/api/auth/mfa/verify", ipMw(sameOriginMw(http.HandlerFunc(authH.MFAVerify))))
 	if root.err != nil {
 		return root.err
 	}
@@ -170,11 +180,19 @@ func (a *App) RegisterRoutes() error {
 	// Protected routes — all require a valid session cookie.
 	roleMw := handler.RoleMiddleware(a.Cfg.App.AdminRole, a.Core.Logger())
 	auditMw := handler.AuditMiddleware(a.AuditStore, a.Cfg.App.AdminRole, a.Core.Logger())
-	guard := func(h http.Handler) http.Handler { return sameOriginMw(authMw(auditMw(roleMw(h)))) }
+	guard := func(h http.Handler) http.Handler {
+		return ipMw(sameOriginMw(authMw(auditMw(roleMw(h)))))
+	}
 
 	protected := newRouteReg(a.Core)
 	protected.post("/api/auth/logout", guard(http.HandlerFunc(authH.Logout)))
 	protected.get("/api/auth/me", guard(http.HandlerFunc(authH.Me)))
+	protected.post("/api/auth/sessions/revoke", guard(http.HandlerFunc(authH.RevokeAllSessions)))
+	protected.get("/api/auth/users", guard(http.HandlerFunc(authH.ListUsers)))
+	protected.get("/api/auth/mfa", guard(http.HandlerFunc(authH.MFAStatus)))
+	protected.post("/api/auth/mfa/enroll", guard(http.HandlerFunc(authH.MFAEnroll)))
+	protected.post("/api/auth/mfa/confirm", guard(http.HandlerFunc(authH.MFAConfirm)))
+	protected.post("/api/auth/mfa/disable", guard(http.HandlerFunc(authH.MFADisable)))
 	protected.get("/api/audit/events", guard(http.HandlerFunc(auditH.List)))
 	protected.get("/api/audit/export", guard(http.HandlerFunc(auditH.Export)))
 
@@ -186,6 +204,8 @@ func (a *App) RegisterRoutes() error {
 	protected.delete("/api/connections/:id", guard(http.HandlerFunc(connH.Delete)))
 	protected.post("/api/connections/:id/test", guard(http.HandlerFunc(connH.Test)))
 	protected.delete("/api/connections/:id/runtime", guard(http.HandlerFunc(connH.CloseRuntime)))
+	protected.get("/api/connections/export", guard(http.HandlerFunc(connH.Export)))
+	protected.post("/api/connections/import", guard(http.HandlerFunc(connH.Import)))
 	protected.get("/api/pool-stats", guard(http.HandlerFunc(poolStatsH.GetAllStats)))
 	protected.get("/api/pool-stats/sql", guard(http.HandlerFunc(poolStatsH.GetSQLPoolStats)))
 
@@ -208,11 +228,15 @@ func (a *App) RegisterRoutes() error {
 	protected.post("/api/conn/:id/db/:db/tables/:table/rows", guard(http.HandlerFunc(rowH.Create)))
 	protected.patch("/api/conn/:id/db/:db/tables/:table/rows", guard(http.HandlerFunc(rowH.Update)))
 	protected.delete("/api/conn/:id/db/:db/tables/:table/rows", guard(http.HandlerFunc(rowH.Delete)))
+	protected.post("/api/connections/:id/db/:db/tables/:table/rows/bulk-delete", guard(http.HandlerFunc(rowH.BulkDelete)))
+	protected.post("/api/connections/:id/db/:db/tables/:table/rows/bulk-update", guard(http.HandlerFunc(rowH.BulkUpdate)))
 
 	// DDL operations.
 	protected.post("/api/conn/:id/db/:db/tables", guard(http.HandlerFunc(ddlH.CreateTable)))
 	protected.put("/api/conn/:id/db/:db/tables/:table", guard(http.HandlerFunc(ddlH.AlterTable)))
 	protected.delete("/api/conn/:id/db/:db/tables/:table", guard(http.HandlerFunc(ddlH.DropTable)))
+	protected.post("/api/conn/:id/db/:db/views", guard(http.HandlerFunc(ddlH.CreateView)))
+	protected.delete("/api/conn/:id/db/:db/views/:view", guard(http.HandlerFunc(ddlH.DropView)))
 
 	// Export and Import.
 	protected.get("/api/conn/:id/db/:db/tables/:table/export", guard(http.HandlerFunc(exportH.Export)))
@@ -262,6 +286,12 @@ func (a *App) RegisterRoutes() error {
 	protected.patch("/api/connections/:id/mongo/documents", guard(http.HandlerFunc(mongoH.UpdateDocument)))
 	protected.delete("/api/connections/:id/mongo/documents", guard(http.HandlerFunc(mongoH.DeleteDocument)))
 
+	// MongoDB collection and index management (DDL-equivalent operations).
+	protected.post("/api/connections/:id/mongo/collections", guard(http.HandlerFunc(mongoH.CreateCollection)))
+	protected.delete("/api/connections/:id/mongo/collections", guard(http.HandlerFunc(mongoH.DropCollection)))
+	protected.post("/api/connections/:id/mongo/indexes/create", guard(http.HandlerFunc(mongoH.CreateIndex)))
+	protected.delete("/api/connections/:id/mongo/indexes", guard(http.HandlerFunc(mongoH.DropIndex)))
+
 	// MongoDB P1 - Advanced features
 	protected.post("/api/connections/:id/mongo/aggregate", guard(http.HandlerFunc(mongoH.Aggregate)))
 	protected.post("/api/connections/:id/mongo/explain", guard(http.HandlerFunc(mongoH.ExplainQuery)))
@@ -279,6 +309,11 @@ func (a *App) RegisterRoutes() error {
 	// Elasticsearch operations — ES-specific route group.
 	protected.get("/api/connections/:id/es/info", guard(http.HandlerFunc(esH.ClusterInfo)))
 	protected.get("/api/connections/:id/es/indices", guard(http.HandlerFunc(esH.ListIndices)))
+	protected.post("/api/connections/:id/es/indices", guard(http.HandlerFunc(esH.CreateIndex)))
+	protected.delete("/api/connections/:id/es/indices", guard(http.HandlerFunc(esH.DeleteIndex)))
+	protected.get("/api/connections/:id/es/templates", guard(http.HandlerFunc(esH.ListTemplates)))
+	protected.post("/api/connections/:id/es/templates", guard(http.HandlerFunc(esH.CreateTemplate)))
+	protected.delete("/api/connections/:id/es/templates", guard(http.HandlerFunc(esH.DeleteTemplate)))
 	protected.get("/api/connections/:id/es/index/mapping", guard(http.HandlerFunc(esH.GetMapping)))
 	protected.get("/api/connections/:id/es/index/settings", guard(http.HandlerFunc(esH.GetSettings)))
 	protected.post("/api/connections/:id/es/search", guard(http.HandlerFunc(esH.Search)))

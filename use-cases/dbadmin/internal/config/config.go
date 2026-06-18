@@ -2,6 +2,7 @@ package config
 
 import (
 	"bufio"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"net"
@@ -19,6 +20,13 @@ type Config struct {
 	App  AppConfig
 }
 
+// UserConfig defines a single user's credentials and role.
+type UserConfig struct {
+	Username string
+	Password string
+	Role     string // "admin" or "readonly"
+}
+
 // AppConfig holds dbadmin-specific configuration.
 type AppConfig struct {
 	EnvFile      string
@@ -33,6 +41,14 @@ type AppConfig struct {
 	AdminPassword string
 	// AdminRole is the single-user role: admin or readonly.
 	AdminRole string
+	// Users is a list of users allowed to log in. When set, overrides AdminUser/AdminPassword/AdminRole.
+	// Format: [{"username":"alice","password":"secret","role":"admin"},...]
+	// Can be set via DBADMIN_USERS env var as a JSON array.
+	Users []UserConfig
+	// AllowedIPs is a CIDR/IP allowlist for the login endpoint and protected routes.
+	// Empty means allow all. Example: ["192.168.1.0/24","10.0.0.1"]
+	// Set via DBADMIN_ALLOWED_IPS as comma-separated CIDRs.
+	AllowedIPs []string
 	// AllowDefaultPassword permits the demo-only admin/admin password.
 	AllowDefaultPassword bool
 	// SessionTTL controls how long web UI sessions remain valid.
@@ -82,7 +98,7 @@ func Defaults() Config {
 			ESQueryTimeoutSeconds:      30,
 			ResourceListTimeoutSeconds: 30,
 			AuditRetentionDays:         90,
-			AuditMaxEvents:             500,
+			AuditMaxEvents:             10000,
 		},
 	}
 }
@@ -118,20 +134,43 @@ func Validate(cfg Config) error {
 	if cfg.Core.Addr == "" {
 		return fmt.Errorf("addr is required")
 	}
-	if cfg.App.AdminUser == "" {
-		return fmt.Errorf("DBADMIN_USER is required")
+	if len(cfg.App.Users) > 0 {
+		for i, u := range cfg.App.Users {
+			if strings.TrimSpace(u.Username) == "" {
+				return fmt.Errorf("DBADMIN_USERS[%d]: username is required", i)
+			}
+			if u.Password == "" {
+				return fmt.Errorf("DBADMIN_USERS[%d]: password is required", i)
+			}
+			if u.Role != "admin" && u.Role != "readonly" {
+				return fmt.Errorf("DBADMIN_USERS[%d]: role must be admin or readonly", i)
+			}
+		}
+	} else {
+		if cfg.App.AdminUser == "" {
+			return fmt.Errorf("DBADMIN_USER is required")
+		}
+		if cfg.App.AdminPassword == "" {
+			return fmt.Errorf("DBADMIN_PASSWORD is required")
+		}
+		if isPublicAddr(cfg.Core.Addr) && cfg.App.AdminPassword == "admin" {
+			return fmt.Errorf("refusing default password on non-loopback listen address")
+		}
+		if !cfg.App.AllowDefaultPassword && cfg.App.AdminUser == "admin" && cfg.App.AdminPassword == "admin" {
+			return fmt.Errorf("refusing default admin/admin credentials; set DBADMIN_PASSWORD or DBADMIN_ALLOW_DEFAULT_PASSWORD=true for disposable loopback demos")
+		}
+		if cfg.App.AdminRole != "admin" && cfg.App.AdminRole != "readonly" {
+			return fmt.Errorf("DBADMIN_ROLE must be admin or readonly")
+		}
 	}
-	if cfg.App.AdminPassword == "" {
-		return fmt.Errorf("DBADMIN_PASSWORD is required")
-	}
-	if isPublicAddr(cfg.Core.Addr) && cfg.App.AdminPassword == "admin" {
-		return fmt.Errorf("refusing default password on non-loopback listen address")
-	}
-	if !cfg.App.AllowDefaultPassword && cfg.App.AdminUser == "admin" && cfg.App.AdminPassword == "admin" {
-		return fmt.Errorf("refusing default admin/admin credentials; set DBADMIN_PASSWORD or DBADMIN_ALLOW_DEFAULT_PASSWORD=true for disposable loopback demos")
-	}
-	if cfg.App.AdminRole != "admin" && cfg.App.AdminRole != "readonly" {
-		return fmt.Errorf("DBADMIN_ROLE must be admin or readonly")
+	for _, ip := range cfg.App.AllowedIPs {
+		if _, _, err := net.ParseCIDR(ip); err == nil {
+			continue
+		}
+		if net.ParseIP(ip) != nil {
+			continue
+		}
+		return fmt.Errorf("DBADMIN_ALLOWED_IPS: invalid IP or CIDR %q", ip)
 	}
 	if cfg.App.SessionTTL <= 0 {
 		return fmt.Errorf("DBADMIN_SESSION_TTL must be positive")
@@ -207,6 +246,37 @@ func applyEnv(cfg *Config, lookupEnv func(string) (string, bool)) {
 	intf("DBADMIN_RESOURCE_LIST_TIMEOUT_SECONDS", &cfg.App.ResourceListTimeoutSeconds)
 	intf("DBADMIN_AUDIT_RETENTION_DAYS", &cfg.App.AuditRetentionDays)
 	intf("DBADMIN_AUDIT_MAX_EVENTS", &cfg.App.AuditMaxEvents)
+
+	// DBADMIN_USERS: JSON array of {"username":"...","password":"...","role":"..."}
+	if val, ok := lookupEnv("DBADMIN_USERS"); ok && strings.TrimSpace(val) != "" {
+		var users []UserConfig
+		if err := json.Unmarshal([]byte(strings.TrimSpace(val)), &users); err == nil && len(users) > 0 {
+			cfg.App.Users = users
+		}
+	}
+	// DBADMIN_ALLOWED_IPS: comma-separated CIDRs/IPs
+	if val, ok := lookupEnv("DBADMIN_ALLOWED_IPS"); ok && strings.TrimSpace(val) != "" {
+		parts := strings.Split(strings.TrimSpace(val), ",")
+		ips := make([]string, 0, len(parts))
+		for _, p := range parts {
+			if t := strings.TrimSpace(p); t != "" {
+				ips = append(ips, t)
+			}
+		}
+		if len(ips) > 0 {
+			cfg.App.AllowedIPs = ips
+		}
+	}
+}
+
+// ResolveUsers returns the effective list of users for authentication.
+// When cfg.Users is set it takes precedence; otherwise it falls back to the
+// single-user AdminUser/AdminPassword/AdminRole fields.
+func (cfg AppConfig) ResolveUsers() []UserConfig {
+	if len(cfg.Users) > 0 {
+		return cfg.Users
+	}
+	return []UserConfig{{Username: cfg.AdminUser, Password: cfg.AdminPassword, Role: cfg.AdminRole}}
 }
 
 func isPublicAddr(addr string) bool {

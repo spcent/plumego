@@ -311,6 +311,8 @@ func (h QueryHandler) Execute(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		maskRowMaps(resultRows, maskedColumnSet(conn.MaskedColumns))
+
 		durationMs := time.Since(start).Milliseconds()
 		_ = h.recordHistory(connID, req.Database, originalSQL, durationMs, "")
 		h.logSlowQuery(connID, req.Database, originalSQL, durationMs)
@@ -435,10 +437,43 @@ func (h QueryHandler) ListActive(w http.ResponseWriter, r *http.Request) {
 	logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusOK, result, map[string]any{"count": len(result)}))
 }
 
-// ListHistory returns query history for a connection.
+// ListHistory returns query history for a connection. Optional query params
+// q, hasError, database, and limit narrow the results via history.Search;
+// when none are present it preserves the original List behavior exactly.
 func (h QueryHandler) ListHistory(w http.ResponseWriter, r *http.Request) {
 	connID := router.Param(r, "id")
-	entries, err := h.History.List(connID)
+	q := r.URL.Query()
+	qText := q.Get("q")
+	hasErrorStr := q.Get("hasError")
+	database := q.Get("database")
+	limitStr := q.Get("limit")
+
+	var entries []history.Entry
+	var err error
+	if qText != "" || hasErrorStr != "" || database != "" || limitStr != "" {
+		opts := history.SearchOptions{Query: qText, Database: database}
+		if hasErrorStr != "" {
+			hasError, parseErr := strconv.ParseBool(hasErrorStr)
+			if parseErr != nil {
+				logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+					Type(contract.TypeBadRequest).Message("invalid hasError value: must be true or false").Build()))
+				return
+			}
+			opts.HasError = &hasError
+		}
+		if limitStr != "" {
+			limit, parseErr := strconv.Atoi(limitStr)
+			if parseErr != nil || limit < 0 {
+				logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+					Type(contract.TypeBadRequest).Message("invalid limit value: must be a non-negative integer").Build()))
+				return
+			}
+			opts.Limit = limit
+		}
+		entries, err = h.History.Search(connID, opts)
+	} else {
+		entries, err = h.History.List(connID)
+	}
 	if err != nil {
 		h.Logger.Error("list history", plumelog.Fields{"error": err.Error()})
 		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().

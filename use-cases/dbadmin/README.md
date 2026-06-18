@@ -1,6 +1,6 @@
 # dbadmin
 
-A local-first, security-focused database management workbench for developers. Manage MySQL, SQLite, Redis, MongoDB, and Elasticsearch from a single modern web interface.
+A local-first, security-focused database management workbench for developers. Manage MySQL, PostgreSQL, SQLite, Redis, MongoDB, and Elasticsearch from a single modern web interface.
 
 ## Overview
 
@@ -17,30 +17,43 @@ As a Plumego use-case app, dbadmin demonstrates how to build a production-scale 
 
 | Database | Features | Status |
 |----------|----------|--------|
-| **MySQL** | Browse tables, execute queries, view/edit rows, DDL operations, import/export | ✅ Stable |
+| **MySQL** | Browse tables, execute queries, view/edit rows, DDL operations (incl. views), bulk row update/delete, import/export (CSV/JSON/SQL/XLSX) | ✅ Stable |
+| **PostgreSQL** | Browse schemas/tables, execute queries, view/edit rows, DDL (CREATE/ALTER/DROP TABLE, views), bulk row update/delete, import/export (CSV/JSON/SQL/XLSX) | ✅ Stable |
 | **SQLite** | All MySQL features + file upload/download, schema inspection | ✅ Stable |
-| **Redis** | Browse keys by type, execute commands, command history, TTL management, batch operations | ✅ Stable |
-| **MongoDB** | Browse collections, query with filters, aggregation pipelines, explain plans | ✅ Stable |
-| **Elasticsearch** | Browse indices, DSL queries, document CRUD, import/export, cluster health, mappings | ✅ Stable |
+| **Redis** | Browse keys by type, execute commands, command history, TTL management, batch operations, standalone/Cluster/Sentinel modes | ✅ Stable |
+| **MongoDB** | Browse collections, query with filters, aggregation pipelines, explain plans, collection and index management | ✅ Stable |
+| **Elasticsearch** | Browse indices, DSL queries, document CRUD, import/export, cluster health, mappings, index and index-template management | ✅ Stable |
 
 ## Features
 
 ### Core Capabilities
 - **Connection Management**: Save, test, and organize connections with optional credential encryption
+- **Connection Config Import/Export**: Export all saved connections as a JSON document (with secrets redacted) and re-import them on another instance
 - **Resource Browsing**: Tree view of databases, tables, collections, indices, and keys
 - **Query Execution**: Syntax-highlighted editors with server-side SQL, Redis, MongoDB, and Elasticsearch history plus result formatting
 - **Data Manipulation**: View, edit, insert, delete with confirmation dialogs for dangerous operations
-- **Import/Export**: CSV, JSON, SQL dump formats for data migration
+- **Import/Export**: CSV, JSON, SQL dump, and XLSX formats for data migration
+- **Bulk Row Operations**: Update or delete multiple SQL rows by primary key in a single confirmed request
+- **SQL View Management**: Create and drop views (`CREATE VIEW`/`DROP VIEW`) per connection
 - **Schema Inspection**: View table structure, indexes, foreign keys, mappings
+- **MongoDB Collection/Index Management**: Create and drop collections and indexes (compound, unique, sparse) per connection
+- **Elasticsearch Index/Template Management**: Create and delete indices and index templates, with configurable settings and mappings
+- **Redis Cluster & Sentinel**: Configure a connection for standalone, Cluster, or Sentinel-backed failover topologies
 - **Operational Diagnostics**: Health, readiness, runtime, and connection-pool endpoints for local troubleshooting
-- **Admin Controls**: Active operation cancellation, connection runtime closing, audit events, and a single-user `admin`/`readonly` role
+- **Prometheus Metrics**: `/metrics` endpoint exposing HTTP request counts, latency histograms, and uptime in Prometheus text exposition format
+- **API Documentation**: Machine-readable OpenAPI 3.0 spec at `GET /openapi.json` / `GET /openapi.yaml`, with an interactive Swagger UI page at `GET /docs` — see [API Documentation](#api-documentation)
+- **Admin Controls**: Active operation cancellation, connection runtime closing, audit events, and multi-user `admin`/`readonly` roles
 
 ### Security & Safety
 - **Read-only Mode**: Block all write operations per connection
+- **Sensitive Column Masking**: Configure a per-connection list of column names (e.g. `password`, `ssn`, `api_key`) that are redacted as `***MASKED***` in query results, row browsing, and exports — display/export-time only, the underlying data is untouched
 - **Dangerous Operation Detection**: Intercept DROP, DELETE, FLUSH, and other destructive commands
 - **Confirmation Dialogs**: Require explicit confirmation before executing dangerous operations
 - **Credential Redaction**: Passwords and API keys redacted in all logs and API responses
-- **Session Management**: HttpOnly cookie-based authentication with automatic timeout, login rate limiting, and same-origin checks for unsafe requests
+- **Session Management**: HttpOnly cookie-based authentication with automatic timeout, login rate limiting, same-origin checks for unsafe requests, and self-service bulk session revocation
+- **Optional TOTP MFA**: Per-user time-based one-time-password second factor (RFC 6238) for login, enrolled and managed via `/api/auth/mfa/*` endpoints
+- **Multi-user Accounts**: Configure multiple named users with independent `admin`/`readonly` roles via `DBADMIN_USERS`
+- **IP Allowlisting**: Restrict the login endpoint and all protected routes to a configured set of CIDRs/IPs via `DBADMIN_ALLOWED_IPS`
 - **Input Validation**: SQL injection prevention and command injection protection
 - **Bounded Execution**: Configurable SQL, Redis, MongoDB, Elasticsearch, and resource-list timeouts
 - **SQL Query Cancellation**: Cancel active SQL queries from the UI when cancellation is enabled
@@ -49,8 +62,17 @@ As a Plumego use-case app, dbadmin demonstrates how to build a production-scale 
 - **Modern UI**: Responsive design with Tailwind CSS
 - **Dark Mode**: Automatic theme switching based on system preferences
 - **Internationalization**: English and Chinese (简体中文) support
-- **Query History**: Searchable history with execution time and result counts
+- **Query History**: Searchable history with execution time and result counts, filterable by query text, error status, and database
 - **Keyboard Shortcuts**: Efficient navigation and execution (Ctrl/Cmd+Enter)
+
+## API Documentation
+
+dbadmin's REST API is documented as a static OpenAPI 3.0 spec, served alongside the app:
+
+- `GET /openapi.json` / `GET /openapi.yaml` — the machine-readable spec (public, no auth)
+- `GET /docs` — an interactive Swagger UI page backed by the spec above (public, no auth)
+
+The spec covers every route registered in `internal/app/routes.go`: path, method, whether a session cookie is required, and which routes are blocked for the `readonly` role or for read-only connections. Source: `internal/handler/openapi.yaml` (and its generated `openapi.json` sibling).
 
 ## Quick Start
 
@@ -150,9 +172,11 @@ For a guided multi-database demo, see [docs/demo-playbook.md](docs/demo-playbook
 |----------|---------|-------------|
 | `APP_ADDR` | `127.0.0.1:8080` | Server listen address |
 | `DBADMIN_DATA_DIR` | `./data` | Directory for sessions, history, and uploads |
-| `DBADMIN_USER` | `admin` | Admin username |
-| `DBADMIN_PASSWORD` | required | Admin password |
+| `DBADMIN_USER` | `admin` | Admin username (single-user mode; ignored when `DBADMIN_USERS` is set) |
+| `DBADMIN_PASSWORD` | required | Admin password (single-user mode; ignored when `DBADMIN_USERS` is set) |
 | `DBADMIN_ROLE` | `admin` | Single-user role: `admin` or `readonly` |
+| `DBADMIN_USERS` | unset | JSON array for multi-user mode: `[{"username":"alice","password":"...","role":"admin"}]`. Overrides `DBADMIN_USER`/`DBADMIN_PASSWORD`/`DBADMIN_ROLE` when set |
+| `DBADMIN_ALLOWED_IPS` | unset | Comma-separated CIDRs/IPs allowed to reach the login endpoint and all protected routes, e.g. `10.0.0.0/8,192.168.1.50`. Empty allows all |
 | `DBADMIN_ALLOW_DEFAULT_PASSWORD` | `false` | Demo-only override that permits `admin/admin` |
 | `DBADMIN_SESSION_TTL` | `24h` | Session timeout duration |
 | `DBADMIN_ENCRYPTION_KEY` | unset | 32-byte hex key for credential encryption; required before saving passwords, API keys, or Mongo URIs with embedded credentials |
@@ -163,7 +187,7 @@ For a guided multi-database demo, see [docs/demo-playbook.md](docs/demo-playbook
 | `DBADMIN_ES_QUERY_TIMEOUT_SECONDS` | `30` | Maximum Elasticsearch operation time in seconds |
 | `DBADMIN_RESOURCE_LIST_TIMEOUT_SECONDS` | `30` | Maximum unified resource-tree listing time in seconds |
 | `DBADMIN_AUDIT_RETENTION_DAYS` | `90` | Local audit event retention period in days |
-| `DBADMIN_AUDIT_MAX_EVENTS` | `500` | Maximum local audit events retained |
+| `DBADMIN_AUDIT_MAX_EVENTS` | `10000` | Maximum local audit events retained |
 
 ### Configuration File
 
@@ -185,7 +209,11 @@ DBADMIN_MONGO_QUERY_TIMEOUT_SECONDS=30
 DBADMIN_ES_QUERY_TIMEOUT_SECONDS=30
 DBADMIN_RESOURCE_LIST_TIMEOUT_SECONDS=30
 DBADMIN_AUDIT_RETENTION_DAYS=90
-DBADMIN_AUDIT_MAX_EVENTS=500
+DBADMIN_AUDIT_MAX_EVENTS=10000
+# Optional: multi-user mode (overrides DBADMIN_USER/PASSWORD/ROLE above)
+# DBADMIN_USERS=[{"username":"alice","password":"alice-secret","role":"admin"},{"username":"bob","password":"bob-secret","role":"readonly"}]
+# Optional: restrict access to a set of CIDRs/IPs
+# DBADMIN_ALLOWED_IPS=10.0.0.0/8,192.168.1.50
 ```
 
 Generate a secure encryption key:
@@ -210,6 +238,7 @@ use-cases/dbadmin/
 │   ├── domain/         # Business logic
 │   │   ├── connection/ # Connection CRUD and encryption
 │   │   ├── session/    # Session management
+│   │   ├── mfa/        # TOTP MFA enrollment and login challenges
 │   │   ├── history/    # Query history (SQL)
 │   │   ├── redishistory/ # Command history (Redis)
 │   │   ├── mongohistory/ # Query history (MongoDB)
@@ -307,6 +336,7 @@ If deploying to production:
 - **Read-only Mode**: Block all write operations per connection
 - **Audit Export**: Local audit events include role, request ID, source address, RBAC denial reason, and JSON/NDJSON export support
 - **Session Timeout**: Automatic logout after configurable inactivity period
+- **Optional TOTP MFA**: Enroll a TOTP secret (`POST /api/auth/mfa/enroll`), confirm it with a 6-digit code (`POST /api/auth/mfa/confirm`) to enable it, and disable it again with your password (`POST /api/auth/mfa/disable`); once enabled, `POST /api/auth/login` returns a short-lived challenge token instead of a session, which must be completed with a TOTP code via `POST /api/auth/mfa/verify`
 - **Input Validation**: SQL injection and command injection prevention
 - **Secure Cookies**: HttpOnly and SameSite attributes on session cookies; Secure is set for HTTPS and trusted HTTPS reverse-proxy requests
 

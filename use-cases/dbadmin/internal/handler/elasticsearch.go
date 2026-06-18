@@ -132,6 +132,38 @@ func validateIndexName(name string, allowWildcard bool) error {
 	return nil
 }
 
+// validateESIndexName validates a name used to create an index or index
+// template. Elasticsearch index/template names must be lowercase and may
+// not start with '-', '_', or '+'. This is intentionally stricter than
+// validateIndexName, which is also used for read-side lookups (e.g.
+// wildcards, names of indices that already exist).
+func validateESIndexName(name string) error {
+	if name == "" {
+		return fmt.Errorf("name is required")
+	}
+	if len(name) > 255 {
+		return fmt.Errorf("name too long")
+	}
+	if name != strings.ToLower(name) {
+		return fmt.Errorf("name must be lowercase")
+	}
+	if strings.Contains(name, " ") {
+		return fmt.Errorf("name cannot contain spaces")
+	}
+	if strings.Contains(name, "..") {
+		return fmt.Errorf("name cannot contain '..'")
+	}
+	if strings.HasPrefix(name, "-") || strings.HasPrefix(name, "_") || strings.HasPrefix(name, "+") {
+		return fmt.Errorf("name cannot start with '-', '_', or '+'")
+	}
+	for _, ch := range []string{"\\", "/", "*", "?", "\"", "<", ">", "|", ",", "#", ":"} {
+		if strings.Contains(name, ch) {
+			return fmt.Errorf("name cannot contain '%s'", ch)
+		}
+	}
+	return nil
+}
+
 // --- endpoints ---------------------------------------------------------------
 
 // ClusterInfo returns cluster information.
@@ -853,6 +885,333 @@ func (h ElasticsearchHandler) ClearHistory(w http.ResponseWriter, r *http.Reques
 
 	if err := h.History.Clear(connID); err != nil {
 		h.internalErr(w, r, "clear history", err)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// CreateIndex creates a new index, optionally with settings and mappings.
+func (h ElasticsearchHandler) CreateIndex(w http.ResponseWriter, r *http.Request) {
+	connID := router.Param(r, "id")
+
+	var req struct {
+		Index    string `json:"index"`
+		Settings string `json:"settings"`
+		Mappings string `json:"mappings"`
+	}
+	if !decodeJSONLimited(w, r, h.Logger, &req) {
+		return
+	}
+
+	if err := validateESIndexName(req.Index); err != nil {
+		h.badRequest(w, r, err.Error())
+		return
+	}
+
+	body, err := buildCreateIndexBody(req.Settings, req.Mappings)
+	if err != nil {
+		h.badRequest(w, r, err.Error())
+		return
+	}
+
+	client, conn := h.openClient(w, r, connID)
+	if client == nil {
+		return
+	}
+	if conn.Readonly {
+		h.readonly(w, r)
+		return
+	}
+
+	ctx, cancel := h.timeout(r.Context())
+	defer cancel()
+	operationID := h.registerOperation(cancel, "command", connID, req.Index, "create index")
+	defer h.unregisterOperation(operationID)
+
+	createReq := esapi.IndicesCreateRequest{
+		Index: req.Index,
+	}
+	if len(body) > 0 {
+		createReq.Body = bytes.NewReader(body)
+	}
+
+	res, err := createReq.Do(ctx, client)
+	if err != nil {
+		h.internalErr(w, r, "create index", err)
+		return
+	}
+	defer res.Body.Close()
+
+	if res.IsError() {
+		respBody, _ := io.ReadAll(res.Body)
+		h.internalErr(w, r, "create index", fmt.Errorf("status: %s, body: %s", res.Status(), string(respBody)))
+		return
+	}
+
+	logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusCreated, map[string]string{
+		"index":  req.Index,
+		"status": "created",
+	}, nil))
+}
+
+// buildCreateIndexBody combines optional settings and mappings JSON
+// fragments into a single index-creation request body.
+func buildCreateIndexBody(settings, mappings string) ([]byte, error) {
+	body := map[string]any{}
+
+	if settings != "" {
+		var s map[string]any
+		if err := json.Unmarshal([]byte(settings), &s); err != nil {
+			return nil, fmt.Errorf("settings must be valid JSON")
+		}
+		body["settings"] = s
+	}
+
+	if mappings != "" {
+		var m map[string]any
+		if err := json.Unmarshal([]byte(mappings), &m); err != nil {
+			return nil, fmt.Errorf("mappings must be valid JSON")
+		}
+		body["mappings"] = m
+	}
+
+	if len(body) == 0 {
+		return nil, nil
+	}
+
+	return json.Marshal(body)
+}
+
+// DeleteIndex deletes an index. Requires confirm=true in the request body.
+func (h ElasticsearchHandler) DeleteIndex(w http.ResponseWriter, r *http.Request) {
+	connID := router.Param(r, "id")
+
+	var req struct {
+		Index   string `json:"index"`
+		Confirm bool   `json:"confirm"`
+	}
+	if !decodeJSONLimited(w, r, h.Logger, &req) {
+		return
+	}
+
+	if !req.Confirm {
+		h.badRequest(w, r, "confirm=true is required for delete operations")
+		return
+	}
+
+	if err := validateESIndexName(req.Index); err != nil {
+		h.badRequest(w, r, err.Error())
+		return
+	}
+
+	client, conn := h.openClient(w, r, connID)
+	if client == nil {
+		return
+	}
+	if conn.Readonly {
+		h.readonly(w, r)
+		return
+	}
+
+	ctx, cancel := h.timeout(r.Context())
+	defer cancel()
+	operationID := h.registerOperation(cancel, "delete", connID, req.Index, "delete index")
+	defer h.unregisterOperation(operationID)
+
+	delReq := esapi.IndicesDeleteRequest{
+		Index: []string{req.Index},
+	}
+	res, err := delReq.Do(ctx, client)
+	if err != nil {
+		h.internalErr(w, r, "delete index", err)
+		return
+	}
+	defer res.Body.Close()
+
+	if res.IsError() {
+		if res.StatusCode == 404 {
+			h.badRequest(w, r, "index not found")
+			return
+		}
+		respBody, _ := io.ReadAll(res.Body)
+		h.internalErr(w, r, "delete index", fmt.Errorf("status: %s, body: %s", res.Status(), string(respBody)))
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// ListTemplates returns all index templates (modern _index_template API).
+func (h ElasticsearchHandler) ListTemplates(w http.ResponseWriter, r *http.Request) {
+	connID := router.Param(r, "id")
+	client, _ := h.openClient(w, r, connID)
+	if client == nil {
+		return
+	}
+
+	req := esapi.IndicesGetIndexTemplateRequest{}
+	ctx, cancel := h.timeout(r.Context())
+	defer cancel()
+
+	res, err := req.Do(ctx, client)
+	if err != nil {
+		h.internalErr(w, r, "list templates", err)
+		return
+	}
+	defer res.Body.Close()
+
+	if res.IsError() {
+		h.internalErr(w, r, "list templates", fmt.Errorf("status: %s", res.Status()))
+		return
+	}
+
+	var result struct {
+		IndexTemplates []map[string]any `json:"index_templates"`
+	}
+	if err := json.NewDecoder(res.Body).Decode(&result); err != nil {
+		h.internalErr(w, r, "decode templates", err)
+		return
+	}
+
+	logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusOK, map[string]any{
+		"templates": result.IndexTemplates,
+	}, map[string]any{"count": len(result.IndexTemplates)}))
+}
+
+// CreateTemplate creates or updates an index template (modern
+// _index_template API).
+func (h ElasticsearchHandler) CreateTemplate(w http.ResponseWriter, r *http.Request) {
+	connID := router.Param(r, "id")
+
+	var req struct {
+		Name          string   `json:"name"`
+		IndexPatterns []string `json:"indexPatterns"`
+		Template      string   `json:"template"`
+	}
+	if !decodeJSONLimited(w, r, h.Logger, &req) {
+		return
+	}
+
+	if err := validateESIndexName(req.Name); err != nil {
+		h.badRequest(w, r, err.Error())
+		return
+	}
+
+	if len(req.IndexPatterns) == 0 {
+		h.badRequest(w, r, "indexPatterns is required")
+		return
+	}
+
+	body := map[string]any{
+		"index_patterns": req.IndexPatterns,
+	}
+	if req.Template != "" {
+		var tpl map[string]any
+		if err := json.Unmarshal([]byte(req.Template), &tpl); err != nil {
+			h.badRequest(w, r, "template must be valid JSON")
+			return
+		}
+		body["template"] = tpl
+	}
+
+	bodyBytes, err := json.Marshal(body)
+	if err != nil {
+		h.internalErr(w, r, "marshal template", err)
+		return
+	}
+
+	client, conn := h.openClient(w, r, connID)
+	if client == nil {
+		return
+	}
+	if conn.Readonly {
+		h.readonly(w, r)
+		return
+	}
+
+	ctx, cancel := h.timeout(r.Context())
+	defer cancel()
+	operationID := h.registerOperation(cancel, "command", connID, req.Name, "create index template")
+	defer h.unregisterOperation(operationID)
+
+	putReq := esapi.IndicesPutIndexTemplateRequest{
+		Name: req.Name,
+		Body: bytes.NewReader(bodyBytes),
+	}
+	res, err := putReq.Do(ctx, client)
+	if err != nil {
+		h.internalErr(w, r, "create template", err)
+		return
+	}
+	defer res.Body.Close()
+
+	if res.IsError() {
+		respBody, _ := io.ReadAll(res.Body)
+		h.internalErr(w, r, "create template", fmt.Errorf("status: %s, body: %s", res.Status(), string(respBody)))
+		return
+	}
+
+	logWriteErr(h.Logger, contract.WriteResponse(w, r, http.StatusCreated, map[string]string{
+		"name":   req.Name,
+		"status": "created",
+	}, nil))
+}
+
+// DeleteTemplate deletes an index template. Requires confirm=true in the
+// request body.
+func (h ElasticsearchHandler) DeleteTemplate(w http.ResponseWriter, r *http.Request) {
+	connID := router.Param(r, "id")
+
+	var req struct {
+		Name    string `json:"name"`
+		Confirm bool   `json:"confirm"`
+	}
+	if !decodeJSONLimited(w, r, h.Logger, &req) {
+		return
+	}
+
+	if !req.Confirm {
+		h.badRequest(w, r, "confirm=true is required for delete operations")
+		return
+	}
+
+	if err := validateESIndexName(req.Name); err != nil {
+		h.badRequest(w, r, err.Error())
+		return
+	}
+
+	client, conn := h.openClient(w, r, connID)
+	if client == nil {
+		return
+	}
+	if conn.Readonly {
+		h.readonly(w, r)
+		return
+	}
+
+	ctx, cancel := h.timeout(r.Context())
+	defer cancel()
+	operationID := h.registerOperation(cancel, "delete", connID, req.Name, "delete index template")
+	defer h.unregisterOperation(operationID)
+
+	delReq := esapi.IndicesDeleteIndexTemplateRequest{
+		Name: req.Name,
+	}
+	res, err := delReq.Do(ctx, client)
+	if err != nil {
+		h.internalErr(w, r, "delete template", err)
+		return
+	}
+	defer res.Body.Close()
+
+	if res.IsError() {
+		if res.StatusCode == 404 {
+			h.badRequest(w, r, "template not found")
+			return
+		}
+		respBody, _ := io.ReadAll(res.Body)
+		h.internalErr(w, r, "delete template", fmt.Errorf("status: %s, body: %s", res.Status(), string(respBody)))
 		return
 	}
 

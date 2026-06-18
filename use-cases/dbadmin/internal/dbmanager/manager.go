@@ -12,6 +12,7 @@ import (
 
 	// Register drivers via blank imports so they're available to database/sql.
 	_ "github.com/go-sql-driver/mysql"
+	_ "github.com/lib/pq"
 	_ "modernc.org/sqlite"
 
 	"dbadmin/internal/domain/connection"
@@ -64,8 +65,11 @@ func (m *Manager) Open(ctx context.Context, c *connection.Connection) (*sql.DB, 
 		return nil, err
 	}
 	driverName := string(c.Driver)
-	if c.Driver == connection.DriverSQLite {
+	switch c.Driver {
+	case connection.DriverSQLite:
 		driverName = "sqlite"
+	case connection.DriverPostgres:
+		driverName = "postgres"
 	}
 
 	cfg := retry.DefaultConfig()
@@ -158,8 +162,11 @@ func (m *Manager) Test(ctx context.Context, c *connection.Connection) error {
 		return err
 	}
 	driverName := string(c.Driver)
-	if c.Driver == connection.DriverSQLite {
+	switch c.Driver {
+	case connection.DriverSQLite:
 		driverName = "sqlite"
+	case connection.DriverPostgres:
+		driverName = "postgres"
 	}
 	db, err := sql.Open(driverName, dsn)
 	if err != nil {
@@ -172,11 +179,26 @@ func (m *Manager) Test(ctx context.Context, c *connection.Connection) error {
 	return nil
 }
 
-// redactDSN masks the password in a MySQL DSN for safe use in log/error messages.
-// Input:  "user:secret@tcp(host:3306)/db?..."
-// Output: "user:***@tcp(host:3306)/db?..."
-// Non-MySQL DSNs (e.g. file paths) are returned unchanged.
+// redactDSN masks the password in a MySQL or PostgreSQL DSN for safe use in
+// log/error messages.
+// MySQL input:    "user:secret@tcp(host:3306)/db?..."
+// MySQL output:   "user:***@tcp(host:3306)/db?..."
+// Postgres input:  "postgres://user:secret@host:5432/db?sslmode=disable"
+// Postgres output: "postgres://user:***@host:5432/db?sslmode=disable"
+// Other DSNs (e.g. file paths) are returned unchanged.
 func redactDSN(dsn string) string {
+	if strings.HasPrefix(dsn, "postgres://") {
+		rest := strings.TrimPrefix(dsn, "postgres://")
+		at := strings.Index(rest, "@")
+		if at <= 0 {
+			return dsn
+		}
+		colon := strings.Index(rest[:at], ":")
+		if colon <= 0 {
+			return dsn
+		}
+		return "postgres://" + rest[:colon+1] + "***" + rest[at:]
+	}
 	at := strings.Index(dsn, "@")
 	if at <= 0 {
 		return dsn
@@ -198,12 +220,23 @@ func buildDSN(c *connection.Connection) (string, error) {
 			dsn += "&" + c.Options
 		}
 		return dsn, nil
+	case connection.DriverPostgres:
+		sslmode := c.SQLTLSMode
+		if sslmode == "" {
+			sslmode = "disable"
+		}
+		dsn := fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=%s",
+			c.Username, c.Password, c.Host, c.Port, c.Database, sslmode)
+		if c.Options != "" {
+			dsn += "&" + c.Options
+		}
+		return dsn, nil
 	case connection.DriverSQLite:
 		if c.FilePath == "" {
 			return "", fmt.Errorf("sqlite requires file_path")
 		}
 		return c.FilePath, nil
 	default:
-		return "", ErrUnknownDriver
+		return "", fmt.Errorf("%w: supported drivers are mysql, postgres, sqlite", ErrUnknownDriver)
 	}
 }

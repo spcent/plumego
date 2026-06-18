@@ -11,7 +11,6 @@ import (
 
 	"github.com/spcent/plumego/core"
 	plumelog "github.com/spcent/plumego/log"
-	"github.com/spcent/plumego/metrics"
 	"github.com/spcent/plumego/middleware/accesslog"
 	"github.com/spcent/plumego/middleware/bodylimit"
 	"github.com/spcent/plumego/middleware/cors"
@@ -21,6 +20,7 @@ import (
 	midsecurity "github.com/spcent/plumego/middleware/securityheaders"
 	"github.com/spcent/plumego/middleware/timeout"
 	kvstore "github.com/spcent/plumego/store/kv"
+	"github.com/spcent/plumego/x/observability"
 
 	"dbadmin/internal/config"
 	"dbadmin/internal/datasource"
@@ -29,6 +29,7 @@ import (
 	"dbadmin/internal/domain/connection"
 	"dbadmin/internal/domain/eshistory"
 	"dbadmin/internal/domain/history"
+	"dbadmin/internal/domain/mfa"
 	"dbadmin/internal/domain/mongohistory"
 	"dbadmin/internal/domain/redishistory"
 	"dbadmin/internal/domain/session"
@@ -43,6 +44,7 @@ type App struct {
 	Core              *core.App
 	Cfg               config.Config
 	SessionStore      *session.Store
+	MFAStore          *mfa.Store
 	ConnectionStore   *connection.Store
 	HistoryStore      *history.Store
 	MongoHistoryStore *mongohistory.Store
@@ -60,7 +62,9 @@ type App struct {
 	UploadDir         string
 	QueryRegistry     *handler.QueryRegistry
 	OperationRegistry *handler.OperationRegistry
-	StartTime         time.Time // Track app start time for uptime monitoring
+	StartTime         time.Time           // Track app start time for uptime monitoring
+	Users             []config.UserConfig // resolved user list (from cfg.App.ResolveUsers())
+	Metrics           *observability.PrometheusCollector
 }
 
 // New constructs the App with all middleware and shared dependencies wired.
@@ -72,6 +76,13 @@ func New(cfg config.Config) (*App, error) {
 	})
 	if err != nil {
 		return nil, fmt.Errorf("create session KV store: %w", err)
+	}
+
+	mfaKV, err := kvstore.NewKVStore(kvstore.Options{
+		DataDir: cfg.App.DataDir + "/mfa",
+	})
+	if err != nil {
+		return nil, fmt.Errorf("create mfa KV store: %w", err)
 	}
 
 	connKV, err := kvstore.NewKVStore(kvstore.Options{
@@ -135,6 +146,8 @@ func New(cfg config.Config) (*App, error) {
 	}
 	timeoutMw := timeout.Middleware(timeout.Config{Timeout: 60 * time.Second})
 
+	metricsCollector := observability.NewPrometheusCollector("dbadmin")
+
 	if err := coreApp.Use(
 		requestid.Middleware(),
 		securityMw,
@@ -145,7 +158,7 @@ func New(cfg config.Config) (*App, error) {
 			MaxBytes: cfg.App.MaxBodyBytes,
 			Logger:   coreApp.Logger(),
 		}),
-		httpmetrics.Middleware(metrics.NewNoopCollector()),
+		httpmetrics.Middleware(metricsCollector),
 		timeoutMw,
 	); err != nil {
 		return nil, fmt.Errorf("register middleware: %w", err)
@@ -164,6 +177,7 @@ func New(cfg config.Config) (*App, error) {
 		Core:              coreApp,
 		Cfg:               cfg,
 		SessionStore:      session.NewStore(sessKV, cfg.App.SessionTTL),
+		MFAStore:          mfa.NewStore(mfaKV),
 		ConnectionStore:   connStore,
 		HistoryStore:      history.NewStore(histKV),
 		MongoHistoryStore: mongohistory.NewStore(mongoHistKV),
@@ -186,6 +200,8 @@ func New(cfg config.Config) (*App, error) {
 		QueryRegistry:     handler.NewQueryRegistry(),
 		OperationRegistry: handler.NewOperationRegistry(),
 		StartTime:         time.Now(),
+		Users:             cfg.App.ResolveUsers(),
+		Metrics:           metricsCollector,
 	}, nil
 }
 
