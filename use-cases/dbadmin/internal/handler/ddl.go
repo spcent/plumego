@@ -2,6 +2,7 @@ package handler
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"net/http"
 	"regexp"
@@ -249,6 +250,33 @@ type createViewRequest struct {
 const maxViewQueryLen = 20000
 
 // CreateView executes CREATE VIEW.
+func validateViewQuery(query string) error {
+	q := strings.TrimSpace(query)
+	lq := strings.ToLower(q)
+
+	if !strings.HasPrefix(lq, "select ") && lq != "select" {
+		return errors.New("view query must start with SELECT")
+	}
+	if strings.Contains(q, ";") {
+		return errors.New("multiple statements are not allowed")
+	}
+	if strings.Contains(lq, "--") || strings.Contains(lq, "/*") || strings.Contains(lq, "*/") {
+		return errors.New("SQL comments are not allowed")
+	}
+
+	disallowed := []string{
+		" insert ", " update ", " delete ", " drop ", " alter ", " create ",
+		" truncate ", " grant ", " revoke ", " execute ", " call ",
+	}
+	padded := " " + lq + " "
+	for _, kw := range disallowed {
+		if strings.Contains(padded, kw) {
+			return errors.New("only read-only SELECT queries are allowed in view definition")
+		}
+	}
+	return nil
+}
+
 func (h DDLHandler) CreateView(w http.ResponseWriter, r *http.Request) {
 	db, conn, dbName, err := h.openDB(r)
 	if err != nil {
@@ -281,6 +309,11 @@ func (h DDLHandler) CreateView(w http.ResponseWriter, r *http.Request) {
 	if len(query) > maxViewQueryLen {
 		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
 			Type(contract.TypeValidation).Message(fmt.Sprintf("query too long (max %d chars)", maxViewQueryLen)).Build()))
+		return
+	}
+	if err := validateViewQuery(query); err != nil {
+		logWriteErr(h.Logger, contract.WriteError(w, r, contract.NewErrorBuilder().
+			Type(contract.TypeValidation).Message("invalid view query: "+err.Error()).Build()))
 		return
 	}
 	var fqn string
