@@ -58,6 +58,7 @@ type ListQuery struct {
 	Order        string // asc | desc
 	Limit        int
 	Offset       int
+	AfterID      string // keyset cursor: ID of the last item on the previous page
 }
 
 // Summary is the list-view representation of a document (no content).
@@ -107,10 +108,12 @@ type SaveResult struct {
 
 // ListResult is the paginated list response.
 type ListResult struct {
-	Items  []Summary `json:"items"`
-	Total  int64     `json:"total"`
-	Limit  int       `json:"limit"`
-	Offset int       `json:"offset"`
+	Items      []Summary `json:"items"`
+	Total      int64     `json:"total"` // -1 in keyset-cursor mode (total not computed)
+	Limit      int       `json:"limit"`
+	Offset     int       `json:"offset"`                // only meaningful in offset mode
+	NextCursor string    `json:"next_cursor,omitempty"` // pass as after_id for the next page
+	HasMore    bool      `json:"has_more"`
 }
 
 // VersionSummary is a list-view item for a document version.

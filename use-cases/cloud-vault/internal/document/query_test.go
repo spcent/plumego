@@ -95,21 +95,21 @@ func TestBuildListWhere_tagID(t *testing.T) {
 
 func TestBuildOrderClause_defaults(t *testing.T) {
 	got := buildOrderClause(ListQuery{})
-	if got != "ORDER BY updated_at DESC" {
+	if got != "ORDER BY updated_at DESC, id DESC" {
 		t.Errorf("default order: %q", got)
 	}
 }
 
 func TestBuildOrderClause_titleAsc(t *testing.T) {
 	got := buildOrderClause(ListQuery{SortBy: "title", Order: "ASC"})
-	if got != "ORDER BY title ASC" {
+	if got != "ORDER BY title ASC, id ASC" {
 		t.Errorf("title asc: %q", got)
 	}
 }
 
 func TestBuildOrderClause_invalidColFallback(t *testing.T) {
 	got := buildOrderClause(ListQuery{SortBy: "injection; DROP TABLE", Order: "asc"})
-	if got != "ORDER BY updated_at ASC" {
+	if got != "ORDER BY updated_at ASC, id ASC" {
 		t.Errorf("invalid col should fall back to updated_at: %q", got)
 	}
 }

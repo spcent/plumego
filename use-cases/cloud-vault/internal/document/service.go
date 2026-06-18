@@ -337,9 +337,23 @@ func (s *Service) List(ctx context.Context, q ListQuery) (*ListResult, error) {
 	}
 	q.Limit = limit
 
+	// In cursor mode, over-fetch by one so we can detect whether a next page exists
+	// without a separate COUNT query.
+	if q.AfterID != "" {
+		q.Limit = limit + 1
+	}
+
 	docs, total, err := s.repo.List(ctx, q)
 	if err != nil {
 		return nil, err
+	}
+
+	hasMore := false
+	var nextCursor string
+	if q.AfterID != "" && len(docs) > limit {
+		hasMore = true
+		docs = docs[:limit]
+		nextCursor = docs[limit-1].ID
 	}
 
 	items := make([]Summary, 0, len(docs))
@@ -348,10 +362,12 @@ func (s *Service) List(ctx context.Context, q ListQuery) (*ListResult, error) {
 	}
 
 	return &ListResult{
-		Items:  items,
-		Total:  total,
-		Limit:  limit,
-		Offset: q.Offset,
+		Items:      items,
+		Total:      total,
+		Limit:      limit,
+		Offset:     q.Offset,
+		NextCursor: nextCursor,
+		HasMore:    hasMore,
 	}, nil
 }
 

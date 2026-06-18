@@ -954,3 +954,70 @@ func TestSQLiteRepository_CreateDoc_WithNullableFields(t *testing.T) {
 		t.Error("ImportedAt should not be nil")
 	}
 }
+
+func TestSQLiteRepository_List_KeysetCursor(t *testing.T) {
+	db := openTestDB(t)
+	repo := NewSQLiteRepository(db)
+	ctx := context.Background()
+
+	// Create 5 docs. Sleep briefly between each so updated_at values differ.
+	ids := []string{"doc-a", "doc-b", "doc-c", "doc-d", "doc-e"}
+	for i, id := range ids {
+		d := newTestDoc(id, "Doc "+id, "hash-"+id)
+		d.UpdatedAt = time.Now().UTC().Add(time.Duration(i) * time.Millisecond)
+		if err := repo.Create(ctx, d); err != nil {
+			t.Fatalf("Create %s: %v", id, err)
+		}
+	}
+
+	// Page 1 via offset — establishes baseline ordering.
+	page1, total, err := repo.List(ctx, ListQuery{Limit: 2, Offset: 0})
+	if err != nil {
+		t.Fatalf("page1: %v", err)
+	}
+	if total != 5 {
+		t.Fatalf("total = %d, want 5", total)
+	}
+	if len(page1) != 2 {
+		t.Fatalf("page1 len = %d, want 2", len(page1))
+	}
+
+	// Page 2 via cursor — must not overlap with page 1 and must cover next 2 items.
+	page2, _, err := repo.List(ctx, ListQuery{Limit: 2, AfterID: page1[len(page1)-1].ID})
+	if err != nil {
+		t.Fatalf("page2 cursor: %v", err)
+	}
+	if len(page2) != 2 {
+		t.Fatalf("page2 len = %d, want 2", len(page2))
+	}
+
+	// No overlap between page1 and page2.
+	page1IDs := map[string]bool{page1[0].ID: true, page1[1].ID: true}
+	for _, d := range page2 {
+		if page1IDs[d.ID] {
+			t.Errorf("cursor page 2 contains page 1 item %s", d.ID)
+		}
+	}
+
+	// Page 3 via cursor — should return the remaining 1 item.
+	page3, _, err := repo.List(ctx, ListQuery{Limit: 2, AfterID: page2[len(page2)-1].ID})
+	if err != nil {
+		t.Fatalf("page3 cursor: %v", err)
+	}
+	if len(page3) != 1 {
+		t.Fatalf("page3 len = %d, want 1", len(page3))
+	}
+
+	// All 5 IDs accounted for across three pages with no overlap.
+	all := append(append(append([]*Document{}, page1...), page2...), page3...)
+	seen := map[string]bool{}
+	for _, d := range all {
+		if seen[d.ID] {
+			t.Errorf("duplicate document %s across cursor pages", d.ID)
+		}
+		seen[d.ID] = true
+	}
+	if len(seen) != 5 {
+		t.Errorf("cursor pagination covered %d distinct docs, want 5", len(seen))
+	}
+}
