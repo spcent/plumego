@@ -8,11 +8,11 @@ import (
 	"strings"
 )
 
-func (c *Collector) Handler() http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+func (c *Collector) Handler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain; version=0.0.4")
 		_, _ = w.Write([]byte(c.PrometheusText()))
-	})
+	}
 }
 
 func (c *Collector) PrometheusText() string {

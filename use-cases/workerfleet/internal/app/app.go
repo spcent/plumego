@@ -21,7 +21,7 @@ import (
 type RouteDependencies struct {
 	Service    *Service
 	Ready      func(context.Context) error
-	Metrics    http.Handler
+	Metrics    http.HandlerFunc
 	WorkerAuth WorkerIngressAuthConfig
 	AdminAuth  AdminAuthConfig
 }

@@ -4,8 +4,9 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/spcent/plumego/core"
 	workerapp "workerfleet/internal/app"
+
+	"github.com/spcent/plumego/core"
 )
 
 func RegisterServiceRoutes(app *core.App, deps workerapp.RouteDependencies) error {
@@ -23,7 +24,7 @@ func RegisterServiceRoutes(app *core.App, deps workerapp.RouteDependencies) erro
 type RouteDependencies struct {
 	Workers *Handler
 	Health  *HealthHandler
-	Metrics http.Handler
+	Metrics http.HandlerFunc
 }
 
 func RegisterRoutes(app *core.App, deps RouteDependencies) error {
@@ -32,17 +33,17 @@ func RegisterRoutes(app *core.App, deps RouteDependencies) error {
 	}
 
 	routes := []routeSpec{
-		{method: http.MethodGet, path: "/healthz", handler: http.HandlerFunc(deps.Health.Live)},
-		{method: http.MethodGet, path: "/readyz", handler: http.HandlerFunc(deps.Health.Ready)},
-		{method: http.MethodPost, path: "/v1/workers/register", handler: http.HandlerFunc(deps.Workers.RegisterWorker)},
-		{method: http.MethodPost, path: "/v1/workers/heartbeat", handler: http.HandlerFunc(deps.Workers.HeartbeatWorker)},
-		{method: http.MethodGet, path: "/v1/workers", handler: http.HandlerFunc(deps.Workers.ListWorkers)},
-		{method: http.MethodGet, path: "/v1/workers/:worker_id", handler: http.HandlerFunc(deps.Workers.GetWorker)},
-		{method: http.MethodGet, path: "/v1/tasks/:task_id/timeline", handler: http.HandlerFunc(deps.Workers.GetCaseTimeline)},
-		{method: http.MethodGet, path: "/v1/tasks/:task_id", handler: http.HandlerFunc(deps.Workers.GetTask)},
-		{method: http.MethodGet, path: "/v1/exec-plans/:exec_plan_id/cases", handler: http.HandlerFunc(deps.Workers.ListExecPlanCases)},
-		{method: http.MethodGet, path: "/v1/fleet/summary", handler: http.HandlerFunc(deps.Workers.FleetSummary)},
-		{method: http.MethodGet, path: "/v1/alerts", handler: http.HandlerFunc(deps.Workers.ListAlerts)},
+		{method: http.MethodGet, path: "/healthz", handler: deps.Health.Live},
+		{method: http.MethodGet, path: "/readyz", handler: deps.Health.Ready},
+		{method: http.MethodPost, path: "/v1/workers/register", handler: deps.Workers.RegisterWorker},
+		{method: http.MethodPost, path: "/v1/workers/heartbeat", handler: deps.Workers.HeartbeatWorker},
+		{method: http.MethodGet, path: "/v1/workers", handler: deps.Workers.ListWorkers},
+		{method: http.MethodGet, path: "/v1/workers/:worker_id", handler: deps.Workers.GetWorker},
+		{method: http.MethodGet, path: "/v1/tasks/:task_id/timeline", handler: deps.Workers.GetCaseTimeline},
+		{method: http.MethodGet, path: "/v1/tasks/:task_id", handler: deps.Workers.GetTask},
+		{method: http.MethodGet, path: "/v1/exec-plans/:exec_plan_id/cases", handler: deps.Workers.ListExecPlanCases},
+		{method: http.MethodGet, path: "/v1/fleet/summary", handler: deps.Workers.FleetSummary},
+		{method: http.MethodGet, path: "/v1/alerts", handler: deps.Workers.ListAlerts},
 	}
 	if deps.Metrics != nil {
 		routes = append(routes, routeSpec{method: http.MethodGet, path: "/metrics", handler: deps.Metrics})
@@ -53,7 +54,7 @@ func RegisterRoutes(app *core.App, deps RouteDependencies) error {
 type routeSpec struct {
 	method  string
 	path    string
-	handler http.Handler
+	handler http.HandlerFunc
 }
 
 func validateRouteDependencies(app *core.App, workers *Handler, health *HealthHandler) error {
