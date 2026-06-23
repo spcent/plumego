@@ -13,7 +13,10 @@ export default defineConfig({
   build: {
     outDir: '../static',
     emptyOutDir: true,
-    rollupOptions: {
+    rolldownOptions: {
+      checks: {
+        pluginTimings: false,
+      },
       output: {
         entryFileNames: 'js/[name].[hash].js',
         chunkFileNames: 'js/[name].[hash].js',
@@ -21,10 +24,12 @@ export default defineConfig({
           if (name && name.endsWith('.css')) return 'css/[name].[hash].css'
           return 'assets/[name].[hash][extname]'
         },
-        manualChunks: {
-          vendor: ['react', 'react-dom', 'react-router-dom'],
-          charts: ['chart.js', 'react-chartjs-2', 'chartjs-adapter-date-fns', 'chartjs-plugin-annotation'],
-          icons: ['lucide-react'],
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return undefined
+          if (id.includes('chart.js') || id.includes('react-chartjs-2') || id.includes('chartjs-adapter-date-fns') || id.includes('chartjs-plugin-annotation')) return 'charts'
+          if (id.includes('lucide-react')) return 'icons'
+          if (id.includes('react') || id.includes('react-dom') || id.includes('react-router-dom')) return 'vendor'
+          return undefined
         },
       },
     },

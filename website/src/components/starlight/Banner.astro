@@ -2,16 +2,12 @@
 /**
  * Banner.astro — Starlight Banner override
  *
- * Extends the default Starlight banner with automatic translation-lag detection.
- * For any zh docs page whose translationKey appears in TRANSLATION_LAG (generated
- * at build time by scripts/check-translation-lag.mjs), a stale-translation notice
- * is prepended before any page-level banner content.
- *
- * CONTENT_RULES Rule 6: zh pages more than 14 days behind their en source must
- * display a visible notice. Wiring this in one override avoids needing to add
- * <TranslationNotice> imports to every zh MDX page individually.
+ * Extends the default Starlight banner with automatic stale-translation
+ * detection. For any zh docs page whose translationKey appears in
+ * STALE_TRANSLATIONS (generated at build time by scripts/check-translation-lag.mjs),
+ * a stale-translation notice is prepended before any page-level banner content.
  */
-import { TRANSLATION_LAG } from '../../generated/translation-lag';
+import { STALE_TRANSLATIONS } from '../../generated/translation-lag';
 import { localeFromPath } from '../../lib/i18n';
 import { TRANSLATION_LAG_LOCALE } from '../../lib/locales';
 
@@ -19,18 +15,18 @@ const { entry } = Astro.locals.starlightRoute;
 
 const locale = localeFromPath(Astro.url.pathname);
 const translationKey: string | undefined = (entry.data as Record<string, unknown>).translationKey as string | undefined;
-const lagDays: number | undefined = translationKey
-  ? (TRANSLATION_LAG as Record<string, number>)[translationKey]
+const isStale: boolean | undefined = translationKey
+  ? (STALE_TRANSLATIONS as Record<string, boolean>)[translationKey]
   : undefined;
 
-const showLagNotice = locale === TRANSLATION_LAG_LOCALE && lagDays !== undefined;
+const showLagNotice = locale === TRANSLATION_LAG_LOCALE && isStale === true;
 ---
 
 {showLagNotice && (
   <aside class="translation-notice" role="note" aria-label="Translation notice">
     <span class="translation-notice__icon">⚠</span>
     <span class="translation-notice__text">
-      此页面的中文翻译可能已过时（落后英文版约 {lagDays} 天）。
+      此页面的中文翻译可能已过时（英文源内容已更新）。
       如需获取最新内容，请查阅
       {translationKey && (
         <a href={`/docs/${translationKey.replace(/-/g, '/')}`}>英文原版</a>

@@ -1,0 +1,3 @@
+overrides:
+  dompurify: 3.4.11
+  undici: 7.28.0

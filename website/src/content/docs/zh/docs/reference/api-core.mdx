@@ -6,11 +6,9 @@ sidebar:
   order: 1
 ---
 
-
-
 # core — API 快速参考
 
-本页列出 `github.com/spcent/plumego/core` 导出的每个公开符号。已知该包时用本页快速查阅；需要边界说明和使用模式时请读 [Core Primer](/zh/docs/modules/core)。
+本页列出 `github.com/spcent/plumego/core` 导出的每个公开符号。已熟悉该包时用本页快速查阅；需要边界说明和使用模式时请读 [Core Primer](/zh/docs/modules/core)。
 
 ```go
 import "github.com/spcent/plumego/core"
@@ -59,8 +57,14 @@ type RouterConfig struct {
 
 ```go
 type AppDependencies struct {
-    Logger log.Logger
+    Logger log.StructuredLogger
 }
+```
+
+### App
+
+```go
+type App struct { /* unexported fields */ }
 ```
 
 ---
@@ -73,7 +77,7 @@ type AppDependencies struct {
 func New(cfg AppConfig, deps AppDependencies) *App
 ```
 
-创建并返回新的 `App`。`cfg` 通常是 `DefaultConfig()` 的结果加上字段覆盖。
+创建并返回新的 `App`。`cfg` 通常来自 `DefaultConfig()` 并按需覆盖字段。`deps` 携带可选共享依赖（Logger）；省略时日志会被丢弃。
 
 ### DefaultConfig
 
@@ -81,16 +85,18 @@ func New(cfg AppConfig, deps AppDependencies) *App
 func DefaultConfig() AppConfig
 ```
 
-返回带有生产默认值的 `AppConfig`。
+返回可直接使用的 `AppConfig`，带有面向生产的默认值。
 
 | 字段 | 默认值 |
 | --- | --- |
 | `Addr` | `:8080` |
+| `TLS.Enabled` | `false` |
+| `Router.MethodNotAllowed` | `false` |
 | `ReadTimeout` | `30s` |
 | `ReadHeaderTimeout` | `5s` |
 | `WriteTimeout` | `30s` |
 | `IdleTimeout` | `60s` |
-| `MaxHeaderBytes` | `1 MiB` |
+| `MaxHeaderBytes` | `1 MiB`（1 048 576 bytes） |
 | `HTTP2Enabled` | `true` |
 | `DrainInterval` | `500ms` |
 
@@ -98,16 +104,45 @@ func DefaultConfig() AppConfig
 
 ## 路由注册方法
 
-### Get / Post / Put / Delete / Patch / Any
+所有路由注册方法都在 `*App` 上。每个方法都会返回已注册的 `*router.Route`（调用方通常会丢弃该返回值）。
+
+### Get
 
 ```go
 func (a *App) Get(path string, handler http.Handler) *router.Route
+```
+
+### Post
+
+```go
 func (a *App) Post(path string, handler http.Handler) *router.Route
+```
+
+### Put
+
+```go
 func (a *App) Put(path string, handler http.Handler) *router.Route
+```
+
+### Delete
+
+```go
 func (a *App) Delete(path string, handler http.Handler) *router.Route
+```
+
+### Patch
+
+```go
 func (a *App) Patch(path string, handler http.Handler) *router.Route
+```
+
+### Any
+
+```go
 func (a *App) Any(path string, handler http.Handler) *router.Route
 ```
+
+为给定路径注册所有 HTTP 方法的处理器。
 
 ### AddRoute
 
@@ -115,13 +150,47 @@ func (a *App) Any(path string, handler http.Handler) *router.Route
 func (a *App) AddRoute(method, path string, handler http.Handler, opts ...router.RouteOption) *router.Route
 ```
 
+低层路由注册方法。`opts` 可接收 `router.WithRouteName(name)` 以启用反向查找。
+
+### Group
+
+```go
+func (a *App) Group(prefix string) *router.Group
+```
+
+返回一个路由分组；在该分组上注册的所有路由都会自动加上 `prefix` 前缀。
+
+### Handle
+
+```go
+func (a *App) Handle(path string, handler http.Handler) *router.Route
+```
+
+在给定路径注册一个 `http.Handler`（任意方法）。
+
+---
+
+## 中间件
+
 ### Use
 
 ```go
 func (a *App) Use(middlewares ...func(http.Handler) http.Handler)
 ```
 
-必须在 `Prepare` 之前调用。中间件按注册顺序运行。
+把中间件追加到处理链。必须在 `Prepare` 之前调用。中间件按注册顺序运行（最先注册的位于最外层）。
+
+---
+
+## 反向路由
+
+### URL
+
+```go
+func (a *App) URL(name string, pairs ...string) string
+```
+
+把命名路由解析为 URL。`pairs` 以参数名和值交替传入：`app.URL("user-detail", "id", "42")` -> `"/api/users/42"`。如果路由名称不存在或参数数量错误，会 panic。
 
 ---
 
@@ -133,7 +202,7 @@ func (a *App) Use(middlewares ...func(http.Handler) http.Handler)
 func (a *App) Prepare() error
 ```
 
-冻结路由表并构建处理链。必须在 `Server` 之前调用。
+冻结路由表、应用中间件，并构建处理链。必须在 `Server` 之前调用。配置无效时返回非 nil 错误。
 
 ### Server
 
@@ -141,7 +210,7 @@ func (a *App) Prepare() error
 func (a *App) Server() (*http.Server, error)
 ```
 
-返回已配置的 `*http.Server`。调用方负责 `ListenAndServe` 和 `Shutdown`。
+返回配置好的 `*http.Server`。必须在 `Prepare` 之后调用。调用方负责 `ListenAndServe`、`ListenAndServeTLS` 和 `Shutdown`。
 
 ### Run
 
@@ -149,7 +218,7 @@ func (a *App) Server() (*http.Server, error)
 func (a *App) Run()
 ```
 
-合并路径：调用 `Prepare` 然后启动服务器。
+合并便利路径：调用 `Prepare`，然后通过 `ListenAndServe` 启动服务器（TLS 启用时调用 `ListenAndServeTLS`）。失败时记录 fatal 日志并退出。需要在启动前检查 server 时，请使用 `Prepare` + `Server`。
 
 ### Shutdown
 
@@ -157,19 +226,41 @@ func (a *App) Run()
 func (a *App) Shutdown(ctx context.Context) error
 ```
 
-优雅停机，排空飞行中的连接。
+发起优雅停机。按 `DrainInterval` 间隔排空飞行中的连接，直到 `ctx` 取消或所有连接排空。调用时应传入带截止时间的 context。
 
-### URL
+---
+
+## 访问器
+
+### Logger
 
 ```go
-func (a *App) URL(name string, pairs ...string) string
+func (a *App) Logger() log.StructuredLogger
 ```
 
-将命名路由解析为 URL 字符串。
+返回通过 `AppDependencies` 注入的 logger。未提供 logger 时返回 no-op logger。
+
+### Router
+
+```go
+func (a *App) Router() *router.Router
+```
+
+返回底层的 `*router.Router`。当需要直接调用 router 上的 `Static`、`StaticFS` 或 `Group` 时使用。
+
+---
+
+## 路径参数语法
+
+| 语法 | 匹配内容 | 读取方式 |
+| --- | --- | --- |
+| `:name` | 单个路径段 | `router.Param(r, "name")` |
+| `*name` | 剩余所有路径段 | `router.Param(r, "name")` |
 
 ---
 
 ## 另见
 
 - [Core Primer](/zh/docs/modules/core) — 边界说明、起点检查表和所有权示例
-- [英文完整版](/docs/reference/api-core) — 含所有方法签名和详细说明
+- [Router API Reference](/zh/docs/reference/api-router) — `router.Router`、`Group`、`Param` 和静态文件服务
+- [Reference App](https://github.com/spcent/plumego/tree/main/reference/standard-service) — `main.go` 与 `internal/app/` 中的规范启动代码

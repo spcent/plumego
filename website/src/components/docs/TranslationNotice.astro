@@ -2,33 +2,33 @@
 /**
  * TranslationNotice
  *
- * Displays a stale-translation warning banner when the zh version of a doc
- * is more than LAG_DAYS behind its en source according to git history.
+ * Displays a stale-translation warning banner when the English source content
+ * no longer matches the recorded source hash for the zh translation.
  *
  * Usage in zh/*.mdx frontmatter: no changes needed.
  * The component reads translationKey from frontmatter and checks
- * TRANSLATION_LAG generated at build time.
+ * STALE_TRANSLATIONS generated at build time.
  *
  * Import and use in zh pages:
  *   import TranslationNotice from '../../../components/docs/TranslationNotice.astro';
  *   <TranslationNotice translationKey="getting-started" />
  */
 
-import { TRANSLATION_LAG } from '../../generated/translation-lag';
+import { STALE_TRANSLATIONS } from '../../generated/translation-lag';
 
 interface Props {
   translationKey: string;
 }
 
 const { translationKey } = Astro.props;
-const lagDays: number | undefined = (TRANSLATION_LAG as Record<string, number>)[translationKey];
+const isStale: boolean | undefined = (STALE_TRANSLATIONS as Record<string, boolean>)[translationKey];
 ---
 
-{lagDays !== undefined && (
+{isStale === true && (
   <aside class="translation-notice" role="note" aria-label="Translation notice">
     <span class="translation-notice__icon">⚠</span>
     <span class="translation-notice__text">
-      此页面的中文翻译可能已过时（落后英文版约 {lagDays} 天）。
+      此页面的中文翻译可能已过时（英文源内容已更新）。
       如需获取最新内容，请查阅
       <a href={`/docs/${translationKey.replace(/-/g, '/')}`}>英文原版</a>。
     </span>
