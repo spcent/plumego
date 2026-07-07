@@ -157,7 +157,7 @@ app := plumego.NewWithConfig(cfg)
 其余所有 `x/*` 扩展均为 **experimental**：API 可能在任意次要版本中变更，无需事先通知。
 未经显式的项目级稳定化处理，请勿在生产服务中依赖这些扩展。
 
-完整兼容性详见 [`STABILITY.md`](./STABILITY.md)、版本升级路径见 [`COMPATIBILITY.md`](./COMPATIBILITY.md)，
+完整兼容性详见 [`STABILITY.md`](./docs/release/STABILITY.md)、版本升级路径见 [`COMPATIBILITY.md`](./docs/release/COMPATIBILITY.md)，
 晋级标准见 [`docs/reference/extension-stability-policy.md`](./docs/reference/extension-stability-policy.md)。
 
 ## Agent-First Design
@@ -182,8 +182,8 @@ Plumego 使用 agent-first 控制面维护仓库：`docs/` 解释架构，`specs
 - [`docs/reference/reference-apps.md`](./docs/reference/reference-apps.md) —— 参考应用选择指南
 
 **选择技术？**
-- [`STABILITY.md`](./STABILITY.md) —— 哪些内容在 v1 中稳定
-- [`COMPATIBILITY.md`](./COMPATIBILITY.md) —— 版本升级和迁移路径
+- [`STABILITY.md`](./docs/release/STABILITY.md) —— 哪些内容在 v1 中稳定
+- [`COMPATIBILITY.md`](./docs/release/COMPATIBILITY.md) —— 版本升级和迁移路径
 - [`docs/modules`](./docs/modules) —— 各包模块导读
 
 **遇到问题？**

@@ -13,7 +13,7 @@ The stable surface is intentionally narrow. Start with `core`, `router`,
 `contract`, and `middleware`; add `security`, `store`, `health`, `log`, and
 `metrics` only when those responsibilities are needed.
 
-## Why Plumego?
+## Why Plumego
 
 For Go services that need more structure than raw `http.ServeMux` without taking on a large framework model.
 
@@ -21,7 +21,7 @@ For Go services that need more structure than raw `http.ServeMux` without taking
 - Want to understand every line of your HTTP server's wiring
 - Prefer stdlib shapes and patterns
 - Expect your service to live for years with predictable maintenance
-- Use code agents (Claude, Codex) to assist development
+- Use code agents (Claude, Codex, Cursor) to assist development
 - Value small, testable, refactorable code over convenience
 
 **Plumego is NOT:**
@@ -98,25 +98,16 @@ see [`docs/start/getting-started.md`](./docs/start/getting-started.md).
 | Real-time WebSocket features | `reference/with-websocket` → `x/websocket` | beta |
 | An AI-backed service | `reference/with-ai` → `x/ai/provider` | experimental |
 | A service with rich messaging/webhooks | `reference/with-messaging` → `x/messaging` | beta |
+| Events / pubsub | `reference/with-events` → `x/messaging` | beta |
+| Frontend / static assets | `reference/with-frontend` → `x/frontend` | beta |
+| Protected ops / admin routes | `reference/with-ops` → stable roots + `security` | GA |
 | A gRPC + HTTP service | `reference/with-rpc` → `x/rpc` | experimental |
 | Observability (Prometheus / OpenTelemetry) | `reference/with-observability` → `x/observability` | beta |
 | A tenant administration console | `reference/with-tenant-admin` → `x/tenant` | beta |
+| Webhook ingress / delivery | `reference/with-webhook` → `x/messaging` | beta |
 
 All paths keep `reference/standard-service` as the base layout; extensions are
 explicit additions, not alternate bootstraps.
-
-## Why plumego
-
-For Go services that need more structure than raw `http.ServeMux` without
-taking on a large framework model.
-
-| Principle | How plumego applies it |
-| --- | --- |
-| Standard library first | Ordinary handlers, middleware, requests, response writers, and `*http.Server`. |
-| Explicit wiring | Routes, middleware, dependencies, and lifecycle are visible at construction sites. |
-| Small stable surface | Stable roots have narrow ownership, not feature catalogs. |
-| Agent-friendly maintenance | `specs/`, `tasks/`, and per-module `module.yaml` make scope and validation discoverable. |
-| Optional capabilities | Product features and protocol adapters live outside the stable learning path. |
 
 ## stdlib comparison
 
@@ -164,7 +155,7 @@ All remaining `x/*` extensions are **experimental**: APIs may change in any
 minor version without notice. Do not use them in production services without
 explicit project-level stabilization.
 
-See [`STABILITY.md`](./STABILITY.md) for the full v1 guarantee, [`COMPATIBILITY.md`](./COMPATIBILITY.md) for upgrade paths, and [`docs/reference/extension-stability-policy.md`](./docs/reference/extension-stability-policy.md) for detailed promotion criteria.
+See [`STABILITY.md`](./docs/release/STABILITY.md) for the full v1 guarantee, [`docs/release/COMPATIBILITY.md`](./COMPATIBILITY.md) for upgrade paths, and [`docs/reference/extension-stability-policy.md`](./docs/reference/extension-stability-policy.md) for detailed promotion criteria.
 
 ## Agent-First Design
 
@@ -191,8 +182,8 @@ for the internal operating reference.
 - [`docs/reference/reference-apps.md`](./docs/reference/reference-apps.md) — guide to choosing a reference application
 
 **Choosing technology?**
-- [`STABILITY.md`](./STABILITY.md) — what's stable, beta, and experimental in v1
-- [`COMPATIBILITY.md`](./COMPATIBILITY.md) — upgrade paths and migration guides
+- [`STABILITY.md`](./docs/release/STABILITY.md) — what's stable, beta, and experimental in v1
+- [`COMPATIBILITY.md`](./docs/release/COMPATIBILITY.md) — upgrade paths and migration guides
 - [`docs/modules`](./docs/modules) — package-specific primers
 
 **Troubleshooting?**
