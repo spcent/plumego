@@ -3,19 +3,86 @@ import mdx from '@astrojs/mdx';
 import sitemap from '@astrojs/sitemap';
 import starlight from '@astrojs/starlight';
 
+/**
+ * Determine sitemap priority based on URL path.
+ */
+function getPriority(path) {
+  if (path === '/') return 1.0;
+  if (path.startsWith('/docs')) return 0.8;
+  return 0.6;
+}
+
+/**
+ * Determine sitemap changefreq based on URL path.
+ */
+function getChangefreq(path) {
+  if (path === '/') return 'weekly';
+  if (path.startsWith('/docs')) return 'weekly';
+  return 'monthly';
+}
+
+/**
+ * Determine sitemap lastmod based on URL path.
+ * Docs pages derive from file mtime; landing pages use build time.
+ */
+async function getLastmod(page) {
+  const url = new URL(page);
+  const path = url.pathname;
+
+  // Map docs URLs to source files for accurate mtime
+  const docsPathMatch = path.match(/^\/zh?\/docs\/(.*)$/);
+  if (docsPathMatch) {
+    const slug = docsPathMatch[1];
+    const candidates = [
+      `src/content/docs/docs/${slug}.mdx`,
+      `src/content/docs/docs/${slug}.md`,
+      `src/content/docs/docs/${slug}/index.mdx`,
+      `src/content/docs/docs/${slug}/index.md`,
+    ];
+    for (const c of candidates) {
+      try {
+        const { stat } = await import('node:fs/promises');
+        const s = await stat(c);
+        return s.mtime.toISOString();
+      } catch {
+        // try next candidate
+      }
+    }
+  }
+
+  return new Date().toISOString();
+}
+
 export default defineConfig({
   site: 'https://plumego.birdor.dev',
   output: 'static',
   trailingSlash: 'never',
   integrations: [
     sitemap({
-      filter: (page) => !page.includes('/404'),
+      filter: (page) => {
+        const path = new URL(page).pathname;
+        // Exclude 404 and any hidden/internal pages
+        if (path.includes('404')) return false;
+        // Exclude search page (Starlight may generate /search)
+        if (path === '/search' || path === '/zh/search') return false;
+        return true;
+      },
       i18n: {
         defaultLocale: 'en',
         locales: {
           en: 'en',
           zh: 'zh-CN',
         },
+      },
+      serialize: async (item) => {
+        const url = new URL(item.url);
+        const path = url.pathname;
+        return {
+          ...item,
+          lastmod: await getLastmod(item.url),
+          changefreq: getChangefreq(path),
+          priority: getPriority(path),
+        };
       },
     }),
     starlight({
