@@ -143,45 +143,70 @@ Footer navigation is grouped by job instead of presented as one flat link row:
 
 ### Release sitemap
 
-Current published routes:
+The site currently ships every page under both `/` (English) and `/zh` (Chinese). The lists below are locale-agnostic — prepend `/zh` for the Chinese variant, except `/404` which has its own locale-specific files.
+
+Marketing (`src/pages/**`):
 
 - `/`
+- `/why-plumego`
+- `/use-cases`
+- `/examples`
+- `/extensions`
+- `/architecture`
+- `/agent-workflow`
+- `/migrate`
+- `/compare`
+- `/status`
+- `/stability`
+- `/releases`
+- `/roadmap`
+- `/404` (English at `src/pages/404.astro`, Chinese at `src/pages/zh/404.astro`)
+
+Docs entry (`src/content/docs/docs/*.mdx`):
+
 - `/docs`
 - `/docs/getting-started`
 - `/docs/reference-app`
-- `/docs/modules/overview`
+- `/docs/faq`
+- `/docs/release-posture`
 - `/docs/stable-roots`
 - `/docs/x-family`
-- `/docs/release-posture`
-- `/roadmap`
-- `/releases`
-- `/use-cases`
-- `/examples`
-- `/404`
-- `/zh`
-- `/zh/docs`
-- `/zh/docs/getting-started`
-- `/zh/docs/reference-app`
-- `/zh/docs/modules/overview`
-- `/zh/docs/stable-roots`
-- `/zh/docs/x-family`
-- `/zh/docs/release-posture`
-- `/zh/roadmap`
-- `/zh/releases`
-- `/zh/use-cases`
-- `/zh/examples`
-- `/docs/concepts/request-flow`
+- `/docs/when-not-to-use`
+
+Docs concepts (`src/content/docs/docs/concepts/*.mdx`):
+
+- `/docs/concepts/agent-first-workflow`
+- `/docs/concepts/configuration-model`
+- `/docs/concepts/core-boundaries`
+- `/docs/concepts/error-model`
+- `/docs/concepts/extension-boundaries`
+- `/docs/concepts/extension-maturity`
+- `/docs/concepts/middleware-model`
 - `/docs/concepts/repo-control-plane`
-- `/docs/faq`
-- `/zh/docs/concepts/request-flow`
-- `/zh/docs/concepts/repo-control-plane`
-- `/zh/docs/faq`
+- `/docs/concepts/request-flow`
 
-Release-completion support pages:
+Docs guides (`src/content/docs/docs/guides/*.mdx`) — 22 files covering JWT auth, REST resources, database connection, middleware, Docker deploy, dev server, file uploads, graceful shutdown, error handling, health & readiness, AI integration, migration from chi/gin/echo, multi-tenancy, observability, structured logging, style guide, handler testing, WebSocket, and more.
 
-- `/404`
+Docs modules (`src/content/docs/docs/modules/*.mdx`) — 32 files:
+
+- 10 stable roots: `contract`, `core`, `health`, `log`, `metrics`, `middleware`, `overview`, `router`, `security`, `store`
+- 14 x/* families + 8 subordinate primers: `x-ai`, `x-cache`, `x-data`, `x-devtools`, `x-discovery`, `x-fileapi`, `x-frontend`, `x-gateway`, `x-ipc`, `x-messaging`, `x-messaging-subordinates`, `x-observability`, `x-openapi`, `x-ops`, `x-resilience`, `x-rest`, `x-rpc`, `x-scheduler`, `x-tenant`, `x-validate`, `x-webhook`, `x-websocket`
+
+Docs reference (`src/content/docs/docs/reference/*.mdx`):
+
+- `/docs/reference` (index)
+- `/docs/reference/api-contract`
+- `/docs/reference/api-core`
+- `/docs/reference/api-router`
+- `/docs/reference/deprecation`
+- `/docs/reference/errors`
+- `/docs/reference/stability`
+
+Release-completion support:
+
 - locale-aware canonical and Open Graph metadata on marketing and docs pages
 - shared OG assets under `public/brand/**`
+- bilingual EN/ZH parity checked by `scripts/check-translation-lag.mjs`
 
 ### Pages deployment shape
 
@@ -265,7 +290,7 @@ After the first successful production deployment:
 
 Common choices:
 
-- production: `plumego.birdor.com`
+- production: `plumego.birdor.dev`
 
 If you want a branch-specific custom domain later, Cloudflare Pages also supports attaching a custom domain to a branch alias such as `staging.example.com`.
 
@@ -293,22 +318,19 @@ If preview URLs should not be public, protect them with Cloudflare Access from t
 
 ## Release Readiness Scope
 
-Currently shipped:
+Currently shipped (v1.1.0):
 
-- home page
-- docs landing page
-- getting started
-- reference app
-- modules overview
-- stable roots
-- x/* family
-- release posture
-- roadmap
-- releases
+- marketing pages: home, why-plumego, use-cases, examples, extensions, architecture, agent-workflow, migrate, compare, status, stability, releases, roadmap, 404
+- docs entry pages: docs home, getting-started, reference-app, faq, release-posture, stable-roots, x-family, when-not-to-use
+- docs concepts (9 pages)
+- docs guides (22 pages)
+- docs modules (10 stable roots + 22 x/* family or subordinate primers)
+- docs reference (index + 6 reference pages)
+- bilingual EN/ZH parity: every marketing page and docs page ships in both locales
+- locale-aware canonical and Open Graph metadata on all pages
 
-Required before release-ready status:
+Ongoing polish items (post-v1.1.0):
 
-- concept-layer docs pages
-- FAQ / use-case / examples pages
-- final 404 and share-preview polish
-- one full content pass for both English and Chinese
+- keep `docs/reference/deprecation.mdx` and `docs/reference/stability.mdx` aligned with `docs/reference/deprecation.md` and `specs/extension-maturity.yaml` on every promotion
+- track translation lag with `scripts/check-translation-lag.mjs`; the tracker only detects English-side drift, so periodic full-content passes are still needed for parity
+- keep the "specific projects" section on `/use-cases` in sync with `use-cases/*` folder contents

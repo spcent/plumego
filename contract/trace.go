@@ -9,8 +9,8 @@ import (
 
 const (
 	traceFlagsSampled uint8 = 0x01
-	traceIDLength           = 32
-	spanIDLength            = 16
+	traceIDLength     int   = 32
+	spanIDLength      int   = 16
 )
 
 // TraceContext is the minimal trace/span metadata carrier stored in

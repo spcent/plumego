@@ -33,8 +33,8 @@ Agent 清理规则：一旦仓库中最后一个调用方已迁离预发布或�
 
 | 层级 | 模块 | 兼容性规则 |
 | --- | --- | --- |
-| `beta` | `x/gateway`, `x/observability`, `x/rest`, `x/websocket` | 导出 API 在次要版本发布引用之间冻结。破坏性变更需要新的标记引用和快照对比。不允许静默破坏。 |
-| `experimental` | 其他所有 `x/*` | 无兼容性冻结。API 和配置可能在任意提交之间变更。有明确理由时采用，不要默认采用。 |
+| `beta` | `x/frontend`、`x/gateway`、`x/messaging`、`x/observability`、`x/rest`、`x/tenant`、`x/websocket`、`x/ai/provider`、`x/ai/session`、`x/ai/streaming`、`x/ai/tool`、`x/data/file`、`x/data/idempotency` | 所列模块或选定表面在次要版本发布引用之间冻结导出 API。破坏性变更需要新的标记引用和快照对比。不允许静默破坏。 |
+| `experimental` | 未列出的 `x/*` 模块与表面 | 无兼容性冻结。API 和配置可能在任意提交之间变更。有明确理由时采用，不要默认采用。 |
 | `ga` | 暂无 | 完整的稳定根级兼容性承诺。 |
 
 从 `experimental` 升级到 `beta` 需要在 `specs/extension-beta-evidence.yaml` 中记录证据。
@@ -109,7 +109,7 @@ func OldMiddlewareHelper(...) { ... }
 
 ## 当前弃用列表
 
-v1.0 时暂无弃用。
+截至 v1.1.0，暂无弃用。
 
 ## 下一步阅读
 

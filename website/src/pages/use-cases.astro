@@ -125,6 +125,49 @@ const scenarios = [
   },
 ] as const;
 
+const useCaseProjects = [
+  {
+    kicker: 'multi-tenant saas',
+    name: 'use-cases/mini-saas-api',
+    body: 'A bounded multi-tenant SaaS API showcase — tenant isolation, quota enforcement, and JWT policy on top of Plumego\'s stable roots.',
+    scenario: 'multi-tenant saas',
+    href: 'https://github.com/spcent/plumego/tree/main/use-cases/mini-saas-api',
+    status: 'reference use case',
+  },
+  {
+    kicker: 'ai + storage',
+    name: 'use-cases/cloud-vault',
+    body: 'A local-first Markdown knowledge vault for AI-generated notes. Demonstrates x/data + x/frontend on the standard-service baseline.',
+    scenario: 'internal api + ai service',
+    href: 'https://github.com/spcent/plumego/tree/main/use-cases/cloud-vault',
+    status: 'reference use case',
+  },
+  {
+    kicker: 'admin plane',
+    name: 'use-cases/dbadmin',
+    body: 'A local-first, security-focused database workbench (MySQL / Postgres / SQLite / Redis / MongoDB / Elasticsearch) — shows how Plumego handles admin-plane services with sensitive connections.',
+    scenario: 'platform service',
+    href: 'https://github.com/spcent/plumego/tree/main/use-cases/dbadmin',
+    status: 'reference use case',
+  },
+  {
+    kicker: 'monitoring',
+    name: 'use-cases/guardus',
+    body: 'A feature-equivalent v1 reimplementation of Gatus (health/status monitoring) built on Plumego stable roots + x/observability.',
+    scenario: 'platform service',
+    href: 'https://github.com/spcent/plumego/tree/main/use-cases/guardus',
+    status: 'reference use case',
+  },
+  {
+    kicker: 'depth exploration',
+    name: 'use-cases/workerfleet',
+    body: 'A work-in-progress worker-fleet monitoring service exploring greater depth than the canonical service — MongoDB stores, Kubernetes pod discovery, Prometheus metrics, and an alert/notification pipeline. Some methods still return ErrNotImplemented.',
+    scenario: 'platform service + messaging',
+    href: 'https://github.com/spcent/plumego/tree/main/use-cases/workerfleet',
+    status: 'work in progress',
+  },
+] as const;
+
 const fitGuide = [
   {
     kicker: 'good fit',
@@ -209,6 +252,35 @@ const fitGuide = [
           <div class="page-links page-links--inline">
             <a class="text-link" href={item.startHref}>{item.startLabel}</a>
             <a class="text-link" href={item.secondaryHref}>{item.secondaryLabel}</a>
+          </div>
+        </article>
+      ))}
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="section__intro">
+      <h2>Real projects in this repository.</h2>
+      <p>
+        These are the runnable use cases that ship under <code>use-cases/</code>. Each one shows what a scenario above looks like as a concrete Go module — inspect the source before deciding which service shape to copy.
+      </p>
+    </div>
+    <div class="page-grid">
+      {useCaseProjects.map((project) => (
+        <article class="page-panel">
+          <p class="signal-list__kicker">{project.kicker}</p>
+          <h3><code>{project.name}</code></h3>
+          <p>{project.body}</p>
+          <p class="use-case-modules">
+            <span class="use-case-modules__label">Maps to: </span>
+            <span class="use-case-modules__note">{project.scenario}</span>
+          </p>
+          <p class="use-case-modules">
+            <span class="use-case-modules__label">Status: </span>
+            <span class="use-case-modules__note">{project.status}</span>
+          </p>
+          <div class="page-links page-links--inline">
+            <a class="text-link" href={project.href}>Open on GitHub →</a>
           </div>
         </article>
       ))}

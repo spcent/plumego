@@ -4,7 +4,7 @@ import sitemap from '@astrojs/sitemap';
 import starlight from '@astrojs/starlight';
 
 export default defineConfig({
-  site: 'https://plumego.birdor.com',
+  site: 'https://plumego.birdor.dev',
   output: 'static',
   trailingSlash: 'never',
   integrations: [

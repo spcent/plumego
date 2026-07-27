@@ -14,6 +14,30 @@ const journeySteps = [
   { label: 'Releases', href: '/releases' },
 ];
 
+const smallestExamples = [
+  {
+    kicker: 'smallest',
+    title: 'examples/hello',
+    body: 'The simplest Plumego service: one endpoint, JSON response. Under 50 lines of code.',
+    href: 'https://github.com/spcent/plumego/tree/main/examples/hello',
+    label: 'Open on GitHub →',
+  },
+  {
+    kicker: 'error handling',
+    title: 'examples/error-handling',
+    body: 'Validation errors, request binding errors, panic recovery, and the structured error response envelope.',
+    href: 'https://github.com/spcent/plumego/tree/main/examples/error-handling',
+    label: 'Open on GitHub →',
+  },
+  {
+    kicker: 'standard api',
+    title: 'examples/standard-api',
+    body: 'A slightly larger stdlib-shaped API — routes, middleware, and item CRUD in one place. Compare against reference/standard-service.',
+    href: 'https://github.com/spcent/plumego/tree/main/examples/standard-api',
+    label: 'Open on GitHub →',
+  },
+];
+
 const recipeTracks = [
   {
     label: 'recipe 01',
@@ -281,6 +305,28 @@ const readingOrder = [
     </div>
   </section>
 
+  <!-- Smallest runnable examples from examples/ -->
+  <section class="section">
+    <div class="section__intro">
+      <h2>Smallest runnable examples.</h2>
+      <p>
+        Under <code>examples/</code> there are three minimal programs — each one focuses on a single teaching point and stays small enough to read end-to-end in one sitting.
+      </p>
+    </div>
+    <div class="page-grid">
+      {smallestExamples.map((item) => (
+        <article class="page-panel">
+          <p class="signal-list__kicker">{item.kicker}</p>
+          <h3>{item.title}</h3>
+          <p>{item.body}</p>
+          <div class="page-links page-links--inline">
+            <a class="text-link" href={item.href}>{item.label}</a>
+          </div>
+        </article>
+      ))}
+    </div>
+  </section>
+
   <!-- Recipe tracks with inline code snippets -->
   <section class="section section--tinted">
     <div class="section__intro">
@@ -413,13 +459,13 @@ const readingOrder = [
     <div class="page-grid page-grid--single-emphasis">
       <article class="page-panel page-panel--feature">
         <p class="signal-list__kicker">{copy.workerfleetMaturity}</p>
-        <h3>reference/workerfleet</h3>
+        <h3>use-cases/workerfleet</h3>
         <ul>
           {copy.workerfleetDetails.map((detail) => (
             <li>{detail}</li>
           ))}
         </ul>
-        <a class="text-link" href="https://github.com/spcent/plumego/tree/main/reference/workerfleet">{copy.workerfleetLabel}</a>
+        <a class="text-link" href="https://github.com/spcent/plumego/tree/main/use-cases/workerfleet">{copy.workerfleetLabel}</a>
       </article>
     </div>
   </section>

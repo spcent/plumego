@@ -42,11 +42,11 @@ Open this page after [x/* Family](/docs/x-family) when the change is clearly ins
 
 ## Stability note
 
-`x/ai` uses explicit stability tiers. Check `module.yaml` before relying on a subpackage:
+`x/ai` uses explicit stability tiers. The parent family remains `experimental`, but four subpackages have their exported API frozen between release refs. Check `module.yaml` before relying on a subpackage:
 
 | Subpackage | Tier | What it means |
 | --- | --- | --- |
-| `provider`, `session`, `streaming`, `tool` | **stable** | Covered by semantic versioning |
+| `provider`, `session`, `streaming`, `tool` | **beta** | API frozen between minor release refs (promoted at v1.1.0) |
 | `tokenizer`, `llmcache` | **experimental** | Foundation tier — depended on by other x/ai packages |
 | `resilience`, `semanticcache`, `instrumentation` | **experimental** | Composition tier — builds on foundation or x/resilience |
 | `orchestration`, `marketplace`, `distributed`, `sse`, `filter`, `metrics`, `multimodal`, `prompt` | **experimental** | Feature tier — may change without a deprecation period |

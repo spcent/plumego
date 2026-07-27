@@ -53,7 +53,7 @@ const scenarios = [
       '租户逻辑演进时，稳定根保持兼容',
     ],
     modules: 'x/tenant',
-    moduleNote: '实验性 — 采用前先评估',
+    moduleNote: 'beta — 次要版本之间 API 冻结',
     startHref: '/zh/docs/modules/x-tenant',
     startLabel: '打开 x/tenant 模块手册',
     secondaryHref: '/zh/releases',
@@ -69,11 +69,102 @@ const scenarios = [
       'AI API 形态演进时，稳定根保持兼容',
     ],
     modules: 'x/ai',
-    moduleNote: '实验性 — 采用前先评估',
+    moduleNote: '实验性 — provider/session/streaming/tool 子表面为 beta，父家族仍在评估',
     startHref: '/zh/docs/modules/x-ai',
     startLabel: '打开 x/ai 模块手册',
     secondaryHref: '/zh/releases',
     secondaryLabel: '查看成熟度姿态',
+  },
+  {
+    kicker: 'api gateway',
+    title: '带负载均衡与边缘路由的反向代理与 API 网关服务',
+    body: '当你的服务需要把请求代理到上游后端、应用改写规则或在多个目标之间负载均衡，就用 x/gateway。稳定 HTTP 内核负责传输层，x/gateway 承担代理与边缘行为层。',
+    fitPoints: [
+      '上游代理与改写规则留在 HTTP 内核之外',
+      '负载均衡与后端发现在配置里显式声明',
+      '稳定中间件在转发前完成鉴权与限流',
+    ],
+    modules: 'x/gateway',
+    moduleNote: 'beta — 次要版本之间 API 冻结',
+    startHref: '/zh/docs/modules/x-gateway',
+    startLabel: '打开 x/gateway 模块手册',
+    secondaryHref: '/zh/docs/reference-app',
+    secondaryLabel: '阅读参考应用',
+  },
+  {
+    kicker: 'real-time service',
+    title: '带 WebSocket hub、房间与广播的实时服务',
+    body: '当服务需要在标准 HTTP 路由旁维护长连接、房间管理与广播能力，就用 x/websocket。WebSocket handler 与标准 HTTP 路由一起显式注册；稳定内核不会去理解 WebSocket 语义。',
+    fitPoints: [
+      'WebSocket 路由与标准 HTTP 路由并列注册',
+      'hub 生命周期与房间管理独立于 HTTP handler 逻辑',
+      '稳定传输中间件在 WebSocket 升级前先生效',
+    ],
+    modules: 'x/websocket',
+    moduleNote: 'beta — 次要版本之间 API 冻结',
+    startHref: '/zh/docs/modules/x-websocket',
+    startLabel: '打开 x/websocket 模块手册',
+    secondaryHref: '/zh/releases',
+    secondaryLabel: '查看成熟度姿态',
+  },
+  {
+    kicker: 'messaging service',
+    title: '把队列、webhook 与定时任务整合进 HTTP handler 的消息服务',
+    body: '当你的服务需要在 HTTP 路由旁分发或消费任务、外发 webhook、pubsub 事件或定时任务，就用 x/messaging。面向应用的服务层是 beta；子级原语（mq、pubsub、scheduler）仍为实验性。',
+    fitPoints: [
+      '消息分发与消费独立于 HTTP handler 逻辑',
+      '定时任务与外发 webhook 作为服务依赖显式声明',
+      '稳定传输层负责路由，与消息层解耦',
+    ],
+    modules: 'x/messaging',
+    moduleNote: 'beta — 应用层服务已冻结；子级原语仍为实验性',
+    startHref: '/zh/docs/modules/x-messaging',
+    startLabel: '打开 x/messaging 模块手册',
+    secondaryHref: '/zh/releases',
+    secondaryLabel: '查看成熟度姿态',
+  },
+] as const;
+
+const useCaseProjects = [
+  {
+    kicker: 'multi-tenant saas',
+    name: 'use-cases/mini-saas-api',
+    body: '一个有边界的多租户 SaaS API 示范——在 Plumego 稳定根之上实现租户隔离、配额执行和 JWT 策略。',
+    scenario: '多租户 SaaS',
+    href: 'https://github.com/spcent/plumego/tree/main/use-cases/mini-saas-api',
+    status: '参考用例',
+  },
+  {
+    kicker: 'ai + storage',
+    name: 'use-cases/cloud-vault',
+    body: '面向 AI 生成笔记的 local-first Markdown 知识库。演示 x/data + x/frontend 在 standard-service 基线上的组合。',
+    scenario: '内部 API + AI 服务',
+    href: 'https://github.com/spcent/plumego/tree/main/use-cases/cloud-vault',
+    status: '参考用例',
+  },
+  {
+    kicker: 'admin plane',
+    name: 'use-cases/dbadmin',
+    body: '本地优先、注重安全的数据库工作台（MySQL / Postgres / SQLite / Redis / MongoDB / Elasticsearch）——展示 Plumego 如何承载带敏感连接的运维平面服务。',
+    scenario: '平台服务',
+    href: 'https://github.com/spcent/plumego/tree/main/use-cases/dbadmin',
+    status: '参考用例',
+  },
+  {
+    kicker: 'monitoring',
+    name: 'use-cases/guardus',
+    body: '在 Plumego 稳定根 + x/observability 之上对 Gatus（健康/状态监控）的 v1 功能等价重实现。',
+    scenario: '平台服务',
+    href: 'https://github.com/spcent/plumego/tree/main/use-cases/guardus',
+    status: '参考用例',
+  },
+  {
+    kicker: 'depth exploration',
+    name: 'use-cases/workerfleet',
+    body: '仍在推进中的 worker 机队监控服务，用于探索超出 canonical 服务深度的形态——MongoDB 存储、Kubernetes Pod 发现、Prometheus 指标以及告警/通知流水线。部分方法仍返回 ErrNotImplemented。',
+    scenario: '平台服务 + 消息',
+    href: 'https://github.com/spcent/plumego/tree/main/use-cases/workerfleet',
+    status: '进行中',
   },
 ] as const;
 
@@ -99,7 +190,7 @@ const fitGuide = [
 <MarketingLayout
   locale="zh"
   title="使用场景"
-  description="四个 Plumego 最适合的服务场景：内部 API、平台服务、多租户 SaaS 和 AI 能力服务。"
+  description="七个 Plumego 最适合的服务场景：内部 API、平台服务、多租户 SaaS、AI 能力服务、API 网关、实时 WebSocket 与消息服务。"
   currentPath="/zh/use-cases"
   imagePath="/brand/og-zh.svg"
   keywords={['plumego 使用场景', 'go http 服务', '多租户 go', 'ai go 服务', '平台服务 go']}
@@ -121,7 +212,7 @@ const fitGuide = [
 
   <section class="section">
     <div class="section__intro">
-      <h2>四个显式 wiring 最有价值的场景。</h2>
+      <h2>七个显式 wiring 最有价值的场景。</h2>
       <p>
         当服务形态需要在代码库增长后依然保持可读、多团队需要从同一基线起步、或者能力工作应当留在 HTTP 内核之外——Plumego 的拟合度最强。
       </p>
@@ -163,6 +254,35 @@ const fitGuide = [
           <div class="page-links page-links--inline">
             <a class="text-link" href={item.startHref}>{item.startLabel}</a>
             <a class="text-link" href={item.secondaryHref}>{item.secondaryLabel}</a>
+          </div>
+        </article>
+      ))}
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="section__intro">
+      <h2>仓库中真实的项目。</h2>
+      <p>
+        这些是 <code>use-cases/</code> 目录下可运行的用例。每一个都把上面的抽象场景落到具体 Go 模块——在决定复制哪种服务形态之前，先看看源码。
+      </p>
+    </div>
+    <div class="page-grid">
+      {useCaseProjects.map((project) => (
+        <article class="page-panel">
+          <p class="signal-list__kicker">{project.kicker}</p>
+          <h3><code>{project.name}</code></h3>
+          <p>{project.body}</p>
+          <p class="use-case-modules">
+            <span class="use-case-modules__label">对应场景：</span>
+            <span class="use-case-modules__note">{project.scenario}</span>
+          </p>
+          <p class="use-case-modules">
+            <span class="use-case-modules__label">状态：</span>
+            <span class="use-case-modules__note">{project.status}</span>
+          </p>
+          <div class="page-links page-links--inline">
+            <a class="text-link" href={project.href}>在 GitHub 查看 →</a>
           </div>
         </article>
       ))}

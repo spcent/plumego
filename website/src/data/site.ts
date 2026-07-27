@@ -126,7 +126,7 @@ export const FOOTER_GROUPS: Record<Locale, Array<{ title: string; links: Array<{
 
 export const HOME_COPY = {
   en: {
-    eyebrow: 'stdlib-only · zero external deps · v1.1.0',
+    eyebrow: `stdlib-only · zero external deps · ${RELEASE_FACTS.currentVersion}`,
     headline: 'Go HTTP your agent and your team can both read.',
     summary:
       'Route registration, middleware order, and dependency wiring stay in one explicit file — readable in every code review. Machine-readable specs give AI coding agents the same operating model as your senior reviewers. <code>net/http</code> compatible: existing handlers work without changes.',
@@ -249,7 +249,7 @@ api.Get("/data", data.List)
     contrastAfterLabel: 'plumego: one file, one contract',
   },
   zh: {
-    eyebrow: 'stdlib only · 零外部依赖 · v1.1.0',
+    eyebrow: `stdlib only · 零外部依赖 · ${RELEASE_FACTS.currentVersion}`,
     headline: 'AI agent 和你的团队都能读懂的 Go HTTP 框架。',
     summary:
       '路由注册、中间件顺序和依赖装配全在一个显式文件里——每次代码评审都能直接看到。机器可读规范给 AI 编程助手和资深评审者提供同一套操作模型。兼容 <code>net/http</code>：现有 handler 无需修改即可接入。',
@@ -1001,6 +1001,8 @@ export const EXAMPLES_COPY = {
     referenceMatrixBody:
       'Each app adds one x/* family to the standard-service baseline. Read the canonical reference app first, then open the one that matches your capability.',
     referenceMatrix: [
+      { name: 'reference/standard-service', kicker: 'stable roots', description: 'Canonical service shape — stable-root-only wiring, the default starting layout', href: '/docs/reference-app', maturity: 'Canonical' },
+      { name: 'reference/benchmark', kicker: 'stable roots', description: 'Router benchmark harness — compares Plumego\'s router against ServeMux, chi, and gin', href: '/docs/reference-app', maturity: 'Supported reference' },
       { name: 'reference/with-ai', kicker: 'x/ai', description: 'Multi-provider AI with streaming responses and tool routing', href: '/docs/modules/x/ai', maturity: 'Experimental' },
       { name: 'reference/with-tenant', kicker: 'x/tenant', description: 'Per-tenant routing, quota enforcement, and JWT-backed policy', href: '/docs/modules/x/tenant', maturity: 'Beta' },
       { name: 'reference/with-tenant-admin', kicker: 'x/tenant', description: 'Multi-tenant admin plane: lifecycle, quota admin, and usage recording', href: '/docs/modules/x/tenant', maturity: 'Beta' },
@@ -1016,9 +1018,9 @@ export const EXAMPLES_COPY = {
       { name: 'reference/with-frontend', kicker: 'x/frontend', description: 'Static and embedded SPA serving with cache headers, SPA fallback, and API co-location', href: '/docs/modules/x/frontend', maturity: 'Beta' },
       { name: 'reference/production-service', kicker: 'stable roots', description: 'Production-hardened variant with full lifecycle, TLS, and tests', href: '/docs/reference-app', maturity: 'Supported reference' },
     ],
-    workerfleetTitle: 'Production-scale reference: reference/workerfleet',
+    workerfleetTitle: 'Depth-oriented use case: use-cases/workerfleet',
     workerfleetBody:
-      'reference/workerfleet is a full-depth production reference app — distributed worker fleet management with domain models, MongoDB-backed stores, Kubernetes pod discovery, Prometheus metrics with custom collectors, alert engine with deduplication and threshold evaluation, and Feishu/webhook notifications. Use it to evaluate Plumego\'s capability depth beyond tutorial services.',
+      'use-cases/workerfleet is a work-in-progress reference app (not a production-readiness claim) exploring what Plumego looks like at greater depth than the canonical service — distributed worker fleet management with domain models, MongoDB-backed stores, Kubernetes pod discovery, Prometheus metrics, and an alert/notification pipeline. Some service methods still return `ErrNotImplemented`; treat it as a partial reference for worker-monitoring ideas, not a template to copy wholesale.',
     workerfleetDetails: [
       'domain-driven design: task, worker, pod, alert, and event models',
       'MongoDB stores with index management and integration tests',
@@ -1026,7 +1028,7 @@ export const EXAMPLES_COPY = {
       'Prometheus metrics with custom collectors and Grafana dashboards',
       'alert engine with deduplication, threshold rules, and notifiers (Feishu, webhook)',
     ],
-    workerfleetMaturity: 'Production reference — full-depth example',
+    workerfleetMaturity: 'Use case — work in progress',
     workerfleetLabel: 'Read workerfleet README',
   },
   zh: {
@@ -1135,6 +1137,8 @@ export const EXAMPLES_COPY = {
     referenceMatrixBody:
       '每个参考应用都在 standard-service 的基础上加入一个 x/* 家族。先读 canonical 参考应用，再按你需要评估的能力选择进入。',
     referenceMatrix: [
+      { name: 'reference/standard-service', kicker: 'stable roots', description: 'canonical 服务形态 — 仅使用稳定根 wiring，默认起步布局', href: '/zh/docs/reference-app', maturity: 'canonical' },
+      { name: 'reference/benchmark', kicker: 'stable roots', description: '路由器基准测试 — 与 ServeMux、chi、gin 的对比', href: '/zh/docs/reference-app', maturity: '受支持参考' },
       { name: 'reference/with-ai', kicker: 'x/ai', description: '带 streaming 响应与 tool 路由的多 provider AI 服务', href: '/zh/docs/modules/x/ai', maturity: '实验性' },
       { name: 'reference/with-tenant', kicker: 'x/tenant', description: 'Per-tenant 路由、配额执行与 JWT 策略评估', href: '/zh/docs/modules/x/tenant', maturity: 'Beta' },
       { name: 'reference/with-tenant-admin', kicker: 'x/tenant', description: '多租户管理平面：生命周期、配额管理与用量记录', href: '/zh/docs/modules/x/tenant', maturity: 'Beta' },
@@ -1150,9 +1154,9 @@ export const EXAMPLES_COPY = {
       { name: 'reference/with-frontend', kicker: 'x/frontend', description: '静态与内嵌 SPA 服务，支持缓存头、SPA fallback 与 API 同挂载', href: '/zh/docs/modules/x/frontend', maturity: 'Beta' },
       { name: 'reference/production-service', kicker: 'stable roots', description: '带完整生命周期、TLS 和测试的生产级加固变体', href: '/zh/docs/reference-app', maturity: '受支持参考' },
     ],
-    workerfleetTitle: '生产规模参考：reference/workerfleet',
+    workerfleetTitle: '深度参考用例：use-cases/workerfleet',
     workerfleetBody:
-      'reference/workerfleet 是一个完整深度的生产参考应用——分布式 worker 机队管理，包含领域模型、MongoDB 存储、Kubernetes Pod 发现、Prometheus 指标、告警引擎（带去重与阈值评估）以及飞书/webhook 通知。适合用来评估 Plumego 在超出教程级别时的能力深度。',
+      'use-cases/workerfleet 是一个仍在推进中的参考应用（不是生产就绪声明），用来探索 Plumego 在超出 canonical 服务深度时的形态——分布式 worker 机队管理，包含领域模型、MongoDB 存储、Kubernetes Pod 发现、Prometheus 指标以及告警/通知流水线。部分服务方法仍返回 `ErrNotImplemented`；应把它当作 worker 监控思路的部分参考，而不是可以整体照搬的模板。',
     workerfleetDetails: [
       '领域驱动设计：task、worker、pod、alert 和 event 模型',
       'MongoDB 存储，含索引管理和集成测试',
@@ -1160,7 +1164,7 @@ export const EXAMPLES_COPY = {
       'Prometheus 指标，含自定义 collector 和 Grafana 看板',
       '告警引擎，含去重、阈值规则和通知器（飞书、webhook）',
     ],
-    workerfleetMaturity: '生产参考 — 完整深度示例',
+    workerfleetMaturity: '用例 — 进行中',
     workerfleetLabel: '阅读 workerfleet README',
   },
 } as const;

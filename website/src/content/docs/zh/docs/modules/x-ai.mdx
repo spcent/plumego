@@ -42,11 +42,11 @@ sidebar:
 
 ## 稳定性说明
 
-`x/ai` 使用显式稳定性分级。在依赖某个子包之前，请检查 `module.yaml`：
+`x/ai` 使用显式稳定性分级。父家族仍为 `experimental`，但四个子包已把导出 API 在发布引用之间冻结。在依赖某个子包之前，请检查 `module.yaml`：
 
 | 子包 | 分级 | 含义 |
 | --- | --- | --- |
-| `provider`、`session`、`streaming`、`tool` | **stable** | 受语义版本控制覆盖 |
+| `provider`、`session`、`streaming`、`tool` | **beta** | 次要版本发布引用之间冻结 API（v1.1.0 晋升） |
 | `tokenizer`、`llmcache` | **experimental** | 基础层 — 被其他 x/ai 子包依赖 |
 | `resilience`、`semanticcache`、`instrumentation` | **experimental** | 组合层 — 构建在基础层或 x/resilience 之上 |
 | `orchestration`、`marketplace`、`distributed`、`sse`、`filter`、`metrics`、`multimodal`、`prompt` | **experimental** | 功能层 — 可能在没有弃用期的情况下发生变化 |

@@ -70,15 +70,42 @@ sidebar:
 
 ## 当前评估状态
 
+### 已晋升至 `beta`
+
+七个家族在 `v1.0.0` 与 `v1.1.0` 之间达到 `beta`。全部在次要版本发布引用之间冻结导出 API，破坏性变更需要新的标记引用和快照对比。
+
+| 模块 | 晋升版本 | 说明 |
+| --- | --- | --- |
+| `x/gateway` | `v1.0.0` | 边缘代理、负载均衡与路由重写 |
+| `x/observability` | `v1.0.0` | Prometheus 指标与 OpenTelemetry 追踪 |
+| `x/rest` | `v1.0.0` | CRUD 资源控制器 |
+| `x/websocket` | `v1.0.0` | 实时传输 |
+| `x/tenant` | `v1.1.0` | Per-tenant 路由、配额与策略 |
+| `x/frontend` | `v1.1.0` | 静态与内嵌 SPA 服务 |
+| `x/messaging` | `v1.1.0` | 异步发布/订阅接线（父家族） |
+
+### 实验性家族内的选定 beta 表面
+
+父家族仍为 `experimental`，但下列表面的导出 API 在发布引用之间冻结：
+
+| 表面 | 晋升版本 | 家族状态 |
+| --- | --- | --- |
+| `x/ai/provider` | `v1.1.0` | `x/ai` 仍为实验性 |
+| `x/ai/session` | `v1.1.0` | `x/ai` 仍为实验性 |
+| `x/ai/streaming` | `v1.1.0` | `x/ai` 仍为实验性 |
+| `x/ai/tool` | `v1.1.0` | `x/ai` 仍为实验性 |
+| `x/data/file` | `v1.1.0` | `x/data` 仍为实验性 |
+| `x/data/idempotency` | `v1.1.0` | `x/data` 仍为实验性 |
+
+### 下一批候选（Phase 16 评估）
+
 | 模块 | 候选晋升至 | 状态 / 剩余工作 |
 | --- | --- | --- |
-| `x/rest` | `beta` | 等待发布历史证据证明连续两个次要版本无导出 API 变更 |
-| `x/websocket` | `beta` | 等待发布历史证据证明连续两个次要版本无导出 API 变更 |
-| `x/tenant` | `beta` | 等待发布历史证据证明连续两个次要版本无导出 API 变更 |
-| `x/observability` | `beta` | 等待发布历史证据证明连续两个次要版本无导出 API 变更 |
-| `x/gateway` | `beta` | 等待发布历史证据证明连续两个次要版本无导出 API 变更 |
+| `x/tenant` | `ga` | 等待 `v1.2.0` 发布证据（任务卡 1500） |
+| `x/ai` 稳定层子包 | 更多 `beta` 表面 | 有发布证据后按子包单独评估（任务卡 1501） |
+| `x/openapi` | `beta` | 有发布证据后清理 `module.yaml` 并进行 beta 评估（任务卡 1502） |
 
-尚未评估或仍有明确待完成工作的模块：`x/ai`（稳定层级子包单独评估）、`x/gateway/discovery`、`x/data`、`x/messaging/scheduler`、`x/messaging/webhook`、`x/messaging`、`x/messaging/mq`、`x/messaging/pubsub`。
+仍为实验性且暂无评估计划的模块：`x/fileapi`、`x/resilience`、`x/rpc`、`x/validate`、`x/ai` 与 `x/data` 的其他表面、`x/messaging/mq`、`x/messaging/pubsub`、`x/messaging/scheduler`、`x/messaging/webhook`、`x/gateway/discovery`、`x/gateway/ipc`、`x/observability/devtools`、`x/observability/ops`。
 
 ## 非目标
 

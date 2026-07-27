@@ -70,15 +70,42 @@ In addition to maintaining all `beta` criteria, a `beta` module must:
 
 ## Current evaluation
 
+### Already promoted to `beta`
+
+Seven families reached `beta` between `v1.0.0` and `v1.1.0`. All are frozen between minor release refs; breaking changes require a new tagged ref and a snapshot diff.
+
+| Module | Promoted at | Notes |
+| --- | --- | --- |
+| `x/gateway` | `v1.0.0` | Edge proxy, load balancing, and route rewriting |
+| `x/observability` | `v1.0.0` | Prometheus metrics and OpenTelemetry tracing |
+| `x/rest` | `v1.0.0` | CRUD resource controllers |
+| `x/websocket` | `v1.0.0` | Real-time transport |
+| `x/tenant` | `v1.1.0` | Per-tenant routing, quota, and policy |
+| `x/frontend` | `v1.1.0` | Static and embedded SPA serving |
+| `x/messaging` | `v1.1.0` | Async publish/subscribe wiring (parent family) |
+
+### Selected beta surfaces within experimental families
+
+The parent family remains `experimental`, but the surfaces below have their exported API frozen between release refs:
+
+| Surface | Promoted at | Family status |
+| --- | --- | --- |
+| `x/ai/provider` | `v1.1.0` | `x/ai` remains experimental |
+| `x/ai/session` | `v1.1.0` | `x/ai` remains experimental |
+| `x/ai/streaming` | `v1.1.0` | `x/ai` remains experimental |
+| `x/ai/tool` | `v1.1.0` | `x/ai` remains experimental |
+| `x/data/file` | `v1.1.0` | `x/data` remains experimental |
+| `x/data/idempotency` | `v1.1.0` | `x/data` remains experimental |
+
+### Next candidates (Phase 16 evaluation)
+
 | Module | Candidate for | Status / remaining action |
 | --- | --- | --- |
-| `x/rest` | `beta` | Blocked until release-history evidence proves two consecutive minor releases without exported API changes |
-| `x/websocket` | `beta` | Blocked until release-history evidence proves two consecutive minor releases without exported API changes |
-| `x/tenant` | `beta` | Blocked until release-history evidence proves two consecutive minor releases without exported API changes |
-| `x/observability` | `beta` | Blocked until release-history evidence proves two consecutive minor releases without exported API changes |
-| `x/gateway` | `beta` | Blocked until release-history evidence proves two consecutive minor releases without exported API changes |
+| `x/tenant` | `ga` | Waiting on `v1.2.0` release evidence (task card 1500) |
+| `x/ai` stable-tier subpackages | Additional `beta` surfaces | Per-subpackage evaluation after release evidence (task card 1501) |
+| `x/openapi` | `beta` | `module.yaml` cleanup and beta evaluation once release evidence is available (task card 1502) |
 
-Not yet evaluated or with clear open work: `x/ai` (stable-tier subpackages evaluated individually), `x/gateway/discovery`, `x/data`, `x/messaging/scheduler`, `x/messaging/webhook`, `x/messaging`, `x/messaging/mq`, `x/messaging/pubsub`.
+Still experimental with no evaluation scheduled: `x/fileapi`, `x/resilience`, `x/rpc`, `x/validate`, remaining `x/ai` and `x/data` surfaces, `x/messaging/mq`, `x/messaging/pubsub`, `x/messaging/scheduler`, `x/messaging/webhook`, `x/gateway/discovery`, `x/gateway/ipc`, `x/observability/devtools`, `x/observability/ops`.
 
 ## Non-goals
 
