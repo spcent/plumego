@@ -7,7 +7,7 @@
   "scripts": {
     "sync": "node ./scripts/sync-all.mjs",
     "dev": "pnpm sync && ASTRO_TELEMETRY_DISABLED=1 astro dev",
-    "build": "pnpm sync && node ./scripts/check-doc-api-symbols.mjs && ASTRO_TELEMETRY_DISABLED=1 astro build",
+    "build": "pnpm sync && node ./scripts/check-doc-api-symbols.mjs && ASTRO_TELEMETRY_DISABLED=1 astro build && node ./scripts/check-rendered-asides.mjs",
     "preview": "ASTRO_TELEMETRY_DISABLED=1 astro preview",
     "check": "pnpm sync && node ./scripts/check-content-contracts.mjs && node ./scripts/check-translation-lag.mjs --strict && node ./scripts/check-doc-api-symbols.mjs && ASTRO_TELEMETRY_DISABLED=1 astro check"
   },
@@ -16,7 +16,7 @@
     "@astrojs/mdx": "6.0.3",
     "@astrojs/sitemap": "3.7.3",
     "@astrojs/starlight": "0.40.0",
-    "astro": "7.1.0",
+    "astro": "6.4.7",
     "typescript": "^6.0.3"
   }
 }
