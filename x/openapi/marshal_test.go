@@ -92,6 +92,82 @@ func TestWriteJSONAndYAML(t *testing.T) {
 	}
 }
 
+func TestWriteJSON_NilWriter(t *testing.T) {
+	err := WriteJSON(nil, Document{})
+	if err == nil {
+		t.Fatal("WriteJSON(nil) should return error")
+	}
+}
+
+func TestWriteYAML_NilWriter(t *testing.T) {
+	err := WriteYAML(nil, Document{})
+	if err == nil {
+		t.Fatal("WriteYAML(nil) should return error")
+	}
+}
+
+func TestMarshalYAMLWithNestedList(t *testing.T) {
+	doc := Document{
+		OpenAPI: "3.1.0",
+		Info:    Info{Title: "Nested", Version: "1.0.0"},
+		Paths: map[string]PathItem{
+			"/items": {
+				Get: &Operation{
+					Summary: "List items",
+					Parameters: []Param{
+						QueryParam("tags", Schema{Type: "array", Items: &Schema{Type: "string"}}),
+					},
+					Responses: map[string]Response{
+						"200": {Description: "OK"},
+					},
+				},
+			},
+		},
+	}
+
+	data, err := MarshalYAML(doc)
+	if err != nil {
+		t.Fatalf("MarshalYAML: %v", err)
+	}
+	out := string(data)
+	if !strings.Contains(out, "openapi:") {
+		t.Fatal("MarshalYAML missing openapi key")
+	}
+	// The nested array schema should produce a YAML list with non-scalar items
+	if !strings.Contains(out, "-") && !strings.Contains(out, "array") {
+		t.Fatalf("MarshalYAML missing expected list content:\n%s", out)
+	}
+}
+
+func TestMarshalYAMLWithBooleanValues(t *testing.T) {
+	doc := Document{
+		OpenAPI: "3.1.0",
+		Info:    Info{Title: "Bool", Version: "1.0.0"},
+		Paths: map[string]PathItem{
+			"/items": {
+				Get: &Operation{
+					Summary: "List items",
+					Parameters: []Param{
+						{Name: "required", In: "query", Required: true, Schema: Schema{Type: "boolean"}},
+					},
+					Responses: map[string]Response{
+						"200": {Description: "OK"},
+					},
+				},
+			},
+		},
+	}
+
+	data, err := MarshalYAML(doc)
+	if err != nil {
+		t.Fatalf("MarshalYAML: %v", err)
+	}
+	out := string(data)
+	if !strings.Contains(out, "true") {
+		t.Fatalf("MarshalYAML should contain boolean true:\n%s", out)
+	}
+}
+
 func sampleDocument() Document {
 	return Document{
 		OpenAPI: "3.1.0",

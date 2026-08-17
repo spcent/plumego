@@ -1,0 +1,50 @@
+name: idempotency
+path: store/idempotency
+layer: stable
+status: ga
+owner: persistence
+risk: medium
+summary: Idempotency primitives — Store interface, Record type, and key/record validation for at-most-once semantics.
+
+strict_boundary: persistence_primitives
+
+responsibilities:
+  - Define the Store and HashAwareStore interfaces for idempotency
+  - Define Record type and Status enum
+  - Provide key and record validation
+
+non_goals:
+  - Durable idempotency providers (SQL, Redis, etc.)
+  - Business-level idempotency semantics
+  - SQL schema or table policy for idempotency storage
+
+public_entrypoints:
+  - Store
+  - HashAwareStore
+  - Record
+  - Status
+  - ValidateKey
+  - ValidateRecord
+  - ValidateCompletion
+  - ValidateCompletionAt
+
+allowed_imports:
+  - stdlib
+
+forbidden_imports:
+  - core/**
+  - middleware/**
+  - x/**
+
+test_commands:
+  - go test -race -timeout 30s ./store/idempotency/...
+  - go vet ./store/idempotency/...
+
+review_checklist:
+  - Keep APIs transport-agnostic
+  - Key validation must be deterministic
+  - Keep durable provider implementations out of stable layer
+
+agent_hints:
+  - Durable idempotency providers (SQL, Redis) belong in x/data/idempotency
+  - Business-level idempotency semantics belong in application code

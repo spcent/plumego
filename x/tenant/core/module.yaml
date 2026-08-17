@@ -1,0 +1,58 @@
+name: x/tenant/core
+path: x/tenant/core
+layer: extension
+status: beta
+owner: multitenancy
+risk: high
+summary: Core tenant primitives — Config, ConfigManager, Hooks, tenant ID context propagation, and middleware composition.
+
+strict_boundary: tenant_primitives
+
+responsibilities:
+  - Define tenant Config, ConfigManager, and QuotaConfigProvider interfaces
+  - Provide tenant ID context propagation
+  - Define tenant resolution hooks
+  - Compose tenant middleware chain from sub-package components
+
+non_goals:
+  - Tenant policy evaluation (belongs in x/tenant/policy)
+  - Tenant quota enforcement (belongs in x/tenant/quota)
+  - Tenant resolution strategy (belongs in x/tenant/resolve)
+
+public_entrypoints:
+  - Config
+  - QuotaConfigProvider
+  - PolicyConfigProvider
+  - ConfigManager
+  - InMemoryConfigManager
+  - NewInMemoryConfigManager
+  - Hooks
+  - ResolveInfo
+  - WithTenantID
+  - TenantIDFromContext
+  - RequestWithTenantID
+
+allowed_imports:
+  - stdlib
+  - contract
+  - middleware
+  - security
+  - store
+  - log
+
+forbidden_imports:
+  - core/**
+  - x/ai/**
+
+test_commands:
+  - go test -race -timeout 30s ./x/tenant/core/...
+  - go vet ./x/tenant/core/...
+
+review_checklist:
+  - Fail closed on tenant config errors
+  - Keep tenant-aware logic out of stable store
+  - Context propagation must be explicit
+
+agent_hints:
+  - x/tenant/core owns the shared tenant primitives, not policy or resolution logic
+  - Sub-package middleware composers should delegate to core interfaces

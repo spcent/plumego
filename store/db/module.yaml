@@ -1,0 +1,59 @@
+name: db
+path: store/db
+layer: stable
+status: ga
+owner: persistence
+risk: medium
+summary: Database helpers — connection opening, configuration, transaction wrapper, and query/scan utilities.
+
+strict_boundary: persistence_primitives
+
+responsibilities:
+  - Database connection opening with configurable pooling
+  - Transaction wrapper with context propagation
+  - Generic row scanning and query helpers
+  - Connection health check via Ping
+
+non_goals:
+  - DB analytics, instrumentation, or slow-query reporting
+  - ORM or query building
+  - Migration or schema management
+
+public_entrypoints:
+  - DB
+  - Open
+  - OpenWith
+  - OpenFunc
+  - Config
+  - DefaultConfig
+  - ApplyConfig
+  - ExecContext
+  - QueryContext
+  - QueryRowContext
+  - QueryRow
+  - QueryRowStrict
+  - ScanRow
+  - ScanRows
+  - WithTransaction
+  - Ping
+
+allowed_imports:
+  - stdlib
+
+forbidden_imports:
+  - core/**
+  - middleware/**
+  - x/**
+
+test_commands:
+  - go test -race -timeout 30s ./store/db/...
+  - go vet ./store/db/...
+
+review_checklist:
+  - Keep APIs transport-agnostic
+  - Keep DB analytics and instrumentation out of stable layer
+  - Connection pooling config must be explicit
+
+agent_hints:
+  - DB analytics, slow-query helpers, and DB health reporting belong in x/observability
+  - Driver-specific adapters (pgx, sqlx) belong in x/data

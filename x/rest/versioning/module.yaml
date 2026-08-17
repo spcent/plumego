@@ -1,0 +1,50 @@
+name: x/rest/versioning
+path: x/rest/versioning
+layer: extension
+status: experimental
+owner: api
+risk: medium
+summary: API versioning middleware — extracts and validates API versions from URL path, Accept header, query parameter, or custom header.
+
+strict_boundary: rest_primitives
+
+responsibilities:
+  - Extract API version from multiple sources (path, header, query, accept)
+  - Validate version against supported version list
+  - Inject version into request context
+  - Return structured error for unsupported versions
+
+non_goals:
+  - Version negotiation or content-type-based versioning
+  - API deprecation or sunset policy enforcement
+  - Version-specific route registration
+
+public_entrypoints:
+  - Middleware
+  - Config
+  - Strategy
+  - WithVersion
+  - VersionFromContext
+
+allowed_imports:
+  - stdlib
+  - middleware
+  - contract
+
+forbidden_imports:
+  - core/**
+  - store/**
+  - x/tenant/**
+
+test_commands:
+  - go test -race -timeout 30s ./x/rest/versioning/...
+  - go vet ./x/rest/versioning/...
+
+review_checklist:
+  - Version extraction must be deterministic
+  - Unsupported versions must fail with clear error
+  - Keep versioning middleware transport-only
+
+agent_hints:
+  - API versioning is a transport concern, orthogonal to resource CRUD logic
+  - Version negotiation strategies should be selected at route registration time

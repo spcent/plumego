@@ -1,0 +1,50 @@
+name: requestid
+path: middleware/requestid
+layer: stable
+status: ga
+owner: transport
+risk: low
+summary: Canonical request ID generation and propagation middleware.
+
+strict_boundary: transport_primitives
+
+responsibilities:
+  - Generate and propagate request IDs
+  - Attach request ID to response headers and context
+  - Provide configurable ID generation
+
+non_goals:
+  - Logging or observability pipeline wiring
+  - Request ID persistence or storage
+  - Secret or token generation
+
+public_entrypoints:
+  - Middleware
+  - Option
+  - WithGenerator
+  - WithRequestHeader
+  - EnsureRequestID
+  - AttachRequestID
+  - NewRequestID
+
+allowed_imports:
+  - stdlib
+  - middleware
+
+forbidden_imports:
+  - core/**
+  - store/**
+  - x/**
+
+test_commands:
+  - go test -race -timeout 30s ./middleware/requestid/...
+  - go vet ./middleware/requestid/...
+
+review_checklist:
+  - next must be called exactly once
+  - Keep responsibility transport-only
+  - Request IDs are correlation identifiers, not secrets
+
+agent_hints:
+  - Production callers that need control should wire WithGenerator explicitly
+  - Default generator uses package-local state for convenience

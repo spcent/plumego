@@ -1,0 +1,53 @@
+name: x/resilience/circuitbreaker
+path: x/resilience/circuitbreaker
+layer: extension
+status: experimental
+owner: resilience
+risk: high
+summary: Circuit breaker pattern implementation — state machine, failure counting, half-open probing, and HTTP middleware adapter.
+
+strict_boundary: resilience_primitives
+
+responsibilities:
+  - Implement circuit breaker state machine (closed, open, half-open)
+  - Track failure counts and success thresholds
+  - Provide HTTP middleware adapter for automatic circuit breaking
+
+non_goals:
+  - Service discovery or health checking
+  - Distributed circuit breaker coordination
+  - Per-tenant or per-route circuit breaker policies
+
+public_entrypoints:
+  - New
+  - CircuitBreaker
+  - Config
+  - State
+  - Counts
+  - Stats
+  - Clock
+  - Middleware
+
+allowed_imports:
+  - stdlib
+  - contract
+  - middleware
+
+forbidden_imports:
+  - core/**
+  - security/**
+  - store/**
+  - x/tenant/**
+
+test_commands:
+  - go test -race -timeout 30s ./x/resilience/circuitbreaker/...
+  - go vet ./x/resilience/circuitbreaker/...
+
+review_checklist:
+  - State transitions must be correct under concurrency
+  - Half-open probing must be safe
+  - Keep circuit breaker primitives transport-agnostic
+
+agent_hints:
+  - CircuitBreaker is a reusable primitive, not an HTTP-only concern
+  - HTTP middleware adapter is provided for convenience but the core is transport-agnostic

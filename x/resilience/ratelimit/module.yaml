@@ -1,0 +1,47 @@
+name: x/resilience/ratelimit
+path: x/resilience/ratelimit
+layer: extension
+status: experimental
+owner: resilience
+risk: medium
+summary: Token bucket rate limiter — single and keyed rate limit primitives for use by middleware and tenant adapters.
+
+strict_boundary: resilience_primitives
+
+responsibilities:
+  - Implement token bucket rate limiting algorithm
+  - Provide single-bucket and keyed-bucket variants
+  - Support concurrent-safe token consumption
+
+non_goals:
+  - HTTP middleware adaptation (consumers build their own)
+  - Distributed rate limit coordination
+  - Rate limit policy definition or storage
+
+public_entrypoints:
+  - New
+  - TokenBucket
+  - NewKeyed
+  - KeyedBuckets
+
+allowed_imports:
+  - stdlib
+
+forbidden_imports:
+  - core/**
+  - middleware/**
+  - security/**
+  - store/**
+
+test_commands:
+  - go test -race -timeout 30s ./x/resilience/ratelimit/...
+  - go vet ./x/resilience/ratelimit/...
+
+review_checklist:
+  - Must be safe for concurrent use
+  - Token consumption must be accurate
+  - Keep rate limiter primitives transport-agnostic
+
+agent_hints:
+  - TokenBucket and KeyedBuckets are primitives, not middleware
+  - HTTP adaptation is built by consumers (e.g., x/tenant/ratelimit, middleware/abuseguard)

@@ -1,0 +1,53 @@
+name: password
+path: security/password
+layer: stable
+status: ga
+owner: security
+risk: high
+summary: Password hashing with Argon2id and strength validation.
+
+strict_boundary: auth_primitives
+
+responsibilities:
+  - Hash passwords using Argon2id with configurable cost
+  - Verify passwords against stored hashes
+  - Validate password strength against configurable policies
+
+non_goals:
+  - Password storage or persistence
+  - Password reset or recovery flows
+  - Multi-factor authentication
+
+public_entrypoints:
+  - HashPassword
+  - HashPasswordWithCost
+  - CheckPassword
+  - ValidatePasswordStrength
+  - PasswordStrengthConfig
+  - DefaultPasswordStrengthConfig
+  - DefaultCost
+  - MinimumCost
+  - MaximumCost
+  - MaxPasswordLength
+
+allowed_imports:
+  - stdlib
+
+forbidden_imports:
+  - core/**
+  - router/**
+  - store/**
+  - x/**
+
+test_commands:
+  - go test -race -timeout 30s ./security/password/...
+  - go vet ./security/password/...
+
+review_checklist:
+  - Never log passwords or hashes
+  - Fail closed on verification errors
+  - Timing-safe comparison is mandatory
+
+agent_hints:
+  - DefaultCost is tuned for server-side hashing; respect MinimumCost
+  - Password strength validation is configurable but defaults are production-safe

@@ -102,11 +102,11 @@ API 在连续次版本 release ref 之间保持冻结。可在生产中安全使
 | --- | --- | --- | --- |
 | 可复用 CRUD 传输与资源路由标准化 | [x/rest Primer](/zh/docs/modules/x-rest) | v0.2.0 | — |
 | 实时 WebSocket 连接生命周期、hub 管理或认证 | [x/websocket Primer](/zh/docs/modules/x-websocket) | v0.2.0 | — |
-| 反向代理、gateway 路由、负载均衡或边缘传输 | [x/gateway Primer](/zh/docs/modules/x-gateway) | v0.2.0 | [x/gateway/discovery](/zh/docs/modules/x-discovery) · `x/gateway/ipc`（实验性） |
-| Prometheus 导出器、OTel 接线、记录缓冲或 DB 分析 | [x/observability Primer](/zh/docs/modules/x-observability) | v0.2.0 | [x/observability/ops](/zh/docs/modules/x-ops) · [x/observability/devtools](/zh/docs/modules/x-devtools)（实验性） |
+| 反向代理、gateway 路由、负载均衡或边缘传输 | [x/gateway Primer](/zh/docs/modules/x-gateway) | v0.2.0 | [x/gateway/discovery](/zh/docs/modules/x-gateway-discovery) · `x/gateway/ipc`（实验性） |
+| Prometheus 导出器、OTel 接线、记录缓冲或 DB 分析 | [x/observability Primer](/zh/docs/modules/x-observability) | v0.2.0 | [x/observability/ops](/zh/docs/modules/x-observability-ops) · [x/observability/devtools](/zh/docs/modules/x-observability-devtools)（实验性） |
 | 多租户解析、策略、配额、限流或 session | [x/tenant Primer](/zh/docs/modules/x-tenant) | v1.1.0 | `resolve`、`policy`、`quota`、`ratelimit`、`session`、`store` |
 | 静态资源服务、嵌入式 FS 或 SPA fallback 路由 | [x/frontend Primer](/zh/docs/modules/x-frontend) | v1.1.0 | — |
-| 应用侧 queue、pubsub、scheduler 或 webhook 编排 | [x/messaging Primer](/zh/docs/modules/x-messaging) | v1.1.0（应用层） | [scheduler](/zh/docs/modules/x-scheduler) · [webhook · pubsub · mq](/zh/docs/modules/x-messaging-subordinates)（下级原语仍为实验性） |
+| 应用侧 queue、pubsub、scheduler 或 webhook 编排 | [x/messaging Primer](/zh/docs/modules/x-messaging) | v1.1.0（应用层） | [scheduler](/zh/docs/modules/x-messaging-scheduler) · [webhook · pubsub · mq](/zh/docs/modules/x-messaging-subordinates)（下级原语仍为实验性） |
 
 #### 实验性家族中的 Beta 表面
 
@@ -124,7 +124,7 @@ API 兼容性未冻结。采用前请先评估；在稳定服务路径中使用�
 | 如果问题主要围绕 | 下一步打开的 primer | 下级包 |
 | --- | --- | --- |
 | AI provider 适配器、session、流式传输或 tool 调用 | [x/ai Primer](/zh/docs/modules/x-ai) | `provider`、`session`、`streaming`、`tool` 为 Beta 表面（见上方）；`orchestration`、`semanticcache`、`distributed`、`resilience` 仍为实验性 |
-| 读写分离、分片、持久化 KV 或幂等性拓扑 | [x/data Primer](/zh/docs/modules/x-data) | [x/data/cache](/zh/docs/modules/x-cache)；`file` 和 `idempotency` 为 Beta 表面（见上方） |
+| 读写分离、分片、持久化 KV 或幂等性拓扑 | [x/data Primer](/zh/docs/modules/x-data) | [x/data/cache](/zh/docs/modules/x-data-cache)；`file` 和 `idempotency` 为 Beta 表面（见上方） |
 | 文件上传、下载或流式传输的 HTTP 传输层 | [x/fileapi Primer](/zh/docs/modules/x-fileapi) | — |
 | 跨扩展共享的熔断器、重试封装或弹性适配器 | [x/resilience Primer](/zh/docs/modules/x-resilience) | — |
 | gRPC + HTTP 服务托管或出站 RPC 客户端池 | [x/rpc Primer](/zh/docs/modules/x-rpc) | — |

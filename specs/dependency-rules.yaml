@@ -95,6 +95,68 @@ modules:
       - reference/**
       - cmd/**
 
+  middleware/auth:
+    path: middleware/auth
+    layer: stable
+    allow:
+      - stdlib
+      - contract
+      - middleware
+      - security/authn
+    deny:
+      - core/**
+      - store/**
+      - x/**
+      - reference/**
+      - cmd/**
+
+  middleware/securityheaders:
+    path: middleware/securityheaders
+    layer: stable
+    allow:
+      - stdlib
+      - middleware
+      - security/headers
+    deny:
+      - core/**
+      - store/**
+      - x/**
+      - reference/**
+      - cmd/**
+
+  middleware/abuseguard:
+    path: middleware/abuseguard
+    layer: stable
+    allow:
+      - stdlib
+      - contract
+      - log
+      - middleware
+      - middleware/internal/telemetry
+      - internal/httputil
+      - security/abuse
+    deny:
+      - core/**
+      - store/**
+      - x/**
+      - reference/**
+      - cmd/**
+
+  middleware/httpmetrics:
+    path: middleware/httpmetrics
+    layer: stable
+    allow:
+      - stdlib
+      - metrics
+      - middleware
+      - middleware/internal/telemetry
+    deny:
+      - core/**
+      - store/**
+      - x/**
+      - reference/**
+      - cmd/**
+
   security:
     path: security
     layer: stable
@@ -109,6 +171,92 @@ modules:
       - store/file/**
       - store/cache/**
       - store/idempotency/**
+      - x/**
+      - reference/**
+      - cmd/**
+
+  security/jwt:
+    path: security/jwt
+    layer: stable
+    allow:
+      - stdlib
+      - security/authn
+    deny:
+      - core/**
+      - router/**
+      - middleware/**
+      - store/**
+      - x/**
+      - reference/**
+      - cmd/**
+
+  security/password:
+    path: security/password
+    layer: stable
+    allow:
+      - stdlib
+    deny:
+      - core/**
+      - router/**
+      - middleware/**
+      - store/**
+      - x/**
+      - reference/**
+      - cmd/**
+
+  security/authn:
+    path: security/authn
+    layer: stable
+    allow:
+      - stdlib
+    deny:
+      - core/**
+      - router/**
+      - middleware/**
+      - store/**
+      - x/**
+      - reference/**
+      - cmd/**
+
+  security/abuse:
+    path: security/abuse
+    layer: stable
+    allow:
+      - stdlib
+    deny:
+      - core/**
+      - router/**
+      - middleware/**
+      - store/**
+      - x/**
+      - reference/**
+      - cmd/**
+
+  security/headers:
+    path: security/headers
+    layer: stable
+    allow:
+      - stdlib
+      - security/input
+    deny:
+      - core/**
+      - router/**
+      - middleware/**
+      - store/**
+      - x/**
+      - reference/**
+      - cmd/**
+
+  security/input:
+    path: security/input
+    layer: stable
+    allow:
+      - stdlib
+    deny:
+      - core/**
+      - router/**
+      - middleware/**
+      - store/**
       - x/**
       - reference/**
       - cmd/**
@@ -578,6 +726,49 @@ modules:
     deny:
       - core/**
       - security/**
+      - store/**
+      - x/tenant/**
+      - reference/**
+      - cmd/**
+
+  x/resilience/circuitbreaker:
+    path: x/resilience/circuitbreaker
+    layer: extension
+    allow:
+      - stdlib
+      - contract
+      - middleware
+    deny:
+      - core/**
+      - security/**
+      - store/**
+      - x/tenant/**
+      - reference/**
+      - cmd/**
+
+  x/resilience/ratelimit:
+    path: x/resilience/ratelimit
+    layer: extension
+    allow:
+      - stdlib
+    deny:
+      - core/**
+      - middleware/**
+      - security/**
+      - store/**
+      - x/tenant/**
+      - reference/**
+      - cmd/**
+
+  x/rest/versioning:
+    path: x/rest/versioning
+    layer: extension
+    allow:
+      - stdlib
+      - middleware
+      - contract
+    deny:
+      - core/**
       - store/**
       - x/tenant/**
       - reference/**

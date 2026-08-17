@@ -1,0 +1,46 @@
+name: compression
+path: middleware/compression
+layer: stable
+status: ga
+owner: transport
+risk: low
+summary: Gzip compression middleware for HTTP response bodies based on Content-Encoding negotiation.
+
+strict_boundary: transport_primitives
+
+responsibilities:
+  - Compress response bodies with gzip when the client accepts it
+  - Defer compression decision until the response status code and content type are known
+  - Skip compression for streaming or already-compressed content types
+
+non_goals:
+  - Brotli or other compression algorithms
+  - Request body decompression
+  - Compression level tuning per route
+
+public_entrypoints:
+  - Middleware
+  - Config
+  - DefaultConfig
+
+allowed_imports:
+  - stdlib
+  - middleware
+
+forbidden_imports:
+  - core/**
+  - store/**
+  - x/**
+
+test_commands:
+  - go test -race -timeout 30s ./middleware/compression/...
+  - go vet ./middleware/compression/...
+
+review_checklist:
+  - next must be called exactly once
+  - Compression must be skipped for streaming responses
+  - Keep responsibility transport-only
+
+agent_hints:
+  - Compression decision is deferred until the first WriteHeader call
+  - Content-type-based skip logic is built into the default config

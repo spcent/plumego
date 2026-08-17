@@ -124,6 +124,40 @@ func TestBindValidatorReturningNilPassesThrough(t *testing.T) {
 	}
 }
 
+func TestValidationError_Error(t *testing.T) {
+	validationErr := newValidationError(errors.New("name is required"))
+	got := validationErr.Error()
+	if got != "name is required" {
+		t.Fatalf("Error() = %q, want %q", got, "name is required")
+	}
+}
+
+func TestValidationError_Error_FallsBackToAPIError(t *testing.T) {
+	// Nil Err should fall back to the embedded APIError message.
+	validationErr := ValidationError{
+		APIError: contract.NewErrorBuilder().
+			Type(contract.TypeBadRequest).
+			Code(contract.CodeValidationError).
+			Message("validation failed").
+			Build(),
+	}
+	got := validationErr.Error()
+	if got != "validation failed" {
+		t.Fatalf("Error() = %q, want %q", got, "validation failed")
+	}
+}
+
+func TestBind_NilValidator(t *testing.T) {
+	req := newJSONRequest(`{"name":"widget"}`)
+	got, err := Bind[createItemRequest](req, nil)
+	if err != nil {
+		t.Fatalf("Bind with nil validator returned error: %v", err)
+	}
+	if got.Name != "widget" {
+		t.Fatalf("Bind name = %q, want widget", got.Name)
+	}
+}
+
 func newJSONRequest(body string) *http.Request {
 	req, err := http.NewRequest(http.MethodPost, "/items", strings.NewReader(body))
 	if err != nil {

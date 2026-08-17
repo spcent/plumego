@@ -1,0 +1,49 @@
+name: abuseguard
+path: middleware/abuseguard
+layer: stable
+status: ga
+owner: transport
+risk: medium
+summary: Abuse guard middleware that applies rate limiting and abuse detection at the HTTP transport layer.
+
+strict_boundary: transport_primitives
+
+responsibilities:
+  - Apply per-client rate limiting via security/abuse primitives
+  - Return structured error responses when limits are exceeded
+  - Manage lifecycle of the underlying abuse guard state
+
+non_goals:
+  - Business-level abuse policy or tenant-specific rate limiting
+  - Abuse metric aggregation or alerting
+  - Persistent abuse state storage
+
+public_entrypoints:
+  - NewAbuseGuard
+  - AbuseGuardMiddleware
+  - AbuseGuardConfig
+  - DefaultAbuseGuardConfig
+
+allowed_imports:
+  - stdlib
+  - middleware
+  - security
+  - log
+
+forbidden_imports:
+  - core/**
+  - store/**
+  - x/**
+
+test_commands:
+  - go test -race -timeout 30s ./middleware/abuseguard/...
+  - go vet ./middleware/abuseguard/...
+
+review_checklist:
+  - next must be called exactly once
+  - Rate limit headers must be set correctly
+  - Keep responsibility transport-only
+
+agent_hints:
+  - Abuseguard is a thin HTTP adapter over security/abuse primitives
+  - Tenant-specific rate limiting belongs in x/tenant, not here

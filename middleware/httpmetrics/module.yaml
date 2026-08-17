@@ -1,0 +1,45 @@
+name: httpmetrics
+path: middleware/httpmetrics
+layer: stable
+status: ga
+owner: transport
+risk: low
+summary: HTTP metrics middleware that records request count, latency, and status code distribution via an injected Observer.
+
+strict_boundary: transport_primitives
+
+responsibilities:
+  - Record HTTP request metrics (count, duration, status)
+  - Delegate to an injected metrics.HTTPObserver implementation
+
+non_goals:
+  - Metrics export or collector configuration
+  - Custom metric dimensions or labels
+  - Histogram bucket configuration
+
+public_entrypoints:
+  - Middleware
+  - Observer
+
+allowed_imports:
+  - stdlib
+  - middleware
+  - metrics
+
+forbidden_imports:
+  - core/**
+  - store/**
+  - x/**
+
+test_commands:
+  - go test -race -timeout 30s ./middleware/httpmetrics/...
+  - go vet ./middleware/httpmetrics/...
+
+review_checklist:
+  - next must be called exactly once
+  - Metrics must be recorded after handler completion
+  - Keep responsibility transport-only
+
+agent_hints:
+  - Httpmetrics is a thin adapter over metrics.HTTPObserver
+  - Collector and exporter wiring stays in x/observability or application code

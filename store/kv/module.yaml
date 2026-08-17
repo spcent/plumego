@@ -1,0 +1,49 @@
+name: kv
+path: store/kv
+layer: stable
+status: ga
+owner: persistence
+risk: medium
+summary: In-memory key-value store with optional disk persistence, TTL support, and concurrent-safe operations.
+
+strict_boundary: persistence_primitives
+
+responsibilities:
+  - Provide a concurrent-safe in-memory KV store
+  - Support optional disk persistence via JSON snapshot
+  - Support TTL-based expiration and statistics
+
+non_goals:
+  - Durable WAL or snapshot-based KV engines
+  - Sharding or distributed KV topology
+  - Serializer selection or compression
+
+public_entrypoints:
+  - NewKVStore
+  - KVStore
+  - Config
+  - Options
+  - DefaultConfig
+  - DefaultOptions
+  - Stats
+
+allowed_imports:
+  - stdlib
+
+forbidden_imports:
+  - core/**
+  - middleware/**
+  - x/**
+
+test_commands:
+  - go test -race -timeout 30s ./store/kv/...
+  - go vet ./store/kv/...
+
+review_checklist:
+  - Must be safe for concurrent use
+  - Keep APIs transport-agnostic
+  - Keep WAL, sharding, and durable engine features out of stable layer
+
+agent_hints:
+  - In-memory KV with optional disk persistence stays in store/kv
+  - Durable WAL-based KV engines and sharding belong in x/data/kvengine

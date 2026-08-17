@@ -1,0 +1,49 @@
+name: singleflight
+path: middleware/singleflight
+layer: stable
+status: ga
+owner: transport
+risk: high
+summary: Response coalescing middleware that deduplicates concurrent identical requests, serving one response to all waiters.
+
+strict_boundary: transport_primitives
+
+responsibilities:
+  - Coalesce concurrent identical requests into a single execution
+  - Replay captured responses to all waiting callers
+  - Limit captured response size to prevent memory exhaustion
+
+non_goals:
+  - Distributed cache or cross-process coalescing
+  - Request body-based deduplication
+  - Persistent response caching
+
+public_entrypoints:
+  - New
+  - Coalescer
+  - Config
+  - KeyFunc
+
+allowed_imports:
+  - stdlib
+  - middleware
+  - log
+  - metrics
+
+forbidden_imports:
+  - core/**
+  - store/**
+  - x/**
+
+test_commands:
+  - go test -race -timeout 30s ./middleware/singleflight/...
+  - go vet ./middleware/singleflight/...
+
+review_checklist:
+  - next must be called exactly once
+  - KeyFunc must cover all sensitive request variants
+  - Keep responsibility transport-only
+
+agent_hints:
+  - Singleflight is GA but high-risk; use only for bounded safe non-streaming responses
+  - Explicit KeyFunc coverage is required for sensitive variants (auth, tenant, content-type)

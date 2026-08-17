@@ -1,0 +1,45 @@
+name: cors
+path: middleware/cors
+layer: stable
+status: ga
+owner: transport
+risk: low
+summary: CORS middleware that sets Access-Control-Allow-* headers on preflight and actual requests.
+
+strict_boundary: transport_primitives
+
+responsibilities:
+  - Handle CORS preflight (OPTIONS) requests
+  - Set appropriate Access-Control-* response headers
+  - Provide strict default options for production
+
+non_goals:
+  - Custom CORS policy engines
+  - Dynamic origin allow-listing from external sources
+  - Security policy beyond HTTP header configuration
+
+public_entrypoints:
+  - Middleware
+  - Config
+  - StrictDefaultOptions
+
+allowed_imports:
+  - stdlib
+  - middleware
+
+forbidden_imports:
+  - core/**
+  - store/**
+  - x/**
+
+test_commands:
+  - go test -race -timeout 30s ./middleware/cors/...
+  - go vet ./middleware/cors/...
+
+review_checklist:
+  - Preflight OPTIONS must be handled correctly
+  - Keep responsibility transport-only
+
+agent_hints:
+  - Use StrictDefaultOptions for production; override only when needed
+  - CORS is a transport header concern, not a security policy engine

@@ -1,0 +1,46 @@
+name: x/tenant/transport
+path: x/tenant/transport
+layer: extension
+status: beta
+owner: multitenancy
+risk: low
+summary: Tenant transport helpers — response header constants and helper functions for Retry-After, rate limit, and quota headers.
+
+strict_boundary: tenant_primitives
+
+responsibilities:
+  - Define canonical tenant-related HTTP header constants
+  - Provide helper functions for setting Retry-After, rate limit, and quota headers
+  - Provide header value extraction with defaults
+
+non_goals:
+  - HTTP handler or middleware implementation
+  - Response body or envelope construction
+  - Tenant policy or quota enforcement
+
+public_entrypoints:
+  - HeaderOrDefault
+  - SetRetryAfterHeader
+  - SetRateLimitHeaders
+  - SetQuotaHeaders
+
+allowed_imports:
+  - stdlib
+
+forbidden_imports:
+  - core/**
+  - middleware/**
+  - x/ai/**
+
+test_commands:
+  - go test -race -timeout 30s ./x/tenant/transport/...
+  - go vet ./x/tenant/transport/...
+
+review_checklist:
+  - Header values must be well-formed
+  - Keep transport helpers focused on header manipulation
+  - Keep tenant transport helpers outside of stable middleware
+
+agent_hints:
+  - Transport helpers are thin utilities for tenant response headers
+  - Do not grow this into a handler or middleware package

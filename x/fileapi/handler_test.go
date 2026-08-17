@@ -741,6 +741,126 @@ func TestHandler_Download_MetadataError(t *testing.T) {
 	}
 }
 
+func TestHandler_Download_MissingFileID(t *testing.T) {
+	h := NewHandler(&mockStorage{}, &mockMetadataManager{})
+
+	req := httptest.NewRequest(http.MethodGet, "/files/", nil)
+	ctx := tenantcore.WithTenantID(req.Context(), "tenant-123")
+	req = req.WithContext(ctx)
+	w := httptest.NewRecorder()
+	h.Download(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("Status = %d, want %d", w.Code, http.StatusBadRequest)
+	}
+}
+
+func TestHandler_Download_MissingTenantID(t *testing.T) {
+	h := NewHandler(&mockStorage{}, &mockMetadataManager{})
+
+	req := httptest.NewRequest(http.MethodGet, "/files/test-id", nil)
+	req = withRouteParam(req, "id", "test-id")
+	w := httptest.NewRecorder()
+	h.Download(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("Status = %d, want %d", w.Code, http.StatusBadRequest)
+	}
+}
+
+func TestRouteParam_NilRequest(t *testing.T) {
+	got := routeParam(nil, "id")
+	if got != "" {
+		t.Errorf("routeParam(nil) = %q, want \"\"", got)
+	}
+}
+
+func TestUserIDFromContext_Empty(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	got := UserIDFromContext(req.Context())
+	if got != "" {
+		t.Errorf("UserIDFromContext = %q, want \"\"", got)
+	}
+}
+
+func TestUserIDFromContext_NilContext(t *testing.T) {
+	got := UserIDFromContext(nil)
+	if got != "" {
+		t.Errorf("UserIDFromContext(nil) = %q, want \"\"", got)
+	}
+}
+
+func TestHandler_Upload_MissingFileField(t *testing.T) {
+	h := NewHandler(&mockStorage{}, &mockMetadataManager{})
+
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+	// No file field added — just close the writer
+	writer.Close()
+
+	req := httptest.NewRequest(http.MethodPost, "/files", body)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	ctx := tenantcore.WithTenantID(req.Context(), "tenant-123")
+	req = req.WithContext(ctx)
+	w := httptest.NewRecorder()
+	h.Upload(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("Status = %d, want %d", w.Code, http.StatusBadRequest)
+	}
+}
+
+func TestHandler_Download_StorageError(t *testing.T) {
+	storage := &mockStorage{
+		getFunc: func(ctx context.Context, path string) (io.ReadCloser, error) {
+			return nil, errors.New("disk error")
+		},
+	}
+	metadata := &mockMetadataManager{
+		getFunc: func(ctx context.Context, tenantID, id string) (*datafile.File, error) {
+			return &datafile.File{
+				File:     storefile.File{ID: id, Path: "test/path.txt", Name: "test.txt", Size: 12, MimeType: "text/plain"},
+				TenantID: "tenant-123",
+			}, nil
+		},
+	}
+	h := NewHandler(storage, metadata)
+
+	req := httptest.NewRequest(http.MethodGet, "/files/test-id", nil)
+	req = withRouteParam(req, "id", "test-id")
+	ctx := tenantcore.WithTenantID(req.Context(), "tenant-123")
+	req = req.WithContext(ctx)
+	w := httptest.NewRecorder()
+	h.Download(w, req)
+
+	if w.Code != http.StatusInternalServerError {
+		t.Errorf("Status = %d, want %d", w.Code, http.StatusInternalServerError)
+	}
+}
+
+func TestHandler_Delete_MetadataError(t *testing.T) {
+	metadata := &mockMetadataManager{
+		getFunc: func(ctx context.Context, tenantID, id string) (*datafile.File, error) {
+			return &datafile.File{File: storefile.File{ID: id, Path: "test/path.txt"}, TenantID: "tenant-123"}, nil
+		},
+		deleteFunc: func(ctx context.Context, tenantID, id string) error {
+			return errors.New("db error")
+		},
+	}
+	h := NewHandler(&mockStorage{}, metadata)
+
+	req := httptest.NewRequest(http.MethodDelete, "/files/test-id", nil)
+	req = withRouteParam(req, "id", "test-id")
+	ctx := tenantcore.WithTenantID(req.Context(), "tenant-123")
+	req = req.WithContext(ctx)
+	w := httptest.NewRecorder()
+	h.Delete(w, req)
+
+	if w.Code != http.StatusInternalServerError {
+		t.Errorf("Status = %d, want %d", w.Code, http.StatusInternalServerError)
+	}
+}
+
 // Benchmarks
 
 func BenchmarkHandler_Upload(b *testing.B) {

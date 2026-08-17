@@ -1,0 +1,47 @@
+name: x/tenant/config
+path: x/tenant/config
+layer: extension
+status: beta
+owner: multitenancy
+risk: medium
+summary: Database-backed tenant configuration manager with in-memory LRU caching.
+
+strict_boundary: tenant_primitives
+
+responsibilities:
+  - Manage per-tenant configuration from a database source
+  - Cache tenant configs with configurable TTL and LRU eviction
+  - Provide strongly-typed config accessors
+
+non_goals:
+  - Configuration file parsing or environment variable loading
+  - Config hot-reload or change notification
+  - Tenant onboarding or provisioning
+
+public_entrypoints:
+  - NewDBTenantConfigManager
+  - DBTenantConfigManager
+  - DBTenantConfigOption
+  - WithTenantCache
+
+allowed_imports:
+  - stdlib
+  - x/tenant
+
+forbidden_imports:
+  - core/**
+  - middleware/**
+  - x/ai/**
+
+test_commands:
+  - go test -race -timeout 30s ./x/tenant/config/...
+  - go vet ./x/tenant/config/...
+
+review_checklist:
+  - Config caching must respect TTL
+  - Fail closed on config retrieval errors
+  - Keep tenant config management out of stable store
+
+agent_hints:
+  - Tenant config is a DB-backed config manager within the x/tenant family
+  - Do not introduce config hot-reload or change notification here

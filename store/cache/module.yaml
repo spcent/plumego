@@ -1,0 +1,52 @@
+name: cache
+path: store/cache
+layer: stable
+status: ga
+owner: persistence
+risk: medium
+summary: In-memory cache primitives — Cache, CounterCache, AppenderCache, AtomicCache interfaces and MemoryCache implementation.
+
+strict_boundary: persistence_primitives
+
+responsibilities:
+  - Define cache interface hierarchy (Cache, CounterCache, AppenderCache, AtomicCache)
+  - Provide a concurrent-safe in-memory MemoryCache implementation
+  - Export cache statistics for observability
+
+non_goals:
+  - Distributed or Redis-backed cache topology (belongs in x/data/cache)
+  - HTTP response caching (belongs in x/gateway/cache)
+  - Cache eviction policy tuning or TTL-based expiration
+
+public_entrypoints:
+  - Cache
+  - CounterCache
+  - AppenderCache
+  - AtomicCache
+  - NewMemoryCache
+  - NewMemoryCacheWithConfig
+  - MemoryCache
+  - Config
+  - DefaultConfig
+  - Stats
+
+allowed_imports:
+  - stdlib
+
+forbidden_imports:
+  - core/**
+  - middleware/**
+  - x/**
+
+test_commands:
+  - go test -race -timeout 30s ./store/cache/...
+  - go vet ./store/cache/...
+
+review_checklist:
+  - Must be safe for concurrent use
+  - Keep APIs transport-agnostic
+  - Keep topology-heavy features out of the stable layer
+
+agent_hints:
+  - In-process cache primitives stay in store/cache
+  - Distributed cache topology (Redis, consistent hashing) belongs in x/data/cache

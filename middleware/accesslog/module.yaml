@@ -1,0 +1,47 @@
+name: accesslog
+path: middleware/accesslog
+layer: stable
+status: ga
+owner: transport
+risk: low
+summary: Structured access logging middleware for HTTP request/response logging.
+
+strict_boundary: transport_primitives
+
+responsibilities:
+  - Log structured access log entries for each request
+  - Record request method, path, status, duration, and size
+  - Support configurable logger injection
+
+non_goals:
+  - Log aggregation or export pipeline wiring
+  - Request body or response body logging
+  - Audit trail or compliance logging
+
+public_entrypoints:
+  - Middleware
+  - Config
+  - ErrNilLogger
+
+allowed_imports:
+  - stdlib
+  - middleware
+  - log
+
+forbidden_imports:
+  - core/**
+  - store/**
+  - x/**
+
+test_commands:
+  - go test -race -timeout 30s ./middleware/accesslog/...
+  - go vet ./middleware/accesslog/...
+
+review_checklist:
+  - next must be called exactly once
+  - Keep responsibility transport-only
+  - Log entries must not leak secrets or PII
+
+agent_hints:
+  - Accesslog is transport observability wiring only
+  - Exporter catalogs, backend setup, and pipeline composition stay in x/observability

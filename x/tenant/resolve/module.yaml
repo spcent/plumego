@@ -1,0 +1,47 @@
+name: x/tenant/resolve
+path: x/tenant/resolve
+layer: extension
+status: beta
+owner: multitenancy
+risk: high
+summary: Tenant resolution middleware — extracts tenant identity from JWT, header, or subdomain and injects it into context.
+
+strict_boundary: tenant_primitives
+
+responsibilities:
+  - Extract tenant identity from the request (JWT claims, custom header, subdomain)
+  - Inject tenant ID into the request context
+  - Return structured error responses for resolution failures
+
+non_goals:
+  - Tenant identity verification or token validation (belongs in security/jwt)
+  - Tenant policy enforcement (belongs in x/tenant/policy)
+  - Tenant provisioning or onboarding
+
+public_entrypoints:
+  - Middleware
+  - Options
+
+allowed_imports:
+  - stdlib
+  - middleware
+  - security
+  - x/tenant/core
+
+forbidden_imports:
+  - core/**
+  - store/**
+  - x/ai/**
+
+test_commands:
+  - go test -race -timeout 30s ./x/tenant/resolve/...
+  - go vet ./x/tenant/resolve/...
+
+review_checklist:
+  - Fail closed on resolution errors
+  - Tenant ID must be validated before injection
+  - Keep tenant resolution middleware transport-only
+
+agent_hints:
+  - Tenant resolution is the first middleware in the tenant chain
+  - Resolution must happen before policy, quota, or rate limit evaluation

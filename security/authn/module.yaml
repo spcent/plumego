@@ -1,0 +1,53 @@
+name: authn
+path: security/authn
+layer: stable
+status: ga
+owner: security
+risk: critical
+summary: Authentication and authorization primitives — Principal, Authenticator, Authorizer interfaces and context propagation.
+
+strict_boundary: auth_primitives
+
+responsibilities:
+  - Define Principal, Authenticator, and Authorizer interfaces
+  - Provide context propagation for authenticated principals
+  - Provide static token authenticator and bearer token extraction
+
+non_goals:
+  - HTTP middleware adaptation (belongs in middleware/auth)
+  - Token verification or credential storage
+  - Session lifecycle or tenant resolution
+
+public_entrypoints:
+  - Principal
+  - Authenticator
+  - RequestAuthenticator
+  - Authorizer
+  - StaticToken
+  - ExtractBearerToken
+  - WithPrincipal
+  - PrincipalFromContext
+  - HeaderAuthorization
+  - HeaderXToken
+
+allowed_imports:
+  - stdlib
+
+forbidden_imports:
+  - core/**
+  - router/**
+  - store/**
+  - x/**
+
+test_commands:
+  - go test -race -timeout 30s ./security/authn/...
+  - go vet ./security/authn/...
+
+review_checklist:
+  - Never log secrets or tokens
+  - Fail closed on verification errors
+  - Context key types must be unexported
+
+agent_hints:
+  - Authenticator and Authorizer are the canonical interfaces for auth decisions
+  - HTTP adaptation of these interfaces belongs in middleware/auth

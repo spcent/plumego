@@ -1,0 +1,44 @@
+name: timeout
+path: middleware/timeout
+layer: stable
+status: ga
+owner: transport
+risk: medium
+summary: Request timeout middleware that enforces a deadline on downstream handler execution.
+
+strict_boundary: transport_primitives
+
+responsibilities:
+  - Enforce a configurable deadline on handler execution
+  - Cancel the request context when the deadline expires
+  - Write a 503 Service Unavailable response on timeout
+
+non_goals:
+  - Per-route timeout configuration
+  - Timeout metrics collection
+  - Adaptive timeout tuning
+
+public_entrypoints:
+  - Middleware
+
+allowed_imports:
+  - stdlib
+  - middleware
+
+forbidden_imports:
+  - core/**
+  - store/**
+  - x/**
+
+test_commands:
+  - go test -race -timeout 30s ./middleware/timeout/...
+  - go vet ./middleware/timeout/...
+
+review_checklist:
+  - next must be called exactly once
+  - Context cancellation must be propagated correctly
+  - Keep responsibility transport-only
+
+agent_hints:
+  - Timeout applies to the entire downstream handler chain
+  - Per-route timeout variations should be handled at the route registration level

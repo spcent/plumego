@@ -1,0 +1,48 @@
+name: debug
+path: middleware/debug
+layer: stable
+status: ga
+owner: transport
+risk: low
+summary: Debug error middleware that replaces error responses with detailed diagnostics in development environments.
+
+strict_boundary: transport_primitives
+
+responsibilities:
+  - Replace error responses with detailed debug payloads
+  - Capture response body up to a configurable limit
+  - Skip replacement for streaming or non-error responses
+
+non_goals:
+  - Production error reporting
+  - Request/response logging or tracing
+  - Debug endpoint or admin surface
+
+public_entrypoints:
+  - Middleware
+  - Config
+  - DefaultConfig
+
+allowed_imports:
+  - stdlib
+  - middleware
+  - contract
+  - log
+
+forbidden_imports:
+  - core/**
+  - store/**
+  - x/**
+
+test_commands:
+  - go test -race -timeout 30s ./middleware/debug/...
+  - go vet ./middleware/debug/...
+
+review_checklist:
+  - next must be called exactly once
+  - Debug middleware must never be mounted in production
+  - Debug payloads must not leak secrets
+
+agent_hints:
+  - Debug middleware is for development and local debugging only
+  - Production debug surfaces belong in x/observability/devtools

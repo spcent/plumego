@@ -1,0 +1,46 @@
+name: concurrencylimit
+path: middleware/concurrencylimit
+layer: stable
+status: ga
+owner: transport
+risk: medium
+summary: Concurrency limit middleware that caps the number of concurrently executing handlers.
+
+strict_boundary: transport_primitives
+
+responsibilities:
+  - Limit concurrent in-flight requests
+  - Return 503 Service Unavailable when the limit is exceeded
+  - Provide configurable queue timeout for waiting callers
+
+non_goals:
+  - Per-route or per-tenant concurrency limits
+  - Adaptive concurrency tuning
+  - Priority-based queueing
+
+public_entrypoints:
+  - Middleware
+  - Config
+  - DefaultConfig
+
+allowed_imports:
+  - stdlib
+  - middleware
+
+forbidden_imports:
+  - core/**
+  - store/**
+  - x/**
+
+test_commands:
+  - go test -race -timeout 30s ./middleware/concurrencylimit/...
+  - go vet ./middleware/concurrencylimit/...
+
+review_checklist:
+  - next must be called exactly once
+  - Limit must be released after handler completion
+  - Keep responsibility transport-only
+
+agent_hints:
+  - Concurrency limit is a global server safeguard, not a per-tenant rate limiter
+  - Per-tenant rate limiting belongs in x/tenant

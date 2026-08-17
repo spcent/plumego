@@ -1,0 +1,46 @@
+name: tracing
+path: middleware/tracing
+layer: stable
+status: ga
+owner: transport
+risk: low
+summary: Distributed tracing middleware that creates and propagates trace spans for HTTP requests.
+
+strict_boundary: transport_primitives
+
+responsibilities:
+  - Create trace spans for incoming HTTP requests
+  - Propagate trace context via request headers
+  - Provide Tracer and TraceSpan interfaces for adapter injection
+
+non_goals:
+  - Trace exporter or collector configuration
+  - Sampling policy or pipeline wiring
+  - Span attribute enrichment beyond transport basics
+
+public_entrypoints:
+  - Middleware
+  - Tracer
+  - TraceSpan
+
+allowed_imports:
+  - stdlib
+  - middleware
+
+forbidden_imports:
+  - core/**
+  - store/**
+  - x/**
+
+test_commands:
+  - go test -race -timeout 30s ./middleware/tracing/...
+  - go vet ./middleware/tracing/...
+
+review_checklist:
+  - next must be called exactly once
+  - Trace context propagation must be correct
+  - Keep responsibility transport-only
+
+agent_hints:
+  - Tracing middleware is a thin adapter over injected Tracer implementations
+  - Exporter and collector wiring stays in x/observability

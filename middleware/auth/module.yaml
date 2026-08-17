@@ -1,0 +1,52 @@
+name: auth
+path: middleware/auth
+layer: stable
+status: ga
+owner: transport
+risk: high
+summary: Authentication and authorization middleware adapters that wrap security/authn primitives as HTTP middleware.
+
+strict_boundary: transport_primitives
+
+responsibilities:
+  - Adapt Authenticator and Authorizer interfaces as HTTP middleware
+  - Extract credentials from requests and inject identity into context
+  - Return structured error responses for auth failures
+
+non_goals:
+  - Token verification or credential storage (belongs in injected Authenticator implementations)
+  - Role-based access control policy engines
+  - Session lifecycle management
+
+public_entrypoints:
+  - Authenticate
+  - Authorize
+  - AuthorizeFunc
+  - AuthOption
+  - WithAuthErrorHandler
+  - WithAuthRealm
+  - AuthErrorHandler
+
+allowed_imports:
+  - stdlib
+  - middleware
+  - security
+  - contract
+
+forbidden_imports:
+  - core/**
+  - store/**
+  - x/**
+
+test_commands:
+  - go test -race -timeout 30s ./middleware/auth/...
+  - go vet ./middleware/auth/...
+
+review_checklist:
+  - next must be called exactly once
+  - Auth errors must fail closed
+  - Keep responsibility transport-only
+
+agent_hints:
+  - Auth middleware is a thin HTTP adapter over security/authn primitives
+  - Token verification logic belongs in the injected Authenticator, not in middleware

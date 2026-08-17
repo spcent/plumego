@@ -1,0 +1,46 @@
+name: x/tenant/policy
+path: x/tenant/policy
+layer: extension
+status: beta
+owner: multitenancy
+risk: high
+summary: Tenant policy evaluation middleware — enforces per-tenant access policies on HTTP requests.
+
+strict_boundary: tenant_primitives
+
+responsibilities:
+  - Evaluate tenant access policies against incoming requests
+  - Enforce allowed methods, paths, and resource constraints
+  - Return structured error responses for policy violations
+
+non_goals:
+  - Policy definition or storage (belongs in tenant config)
+  - Business-level authorization rules
+  - Cross-tenant access control
+
+public_entrypoints:
+  - Middleware
+  - Options
+
+allowed_imports:
+  - stdlib
+  - middleware
+  - x/tenant/core
+
+forbidden_imports:
+  - core/**
+  - store/**
+  - x/ai/**
+
+test_commands:
+  - go test -race -timeout 30s ./x/tenant/policy/...
+  - go vet ./x/tenant/policy/...
+
+review_checklist:
+  - Fail closed on policy errors
+  - Keep tenant policy middleware transport-only
+  - Policy evaluation must be deterministic
+
+agent_hints:
+  - Tenant policy middleware enforces, not defines, access policies
+  - Policy definition and storage belongs in x/tenant/config

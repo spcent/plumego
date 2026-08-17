@@ -1,0 +1,47 @@
+name: securityheaders
+path: middleware/securityheaders
+layer: stable
+status: ga
+owner: transport
+risk: low
+summary: Security headers middleware that sets common HTTP security headers (CSP, HSTS, X-Frame-Options, etc.).
+
+strict_boundary: transport_primitives
+
+responsibilities:
+  - Set standard security-related HTTP response headers
+  - Provide secure defaults suitable for production
+  - Validate configuration at construction time
+
+non_goals:
+  - Dynamic CSP policy generation
+  - Per-route security header customization
+  - Security policy enforcement beyond header configuration
+
+public_entrypoints:
+  - Middleware
+  - Config
+  - DefaultConfig
+
+allowed_imports:
+  - stdlib
+  - middleware
+  - security
+
+forbidden_imports:
+  - core/**
+  - store/**
+  - x/**
+
+test_commands:
+  - go test -race -timeout 30s ./middleware/securityheaders/...
+  - go vet ./middleware/securityheaders/...
+
+review_checklist:
+  - next must be called exactly once
+  - Config validation must reject invalid values
+  - Keep responsibility transport-only
+
+agent_hints:
+  - Security headers middleware is a thin HTTP adapter over security header primitives
+  - Default config is production-safe; override only with explicit justification

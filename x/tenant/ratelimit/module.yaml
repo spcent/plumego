@@ -1,0 +1,47 @@
+name: x/tenant/ratelimit
+path: x/tenant/ratelimit
+layer: extension
+status: beta
+owner: multitenancy
+risk: medium
+summary: Tenant-aware rate limiting middleware — enforces per-tenant rate limits using x/resilience primitives.
+
+strict_boundary: tenant_primitives
+
+responsibilities:
+  - Enforce per-tenant rate limits via x/resilience primitives
+  - Set Retry-After and rate limit response headers
+  - Return structured error responses for rate limit exhaustion
+
+non_goals:
+  - Global or IP-based rate limiting (belongs in middleware/abuseguard)
+  - Rate limit policy definition (belongs in tenant config)
+  - Distributed rate limit coordination
+
+public_entrypoints:
+  - Middleware
+  - Options
+
+allowed_imports:
+  - stdlib
+  - middleware
+  - x/resilience
+  - x/tenant/core
+
+forbidden_imports:
+  - core/**
+  - store/**
+  - x/ai/**
+
+test_commands:
+  - go test -race -timeout 30s ./x/tenant/ratelimit/...
+  - go vet ./x/tenant/ratelimit/...
+
+review_checklist:
+  - Fail closed on rate limit errors
+  - Retry-After headers must be accurate
+  - Keep tenant rate limit middleware transport-only
+
+agent_hints:
+  - Tenant rate limiting uses x/resilience/ratelimit primitives under the hood
+  - Global rate limiting without tenant awareness belongs in middleware/abuseguard

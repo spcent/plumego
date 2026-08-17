@@ -1,0 +1,55 @@
+name: input
+path: security/input
+layer: stable
+status: ga
+owner: security
+risk: medium
+summary: Input validation and sanitization primitives — email, URL, phone, token, HTML/SQL sanitization, control character stripping.
+
+strict_boundary: auth_primitives
+
+responsibilities:
+  - Validate common input types (email, URL, phone, token, header values)
+  - Sanitize potentially dangerous input (HTML, SQL, control characters)
+  - Provide best-effort safety checks for user-supplied data
+
+non_goals:
+  - Business-domain validation rules
+  - Comprehensive XSS or SQL injection prevention
+  - Input binding or deserialization
+
+public_entrypoints:
+  - IsToken
+  - IsHeaderName
+  - IsHeaderValue
+  - ValidateEmail
+  - ValidateURL
+  - ValidatePublicURL
+  - ValidatePhone
+  - BestEffortSanitizeHTML
+  - BestEffortSanitizeSQL
+  - StripControlChars
+  - ContainsDangerousChars
+  - TrimWhitespace
+
+allowed_imports:
+  - stdlib
+
+forbidden_imports:
+  - core/**
+  - router/**
+  - store/**
+  - x/**
+
+test_commands:
+  - go test -race -timeout 30s ./security/input/...
+  - go vet ./security/input/...
+
+review_checklist:
+  - Validation functions must be deterministic
+  - Sanitization is best-effort, not a security guarantee
+  - Keep responsibility at the primitive level
+
+agent_hints:
+  - Input validation primitives are building blocks, not a complete validation framework
+  - Business-domain validation belongs in the domain layer, not here

@@ -1,0 +1,46 @@
+name: x/tenant/quota
+path: x/tenant/quota
+layer: extension
+status: beta
+owner: multitenancy
+risk: high
+summary: Tenant quota enforcement middleware — enforces per-tenant request and token quotas on HTTP requests.
+
+strict_boundary: tenant_primitives
+
+responsibilities:
+  - Enforce per-tenant request and token quotas
+  - Set quota-related response headers (remaining requests/tokens)
+  - Return structured error responses for quota exhaustion
+
+non_goals:
+  - Quota definition or storage (belongs in tenant config)
+  - Quota billing or metering
+  - Cross-tenant quota aggregation
+
+public_entrypoints:
+  - Middleware
+  - Options
+
+allowed_imports:
+  - stdlib
+  - middleware
+  - x/tenant/core
+
+forbidden_imports:
+  - core/**
+  - store/**
+  - x/ai/**
+
+test_commands:
+  - go test -race -timeout 30s ./x/tenant/quota/...
+  - go vet ./x/tenant/quota/...
+
+review_checklist:
+  - Fail closed on quota errors
+  - Quota headers must be accurate
+  - Keep tenant quota middleware transport-only
+
+agent_hints:
+  - Quota middleware enforces, not defines, tenant quotas
+  - Quota configuration belongs in x/tenant/config

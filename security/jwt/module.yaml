@@ -1,0 +1,59 @@
+name: jwt
+path: security/jwt
+layer: stable
+status: ga
+owner: security
+risk: critical
+summary: JWT token creation, signing, verification, key management, and authn adapter implementations.
+
+strict_boundary: auth_primitives
+
+responsibilities:
+  - JWT token creation and signing
+  - Token verification and claims extraction
+  - Key store interface and in-memory implementation
+  - Authenticator and Authorizer implementations for JWT
+
+non_goals:
+  - HTTP middleware (belongs in middleware/auth)
+  - Session lifecycle or refresh token management
+  - OAuth/OIDC protocol flows
+
+public_entrypoints:
+  - JWTManager
+  - Authenticator
+  - PolicyAuthorizer
+  - PermissionAuthorizer
+  - TokenClaims
+  - IdentityClaims
+  - AuthorizationClaims
+  - TokenPair
+  - TokenType
+  - KeyStore
+  - SigningKeyMetadata
+  - JWTSigningKey
+  - PrincipalFromClaims
+
+allowed_imports:
+  - stdlib
+  - security/authn
+
+forbidden_imports:
+  - core/**
+  - router/**
+  - store/**
+  - x/**
+
+test_commands:
+  - go test -race -timeout 30s ./security/jwt/...
+  - go vet ./security/jwt/...
+
+review_checklist:
+  - Never log secrets, tokens, or signing keys
+  - Fail closed on verification errors
+  - Use timing-safe comparison for secret checks
+  - Negative-path tests are mandatory
+
+agent_hints:
+  - JWT verification must fail closed; never weaken verification for convenience
+  - Key management is explicit; no hidden global key store

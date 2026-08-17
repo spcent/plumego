@@ -1,0 +1,49 @@
+name: file
+path: store/file
+layer: stable
+status: ga
+owner: persistence
+risk: medium
+summary: File storage interface — Storage abstraction with Put, Get, Delete, List, and Stat operations.
+
+strict_boundary: persistence_primitives
+
+responsibilities:
+  - Define the Storage interface for file operations
+  - Define File, PutOptions, FileStat, and Query types
+  - Define sentinel errors for storage operations
+
+non_goals:
+  - File backend or provider configuration (S3, GCS, etc.)
+  - Signed URL generation
+  - Image processing or thumbnail generation
+  - Metadata management
+
+public_entrypoints:
+  - Storage
+  - File
+  - PutOptions
+  - FileStat
+  - Query
+  - Error
+
+allowed_imports:
+  - stdlib
+
+forbidden_imports:
+  - core/**
+  - middleware/**
+  - x/**
+
+test_commands:
+  - go test -race -timeout 30s ./store/file/...
+  - go vet ./store/file/...
+
+review_checklist:
+  - Keep APIs transport-agnostic and provider-agnostic
+  - Keep file backend config and signed URLs out of stable layer
+  - Sentry errors must be well-defined
+
+agent_hints:
+  - File backend configuration, S3 adapters, and signed URLs belong in x/data/file
+  - Image processing and metadata management belong in application code

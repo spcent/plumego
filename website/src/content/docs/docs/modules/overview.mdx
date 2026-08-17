@@ -102,11 +102,11 @@ API is frozen between consecutive minor release refs. Safe to adopt in productio
 | --- | --- | --- | --- |
 | reusable CRUD transport and resource route standardization | [x/rest Primer](/docs/modules/x-rest) | v0.2.0 | — |
 | real-time WebSocket connection lifecycle, hub management, or auth | [x/websocket Primer](/docs/modules/x-websocket) | v0.2.0 | — |
-| reverse proxying, gateway routing, load balancing, or edge transport | [x/gateway Primer](/docs/modules/x-gateway) | v0.2.0 | [x/gateway/discovery](/docs/modules/x-discovery) · `x/gateway/ipc` (experimental) |
-| Prometheus exporters, OTel wiring, record buffering, or DB analytics | [x/observability Primer](/docs/modules/x-observability) | v0.2.0 | [x/observability/ops](/docs/modules/x-ops) · [x/observability/devtools](/docs/modules/x-devtools) (experimental) |
+| reverse proxying, gateway routing, load balancing, or edge transport | [x/gateway Primer](/docs/modules/x-gateway) | v0.2.0 | [x/gateway/discovery](/docs/modules/x-gateway-discovery) · `x/gateway/ipc` (experimental) |
+| Prometheus exporters, OTel wiring, record buffering, or DB analytics | [x/observability Primer](/docs/modules/x-observability) | v0.2.0 | [x/observability/ops](/docs/modules/x-observability-ops) · [x/observability/devtools](/docs/modules/x-observability-devtools) (experimental) |
 | multi-tenant resolution, policy, quota, rate limiting, or session | [x/tenant Primer](/docs/modules/x-tenant) | v1.1.0 | `resolve`, `policy`, `quota`, `ratelimit`, `session`, `store` |
 | static asset serving, embedded FS, or SPA fallback routing | [x/frontend Primer](/docs/modules/x-frontend) | v1.1.0 | — |
-| app-facing queue, pubsub, scheduler, or webhook orchestration | [x/messaging Primer](/docs/modules/x-messaging) | v1.1.0 (app-facing) | [scheduler](/docs/modules/x-scheduler) · [webhook · pubsub · mq](/docs/modules/x-messaging-subordinates) (subordinate primitives are experimental) |
+| app-facing queue, pubsub, scheduler, or webhook orchestration | [x/messaging Primer](/docs/modules/x-messaging) | v1.1.0 (app-facing) | [scheduler](/docs/modules/x-messaging-scheduler) · [webhook · pubsub · mq](/docs/modules/x-messaging-subordinates) (subordinate primitives are experimental) |
 
 #### Beta surfaces in experimental families
 
@@ -124,7 +124,7 @@ API compatibility is not frozen. Evaluate before adopting; wrap behind an app-lo
 | If the question is mainly about | Open this primer next | Subordinate packages |
 | --- | --- | --- |
 | AI provider adapters, session, streaming, or tool invocation | [x/ai Primer](/docs/modules/x-ai) | `provider`, `session`, `streaming`, `tool` are beta surfaces — see above; `orchestration`, `semanticcache`, `distributed`, `resilience` remain experimental |
-| read-write splitting, sharding, durable KV, or idempotency topology | [x/data Primer](/docs/modules/x-data) | [x/data/cache](/docs/modules/x-cache); `file` and `idempotency` are beta surfaces — see above |
+| read-write splitting, sharding, durable KV, or idempotency topology | [x/data Primer](/docs/modules/x-data) | [x/data/cache](/docs/modules/x-data-cache); `file` and `idempotency` are beta surfaces — see above |
 | HTTP transport for file upload, download, or streaming delivery | [x/fileapi Primer](/docs/modules/x-fileapi) | — |
 | shared circuit breakers, retry wrappers, or resilience adapters across extensions | [x/resilience Primer](/docs/modules/x-resilience) | — |
 | gRPC + HTTP service hosting or outbound RPC client pooling | [x/rpc Primer](/docs/modules/x-rpc) | — |

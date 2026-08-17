@@ -1,0 +1,49 @@
+name: headers
+path: security/headers
+layer: stable
+status: ga
+owner: security
+risk: medium
+summary: HTTP security header policy — CSP, HSTS, X-Frame-Options, X-Content-Type-Options, and related headers.
+
+strict_boundary: auth_primitives
+
+responsibilities:
+  - Define configurable security header policies
+  - Apply security headers to HTTP responses
+  - Validate policy configurations at construction time
+  - Provide strict and default production-safe policies
+
+non_goals:
+  - HTTP middleware adaptation (belongs in middleware/securityheaders)
+  - Dynamic CSP generation or reporting
+  - TLS termination or certificate management
+
+public_entrypoints:
+  - Policy
+  - DefaultPolicy
+  - StrictPolicy
+  - HSTSOptions
+  - ErrInvalidPolicy
+
+allowed_imports:
+  - stdlib
+
+forbidden_imports:
+  - core/**
+  - router/**
+  - store/**
+  - x/**
+
+test_commands:
+  - go test -race -timeout 30s ./security/headers/...
+  - go vet ./security/headers/...
+
+review_checklist:
+  - Policy validation must reject invalid values
+  - StrictPolicy must be production-safe
+  - Keep responsibility at the primitive level
+
+agent_hints:
+  - HTTP middleware adaptation of security header policies belongs in middleware/securityheaders
+  - StrictPolicy is the production-safe default; override only with explicit justification

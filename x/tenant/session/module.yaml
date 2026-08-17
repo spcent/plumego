@@ -1,0 +1,57 @@
+name: x/tenant/session
+path: x/tenant/session
+layer: extension
+status: beta
+owner: multitenancy
+risk: high
+summary: Tenant session lifecycle middleware — session lookup, validation, JWT state store, and session error handling.
+
+strict_boundary: tenant_primitives
+
+responsibilities:
+  - Manage tenant session lifecycle (lookup, validation, expiry)
+  - Provide JWT-backed session state store
+  - Inject session context into requests
+  - Return structured error responses for session failures
+
+non_goals:
+  - Session storage or persistence design
+  - OAuth/OIDC session flows
+  - Session analytics or auditing
+
+public_entrypoints:
+  - Middleware
+  - SessionOption
+  - SessionErrorHandler
+  - SessionLookup
+  - WithSessionErrorHandler
+  - WithSessionRequired
+  - WithSessionNow
+  - WithSessionIDExtractor
+  - WithSessionLookup
+  - JWTStateStore
+  - NewJWTStateStore
+
+allowed_imports:
+  - stdlib
+  - middleware
+  - security
+  - store
+  - x/tenant/core
+
+forbidden_imports:
+  - core/**
+  - x/ai/**
+
+test_commands:
+  - go test -race -timeout 30s ./x/tenant/session/...
+  - go vet ./x/tenant/session/...
+
+review_checklist:
+  - Fail closed on session errors
+  - Session tokens must not be logged
+  - Keep tenant session middleware transport-only
+
+agent_hints:
+  - Session lifecycle is a tenant concern, not a core or stable middleware concern
+  - JWTStateStore uses store/kv primitives for session state persistence

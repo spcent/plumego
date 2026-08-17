@@ -1,0 +1,44 @@
+name: recovery
+path: middleware/recovery
+layer: stable
+status: ga
+owner: transport
+risk: medium
+summary: Panic recovery middleware that catches panics in downstream handlers and writes a structured error response.
+
+strict_boundary: transport_primitives
+
+responsibilities:
+  - Catch panics in the handler chain
+  - Log panic details via structured logger
+  - Write a safe error response without leaking internals
+
+non_goals:
+  - Error classification or aggregation
+  - Panic telemetry export
+  - Custom panic response shaping
+
+public_entrypoints:
+  - Middleware
+
+allowed_imports:
+  - stdlib
+  - middleware
+
+forbidden_imports:
+  - core/**
+  - store/**
+  - x/**
+
+test_commands:
+  - go test -race -timeout 30s ./middleware/recovery/...
+  - go vet ./middleware/recovery/...
+
+review_checklist:
+  - next must be called exactly once
+  - Panic details must not leak in responses
+  - Keep responsibility transport-only
+
+agent_hints:
+  - Recovery is a thin transport adapter over explicit logger injection
+  - Do not add panic classification or aggregation behavior here
