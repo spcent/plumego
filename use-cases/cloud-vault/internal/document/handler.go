@@ -62,6 +62,7 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 		Order:        q.Get("order"),
 		Limit:        parseIntParam(r, "limit", 50, 100),
 		Offset:       parseIntParam(r, "offset", 0, -1),
+		AfterID:      q.Get("after_id"),
 	})
 	if err != nil {
 		h.writeErr(w, r, err)

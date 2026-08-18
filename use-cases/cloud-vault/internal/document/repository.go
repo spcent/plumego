@@ -114,17 +114,41 @@ func (r *SQLiteRepository) Update(ctx context.Context, doc *Document) error {
 
 func (r *SQLiteRepository) List(ctx context.Context, q ListQuery) ([]*Document, int64, error) {
 	wheres, args := buildListWhere(q)
-	where := "WHERE " + strings.Join(wheres, " AND ")
 
-	countArgs := make([]any, len(args))
-	copy(countArgs, args)
+	var total int64 = -1
 
-	var total int64
-	if err := r.db.QueryRowContext(ctx,
-		`SELECT COUNT(*) FROM documents `+where,
-		countArgs...,
-	).Scan(&total); err != nil {
-		return nil, 0, fmt.Errorf("count documents: %w", err)
+	if q.AfterID != "" {
+		// Keyset mode: apply cursor condition instead of OFFSET.
+		col := sortColName(q.SortBy)
+		dir := "DESC"
+		if strings.EqualFold(q.Order, "ASC") {
+			dir = "ASC"
+		}
+		op := "<"
+		if dir == "ASC" {
+			op = ">"
+		}
+		cursorVal, err := r.cursorSortValue(ctx, q.AfterID, col)
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+			return nil, 0, fmt.Errorf("cursor lookup: %w", err)
+		}
+		if err == nil {
+			// (col OP cursorVal) OR (col = cursorVal AND id OP afterID)
+			wheres = append(wheres, "("+col+" "+op+" ? OR ("+col+" = ? AND id "+op+" ?))")
+			args = append(args, cursorVal, cursorVal, q.AfterID)
+		}
+		// If cursor doc is missing (deleted), skip the condition — first page is returned.
+	} else {
+		// Offset mode: count total rows.
+		countArgs := make([]any, len(args))
+		copy(countArgs, args)
+		where := "WHERE " + strings.Join(wheres, " AND ")
+		if err := r.db.QueryRowContext(ctx,
+			`SELECT COUNT(*) FROM documents `+where,
+			countArgs...,
+		).Scan(&total); err != nil {
+			return nil, 0, fmt.Errorf("count documents: %w", err)
+		}
 	}
 
 	orderClause := buildOrderClause(q)
@@ -132,14 +156,26 @@ func (r *SQLiteRepository) List(ctx context.Context, q ListQuery) ([]*Document, 
 	if limit <= 0 {
 		limit = 50
 	}
-	args = append(args, limit, q.Offset)
 
-	rows, err := r.db.QueryContext(ctx,
-		`SELECT `+allDocCols+`
-		 FROM documents `+where+` `+orderClause+`
-		 LIMIT ? OFFSET ?`,
-		args...,
-	)
+	where := "WHERE " + strings.Join(wheres, " AND ")
+	if q.AfterID != "" {
+		args = append(args, limit)
+	} else {
+		args = append(args, limit, q.Offset)
+	}
+
+	var querySQL string
+	if q.AfterID != "" {
+		querySQL = `SELECT ` + allDocCols + `
+		 FROM documents ` + where + ` ` + orderClause + `
+		 LIMIT ?`
+	} else {
+		querySQL = `SELECT ` + allDocCols + `
+		 FROM documents ` + where + ` ` + orderClause + `
+		 LIMIT ? OFFSET ?`
+	}
+
+	rows, err := r.db.QueryContext(ctx, querySQL, args...)
 	if err != nil {
 		return nil, 0, fmt.Errorf("list documents: %w", err)
 	}
@@ -157,6 +193,32 @@ func (r *SQLiteRepository) List(ctx context.Context, q ListQuery) ([]*Document, 
 		return nil, 0, fmt.Errorf("iterate documents: %w", err)
 	}
 	return docs, total, nil
+}
+
+// cursorSortValue fetches the value of the sort column for the cursor document.
+func (r *SQLiteRepository) cursorSortValue(ctx context.Context, cursorID, col string) (any, error) {
+	if col == "size_bytes" {
+		var v int64
+		err := r.db.QueryRowContext(ctx, `SELECT size_bytes FROM documents WHERE id = ?`, cursorID).Scan(&v)
+		return v, err
+	}
+	var v string
+	err := r.db.QueryRowContext(ctx, `SELECT `+col+` FROM documents WHERE id = ?`, cursorID).Scan(&v)
+	return v, err
+}
+
+// sortColName maps the ListQuery.SortBy value to the actual column name.
+func sortColName(sortBy string) string {
+	switch strings.ToLower(sortBy) {
+	case "created_at":
+		return "created_at"
+	case "title":
+		return "title"
+	case "size_bytes":
+		return "size_bytes"
+	default:
+		return "updated_at"
+	}
 }
 
 func (r *SQLiteRepository) SoftDelete(ctx context.Context, id string) error {
@@ -414,7 +476,9 @@ func buildOrderClause(q ListQuery) string {
 		dir = dirAsc
 	}
 
-	return "ORDER BY " + col + " " + dir
+	// Secondary sort on id ensures deterministic ordering when the primary key ties,
+	// which is required for correct keyset-cursor pagination.
+	return "ORDER BY " + col + " " + dir + ", id " + dir
 }
 
 // --- scan helpers ---
