@@ -17,9 +17,6 @@ func TestModuleFromFilePath(t *testing.T) {
 		// reference/* — two-level (new behaviour)
 		{"reference/standard-service/internal/app/app_test.go", "reference/standard-service"},
 		{"reference/with-ai/main.go", "reference/with-ai"},
-		// use-cases/* — two-level (new behaviour)
-		{"use-cases/workerfleet/main.go", "use-cases/workerfleet"},
-		{"use-cases/mini-saas-api/cmd/api/main.go", "use-cases/mini-saas-api"},
 		// other top-level paths
 		{"specs/gate-profiles.yaml", "specs"},
 		{"docs/reference/style-guide.md", "docs"},

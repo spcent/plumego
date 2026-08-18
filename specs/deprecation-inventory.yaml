@@ -92,34 +92,6 @@ entries:
     paths:
       - x/gateway/discovery/discovery.go
 
-  - id: reference-workerfleet-unimplemented-registration
-    category: reference_placeholder
-    status: keep
-    owner: reference
-    decision: Keep outside the v1 stable release surface. Workerfleet is a partial WIP reference, and worker registration still returns ErrNotImplemented when the reference profile does not wire ingest dependencies.
-    replacement: implemented worker registration flow
-    paths:
-      - use-cases/workerfleet/internal/handler/worker_register.go
-
-  - id: reference-workerfleet-view-and-store-aliases
-    category: reference_alias
-    status: keep
-    owner: reference
-    decision: Workerfleet reference layers alias domain records for local platform package readability.
-    replacement: direct domain types
-    paths:
-      - use-cases/workerfleet/internal/platform/store/types.go
-
-  - id: reference-workerfleet-app-compatibility-markers
-    category: reference_placeholder
-    status: keep
-    owner: reference
-    decision: Workerfleet app-layer ErrNotImplemented markers are dependency-gated WIP behavior, not proof that the entire service is absent. Keep them outside the stable-root v1 surface while the reference fills in the remaining ingest/query/case-step wiring.
-    replacement: implemented workerfleet app behavior and direct view types
-    paths:
-      - use-cases/workerfleet/internal/app/types.go
-      - use-cases/workerfleet/internal/app/service.go
-
   - id: x-devtools-removed-legacy-alias-regression
     category: regression_test
     status: keep
@@ -275,7 +247,7 @@ entries:
     category: public_alias
     status: keep
     owner: persistence
-    decision: Options and DefaultOptions are type/function aliases for Config and DefaultConfig, kept so existing callers (e.g. use-cases/dbadmin) continue to compile after the stable-root rename. Remove in a future major release once all callers migrate.
+    decision: Options and DefaultOptions are type/function aliases for Config and DefaultConfig, kept so existing callers continue to compile after the stable-root rename. Remove in a future major release once all callers migrate.
     replacement: store/kv.Config and store/kv.DefaultConfig
     paths:
       - store/kv/options.go

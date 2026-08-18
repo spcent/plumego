@@ -423,7 +423,6 @@ Each phase is released as a PR so progress is visible.
   - Filtering by maturity level (beta only, or including experimental)
   - When NOT to use an extension
 - **Definition of Done:** Makes it obvious which extension to try for common use-cases; links to all x/* primer docs
-- **Tests:** Spot-check 5 use-cases map to right extensions
 - **Risk:** LOW
 - **Rollback:** Delete docs/start/extension-guide.md
 

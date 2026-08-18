@@ -1156,7 +1156,7 @@ export const EXAMPLES_COPY = {
     ],
     workerfleetTitle: '深度参考用例：use-cases/workerfleet',
     workerfleetBody:
-      'use-cases/workerfleet 是一个仍在推进中的参考应用（不是生产就绪声明），用来探索 Plumego 在超出 canonical 服务深度时的形态——分布式 worker 机队管理，包含领域模型、MongoDB 存储、Kubernetes Pod 发现、Prometheus 指标以及告警/通知流水线。部分服务方法仍返回 `ErrNotImplemented`；应把它当作 worker 监控思路的部分参考，而不是可以整体照搬的模板。',
+      'use-cases/workerfleet 是一个仍在推进中的参考应用（不是生产就绪声明），用来探索 Plumego 在超出 canonical 服务深度时的形态——分布式 worker 集群管理，包含领域模型、MongoDB 存储、Kubernetes Pod 发现、Prometheus 指标以及告警/通知流水线。部分服务方法仍返回 `ErrNotImplemented`；应把它当作 worker 监控思路的部分参考，而不是可以整体照搬的模板。',
     workerfleetDetails: [
       '领域驱动设计：task、worker、pod、alert 和 event 模型',
       'MongoDB 存储，含索引管理和集成测试',

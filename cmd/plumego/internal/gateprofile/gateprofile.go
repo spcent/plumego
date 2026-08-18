@@ -121,7 +121,7 @@ func matchGlob(pattern, path string) bool {
 }
 
 func fallbackProfile(module string) Profile {
-	// reference/* and use-cases/* live in nested go.mod directories that cannot
+	// reference/* live in nested go.mod directories that cannot
 	// be tested via "./reference/..." from the root module. Use "go -C <dir>" to
 	// change into the module directory before running — supported since Go 1.21.
 	if strings.Contains(module, "/") {

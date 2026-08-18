@@ -131,7 +131,7 @@ const useCaseProjects = [
     name: 'use-cases/mini-saas-api',
     body: '一个有边界的多租户 SaaS API 示范——在 Plumego 稳定根之上实现租户隔离、配额执行和 JWT 策略。',
     scenario: '多租户 SaaS',
-    href: 'https://github.com/spcent/plumego/tree/main/use-cases/mini-saas-api',
+    href: 'https://github.com/birdordev/mini-saas-api',
     status: '参考用例',
   },
   {
@@ -139,7 +139,7 @@ const useCaseProjects = [
     name: 'use-cases/cloud-vault',
     body: '面向 AI 生成笔记的 local-first Markdown 知识库。演示 x/data + x/frontend 在 standard-service 基线上的组合。',
     scenario: '内部 API + AI 服务',
-    href: 'https://github.com/spcent/plumego/tree/main/use-cases/cloud-vault',
+    href: 'https://github.com/birdordev/cloud-vault',
     status: '参考用例',
   },
   {
@@ -147,7 +147,7 @@ const useCaseProjects = [
     name: 'use-cases/dbadmin',
     body: '本地优先、注重安全的数据库工作台（MySQL / Postgres / SQLite / Redis / MongoDB / Elasticsearch）——展示 Plumego 如何承载带敏感连接的运维平面服务。',
     scenario: '平台服务',
-    href: 'https://github.com/spcent/plumego/tree/main/use-cases/dbadmin',
+    href: 'https://github.com/birdordev/dbadmin',
     status: '参考用例',
   },
   {
@@ -155,7 +155,7 @@ const useCaseProjects = [
     name: 'use-cases/guardus',
     body: '在 Plumego 稳定根 + x/observability 之上对 Gatus（健康/状态监控）的 v1 功能等价重实现。',
     scenario: '平台服务',
-    href: 'https://github.com/spcent/plumego/tree/main/use-cases/guardus',
+    href: 'https://github.com/birdordev/guardus',
     status: '参考用例',
   },
   {
@@ -163,7 +163,7 @@ const useCaseProjects = [
     name: 'use-cases/workerfleet',
     body: '仍在推进中的 worker 机队监控服务，用于探索超出 canonical 服务深度的形态——MongoDB 存储、Kubernetes Pod 发现、Prometheus 指标以及告警/通知流水线。部分方法仍返回 ErrNotImplemented。',
     scenario: '平台服务 + 消息',
-    href: 'https://github.com/spcent/plumego/tree/main/use-cases/workerfleet',
+    href: 'https://github.com/birdordev/workerfleet',
     status: '进行中',
   },
 ] as const;
@@ -264,7 +264,7 @@ const fitGuide = [
     <div class="section__intro">
       <h2>仓库中真实的项目。</h2>
       <p>
-        这些是 <code>use-cases/</code> 目录下可运行的用例。每一个都把上面的抽象场景落到具体 Go 模块——在决定复制哪种服务形态之前，先看看源码。
+        这些是可运行的实际用例，每一个都把上面的抽象场景落到具体 Go 模块——在决定复制哪种服务形态之前，先看看源码。
       </p>
     </div>
     <div class="page-grid">

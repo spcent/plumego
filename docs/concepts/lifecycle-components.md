@@ -98,7 +98,6 @@ wrapped type:
 | `Stop()` no ctx/error (`x/websocket.Hub`, `x/gateway` health checker) | `OnStop: func(context.Context) error { h.Stop(); return nil }` |
 | `Close() error` (`x/data/cache/distributed`, IPC servers) | `OnStop: func(context.Context) error { return c.Close() }` |
 | `Shutdown(ctx) error` (`x/websocket.Hub`, core `App`) | `OnStop: hub.Shutdown` |
-| `StartBackgroundTasks(ctx)` (`use-cases/cloud-vault`) | `OnStart: func(ctx) error { app.StartBackgroundTasks(ctx); return nil }` |
 | readiness via `IsHealthy()` / `IsRunning()` | `OnReady: func(context.Context) error { if !c.IsHealthy() { return errNotReady }; return nil }` |
 
 New components should implement `core.Lifecycle` directly; existing ones can be

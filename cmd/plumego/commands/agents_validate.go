@@ -237,7 +237,6 @@ func detectModules(changedFiles []string) (primary string, multi bool) {
 //	"middleware/timeout/timeout.go"                         → "middleware"
 //	"x/tenant/resolver.go"                                 → "x/tenant"
 //	"reference/standard-service/internal/app/app_test.go"  → "reference/standard-service"
-//	"use-cases/workerfleet/main.go"                        → "use-cases/workerfleet"
 //	"specs/gate-profiles.yaml"                             → "specs"
 func moduleFromFilePath(path string) string {
 	path = filepath.ToSlash(path)
@@ -245,11 +244,11 @@ func moduleFromFilePath(path string) string {
 	if len(parts) == 0 || parts[0] == "" {
 		return ""
 	}
-	// x/*, reference/*, and use-cases/* each contain nested go.mod boundaries
+	// x/* and reference/* each contain nested go.mod boundaries
 	// at the second directory level — return a two-level module identifier so
 	// the gate profile runs tests from within the correct sub-module directory.
 	switch parts[0] {
-	case "x", "reference", "use-cases":
+	case "x", "reference":
 		if len(parts) >= 2 {
 			return parts[0] + "/" + parts[1]
 		}

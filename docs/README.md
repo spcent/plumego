@@ -83,9 +83,6 @@ Related execution surfaces live outside `docs/`:
 - `../reference/with-rpc/README.md` — explicit `x/rpc` gRPC transport mounting pattern
 - `../reference/benchmark/README.md` — benchmarking harness comparing Plumego against other routers
 
-For use-cases (end-to-end applications, not part of the canonical web-service
-path), see `../use-cases/` — e.g. `../use-cases/workerfleet/README.md`.
-
 ## Authority Order
 
 When guidance overlaps, use this order:

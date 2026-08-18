@@ -5,9 +5,6 @@ self-contained Go module that demonstrates a specific capability or deployment
 pattern. They are teaching tools, not production bundles — every middleware and
 route decision is visible and intentional.
 
-For production-scale applications with external dependencies (MongoDB,
-Kubernetes, Prometheus), see [`use-cases/`](../use-cases/AGENTS.md).
-
 ---
 
 ## Where to start
