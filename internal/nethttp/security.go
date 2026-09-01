@@ -138,7 +138,7 @@ func ValidateURL(urlStr string, protection SSRFProtection) error {
 
 	u, err := url.Parse(urlStr)
 	if err != nil {
-		return fmt.Errorf("%w: %v", ErrInvalidURL, err)
+		return fmt.Errorf("%w: %w", ErrInvalidURL, err)
 	}
 
 	// Validate scheme

@@ -26,16 +26,18 @@ func NewLineScanner(r io.Reader) *bufio.Scanner {
 	return scanner
 }
 
-var StableRoots = []string{
-	"core",
-	"router",
-	"contract",
-	"middleware",
-	"security",
-	"store",
-	"health",
-	"log",
-	"metrics",
+func StableRoots() []string {
+	return []string{
+		"core",
+		"router",
+		"contract",
+		"middleware",
+		"security",
+		"store",
+		"health",
+		"log",
+		"metrics",
+	}
 }
 
 var allowedTopLevelDirs = []string{
@@ -510,7 +512,7 @@ func matchesAnyRepoPattern(relPath string, patterns []string) bool {
 func FindMissingModuleManifests(repoRoot string) ([]string, error) {
 	var missing []string
 
-	for _, root := range StableRoots {
+	for _, root := range StableRoots() {
 		path := filepath.Join(repoRoot, root, "module.yaml")
 		if _, err := os.Stat(path); err != nil {
 			if os.IsNotExist(err) {
@@ -730,7 +732,7 @@ func FindOrphanedExtensionRoots(repoRoot string, declared map[string]struct{}) (
 }
 
 func FindEmptyMisleadingDirs(repoRoot string) ([]string, error) {
-	roots := append([]string{}, StableRoots...)
+	roots := append([]string{}, StableRoots()...)
 	roots = append(roots, "x")
 
 	var empty []string
@@ -1129,7 +1131,7 @@ func FindExtensionTaxonomyCoverageViolations(repoRoot string, declared map[strin
 
 func FindStableHTTPSurfaceViolations(repoRoot string) ([]string, error) {
 	var violations []string
-	for _, root := range StableRoots {
+	for _, root := range StableRoots() {
 		if _, exempt := stableHTTPSurfaceExemptRoots[root]; exempt {
 			continue
 		}
@@ -1445,7 +1447,7 @@ func isDisallowedImport(importPath string, blockedPrefixes []string) bool {
 }
 
 func isStableRoot(path string) bool {
-	for _, root := range StableRoots {
+	for _, root := range StableRoots() {
 		if path == root {
 			return true
 		}
@@ -1467,7 +1469,7 @@ func ReadModulePublicEntrypoints(manifestPath string) ([]string, error) {
 // declares a non-empty strict_boundary field.
 func ValidateStableBoundaryDeclarations(repoRoot string) ([]string, error) {
 	var violations []string
-	for _, root := range StableRoots {
+	for _, root := range StableRoots() {
 		path := filepath.Join(repoRoot, root, "module.yaml")
 		doc, err := parseManifest(path)
 		if err != nil {

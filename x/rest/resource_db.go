@@ -16,14 +16,19 @@ type Repository[T any] interface {
 	Exists(ctx context.Context, id string) (bool, error)
 }
 
+// Validator validates a decoded request value before persistence.
+// This is the canonical type used by DBResourceController; any package-local
+// validator that satisfies Validate(any) error is accepted implicitly.
+type Validator interface {
+	Validate(v any) error
+}
+
 // DBResourceController combines BaseContextResourceController with a Repository,
 // providing database-backed CRUD handlers out of the box.
 type DBResourceController[T any] struct {
 	*BaseContextResourceController
 	repository Repository[T]
-	validator  interface {
-		Validate(any) error
-	}
+	validator  Validator
 }
 
 // NewDBResourceController creates a new database resource controller.
@@ -35,7 +40,7 @@ func NewDBResourceController[T any](resourceName string, repository Repository[T
 }
 
 // WithValidator sets the validator used by Create and Update handlers.
-func (c *DBResourceController[T]) WithValidator(v interface{ Validate(any) error }) *DBResourceController[T] {
+func (c *DBResourceController[T]) WithValidator(v Validator) *DBResourceController[T] {
 	c.validator = v
 	return c
 }

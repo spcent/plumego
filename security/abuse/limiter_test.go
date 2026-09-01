@@ -159,13 +159,13 @@ func TestNewLimiterWithConfigDefaultsAndInvalidConfig(t *testing.T) {
 	}
 }
 
-func TestNewLimiterFailsClosedForInvalidConfig(t *testing.T) {
-	limiter := NewLimiter(Config{Rate: -1})
-	defer limiter.Stop()
-
-	if decision := limiter.Allow("fallback-key"); decision.Allowed {
-		t.Fatalf("invalid-config limiter should deny requests")
-	}
+func TestNewLimiterPanicsForInvalidConfig(t *testing.T) {
+	defer func() {
+		if r := recover(); r == nil {
+			t.Fatalf("NewLimiter with invalid config should panic")
+		}
+	}()
+	_ = NewLimiter(Config{Rate: -1})
 }
 
 func TestZeroValueLimiterFailsClosed(t *testing.T) {

@@ -82,9 +82,11 @@ type defaultLogger struct {
 }
 
 // NewLogger creates the canonical structured logger.
+//
 // With no config it returns the default text logger. Alternate formats such as
-// JSON or discard mode are selected through LoggerConfig.Format so there is
-// one constructor path for all stable logger variants.
+// JSON or discard mode are selected through LoggerConfig.Format. Invalid format
+// values are treated as a programming error and panic, matching the MustXxx
+// convention used elsewhere in the library.
 func NewLogger(configs ...LoggerConfig) StructuredLogger {
 	cfg := LoggerConfig{}
 	if len(configs) > 0 {
@@ -99,7 +101,7 @@ func NewLogger(configs ...LoggerConfig) StructuredLogger {
 	case "", LoggerFormatText:
 		return newDefaultLogger(cfg)
 	default:
-		return newDiscardLogger()
+		panic(fmt.Sprintf("log.NewLogger: unsupported format %q", cfg.Format))
 	}
 }
 

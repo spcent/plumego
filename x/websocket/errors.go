@@ -89,21 +89,21 @@ const (
 
 // Error types for more detailed error information
 
-// ValidationError represents an input validation error.
-type ValidationError struct {
-	Field   string
-	Message string
+// validationError represents an input validation error (package-local only).
+type validationError struct {
+	field   string
+	message string
 }
 
-func (e *ValidationError) Error() string {
-	return fmt.Sprintf("websocket: validation error on %s: %s", e.Field, e.Message)
+func (e *validationError) Error() string {
+	return fmt.Sprintf("websocket: validation error on %s: %s", e.field, e.message)
 }
 
-// NewValidationError creates a new ValidationError
-func NewValidationError(field, message string) *ValidationError {
-	return &ValidationError{
-		Field:   field,
-		Message: message,
+// NewValidationError creates a new validation error for the given field.
+func NewValidationError(field, message string) error {
+	return &validationError{
+		field:   field,
+		message: message,
 	}
 }
 

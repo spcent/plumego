@@ -174,22 +174,20 @@ func (p *PermissivePolicy) ShouldBlock(result *Result) bool {
 	return !result.Allowed && result.Score >= p.Threshold
 }
 
-// PIIFilter detects personally identifiable information.
-type PIIFilter struct {
-	patterns map[string]*regexp.Regexp
+var piiPatterns = map[string]*regexp.Regexp{
+	"email":       regexp.MustCompile(`[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}`),
+	"phone":       regexp.MustCompile(`\b\d{3}[-.]?\d{3}[-.]?\d{4}\b`),
+	"ssn":         regexp.MustCompile(`\b\d{3}-\d{2}-\d{4}\b`),
+	"credit_card": regexp.MustCompile(`\b\d{4}[-\s]?\d{4}[-\s]?\d{4}[-\s]?\d{4}\b`),
+	"ip_address":  regexp.MustCompile(`\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b`),
 }
+
+// PIIFilter detects personally identifiable information.
+type PIIFilter struct{}
 
 // NewPIIFilter creates a new PII filter.
 func NewPIIFilter() *PIIFilter {
-	return &PIIFilter{
-		patterns: map[string]*regexp.Regexp{
-			"email":       regexp.MustCompile(`[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}`),
-			"phone":       regexp.MustCompile(`\b\d{3}[-.]?\d{3}[-.]?\d{4}\b`),
-			"ssn":         regexp.MustCompile(`\b\d{3}-\d{2}-\d{4}\b`),
-			"credit_card": regexp.MustCompile(`\b\d{4}[-\s]?\d{4}[-\s]?\d{4}[-\s]?\d{4}\b`),
-			"ip_address":  regexp.MustCompile(`\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b`),
-		},
-	}
+	return &PIIFilter{}
 }
 
 // Name implements Filter.
@@ -204,7 +202,7 @@ func (f *PIIFilter) Filter(ctx context.Context, content string) (*Result, error)
 		FilterName: f.Name(),
 	}
 
-	for label, pattern := range f.patterns {
+	for label, pattern := range piiPatterns {
 		matches := pattern.FindAllStringIndex(content, -1)
 		if len(matches) > 0 {
 			result.Allowed = false
@@ -226,24 +224,22 @@ func (f *PIIFilter) Filter(ctx context.Context, content string) (*Result, error)
 	return result, nil
 }
 
-// SecretFilter detects secrets and credentials.
-type SecretFilter struct {
-	patterns map[string]*regexp.Regexp
+var secretPatterns = map[string]*regexp.Regexp{
+	"api_key":      regexp.MustCompile(`(?i)(api[_-]?key|apikey)\s*[:=]\s*['"]?([a-zA-Z0-9_-]{20,})['"]?`),
+	"aws_key":      regexp.MustCompile(`(?i)(AKIA[0-9A-Z]{16})`),
+	"github_token": regexp.MustCompile(`(?i)(ghp|gho|ghu|ghs|ghr)_[a-zA-Z0-9]{36,}`),
+	"slack_token":  regexp.MustCompile(`xox[baprs]-[0-9]{10,13}-[0-9]{10,13}-[a-zA-Z0-9]{24,}`),
+	"jwt":          regexp.MustCompile(`eyJ[a-zA-Z0-9_-]+\.eyJ[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+`),
+	"private_key":  regexp.MustCompile(`-----BEGIN (RSA |EC |DSA )?PRIVATE KEY-----`),
+	"password":     regexp.MustCompile(`(?i)(password|passwd|pwd)\s*[:=]\s*['"]?([^'"\s]{8,})['"]?`),
 }
+
+// SecretFilter detects secrets and credentials.
+type SecretFilter struct{}
 
 // NewSecretFilter creates a new secret filter.
 func NewSecretFilter() *SecretFilter {
-	return &SecretFilter{
-		patterns: map[string]*regexp.Regexp{
-			"api_key":      regexp.MustCompile(`(?i)(api[_-]?key|apikey)\s*[:=]\s*['"]?([a-zA-Z0-9_-]{20,})['"]?`),
-			"aws_key":      regexp.MustCompile(`(?i)(AKIA[0-9A-Z]{16})`),
-			"github_token": regexp.MustCompile(`(?i)(ghp|gho|ghu|ghs|ghr)_[a-zA-Z0-9]{36,}`),
-			"slack_token":  regexp.MustCompile(`xox[baprs]-[0-9]{10,13}-[0-9]{10,13}-[a-zA-Z0-9]{24,}`),
-			"jwt":          regexp.MustCompile(`eyJ[a-zA-Z0-9_-]+\.eyJ[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+`),
-			"private_key":  regexp.MustCompile(`-----BEGIN (RSA |EC |DSA )?PRIVATE KEY-----`),
-			"password":     regexp.MustCompile(`(?i)(password|passwd|pwd)\s*[:=]\s*['"]?([^'"\s]{8,})['"]?`),
-		},
-	}
+	return &SecretFilter{}
 }
 
 // Name implements Filter.
@@ -258,7 +254,7 @@ func (f *SecretFilter) Filter(ctx context.Context, content string) (*Result, err
 		FilterName: f.Name(),
 	}
 
-	for label, pattern := range f.patterns {
+	for label, pattern := range secretPatterns {
 		matches := pattern.FindAllStringIndex(content, -1)
 		if len(matches) > 0 {
 			result.Allowed = false

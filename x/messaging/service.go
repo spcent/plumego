@@ -336,7 +336,7 @@ func (s *Service) deliverTask(
 
 	if err != nil {
 		s.recordTaskFailure(ctx, reqID, channel, providerName, err, task.Attempts, elapsed, true)
-		return fmt.Errorf("%w: %v", ErrProviderFailure, err)
+		return fmt.Errorf("%w: %w", ErrProviderFailure, err)
 	}
 
 	s.monitor.RecordSuccess(channel, elapsed)

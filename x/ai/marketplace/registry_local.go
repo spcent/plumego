@@ -46,7 +46,7 @@ func (r *LocalAgentRegistry) Publish(ctx context.Context, metadata *AgentMetadat
 
 	// Validate version
 	if _, err := semver.Parse(metadata.Version); err != nil {
-		return fmt.Errorf("%w: %v", ErrInvalidVersion, err)
+		return fmt.Errorf("%w: %w", ErrInvalidVersion, err)
 	}
 
 	// Create directory structure
@@ -490,7 +490,7 @@ func (r *LocalWorkflowRegistry) Publish(ctx context.Context, template *WorkflowT
 
 	// Validate version
 	if _, err := semver.Parse(template.Version); err != nil {
-		return fmt.Errorf("%w: %v", ErrInvalidVersion, err)
+		return fmt.Errorf("%w: %w", ErrInvalidVersion, err)
 	}
 
 	// Create directory structure

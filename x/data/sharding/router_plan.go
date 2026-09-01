@@ -3,57 +3,16 @@ package sharding
 import (
 	"context"
 	"database/sql"
-	"database/sql/driver"
 	"errors"
 	"fmt"
 	"sync"
 
+	"github.com/spcent/plumego/x/data/internal/testx"
 	"github.com/spcent/plumego/x/data/rw"
 )
 
 func queryRowError(err error) *sql.Row {
-	db := sql.OpenDB(rowErrorConnector{err: err})
-	row := db.QueryRowContext(context.Background(), "")
-	_ = db.Close()
-	return row
-}
-
-type rowErrorConnector struct {
-	err error
-}
-
-func (c rowErrorConnector) Connect(context.Context) (driver.Conn, error) {
-	return rowErrorConn{err: c.err}, nil
-}
-
-func (c rowErrorConnector) Driver() driver.Driver {
-	return rowErrorDriver{}
-}
-
-type rowErrorDriver struct{}
-
-func (rowErrorDriver) Open(string) (driver.Conn, error) {
-	return rowErrorConn{}, nil
-}
-
-type rowErrorConn struct {
-	err error
-}
-
-func (c rowErrorConn) Prepare(string) (driver.Stmt, error) {
-	return nil, c.err
-}
-
-func (c rowErrorConn) Close() error {
-	return nil
-}
-
-func (c rowErrorConn) Begin() (driver.Tx, error) {
-	return nil, c.err
-}
-
-func (c rowErrorConn) QueryContext(context.Context, string, []driver.NamedValue) (driver.Rows, error) {
-	return nil, c.err
+	return testx.QueryRowError(err)
 }
 
 // handleCrossShardQuery handles queries that span multiple shards
@@ -215,7 +174,7 @@ func (r *Router) queryResolvedShards(ctx context.Context, query string, args []a
 	}
 
 	if len(errs) > 0 {
-		return nil, fmt.Errorf("%w: %v", ErrAllShardsFailed, errs)
+		return nil, fmt.Errorf("%w: %w", ErrAllShardsFailed, errors.Join(errs...))
 	}
 
 	return nil, ErrAllShardsFailed

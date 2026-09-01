@@ -3,12 +3,13 @@ package rw
 import (
 	"context"
 	"database/sql"
-	"database/sql/driver"
 	"errors"
 	"fmt"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/spcent/plumego/x/data/internal/testx"
 )
 
 var (
@@ -225,48 +226,7 @@ func (c *Cluster) QueryRowContext(ctx context.Context, query string, args ...any
 }
 
 func queryRowError(err error) *sql.Row {
-	db := sql.OpenDB(rowErrorConnector{err: err})
-	row := db.QueryRowContext(context.Background(), "")
-	_ = db.Close()
-	return row
-}
-
-type rowErrorConnector struct {
-	err error
-}
-
-func (c rowErrorConnector) Connect(context.Context) (driver.Conn, error) {
-	return rowErrorConn{err: c.err}, nil
-}
-
-func (c rowErrorConnector) Driver() driver.Driver {
-	return rowErrorDriver{}
-}
-
-type rowErrorDriver struct{}
-
-func (rowErrorDriver) Open(string) (driver.Conn, error) {
-	return rowErrorConn{}, nil
-}
-
-type rowErrorConn struct {
-	err error
-}
-
-func (c rowErrorConn) Prepare(string) (driver.Stmt, error) {
-	return nil, c.err
-}
-
-func (c rowErrorConn) Close() error {
-	return nil
-}
-
-func (c rowErrorConn) Begin() (driver.Tx, error) {
-	return nil, c.err
-}
-
-func (c rowErrorConn) QueryContext(context.Context, string, []driver.NamedValue) (driver.Rows, error) {
-	return nil, c.err
+	return testx.QueryRowError(err)
 }
 
 // BeginTx begins a transaction (always uses primary)

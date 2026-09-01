@@ -472,7 +472,7 @@ func (d *Dashboard) Start(ctx context.Context) (err error) {
 		cleanupCtx, cancel := context.WithTimeout(context.Background(), dashboardStartCleanupTimeout)
 		defer cancel()
 		if cleanupErr := d.Stop(cleanupCtx); cleanupErr != nil {
-			err = fmt.Errorf("%w; cleanup dashboard start: %v", err, cleanupErr)
+			err = fmt.Errorf("%w; cleanup dashboard start: %w", err, cleanupErr)
 		}
 	}()
 

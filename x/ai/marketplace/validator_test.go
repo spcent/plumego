@@ -1,6 +1,7 @@
 package marketplace
 
 import (
+	"strings"
 	"testing"
 	"time"
 )
@@ -58,7 +59,7 @@ func TestValidator_ValidateAgent(t *testing.T) {
 
 		foundError := false
 		for _, err := range result.Errors {
-			if err.Field == "id" {
+			if err.Error() == "validation error in field 'id': ID is required" {
 				foundError = true
 				break
 			}
@@ -109,7 +110,7 @@ func TestValidator_ValidateAgent(t *testing.T) {
 
 		foundError := false
 		for _, err := range result.Errors {
-			if err.Field == "version" {
+			if strings.HasPrefix(err.Error(), "validation error in field 'version': Invalid semantic version:") {
 				foundError = true
 				break
 			}

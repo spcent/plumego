@@ -100,7 +100,7 @@ func ParseCronSpecWithLocation(expr string, loc *time.Location) (CronSpec, error
 		durationStr := strings.TrimPrefix(expr, "@every ")
 		duration, err := time.ParseDuration(durationStr)
 		if err != nil {
-			return CronSpec{}, fmt.Errorf("%w: %v", ErrInvalidEveryDuration, err)
+			return CronSpec{}, fmt.Errorf("%w: %w", ErrInvalidEveryDuration, err)
 		}
 		if duration <= 0 {
 			return CronSpec{}, fmt.Errorf("%w: must be positive", ErrInvalidEveryDuration)

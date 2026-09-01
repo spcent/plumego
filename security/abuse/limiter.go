@@ -274,10 +274,10 @@ func (c Config) Validate() error {
 //	defer limiter.Stop()
 func NewLimiter(config Config) *Limiter {
 	limiter, err := NewLimiterWithConfig(config)
-	if err == nil {
-		return limiter
+	if err != nil {
+		panic(fmt.Errorf("abuse.NewLimiter: invalid config: %w", err))
 	}
-	return &Limiter{}
+	return limiter
 }
 
 // NewLimiterWithConfig creates a limiter with strict startup semantics.

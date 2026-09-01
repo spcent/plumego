@@ -48,7 +48,7 @@ func main() {
 		}
 
 		// Success
-		contract.WriteResponse(w, r, http.StatusCreated, map[string]interface{}{
+		contract.WriteResponse(w, r, http.StatusCreated, map[string]any{
 			"message": "user created",
 			"user":    req,
 		}, nil)
@@ -74,7 +74,7 @@ func main() {
 			return
 		}
 
-		contract.WriteResponse(w, r, http.StatusOK, map[string]interface{}{
+		contract.WriteResponse(w, r, http.StatusOK, map[string]any{
 			"id": id,
 		}, nil)
 	}))

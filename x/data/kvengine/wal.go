@@ -181,7 +181,7 @@ func (kv *KVStore) replayWAL() error {
 			break
 		}
 		if err != nil {
-			return fmt.Errorf("%w: decode WAL: %v", ErrInvalidEntry, err)
+			return fmt.Errorf("%w: decode WAL: %w", ErrInvalidEntry, err)
 		}
 
 		if !kv.validateWALEntry(*entry) {

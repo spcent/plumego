@@ -62,13 +62,13 @@ func (p *HTTPSMSProvider) Send(ctx context.Context, msg SMSMessage) (*SMSResult,
 		"body": msg.Body,
 	}, phttp.WithHeader("Authorization", "Bearer "+p.apiKey))
 	if err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrProviderFailure, err)
+		return nil, fmt.Errorf("%w: %w", ErrProviderFailure, err)
 	}
 	var resp struct {
 		ID string `json:"id"`
 	}
 	if err := json.Unmarshal(body, &resp); err != nil {
-		return nil, fmt.Errorf("%w: failed to parse response: %v", ErrProviderFailure, err)
+		return nil, fmt.Errorf("%w: failed to parse response: %w", ErrProviderFailure, err)
 	}
 	return &SMSResult{ProviderID: resp.ID}, nil
 }
@@ -119,13 +119,13 @@ func (p *HTTPEmailProvider) Send(ctx context.Context, msg EmailMessage) (*EmailR
 		"content_type": contentType,
 	}, phttp.WithHeader("Authorization", "Bearer "+p.apiKey))
 	if err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrProviderFailure, err)
+		return nil, fmt.Errorf("%w: %w", ErrProviderFailure, err)
 	}
 	var resp struct {
 		ID string `json:"id"`
 	}
 	if err := json.Unmarshal(body, &resp); err != nil {
-		return nil, fmt.Errorf("%w: failed to parse response: %v", ErrProviderFailure, err)
+		return nil, fmt.Errorf("%w: failed to parse response: %w", ErrProviderFailure, err)
 	}
 	return &EmailResult{MessageID: resp.ID}, nil
 }

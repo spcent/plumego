@@ -357,7 +357,7 @@ func (r *Router) PingContext(ctx context.Context) error {
 	}
 
 	if len(errs) > 0 {
-		return fmt.Errorf("ping failed: %v", errs)
+		return fmt.Errorf("ping failed: %w", errors.Join(errs...))
 	}
 
 	return nil
@@ -374,7 +374,7 @@ func (r *Router) Close() error {
 	}
 
 	if len(errs) > 0 {
-		return fmt.Errorf("close failed: %v", errs)
+		return fmt.Errorf("close failed: %w", errors.Join(errs...))
 	}
 
 	return nil

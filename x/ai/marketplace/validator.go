@@ -43,19 +43,19 @@ func NewValidator() *Validator {
 	}
 }
 
-// ValidationError represents a validation error.
-type ValidationError struct {
-	Field   string
-	Message string
+// validationError represents a single field validation error.
+type validationError struct {
+	field   string
+	message string
 }
 
-func (e *ValidationError) Error() string {
-	return fmt.Sprintf("validation error in field '%s': %s", e.Field, e.Message)
+func (e *validationError) Error() string {
+	return fmt.Sprintf("validation error in field '%s': %s", e.field, e.message)
 }
 
 // ValidationResult contains validation errors.
 type ValidationResult struct {
-	Errors []ValidationError
+	Errors []validationError
 }
 
 // IsValid returns true if there are no errors.
@@ -65,9 +65,9 @@ func (r *ValidationResult) IsValid() bool {
 
 // AddError adds a validation error.
 func (r *ValidationResult) AddError(field, message string) {
-	r.Errors = append(r.Errors, ValidationError{
-		Field:   field,
-		Message: message,
+	r.Errors = append(r.Errors, validationError{
+		field:   field,
+		message: message,
 	})
 }
 

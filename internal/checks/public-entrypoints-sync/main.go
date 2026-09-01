@@ -39,7 +39,7 @@ func main() {
 func runCheck(repoRoot string, baseline map[string]struct{}) ([]string, error) {
 	var violations []string
 
-	for _, root := range checkutil.StableRoots {
+	for _, root := range checkutil.StableRoots() {
 		v, err := checkModule(repoRoot, root, baseline)
 		if err != nil {
 			return nil, err

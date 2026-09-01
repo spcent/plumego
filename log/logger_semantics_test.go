@@ -96,20 +96,18 @@ func TestDefaultLoggerErrorOutput(t *testing.T) {
 	}
 }
 
-func TestNewLoggerUnknownFormatDiscardsOutput(t *testing.T) {
+func TestNewLoggerUnknownFormatPanics(t *testing.T) {
+	defer func() {
+		if r := recover(); r == nil {
+			t.Fatalf("NewLogger with unknown format should panic")
+		}
+	}()
 	var buf bytes.Buffer
-	logger := NewLogger(LoggerConfig{
+	_ = NewLogger(LoggerConfig{
 		Format: LoggerFormat("unknown"),
 		Output: &buf,
 		Level:  DEBUG,
 	})
-
-	logger.Info("should-not-write")
-	logger.Error("should-not-write")
-
-	if got := buf.String(); got != "" {
-		t.Fatalf("unknown logger format wrote output: %q", got)
-	}
 }
 
 func TestTextLoggerMergesVariadicFieldsInOrder(t *testing.T) {

@@ -115,17 +115,28 @@ func (r *ShardKeyResolver) countSetPlaceholders(query string) int {
 	return count
 }
 
+// shardCondition captures a single WHERE predicate that references the shard key column.
+type shardCondition struct {
+	op               string
+	placeholderCount int
+	argStart         int
+	explicitIndex    bool
+}
+
+// shardValueCollector accumulates shard-key values extracted from WHERE conditions.
+type shardValueCollector struct {
+	inValues   []any
+	eqValue    any
+	hasEqual   bool
+	rangeStart any
+	rangeEnd   any
+	hasStart   bool
+	hasEnd     bool
+}
+
 func (r *ShardKeyResolver) resolveMultipleFromWhere(query string, parsed *ParsedSQL, rule *ShardingRule, args []any) ([]*ResolvedShard, error) {
 	if parsed.WhereClause == "" {
-		if rule.HasDefaultShard() {
-			return []*ResolvedShard{{
-				TableName:  parsed.TableName,
-				ShardIndex: rule.DefaultShard,
-				ShardKey:   nil,
-				Rule:       rule,
-			}}, nil
-		}
-		return nil, fmt.Errorf("%w: column %s not found in WHERE clause", ErrShardKeyNotFound, rule.ShardKeyColumn)
+		return r.defaultShardOrError(parsed.TableName, rule)
 	}
 
 	argOffset := 0
@@ -133,16 +144,35 @@ func (r *ShardKeyResolver) resolveMultipleFromWhere(query string, parsed *Parsed
 		argOffset = r.countSetPlaceholders(query)
 	}
 
-	type shardCondition struct {
-		op               string
-		placeholderCount int
-		argStart         int
-		explicitIndex    bool
+	conditions := r.collectShardConditions(parsed.WhereClause, rule.ShardKeyColumn)
+	if len(conditions) == 0 {
+		return r.defaultShardOrError(parsed.TableName, rule)
 	}
 
-	var shardConditions []shardCondition
+	collector, err := r.extractShardValues(conditions, args, argOffset)
+	if err != nil {
+		return nil, err
+	}
+
+	return collector.buildShards(parsed.TableName, rule)
+}
+
+func (r *ShardKeyResolver) defaultShardOrError(table string, rule *ShardingRule) ([]*ResolvedShard, error) {
+	if rule.HasDefaultShard() {
+		return []*ResolvedShard{{
+			TableName:  table,
+			ShardIndex: rule.DefaultShard,
+			ShardKey:   nil,
+			Rule:       rule,
+		}}, nil
+	}
+	return nil, fmt.Errorf("%w: column %s not found in WHERE clause", ErrShardKeyNotFound, rule.ShardKeyColumn)
+}
+
+func (r *ShardKeyResolver) collectShardConditions(whereClause, shardKeyColumn string) []shardCondition {
+	var conditions []shardCondition
 	argIndex := 0
-	for _, part := range splitConditions(parsed.WhereClause) {
+	for _, part := range splitConditions(whereClause) {
 		column, op, placeholders, explicitArgIndex, ok := parseCondition(part)
 		if !ok {
 			continue
@@ -155,8 +185,8 @@ func (r *ShardKeyResolver) resolveMultipleFromWhere(query string, parsed *Parsed
 			explicitIndex = true
 		}
 
-		if strings.EqualFold(column, rule.ShardKeyColumn) {
-			shardConditions = append(shardConditions, shardCondition{
+		if strings.EqualFold(column, shardKeyColumn) {
+			conditions = append(conditions, shardCondition{
 				op:               op,
 				placeholderCount: placeholders,
 				argStart:         conditionArgStart,
@@ -166,122 +196,129 @@ func (r *ShardKeyResolver) resolveMultipleFromWhere(query string, parsed *Parsed
 
 		argIndex += placeholders
 	}
+	return conditions
+}
 
-	if len(shardConditions) == 0 {
-		if rule.HasDefaultShard() {
-			return []*ResolvedShard{{
-				TableName:  parsed.TableName,
-				ShardIndex: rule.DefaultShard,
-				ShardKey:   nil,
-				Rule:       rule,
-			}}, nil
-		}
-		return nil, fmt.Errorf("%w: column %s not found in WHERE clause", ErrShardKeyNotFound, rule.ShardKeyColumn)
-	}
-
-	var (
-		inValues   []any
-		eqValue    any
-		hasEqual   bool
-		rangeStart any
-		rangeEnd   any
-		hasStart   bool
-		hasEnd     bool
-	)
-
-	for _, cond := range shardConditions {
+func (r *ShardKeyResolver) extractShardValues(conditions []shardCondition, args []any, argOffset int) (*shardValueCollector, error) {
+	collector := &shardValueCollector{}
+	for _, cond := range conditions {
 		switch strings.ToUpper(cond.op) {
 		case "=":
-			idx := cond.argStart
-			if !cond.explicitIndex {
-				idx += argOffset
+			value, err := r.resolveSingleArg(cond, argOffset, args)
+			if err != nil {
+				return nil, err
 			}
-			if idx >= len(args) {
-				return nil, fmt.Errorf("%w: expected at least %d args, got %d", ErrInvalidArgumentCount, idx+1, len(args))
-			}
-			eqValue = args[idx]
-			hasEqual = true
+			collector.eqValue = value
+			collector.hasEqual = true
 		case "IN":
-			if cond.placeholderCount == 0 {
-				return nil, fmt.Errorf("%w: expected shard key values for IN clause", ErrInvalidArgumentCount)
+			values, err := r.resolveInArgs(cond, argOffset, args)
+			if err != nil {
+				return nil, err
 			}
-			start := cond.argStart
-			if !cond.explicitIndex {
-				start += argOffset
-			}
-			end := start + cond.placeholderCount
-			if end > len(args) {
-				return nil, fmt.Errorf("%w: expected at least %d args, got %d", ErrInvalidArgumentCount, end, len(args))
-			}
-			inValues = append(inValues, args[start:end]...)
+			collector.inValues = append(collector.inValues, values...)
 		case ">", ">=":
-			idx := cond.argStart
-			if !cond.explicitIndex {
-				idx += argOffset
+			value, err := r.resolveSingleArg(cond, argOffset, args)
+			if err != nil {
+				return nil, err
 			}
-			if idx >= len(args) {
-				return nil, fmt.Errorf("%w: expected at least %d args, got %d", ErrInvalidArgumentCount, idx+1, len(args))
-			}
-			rangeStart = args[idx]
-			hasStart = true
+			collector.rangeStart = value
+			collector.hasStart = true
 		case "<", "<=":
-			idx := cond.argStart
-			if !cond.explicitIndex {
-				idx += argOffset
+			value, err := r.resolveSingleArg(cond, argOffset, args)
+			if err != nil {
+				return nil, err
 			}
-			if idx >= len(args) {
-				return nil, fmt.Errorf("%w: expected at least %d args, got %d", ErrInvalidArgumentCount, idx+1, len(args))
-			}
-			rangeEnd = args[idx]
-			hasEnd = true
+			collector.rangeEnd = value
+			collector.hasEnd = true
 		}
 	}
+	return collector, nil
+}
 
-	if hasEqual {
-		shardIndex, err := rule.Strategy.Shard(eqValue, rule.ShardCount)
+func (r *ShardKeyResolver) resolveSingleArg(cond shardCondition, argOffset int, args []any) (any, error) {
+	idx := cond.argStart
+	if !cond.explicitIndex {
+		idx += argOffset
+	}
+	if idx >= len(args) {
+		return nil, fmt.Errorf("%w: expected at least %d args, got %d", ErrInvalidArgumentCount, idx+1, len(args))
+	}
+	return args[idx], nil
+}
+
+func (r *ShardKeyResolver) resolveInArgs(cond shardCondition, argOffset int, args []any) ([]any, error) {
+	if cond.placeholderCount == 0 {
+		return nil, fmt.Errorf("%w: expected shard key values for IN clause", ErrInvalidArgumentCount)
+	}
+	start := cond.argStart
+	if !cond.explicitIndex {
+		start += argOffset
+	}
+	end := start + cond.placeholderCount
+	if end > len(args) {
+		return nil, fmt.Errorf("%w: expected at least %d args, got %d", ErrInvalidArgumentCount, end, len(args))
+	}
+	return args[start:end], nil
+}
+
+func (c *shardValueCollector) buildShards(table string, rule *ShardingRule) ([]*ResolvedShard, error) {
+	if c.hasEqual {
+		return c.resolveEqualShard(table, rule)
+	}
+	if len(c.inValues) > 0 {
+		return c.resolveInShards(table, rule)
+	}
+	if c.hasStart && c.hasEnd {
+		return c.resolveRangeShards(table, rule)
+	}
+	return c.resolveAllShards(table, rule)
+}
+
+func (c *shardValueCollector) resolveEqualShard(table string, rule *ShardingRule) ([]*ResolvedShard, error) {
+	shardIndex, err := rule.Strategy.Shard(c.eqValue, rule.ShardCount)
+	if err != nil {
+		return nil, fmt.Errorf("failed to calculate shard: %w", err)
+	}
+	return []*ResolvedShard{{
+		TableName:  table,
+		ShardIndex: shardIndex,
+		ShardKey:   c.eqValue,
+		Rule:       rule,
+	}}, nil
+}
+
+func (c *shardValueCollector) resolveInShards(table string, rule *ShardingRule) ([]*ResolvedShard, error) {
+	unique := make(map[int]any)
+	for _, value := range c.inValues {
+		shardIndex, err := rule.Strategy.Shard(value, rule.ShardCount)
 		if err != nil {
 			return nil, fmt.Errorf("failed to calculate shard: %w", err)
 		}
-		return []*ResolvedShard{{
-			TableName:  parsed.TableName,
-			ShardIndex: shardIndex,
-			ShardKey:   eqValue,
-			Rule:       rule,
-		}}, nil
-	}
-
-	if len(inValues) > 0 {
-		unique := make(map[int]any)
-		for _, value := range inValues {
-			shardIndex, err := rule.Strategy.Shard(value, rule.ShardCount)
-			if err != nil {
-				return nil, fmt.Errorf("failed to calculate shard: %w", err)
-			}
-			if _, exists := unique[shardIndex]; !exists {
-				unique[shardIndex] = value
-			}
+		if _, exists := unique[shardIndex]; !exists {
+			unique[shardIndex] = value
 		}
-		return buildResolvedShards(parsed.TableName, rule, unique), nil
 	}
+	return buildResolvedShards(table, rule, unique), nil
+}
 
-	if hasStart && hasEnd {
-		shards, err := rule.Strategy.ShardRange(rangeStart, rangeEnd, rule.ShardCount)
-		if err != nil {
-			return nil, fmt.Errorf("failed to calculate shard range: %w", err)
-		}
-		unique := make(map[int]any)
-		for _, shard := range shards {
-			unique[shard] = map[string]any{"start": rangeStart, "end": rangeEnd}
-		}
-		return buildResolvedShards(parsed.TableName, rule, unique), nil
+func (c *shardValueCollector) resolveRangeShards(table string, rule *ShardingRule) ([]*ResolvedShard, error) {
+	shards, err := rule.Strategy.ShardRange(c.rangeStart, c.rangeEnd, rule.ShardCount)
+	if err != nil {
+		return nil, fmt.Errorf("failed to calculate shard range: %w", err)
 	}
+	unique := make(map[int]any)
+	for _, shard := range shards {
+		unique[shard] = map[string]any{"start": c.rangeStart, "end": c.rangeEnd}
+	}
+	return buildResolvedShards(table, rule, unique), nil
+}
 
-	// Open-ended range or unsupported condition: fall back to all shards.
+func (c *shardValueCollector) resolveAllShards(table string, rule *ShardingRule) ([]*ResolvedShard, error) {
 	unique := make(map[int]any)
 	for shard := 0; shard < rule.ShardCount; shard++ {
-		unique[shard] = map[string]any{"start": rangeStart, "end": rangeEnd}
+		unique[shard] = map[string]any{"start": c.rangeStart, "end": c.rangeEnd}
 	}
-	return buildResolvedShards(parsed.TableName, rule, unique), nil
+	return buildResolvedShards(table, rule, unique), nil
 }
 
 func buildResolvedShards(table string, rule *ShardingRule, shards map[int]any) []*ResolvedShard {

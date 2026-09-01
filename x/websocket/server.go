@@ -212,229 +212,35 @@ func ServeWSWithConfig(w http.ResponseWriter, r *http.Request, cfg ServerConfig)
 	}
 	cfg = normalized
 
-	// Origin validation (CSRF protection)
-	origin := r.Header.Get("Origin")
-	if !isOriginAllowed(origin, cfg.AllowedOrigins, cfg.AllowAllOrigins) {
-		cfg.Hub.securityRejections.Add(1)
-		writeWebSocketHandshakeError(w, r, http.StatusForbidden, codeWebSocketForbiddenOrigin, "forbidden origin", contract.CategoryClient)
+	if !handshakeValidateOrigin(w, r, cfg) {
 		return
 	}
-
-	// Basic HTTP validation first
-	if r.Method != http.MethodGet {
-		writeWebSocketHandshakeError(w, r, http.StatusMethodNotAllowed, contract.CodeMethodNotAllowed, "method not allowed", contract.CategoryClient)
+	if !handshakeValidateMethod(w, r, cfg) {
 		return
 	}
-	if !headerContains(r.Header, "Connection", "Upgrade") || !headerContains(r.Header, "Upgrade", "websocket") {
-		writeWebSocketHandshakeError(w, r, http.StatusBadRequest, codeWebSocketBadUpgrade, "websocket upgrade required", contract.CategoryClient)
-		return
-	}
-	if r.Header.Get("Sec-WebSocket-Version") != "13" {
-		writeWebSocketHandshakeError(w, r, http.StatusBadRequest, codeWebSocketBadVersion, "websocket version 13 required", contract.CategoryClient)
-		return
-	}
-
-	// Validate WebSocket key
-	key := r.Header.Get("Sec-WebSocket-Key")
-	if key == "" {
-		writeWebSocketHandshakeError(w, r, http.StatusBadRequest, codeWebSocketKeyMissing, "websocket key required", contract.CategoryClient)
-		return
-	}
-	if err := ValidateWebSocketKey(key); err != nil {
-		cfg.Hub.invalidWSKeys.Add(1)
-		writeWebSocketHandshakeError(w, r, http.StatusBadRequest, codeWebSocketKeyInvalid, "invalid websocket key", contract.CategoryClient)
-		return
-	}
-
-	// Auth: establish the requested room, then verify identity before applying
-	// room policy. This lets custom room authorizers use authenticated claims
-	// without relying on URL credentials or pre-auth side channels.
-	room := r.URL.Query().Get("room")
-	if room == "" {
-		room = "default"
-	}
-	if err := cfg.RoomNameValidator(room); err != nil {
-		cfg.Hub.securityRejections.Add(1)
-		writeWebSocketHandshakeError(w, r, http.StatusBadRequest, codeWebSocketInvalidRoom, "invalid websocket room", contract.CategoryClient)
-		return
-	}
-	// Check token. Missing tokens are rejected unless callers explicitly allow
-	// unauthenticated connections and rely on room-password checks only.
-	token := ""
-	var userInfo *UserInfo
-	var tokenClaims map[string]any
-	if ah := r.Header.Get("Authorization"); ah != "" && strings.HasPrefix(strings.ToLower(ah), "bearer ") {
-		token = strings.TrimSpace(ah[len("bearer "):])
-	} else if cfg.AllowQueryToken {
-		t := r.URL.Query().Get("token")
-		token = t
-	}
-	if token == "" {
-		if !cfg.AllowUnauthenticated {
-			cfg.Hub.securityRejections.Add(1)
-			writeWebSocketHandshakeError(w, r, http.StatusUnauthorized, codeWebSocketTokenRequired, "websocket token required", contract.CategoryClient)
-			return
-		}
-	} else {
-		if cfg.TokenAuth == nil {
-			cfg.Hub.securityRejections.Add(1)
-			writeWebSocketHandshakeError(w, r, http.StatusForbidden, codeWebSocketInvalidToken, "invalid websocket token", contract.CategoryClient)
-			return
-		}
-		payload, err := cfg.TokenAuth.VerifyJWT(token)
-		if err != nil {
-			cfg.Hub.securityRejections.Add(1)
-			writeWebSocketHandshakeError(w, r, http.StatusForbidden, codeWebSocketInvalidToken, "invalid websocket token", contract.CategoryClient)
-			return
-		}
-		tokenClaims = payload
-		userInfo = ExtractUserInfo(payload)
-		cfg.Hub.successfulAuths.Add(1)
-	}
-
-	// Check room password/policy. Room credentials intentionally come from
-	// headers, not URL query parameters, so they are less likely to leak through
-	// request logs, browser history, or referrers.
-	roomPwd := r.Header.Get(roomPasswordHeader)
-	if !authorizeRoomAccess(cfg.RoomAuth, RoomAuthorization{
-		Request:      r,
-		Room:         room,
-		Password:     roomPwd,
-		User:         userInfo,
-		TokenClaims:  tokenClaims,
-		Anonymous:    token == "",
-		QueryTokenOK: cfg.AllowQueryToken,
-	}) {
-		cfg.Hub.securityRejections.Add(1)
-		writeWebSocketHandshakeError(w, r, http.StatusForbidden, codeWebSocketRoomForbidden, "websocket room access denied", contract.CategoryClient)
-		return
-	}
-	if err := cfg.Hub.canJoin(room, cfg.RoomNameValidator); err != nil {
-		status := websocketJoinDeniedStatus(err)
-		writeWebSocketHandshakeError(w, r, status, codeWebSocketJoinDenied, "websocket room join denied", contract.CategoryClient)
-		return
-	}
-
-	hj, ok := w.(http.Hijacker)
+	key, ok := handshakeValidateKey(w, r, cfg)
 	if !ok {
-		writeWebSocketHandshakeError(w, r, http.StatusInternalServerError, codeWebSocketHijackUnsupported, "websocket hijack unsupported", contract.CategoryServer)
 		return
 	}
-	conn, buf, err := hj.Hijack()
-	if err != nil {
-		writeWebSocketHandshakeError(w, r, http.StatusInternalServerError, codeWebSocketHandshakeFailed, "websocket handshake failed", contract.CategoryServer)
+	room, ok := handshakeResolveRoom(w, r, cfg)
+	if !ok {
 		return
 	}
-
-	// Reuse the bufio.ReadWriter returned by Hijack to avoid a redundant
-	// buffer allocation (NewConn would otherwise create default-sized buffers
-	// that are immediately discarded).
-	c := newConnFromHijack(conn, buf.Reader, buf.Writer, cfg.QueueSize, cfg.SendTimeout, cfg.SendBehavior, false)
-	if cfg.WriteTimeout > 0 {
-		if err := c.SetWriteTimeout(cfg.WriteTimeout); err != nil {
-			writeHijackedWebSocketHandshakeError(buf.Writer, http.StatusInternalServerError, codeWebSocketInvalidConfig, "websocket server misconfigured", contract.CategoryServer)
-			c.Close()
-			return
-		}
-	}
-	if cfg.ReadLimit > 0 {
-		if err := c.SetReadLimit(cfg.ReadLimit); err != nil {
-			writeHijackedWebSocketHandshakeError(buf.Writer, http.StatusInternalServerError, codeWebSocketInvalidConfig, "websocket server misconfigured", contract.CategoryServer)
-			c.Close()
-			return
-		}
-	}
-	c.UserInfo = userInfo
-
-	// Register in the hub before writing 101. This closes the race where the
-	// pre-check passes, capacity is consumed by another connection, and this
-	// request would otherwise be upgraded before the real join failure.
-	if err := cfg.Hub.tryJoin(room, c, cfg.RoomNameValidator); err != nil {
-		writeHijackedWebSocketHandshakeError(buf.Writer, websocketJoinDeniedStatus(err), codeWebSocketJoinDenied, "websocket room join denied", contract.CategoryClient)
-		c.Close()
+	token, userInfo, tokenClaims, ok := handshakeResolveUser(w, r, cfg)
+	if !ok {
 		return
 	}
-
-	accept := computeAcceptKey(key)
-	resp := "HTTP/1.1 101 Switching Protocols\r\n" +
-		"Upgrade: websocket\r\n" +
-		"Connection: Upgrade\r\n" +
-		"Sec-WebSocket-Accept: " + accept + "\r\n" +
-		"\r\n"
-	if _, err := buf.WriteString(resp); err != nil {
-		cfg.Hub.RemoveConn(c)
-		c.Close()
+	if !handshakeCheckRoomAccess(w, r, cfg, room, userInfo, tokenClaims, token) {
 		return
 	}
-	if err := buf.Flush(); err != nil {
-		cfg.Hub.RemoveConn(c)
-		c.Close()
+	c, bufWriter, ok := handshakeUpgradeConn(w, r, cfg, userInfo)
+	if !ok {
 		return
 	}
-
-	// Cleanup on close: remove from all rooms once the connection is gone.
-	go func() {
-		<-c.closeC
-		cfg.Hub.RemoveConn(c)
-	}()
-
-	// Read frames from the client and delegate validated messages to the caller.
-	go func() {
-		validationCfg := resolveValidationConfig(cfg)
-		for {
-			op, rstream, err := c.ReadMessageReader()
-			if err != nil {
-				if err != io.EOF {
-					cfg.Hub.logger.Printf("ReadMessageReader error: %v", err)
-					writeCloseForReadError(c, err)
-				}
-				c.Close()
-				return
-			}
-			buf := msgBufPool.Get().(*bytes.Buffer)
-			buf.Reset()
-			if _, err := io.Copy(buf, rstream); err != nil {
-				_ = rstream.Close()
-				putMessageBuffer(buf)
-				cfg.Hub.logger.Printf("ReadMessageReader copy error: %v", err)
-				writeCloseForReadError(c, err)
-				c.Close()
-				return
-			}
-			if err := rstream.Close(); err != nil {
-				putMessageBuffer(buf)
-				cfg.Hub.logger.Printf("ReadMessageReader close error: %v", err)
-				_ = c.WriteClose(CloseServerError, "read close failed")
-				c.Close()
-				return
-			}
-
-			// Validate text messages before broadcasting.
-			if op == OpcodeText {
-				if err := ValidateTextMessage(buf.Bytes(), validationCfg); err != nil {
-					cfg.Hub.logger.Printf("closing invalid text message: %v", err)
-					putMessageBuffer(buf)
-					writeCloseForValidationError(c, err)
-					c.Close()
-					return
-				}
-			}
-
-			// Copy data before returning buf to pool; callbacks may retain the
-			// message beyond this read-loop iteration.
-			data := make([]byte, buf.Len())
-			copy(data, buf.Bytes())
-			putMessageBuffer(buf)
-			if cfg.OnMessage != nil {
-				if err := cfg.OnMessage(c, Message{Room: room, Op: op, Data: data}); err != nil {
-					cfg.Hub.logger.Printf("OnMessage error: %v", err)
-					writeCloseForHandlerError(c, err)
-					c.Close()
-					return
-				}
-			}
-		}
-	}()
+	if !handshakeRegisterAndRespond(c, bufWriter, cfg, room, key) {
+		return
+	}
+	startReadLoopAndCleanup(c, room, cfg)
 }
 
 func authorizeRoomAccess(auth RoomAuthorizer, decision RoomAuthorization) bool {
@@ -581,4 +387,232 @@ func websocketJoinDeniedStatus(err error) int {
 		return http.StatusTooManyRequests
 	}
 	return http.StatusServiceUnavailable
+}
+
+// ============================================================================
+// Refactored helpers: each validates one handshake phase and returns true on success.
+// On failure they write the appropriate HTTP error and return false.
+// ============================================================================
+
+func handshakeValidateOrigin(w http.ResponseWriter, r *http.Request, cfg ServerConfig) bool {
+	origin := r.Header.Get("Origin")
+	if !isOriginAllowed(origin, cfg.AllowedOrigins, cfg.AllowAllOrigins) {
+		cfg.Hub.securityRejections.Add(1)
+		writeWebSocketHandshakeError(w, r, http.StatusForbidden, codeWebSocketForbiddenOrigin, "forbidden origin", contract.CategoryClient)
+		return false
+	}
+	return true
+}
+
+func handshakeValidateMethod(w http.ResponseWriter, r *http.Request, cfg ServerConfig) bool {
+	if r.Method != http.MethodGet {
+		writeWebSocketHandshakeError(w, r, http.StatusMethodNotAllowed, contract.CodeMethodNotAllowed, "method not allowed", contract.CategoryClient)
+		return false
+	}
+	if !headerContains(r.Header, "Connection", "Upgrade") || !headerContains(r.Header, "Upgrade", "websocket") {
+		writeWebSocketHandshakeError(w, r, http.StatusBadRequest, codeWebSocketBadUpgrade, "websocket upgrade required", contract.CategoryClient)
+		return false
+	}
+	if r.Header.Get("Sec-WebSocket-Version") != "13" {
+		writeWebSocketHandshakeError(w, r, http.StatusBadRequest, codeWebSocketBadVersion, "websocket version 13 required", contract.CategoryClient)
+		return false
+	}
+	return true
+}
+
+func handshakeValidateKey(w http.ResponseWriter, r *http.Request, cfg ServerConfig) (string, bool) {
+	key := r.Header.Get("Sec-WebSocket-Key")
+	if key == "" {
+		writeWebSocketHandshakeError(w, r, http.StatusBadRequest, codeWebSocketKeyMissing, "websocket key required", contract.CategoryClient)
+		return "", false
+	}
+	if err := ValidateWebSocketKey(key); err != nil {
+		cfg.Hub.invalidWSKeys.Add(1)
+		writeWebSocketHandshakeError(w, r, http.StatusBadRequest, codeWebSocketKeyInvalid, "invalid websocket key", contract.CategoryClient)
+		return "", false
+	}
+	return key, true
+}
+
+func handshakeResolveRoom(w http.ResponseWriter, r *http.Request, cfg ServerConfig) (string, bool) {
+	room := r.URL.Query().Get("room")
+	if room == "" {
+		room = "default"
+	}
+	if err := cfg.RoomNameValidator(room); err != nil {
+		cfg.Hub.securityRejections.Add(1)
+		writeWebSocketHandshakeError(w, r, http.StatusBadRequest, codeWebSocketInvalidRoom, "invalid websocket room", contract.CategoryClient)
+		return "", false
+	}
+	return room, true
+}
+
+func handshakeResolveUser(w http.ResponseWriter, r *http.Request, cfg ServerConfig) (token string, userInfo *UserInfo, tokenClaims map[string]any, ok bool) {
+	if ah := r.Header.Get("Authorization"); ah != "" && strings.HasPrefix(strings.ToLower(ah), "bearer ") {
+		token = strings.TrimSpace(ah[len("bearer "):])
+	} else if cfg.AllowQueryToken {
+		token = r.URL.Query().Get("token")
+	}
+	if token == "" {
+		if !cfg.AllowUnauthenticated {
+			cfg.Hub.securityRejections.Add(1)
+			writeWebSocketHandshakeError(w, r, http.StatusUnauthorized, codeWebSocketTokenRequired, "websocket token required", contract.CategoryClient)
+			return "", nil, nil, false
+		}
+		return "", nil, nil, true // anonymous allowed
+	}
+	if cfg.TokenAuth == nil {
+		cfg.Hub.securityRejections.Add(1)
+		writeWebSocketHandshakeError(w, r, http.StatusForbidden, codeWebSocketInvalidToken, "invalid websocket token", contract.CategoryClient)
+		return "", nil, nil, false
+	}
+	payload, err := cfg.TokenAuth.VerifyJWT(token)
+	if err != nil {
+		cfg.Hub.securityRejections.Add(1)
+		writeWebSocketHandshakeError(w, r, http.StatusForbidden, codeWebSocketInvalidToken, "invalid websocket token", contract.CategoryClient)
+		return "", nil, nil, false
+	}
+	cfg.Hub.successfulAuths.Add(1)
+	return token, ExtractUserInfo(payload), payload, true
+}
+
+func handshakeCheckRoomAccess(w http.ResponseWriter, r *http.Request, cfg ServerConfig, room string, userInfo *UserInfo, tokenClaims map[string]any, token string) bool {
+	roomPwd := r.Header.Get(roomPasswordHeader)
+	if !authorizeRoomAccess(cfg.RoomAuth, RoomAuthorization{
+		Request:      r,
+		Room:         room,
+		Password:     roomPwd,
+		User:         userInfo,
+		TokenClaims:  tokenClaims,
+		Anonymous:    token == "",
+		QueryTokenOK: cfg.AllowQueryToken,
+	}) {
+		cfg.Hub.securityRejections.Add(1)
+		writeWebSocketHandshakeError(w, r, http.StatusForbidden, codeWebSocketRoomForbidden, "websocket room access denied", contract.CategoryClient)
+		return false
+	}
+	if err := cfg.Hub.canJoin(room, cfg.RoomNameValidator); err != nil {
+		status := websocketJoinDeniedStatus(err)
+		writeWebSocketHandshakeError(w, r, status, codeWebSocketJoinDenied, "websocket room join denied", contract.CategoryClient)
+		return false
+	}
+	return true
+}
+
+func handshakeUpgradeConn(w http.ResponseWriter, r *http.Request, cfg ServerConfig, userInfo *UserInfo) (*Conn, *bufio.Writer, bool) {
+	hj, ok := w.(http.Hijacker)
+	if !ok {
+		writeWebSocketHandshakeError(w, r, http.StatusInternalServerError, codeWebSocketHijackUnsupported, "websocket hijack unsupported", contract.CategoryServer)
+		return nil, nil, false
+	}
+	conn, buf, err := hj.Hijack()
+	if err != nil {
+		writeWebSocketHandshakeError(w, r, http.StatusInternalServerError, codeWebSocketHandshakeFailed, "websocket handshake failed", contract.CategoryServer)
+		return nil, nil, false
+	}
+
+	c := newConnFromHijack(conn, buf.Reader, buf.Writer, cfg.QueueSize, cfg.SendTimeout, cfg.SendBehavior, false)
+	if cfg.WriteTimeout > 0 {
+		if err := c.SetWriteTimeout(cfg.WriteTimeout); err != nil {
+			writeHijackedWebSocketHandshakeError(buf.Writer, http.StatusInternalServerError, codeWebSocketInvalidConfig, "websocket server misconfigured", contract.CategoryServer)
+			c.Close()
+			return nil, nil, false
+		}
+	}
+	if cfg.ReadLimit > 0 {
+		if err := c.SetReadLimit(cfg.ReadLimit); err != nil {
+			writeHijackedWebSocketHandshakeError(buf.Writer, http.StatusInternalServerError, codeWebSocketInvalidConfig, "websocket server misconfigured", contract.CategoryServer)
+			c.Close()
+			return nil, nil, false
+		}
+	}
+	c.UserInfo = userInfo
+	return c, buf.Writer, true
+}
+
+func handshakeRegisterAndRespond(c *Conn, bufWriter *bufio.Writer, cfg ServerConfig, room, key string) bool {
+	if err := cfg.Hub.tryJoin(room, c, cfg.RoomNameValidator); err != nil {
+		writeHijackedWebSocketHandshakeError(bufWriter, websocketJoinDeniedStatus(err), codeWebSocketJoinDenied, "websocket room join denied", contract.CategoryClient)
+		c.Close()
+		return false
+	}
+
+	accept := computeAcceptKey(key)
+	resp := "HTTP/1.1 101 Switching Protocols\r\n" +
+		"Upgrade: websocket\r\n" +
+		"Connection: Upgrade\r\n" +
+		"Sec-WebSocket-Accept: " + accept + "\r\n" +
+		"\r\n"
+	if _, err := bufWriter.WriteString(resp); err != nil {
+		cfg.Hub.RemoveConn(c)
+		c.Close()
+		return false
+	}
+	if err := bufWriter.Flush(); err != nil {
+		cfg.Hub.RemoveConn(c)
+		c.Close()
+		return false
+	}
+	return true
+}
+
+func startReadLoopAndCleanup(c *Conn, room string, cfg ServerConfig) {
+	go func() {
+		<-c.closeC
+		cfg.Hub.RemoveConn(c)
+	}()
+
+	go func() {
+		validationCfg := resolveValidationConfig(cfg)
+		for {
+			op, rstream, err := c.ReadMessageReader()
+			if err != nil {
+				if err != io.EOF {
+					cfg.Hub.logger.Printf("ReadMessageReader error: %v", err)
+					writeCloseForReadError(c, err)
+				}
+				c.Close()
+				return
+			}
+			buf := msgBufPool.Get().(*bytes.Buffer)
+			buf.Reset()
+			if _, err := io.Copy(buf, rstream); err != nil {
+				_ = rstream.Close()
+				putMessageBuffer(buf)
+				cfg.Hub.logger.Printf("ReadMessageReader copy error: %v", err)
+				writeCloseForReadError(c, err)
+				c.Close()
+				return
+			}
+			if err := rstream.Close(); err != nil {
+				putMessageBuffer(buf)
+				cfg.Hub.logger.Printf("ReadMessageReader close error: %v", err)
+				_ = c.WriteClose(CloseServerError, "read close failed")
+				c.Close()
+				return
+			}
+			// Validate text messages before broadcasting.
+			if op == OpcodeText {
+				if err := ValidateTextMessage(buf.Bytes(), validationCfg); err != nil {
+					cfg.Hub.logger.Printf("closing invalid text message: %v", err)
+					putMessageBuffer(buf)
+					writeCloseForValidationError(c, err)
+					c.Close()
+					return
+				}
+			}
+			// Copy data before returning buf to pool; callbacks may retain.
+			data := make([]byte, buf.Len())
+			copy(data, buf.Bytes())
+			putMessageBuffer(buf)
+			if cfg.OnMessage != nil {
+				if err := cfg.OnMessage(c, Message{Room: room, Op: op, Data: data}); err != nil {
+					cfg.Hub.logger.Printf("OnMessage error: %v", err)
+					writeCloseForHandlerError(c, err)
+					c.Close()
+					return
+				}
+			}
+		}
+	}()
 }

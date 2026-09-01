@@ -280,7 +280,7 @@ func CheckPassword(hashedPassword, password string) error {
 
 	salt, err := base64.StdEncoding.DecodeString(parts[1])
 	if err != nil {
-		return fmt.Errorf("%w: decode salt: %v", ErrInvalidHash, err)
+		return fmt.Errorf("%w: decode salt: %w", ErrInvalidHash, err)
 	}
 	if len(salt) != saltSize {
 		return fmt.Errorf("%w: invalid salt length", ErrInvalidHash)
@@ -288,7 +288,7 @@ func CheckPassword(hashedPassword, password string) error {
 
 	expectedHash, err := base64.StdEncoding.DecodeString(parts[2])
 	if err != nil {
-		return fmt.Errorf("%w: decode hash: %v", ErrInvalidHash, err)
+		return fmt.Errorf("%w: decode hash: %w", ErrInvalidHash, err)
 	}
 
 	// Accept both current (64-byte) and legacy (32-byte) derived key lengths.

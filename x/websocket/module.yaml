@@ -133,7 +133,6 @@ public_entrypoints:
   - ErrNegativeLimit
   - ErrInvalidPingPeriod
   - ErrInvalidPongWait
-  - ValidationError
   - NewValidationError
   - CloseError
   - NewCloseError
