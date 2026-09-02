@@ -17,6 +17,10 @@ type statusCodeWriter struct {
 	wroteHeader bool
 }
 
+func (s *statusCodeWriter) Unwrap() http.ResponseWriter {
+	return s.ResponseWriter
+}
+
 func (s *statusCodeWriter) WriteHeader(code int) {
 	if !s.wroteHeader {
 		s.wroteHeader = true
@@ -24,6 +28,12 @@ func (s *statusCodeWriter) WriteHeader(code int) {
 			code = s.code
 		}
 		s.ResponseWriter.WriteHeader(code)
+	}
+}
+
+func (s *statusCodeWriter) Flush() {
+	if f, ok := s.ResponseWriter.(http.Flusher); ok {
+		f.Flush()
 	}
 }
 

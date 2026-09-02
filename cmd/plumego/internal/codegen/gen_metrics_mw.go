@@ -96,6 +96,17 @@ type statusRecorder struct {
 	status int
 }
 
+
+func (rr *statusRecorder) Unwrap() http.ResponseWriter {
+	return rr.ResponseWriter
+}
+
+func (rr *statusRecorder) Flush() {
+	if f, ok := rr.ResponseWriter.(http.Flusher); ok {
+		f.Flush()
+	}
+}
+
 func (rr *statusRecorder) WriteHeader(code int) {
 	rr.status = code
 	rr.ResponseWriter.WriteHeader(code)

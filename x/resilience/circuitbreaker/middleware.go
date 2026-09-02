@@ -88,11 +88,21 @@ type statusWriter struct {
 	written    bool
 }
 
+func (w *statusWriter) Unwrap() http.ResponseWriter {
+	return w.ResponseWriter
+}
+
 func (w *statusWriter) WriteHeader(code int) {
 	if !w.written {
 		w.statusCode = code
 		w.written = true
 		w.ResponseWriter.WriteHeader(code)
+	}
+}
+
+func (w *statusWriter) Flush() {
+	if f, ok := w.ResponseWriter.(http.Flusher); ok {
+		f.Flush()
 	}
 }
 
