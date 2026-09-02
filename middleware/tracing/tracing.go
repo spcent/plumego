@@ -26,6 +26,13 @@ type Tracer interface {
 	Start(ctx context.Context, r *http.Request) (context.Context, TraceSpan)
 }
 
+// Middleware creates a tracing middleware that starts a span for each request
+// using the provided tracer.
+//
+// If tracer is nil the middleware is a no-op pass-through. The middleware
+// measures request timing and delegates span lifecycle to the tracer
+// implementation. Concrete tracers (OpenTelemetry, custom, etc.) live in
+// x/observability/tracer; this package only defines the interface.
 func Middleware(tracer Tracer) middleware.Middleware {
 	return func(next http.Handler) http.Handler {
 		if tracer == nil {

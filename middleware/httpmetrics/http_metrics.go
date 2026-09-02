@@ -10,6 +10,11 @@ import (
 
 type Observer = metrics.HTTPObserver
 
+// Middleware records HTTP request metrics using the provided collector.
+//
+// If collector is nil the middleware is a no-op pass-through. Otherwise it
+// wraps the response writer, measures duration, status, and bytes, and
+// forwards the observation to the collector after the handler completes.
 func Middleware(collector Observer) middleware.Middleware {
 	return func(next http.Handler) http.Handler {
 		if collector == nil {

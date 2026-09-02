@@ -150,7 +150,11 @@ type capturedResponse struct {
 	body       []byte
 }
 
-// New creates a new Coalescer
+// New creates a new request coalescer with the provided configuration.
+//
+// The returned Coalescer is safe for concurrent use. Call its Middleware()
+// method to obtain the middleware function. Use the zero Config{} for
+// package defaults (GET/HEAD coalescing, 30-second wait, 10MB capture).
 func New(config Config) *Coalescer {
 	cfg := config.WithDefaults()
 
