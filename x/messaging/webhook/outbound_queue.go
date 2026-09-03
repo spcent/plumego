@@ -2,6 +2,7 @@ package webhook
 
 import (
 	"context"
+	"sync"
 	"time"
 )
 
@@ -13,6 +14,7 @@ type Queue struct {
 	ch         chan Task
 	dropPolicy DropPolicy
 	blockWait  time.Duration
+	closeOnce  sync.Once
 }
 
 func NewQueue(size int, policy DropPolicy, blockWait time.Duration) *Queue {
@@ -71,4 +73,4 @@ func (q *Queue) Enqueue(ctx context.Context, t Task) error {
 }
 
 func (q *Queue) Chan() <-chan Task { return q.ch }
-func (q *Queue) Close()            { close(q.ch) }
+func (q *Queue) Close()            { q.closeOnce.Do(func() { close(q.ch) }) }

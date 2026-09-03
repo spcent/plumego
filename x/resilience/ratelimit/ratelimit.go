@@ -84,14 +84,23 @@ func (b *TokenBucket) Wait(ctx context.Context) error {
 
 // WaitN blocks until n tokens are available or ctx is cancelled.
 func (b *TokenBucket) WaitN(ctx context.Context, n int64) error {
+	timer := time.NewTimer(time.Millisecond)
+	defer timer.Stop()
 	for {
 		if b.AllowN(n) {
 			return nil
 		}
+		if !timer.Stop() {
+			select {
+			case <-timer.C:
+			default:
+			}
+		}
+		timer.Reset(time.Millisecond)
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case <-time.After(time.Millisecond):
+		case <-timer.C:
 		}
 	}
 }

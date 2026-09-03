@@ -145,7 +145,11 @@ func (dlq *DLQ) checkAlertThreshold() {
 
 		dlq.stats.AlertsTriggered.Add(1)
 
-		// Call callback in goroutine
-		go dlq.config.AlertCallback(alert)
+		// Call callback in a goroutine; recover from user panics so a buggy
+		// observer cannot crash the application.
+		go func(a DLQAlert, f func(DLQAlert)) {
+			defer func() { _ = recover() }()
+			f(a)
+		}(alert, dlq.config.AlertCallback)
 	}
 }

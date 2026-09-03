@@ -341,9 +341,13 @@ func (cb *CircuitBreaker) setState(newState State) {
 		cb.halfOpenSuccesses.Store(0)
 	}
 
-	// Call hook
-	if cb.onStateChange != nil {
-		go cb.onStateChange(oldState, newState)
+	// Call hook in a goroutine; recover from callback panics so a buggy
+	// observer cannot crash the application.
+	if fn := cb.onStateChange; fn != nil {
+		go func(from, to State, f func(State, State)) {
+			defer func() { _ = recover() }()
+			f(from, to)
+		}(oldState, newState, fn)
 	}
 }
 

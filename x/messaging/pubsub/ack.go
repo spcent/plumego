@@ -395,9 +395,13 @@ func (dlq *deadLetterQueue) Add(msg Message, reason string) {
 		dlq.messages = dlq.messages[len(dlq.messages)-dlq.config.MaxSize:]
 	}
 
-	// Call callback
-	if dlq.config.OnDeadLetter != nil {
-		go dlq.config.OnDeadLetter(msg, reason)
+	// Call callback in a goroutine; recover from user panics so a buggy
+	// observer cannot crash the application.
+	if fn := dlq.config.OnDeadLetter; fn != nil {
+		go func(m Message, r string, f func(Message, string)) {
+			defer func() { _ = recover() }()
+			f(m, r)
+		}(msg, reason, fn)
 	}
 }
 

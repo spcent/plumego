@@ -41,7 +41,9 @@ func (kv *KVStore) load() error {
 	return nil
 }
 
-func (kv *KVStore) persistLocked() error {
+// makeDiskStateLocked creates an in-memory snapshot of the current data.
+// Must be called with kv.mu held (read or write).
+func (kv *KVStore) makeDiskStateLocked() diskState {
 	state := diskState{
 		Entries: make(map[string]entry, len(kv.data)),
 	}
@@ -53,7 +55,12 @@ func (kv *KVStore) persistLocked() error {
 			Size:      item.Size,
 		}
 	}
+	return state
+}
 
+// persistState writes a diskState to the backing file atomically.
+// It must NOT be called while holding kv.mu.
+func (kv *KVStore) persistState(state diskState) error {
 	raw, err := json.Marshal(state)
 	if err != nil {
 		return fmt.Errorf("encode state: %w", err)
@@ -91,6 +98,15 @@ func (kv *KVStore) persistLocked() error {
 	}
 	committed = true
 	return nil
+}
+
+// persistLocked performs a full persist while holding kv.mu.
+// Prefer the makeDiskStateLocked + persistState pattern to avoid holding
+// the lock during file I/O.
+func (kv *KVStore) persistLocked() error {
+	state := kv.makeDiskStateLocked()
+	// kv.mu is still held here, but persistState works without it.
+	return kv.persistState(state)
 }
 
 func syncDir(dir string) error {
