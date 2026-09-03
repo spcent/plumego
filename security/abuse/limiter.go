@@ -376,6 +376,8 @@ func (l *Limiter) Allow(key string) Decision {
 	}
 	shard := l.shardFor(key)
 	shardIdx := fnv32a(key) % uint32(len(l.shards))
+
+	// --- critical section: update bucket state only ---
 	shard.mu.Lock()
 	b, ok := shard.buckets[key]
 	if !ok {
@@ -396,22 +398,28 @@ func (l *Limiter) Allow(key string) Decision {
 	if elapsed < 0 {
 		elapsed = 0
 	}
-	b.tokens = math.Min(l.capacity, b.tokens+elapsed*l.rate)
+	tokens := math.Min(l.capacity, b.tokens+elapsed*l.rate)
+	allowed := tokens >= 1
+	if allowed {
+		tokens -= 1
+	}
+	b.tokens = tokens
 	b.lastRefill = now
 	b.lastAccess = now
+	shard.mu.Unlock()
+	// --- end critical section ---
 
+	// Build decision outside the lock with local snapshot values.
+	now = l.now() // refresh after unlock for time-sensitive fields
 	decision := Decision{
-		Allowed:   b.tokens >= 1,
+		Allowed:   allowed,
 		Limit:     int(l.capacity),
-		Remaining: int(math.Floor(b.tokens)),
+		Remaining: int(math.Floor(tokens)),
 		Reset:     now,
 	}
 
-	if decision.Allowed {
-		b.tokens -= 1
-		decision.Remaining = int(math.Floor(b.tokens))
-	} else if l.rate > 0 {
-		need := 1 - b.tokens
+	if !allowed && l.rate > 0 {
+		need := 1 - tokens
 		if need < 0 {
 			need = 0
 		}
@@ -419,18 +427,14 @@ func (l *Limiter) Allow(key string) Decision {
 	}
 
 	if l.rate > 0 {
-		missing := l.capacity - b.tokens
+		missing := l.capacity - tokens
 		if missing < 0 {
 			missing = 0
 		}
 		decision.Reset = now.Add(durationFromSeconds(missing / l.rate))
 	}
 
-	shard.mu.Unlock()
-
-	// Record metrics
-	l.RecordAllow(decision.Allowed)
-
+	l.RecordAllow(allowed)
 	return decision
 }
 

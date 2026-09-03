@@ -194,10 +194,12 @@ func (r *RetryStep) Execute(ctx context.Context, wf *Workflow) (*AgentResult, er
 		}
 
 		if i < r.MaxRetries {
+			timer := time.NewTimer(r.Delay)
 			select {
 			case <-ctx.Done():
+				timer.Stop()
 				return lastResult, ctx.Err()
-			case <-time.After(r.Delay):
+			case <-timer.C:
 				// Continue to next retry
 			}
 		}

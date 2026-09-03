@@ -66,6 +66,8 @@ func (r *RemoteStep) Execute(ctx context.Context, wf *orchestration.Workflow) (*
 		timeout = 5 * time.Minute
 	}
 
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
 	select {
 	case <-ctx.Done():
 		return nil, ctx.Err()
@@ -85,7 +87,7 @@ func (r *RemoteStep) Execute(ctx context.Context, wf *orchestration.Workflow) (*
 		}
 
 		return result.AgentResult, nil
-	case <-time.After(timeout):
+	case <-timer.C:
 		return nil, fmt.Errorf("remote execution timeout after %v", timeout)
 	}
 }
@@ -178,8 +180,8 @@ func (d *DistributedParallelStep) Execute(ctx context.Context, wf *orchestration
 		timeout = 5 * time.Minute
 	}
 
-	deadline := time.After(timeout)
-
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
 	for completedCount < len(d.Agents) {
 		select {
 		case <-ctx.Done():
@@ -200,7 +202,7 @@ func (d *DistributedParallelStep) Execute(ctx context.Context, wf *orchestration
 					break
 				}
 			}
-		case <-deadline:
+		case <-timer.C:
 			return nil, fmt.Errorf("distributed parallel execution timeout after %v", timeout)
 		}
 	}

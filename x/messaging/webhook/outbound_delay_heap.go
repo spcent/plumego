@@ -57,11 +57,16 @@ func (d *DelayScheduler) Schedule(at time.Time, task Task) {
 }
 
 func (d *DelayScheduler) Run(ctx context.Context) {
+	timer := time.NewTimer(0)
+	if !timer.Stop() {
+		<-timer.C
+	}
+	defer timer.Stop()
+
 	for {
 		nextWait := d.nextWaitDuration()
-		var timer <-chan time.Time
 		if nextWait > 0 {
-			timer = time.After(nextWait)
+			timer.Reset(nextWait)
 		}
 
 		select {
@@ -70,8 +75,14 @@ func (d *DelayScheduler) Run(ctx context.Context) {
 		case <-d.stop:
 			return
 		case <-d.wake:
+			if !timer.Stop() {
+				select {
+				case <-timer.C:
+				default:
+				}
+			}
 			continue
-		case <-timer:
+		case <-timer.C:
 			d.flushDue(ctx)
 		}
 	}

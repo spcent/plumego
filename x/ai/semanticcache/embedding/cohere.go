@@ -172,10 +172,12 @@ func (p *CohereProvider) GenerateBatch(ctx context.Context, texts []string) ([]*
 		if attempt < p.maxRetries {
 			// Exponential backoff
 			backoff := time.Duration(1<<uint(attempt)) * time.Second
+			timer := time.NewTimer(backoff)
 			select {
 			case <-ctx.Done():
+				timer.Stop()
 				return nil, ctx.Err()
-			case <-time.After(backoff):
+			case <-timer.C:
 			}
 		}
 	}

@@ -279,6 +279,8 @@ func (e *DistributedEngine) executeStepDistributed(
 		timeout = e.config.DefaultTimeout
 	}
 
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
 	select {
 	case <-ctx.Done():
 		return nil, ctx.Err()
@@ -293,7 +295,7 @@ func (e *DistributedEngine) executeStepDistributed(
 			}
 		}
 		return result.AgentResult, nil
-	case <-time.After(timeout):
+	case <-timer.C:
 		return nil, fmt.Errorf("task execution timeout after %v", timeout)
 	}
 }

@@ -74,6 +74,11 @@ func RetryWithPolicy(
 ) error {
 	var lastErr error
 	delay := policy.InitialDelay
+	timer := time.NewTimer(0)
+	if !timer.Stop() {
+		<-timer.C
+	}
+	defer timer.Stop()
 
 	for i := 0; i <= policy.MaxRetries; i++ {
 		lastErr = operation()
@@ -82,10 +87,17 @@ func RetryWithPolicy(
 		}
 
 		if i < policy.MaxRetries {
+			if !timer.Stop() {
+				select {
+				case <-timer.C:
+				default:
+				}
+			}
+			timer.Reset(delay)
 			select {
 			case <-ctx.Done():
 				return ctx.Err()
-			case <-time.After(delay):
+			case <-timer.C:
 				// Calculate next delay with exponential backoff
 				delay = time.Duration(float64(delay) * policy.Multiplier)
 				if delay > policy.MaxDelay {
