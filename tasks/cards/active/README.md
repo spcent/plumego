@@ -62,7 +62,6 @@ chain in tasks/milestones/ROADMAP.md.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 1534-merge-error-codes-into-contract.md | P1 | contract/internal/httputil | Move transport error codes into contract; single source of truth |
 | 1535-evaluate-httputil-placement.md | P2 | internal/httputil | Evaluate BufferedResponse promotion or httputil splitting (design-only) |
 
 ### M-009 — Beta Promotions Round 1 (P1, depends on M-008)
