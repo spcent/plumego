@@ -58,6 +58,14 @@ chain in tasks/milestones/ROADMAP.md.
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
 
+### M-027 — Quality & Extensibility Sweep (P1, continuous, depends on nothing)
+
+| Card | Priority | Primary module | Focus |
+|---|---|---|---|
+| 1533-extract-preparerequest-template.md | P1 | middleware/internal/telemetry | Extract shared PrepareRequest/Complete observer template |
+| 1534-merge-error-codes-into-contract.md | P1 | contract/internal/httputil | Move transport error codes into contract; single source of truth |
+| 1535-evaluate-httputil-placement.md | P2 | internal/httputil | Evaluate BufferedResponse promotion or httputil splitting (design-only) |
+
 ### M-009 — Beta Promotions Round 1 (P1, depends on M-008)
 
 | Card | Priority | Primary module | Focus |
