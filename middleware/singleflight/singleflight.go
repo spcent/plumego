@@ -42,6 +42,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/spcent/plumego/contract"
@@ -140,7 +141,7 @@ type inFlightRequest struct {
 	response *capturedResponse
 	err      error
 	done     chan struct{}
-	waiters  int
+	waiters  atomic.Int32
 }
 
 // capturedResponse represents a captured HTTP response
@@ -185,7 +186,7 @@ func (c *Coalescer) Middleware() func(http.Handler) http.Handler {
 			c.mu.Lock()
 			inflight, exists := c.inFlight[key]
 			if exists {
-				inflight.waiters++
+				inflight.waiters.Add(1)
 				c.mu.Unlock()
 
 				// Wait for in-flight request to complete
@@ -195,8 +196,7 @@ func (c *Coalescer) Middleware() func(http.Handler) http.Handler {
 
 			// Start new request
 			inflight = &inFlightRequest{
-				done:    make(chan struct{}),
-				waiters: 0,
+				done: make(chan struct{}),
 			}
 			c.inFlight[key] = inflight
 			c.mu.Unlock()
@@ -265,11 +265,17 @@ func (c *Coalescer) reportCoalesced(key string, count int) {
 	c.config.OnCoalesced(key, count)
 }
 
+// decrementWaiters decrements the waiter count using a CAS loop to avoid
+// underflow during concurrent timeout and normal completion races.
 func (c *Coalescer) decrementWaiters(inflight *inFlightRequest) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if inflight.waiters > 0 {
-		inflight.waiters--
+	for {
+		v := inflight.waiters.Load()
+		if v <= 0 {
+			return
+		}
+		if inflight.waiters.CompareAndSwap(v, v-1) {
+			return
+		}
 	}
 }
 

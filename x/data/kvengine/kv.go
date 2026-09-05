@@ -584,10 +584,14 @@ func (kv *KVStore) close() error {
 		close(done)
 	}()
 
+	timer := time.NewTimer(kv.opts.CloseTimeout)
 	select {
 	case <-done:
 		// Normal shutdown
-	case <-time.After(kv.opts.CloseTimeout):
+		if !timer.Stop() {
+			<-timer.C
+		}
+	case <-timer.C:
 		kv.closeErr = ErrCloseTimeout
 	}
 

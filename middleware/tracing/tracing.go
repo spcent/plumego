@@ -16,11 +16,7 @@ import (
 	internaltelemetry "github.com/spcent/plumego/middleware/internal/telemetry"
 )
 
-type TraceSpan interface {
-	End(status, bytes int, requestID string)
-	TraceID() string
-	SpanID() string
-}
+type TraceSpan = internaltelemetry.TraceSpan
 
 type Tracer interface {
 	Start(ctx context.Context, r *http.Request) (context.Context, TraceSpan)

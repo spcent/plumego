@@ -474,10 +474,14 @@ func connectNamedPipeWithContext(ctx context.Context, handle syscall.Handle) err
 		// The goroutine will complete shortly after the handle is closed
 		syscall.CloseHandle(handle)
 		// Wait for the goroutine to finish to avoid leaks
+		timer := time.NewTimer(100 * time.Millisecond)
 		select {
 		case <-done:
+			if !timer.Stop() {
+				<-timer.C
+			}
 			// Goroutine completed
-		case <-time.After(100 * time.Millisecond):
+		case <-timer.C:
 			// Timeout waiting for goroutine - it will complete eventually
 			// This is acceptable as we've closed the handle
 		}

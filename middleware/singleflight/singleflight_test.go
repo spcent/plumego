@@ -967,7 +967,7 @@ func TestCoalesce_WaiterContextCancelReturnsWithoutReplay(t *testing.T) {
 		coalescer.mu.RUnlock()
 		t.Fatal("leader in-flight entry was removed before release")
 	}
-	waiters := inflight.waiters
+	waiters := inflight.waiters.Load()
 	coalescer.mu.RUnlock()
 	if waiters != 0 {
 		t.Fatalf("waiters = %d, want 0 after cancellation", waiters)
@@ -1001,9 +1001,9 @@ func waitForCoalesceWaiterForMethod(t *testing.T, coalescer *Coalescer, method, 
 	for {
 		coalescer.mu.RLock()
 		inflight := coalescer.inFlight[key]
-		waiters := 0
+		waiters := int32(0)
 		if inflight != nil {
-			waiters = inflight.waiters
+			waiters = inflight.waiters.Load()
 		}
 		coalescer.mu.RUnlock()
 

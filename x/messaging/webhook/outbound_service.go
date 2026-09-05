@@ -184,9 +184,13 @@ func (s *Service) Stop() {
 		s.wg.Wait()
 		close(done)
 	}()
+	timer := time.NewTimer(s.cfg.DrainMax)
 	select {
 	case <-done:
-	case <-time.After(s.cfg.DrainMax):
+		if !timer.Stop() {
+			<-timer.C
+		}
+	case <-timer.C:
 	}
 }
 

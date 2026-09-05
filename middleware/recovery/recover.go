@@ -1,9 +1,7 @@
 package recovery
 
 import (
-	"bufio"
 	"errors"
-	"net"
 	"net/http"
 	"reflect"
 
@@ -56,7 +54,7 @@ func Middleware(config Config) (middleware.Middleware, error) {
 
 func recoveryHandler(next http.Handler, logger log.StructuredLogger) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		rw := &recoveryResponseWriter{ResponseWriter: w}
+		rw := &recoveryResponseWriter{BaseWrappedResponseWriter: internaltransport.BaseWrappedResponseWriter{ResponseWriter: w}}
 		defer func() {
 			if rec := recover(); rec != nil {
 				fields := internaltelemetry.MiddlewareLogFields(r, http.StatusInternalServerError, 0)
@@ -64,7 +62,7 @@ func recoveryHandler(next http.Handler, logger log.StructuredLogger) http.Handle
 				internaltelemetry.RunSafeFinalizer(func() {
 					logger.WithFields(log.Fields(internaltelemetry.RedactFields(fields))).Error("panic recovered")
 				})
-				if rw.wrote {
+				if rw.Written() {
 					return
 				}
 				internaltransport.WriteTransportError(rw, r, http.StatusInternalServerError, contract.CodeInternalError, "internal server error", nil)
@@ -75,34 +73,7 @@ func recoveryHandler(next http.Handler, logger log.StructuredLogger) http.Handle
 }
 
 type recoveryResponseWriter struct {
-	http.ResponseWriter
-	wrote bool
-}
-
-func (w *recoveryResponseWriter) Unwrap() http.ResponseWriter {
-	return w.ResponseWriter
-}
-
-func (w *recoveryResponseWriter) WriteHeader(statusCode int) {
-	if w.wrote {
-		return
-	}
-	w.wrote = true
-	w.ResponseWriter.WriteHeader(statusCode)
-}
-
-func (w *recoveryResponseWriter) Write(p []byte) (int, error) {
-	if !w.wrote {
-		w.WriteHeader(http.StatusOK)
-	}
-	return w.ResponseWriter.Write(p)
-}
-
-func (w *recoveryResponseWriter) Flush() {
-	if !w.wrote {
-		w.WriteHeader(http.StatusOK)
-	}
-	internaltransport.FlushIfSupported(w.ResponseWriter)
+	internaltransport.BaseWrappedResponseWriter
 }
 
 func panicType(rec any) string {
@@ -110,13 +81,4 @@ func panicType(rec any) string {
 		return "unknown"
 	}
 	return reflect.TypeOf(rec).String()
-}
-
-func (w *recoveryResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
-	conn, rw, err := internaltransport.HijackIfSupported(w.ResponseWriter)
-	if err != nil {
-		return nil, nil, err
-	}
-	w.wrote = true
-	return conn, rw, nil
 }

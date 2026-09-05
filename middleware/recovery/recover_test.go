@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/spcent/plumego/contract"
+	internaltransport "github.com/spcent/plumego/internal/httputil"
 	"github.com/spcent/plumego/log"
 	"github.com/spcent/plumego/middleware"
 )
@@ -382,7 +383,7 @@ func TestRecoveryRejectsNilLogger(t *testing.T) {
 
 func TestRecoveryResponseWriterUnwrap(t *testing.T) {
 	underlying := httptest.NewRecorder()
-	w := &recoveryResponseWriter{ResponseWriter: underlying}
+	w := &recoveryResponseWriter{BaseWrappedResponseWriter: internaltransport.BaseWrappedResponseWriter{ResponseWriter: underlying}}
 
 	if got := w.Unwrap(); got != underlying {
 		t.Fatalf("Unwrap() = %v, want underlying writer", got)
@@ -506,7 +507,7 @@ func TestRecoveryResponseWriterHijack(t *testing.T) {
 // TestRecoveryResponseWriterHijackNotSupported verifies that Hijack returns an error
 // when the underlying writer does not implement http.Hijacker.
 func TestRecoveryResponseWriterHijackNotSupported(t *testing.T) {
-	w := &recoveryResponseWriter{ResponseWriter: httptest.NewRecorder()}
+	w := &recoveryResponseWriter{BaseWrappedResponseWriter: internaltransport.BaseWrappedResponseWriter{ResponseWriter: httptest.NewRecorder()}}
 	_, _, err := w.Hijack()
 	if err == nil {
 		t.Fatal("expected error when underlying writer does not support Hijack")
@@ -517,7 +518,7 @@ func TestRecoveryResponseWriterHijackNotSupported(t *testing.T) {
 // twice only writes the first status code.
 func TestRecoveryResponseWriterWriteHeader_Idempotent(t *testing.T) {
 	underlying := httptest.NewRecorder()
-	w := &recoveryResponseWriter{ResponseWriter: underlying}
+	w := &recoveryResponseWriter{BaseWrappedResponseWriter: internaltransport.BaseWrappedResponseWriter{ResponseWriter: underlying}}
 
 	w.WriteHeader(http.StatusCreated)
 	w.WriteHeader(http.StatusNotFound) // second call should be ignored
@@ -531,7 +532,7 @@ func TestRecoveryResponseWriterWriteHeader_Idempotent(t *testing.T) {
 // when no status has been set yet.
 func TestRecoveryResponseWriterWrite_SetsWrote(t *testing.T) {
 	underlying := httptest.NewRecorder()
-	w := &recoveryResponseWriter{ResponseWriter: underlying}
+	w := &recoveryResponseWriter{BaseWrappedResponseWriter: internaltransport.BaseWrappedResponseWriter{ResponseWriter: underlying}}
 
 	n, err := w.Write([]byte("hello"))
 	if err != nil {
@@ -543,7 +544,7 @@ func TestRecoveryResponseWriterWrite_SetsWrote(t *testing.T) {
 	if underlying.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200", underlying.Code)
 	}
-	if !w.wrote {
+	if !w.Written() {
 		t.Fatal("wrote flag should be true after Write")
 	}
 }
