@@ -40,4 +40,11 @@ const (
 	CodeRequestBodyTooLarge = "REQUEST_BODY_TOO_LARGE"
 	CodeInvalidJSON         = "INVALID_JSON"
 	CodeInvalidQuery        = "INVALID_QUERY"
+
+	// Transport-layer codes used by infrastructure middleware (concurrencylimit,
+	// singleflight). Values intentionally match the historical string shape for
+	// backward compatibility with client integrations.
+	CodeServerBusy         = "server_busy"
+	CodeServerQueueTimeout = "server_queue_timeout"
+	CodeUpstreamFailed     = "upstream_failed"
 )

@@ -242,7 +242,7 @@ func (c *Coalescer) waitForInFlight(w http.ResponseWriter, r *http.Request, key 
 
 func (c *Coalescer) failWaiter(w http.ResponseWriter, r *http.Request, key string, err error) {
 	c.reportError(key, err)
-	internaltransport.WriteTransportError(w, r, http.StatusBadGateway, internaltransport.CodeUpstreamFailed, "upstream request failed", nil)
+	internaltransport.WriteTransportError(w, r, http.StatusBadGateway, contract.CodeUpstreamFailed, "upstream request failed", nil)
 }
 
 func (c *Coalescer) reportError(key string, err error) {

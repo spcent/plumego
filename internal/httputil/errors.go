@@ -6,13 +6,6 @@ import (
 	"github.com/spcent/plumego/contract"
 )
 
-// Middleware-specific transport error codes. Keep values stable for client integrations.
-const (
-	CodeServerBusy         = "server_busy"
-	CodeServerQueueTimeout = "server_queue_timeout"
-	CodeUpstreamFailed     = "upstream_failed"
-)
-
 // WriteTransportError writes transport errors using the canonical contract helper.
 func WriteTransportError(
 	w http.ResponseWriter,
