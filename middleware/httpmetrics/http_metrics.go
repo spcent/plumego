@@ -22,16 +22,9 @@ func Middleware(collector Observer) middleware.Middleware {
 		}
 
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			prepared := internaltelemetry.PrepareRequest(w, r)
-			r = prepared.Request
-			recorder := prepared.Recorder
-
-			defer internaltelemetry.FinishPreservingPanic(func() {
-				metricsData := prepared.Complete(r)
+			internaltelemetry.WithObserver(next, w, r, func(metricsData internaltelemetry.RequestMetrics, _ *internaltelemetry.ResponseRecorder, r *http.Request) {
 				collector.ObserveHTTP(r.Context(), metricsData.Method, metricsData.ObservedPath(), metricsData.Status, metricsData.Bytes, metricsData.Duration)
 			})
-
-			next.ServeHTTP(recorder, r)
 		})
 	}
 }

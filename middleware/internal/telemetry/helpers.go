@@ -163,4 +163,24 @@ func (m RequestMetrics) ObservedPath() string {
 	return m.Path
 }
 
+// WithObserver wraps the next handler with the canonical PrepareRequest lifecycle
+// and calls observe after the handler completes. It preserves panics raised by
+// downstream code so they bubble correctly through the middleware chain.
+//
+// The observe callback receives:
+//   - metrics: the completed request metrics (from Complete)
+//   - recorder: the response recorder wrapping the original writer
+//   - r: the modified request (post-handler, for context reads like route/span)
+func WithObserver(next http.Handler, w http.ResponseWriter, r *http.Request, observe func(metrics RequestMetrics, recorder *ResponseRecorder, r *http.Request)) {
+	prepared := PrepareRequest(w, r)
+	recorder := prepared.Recorder
+	r = prepared.Request
+
+	defer FinishPreservingPanic(func() {
+		observe(prepared.Complete(r), recorder, r)
+	})
+
+	next.ServeHTTP(recorder, r)
+}
+
 type ResponseRecorder = internaltransport.ResponseRecorder

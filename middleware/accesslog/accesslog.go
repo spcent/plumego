@@ -26,12 +26,7 @@ func Middleware(config Config) (middleware.Middleware, error) {
 	}
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			prepared := internaltelemetry.PrepareRequest(w, r)
-			r = prepared.Request
-			recorder := prepared.Recorder
-
-			defer internaltelemetry.FinishPreservingPanic(func() {
-				metricsData := prepared.Complete(r)
+			internaltelemetry.WithObserver(next, w, r, func(metricsData internaltelemetry.RequestMetrics, recorder *internaltelemetry.ResponseRecorder, r *http.Request) {
 				rc := contract.RequestContextFromContext(r.Context())
 
 				fields := internaltelemetry.MiddlewareLogFields(r, metricsData.Status, metricsData.Duration)
@@ -52,8 +47,6 @@ func Middleware(config Config) (middleware.Middleware, error) {
 
 				config.Logger.WithFields(log.Fields(internaltelemetry.RedactFields(fields))).Info("request completed")
 			})
-
-			next.ServeHTTP(recorder, r)
 		})
 	}, nil
 }
