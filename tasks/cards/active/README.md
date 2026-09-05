@@ -62,7 +62,6 @@ chain in tasks/milestones/ROADMAP.md.
 
 | Card | Priority | Primary module | Focus |
 |---|---|---|---|
-| 1533-extract-preparerequest-template.md | P1 | middleware/internal/telemetry | Extract shared PrepareRequest/Complete observer template |
 | 1534-merge-error-codes-into-contract.md | P1 | contract/internal/httputil | Move transport error codes into contract; single source of truth |
 | 1535-evaluate-httputil-placement.md | P2 | internal/httputil | Evaluate BufferedResponse promotion or httputil splitting (design-only) |
 
