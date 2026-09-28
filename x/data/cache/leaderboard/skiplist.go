@@ -1,7 +1,7 @@
 package leaderboard
 
 import (
-	"math/rand"
+	"math/rand/v2"
 	"time"
 )
 
@@ -40,12 +40,12 @@ type levelRNG interface {
 
 // newSkipList creates a new skip list
 func newSkipList() *skipList {
-	return newSkipListWithRand(rand.New(rand.NewSource(time.Now().UnixNano())))
+	return newSkipListWithRand(rand.New(rand.NewPCG(uint64(time.Now().UnixNano()), 0)))
 }
 
 func newSkipListWithRand(rng levelRNG) *skipList {
 	if rng == nil {
-		rng = rand.New(rand.NewSource(time.Now().UnixNano()))
+		rng = rand.New(rand.NewPCG(uint64(time.Now().UnixNano()), 0))
 	}
 	return &skipList{
 		header: newSkipListNode(maxLevel, "", 0),

@@ -2,7 +2,7 @@ package scheduler
 
 import (
 	"context"
-	"math/rand"
+	"math/rand/v2"
 	"sync"
 	"time"
 
@@ -127,7 +127,7 @@ func WithBackpressure(config BackpressureConfig) Option {
 // WithRandomSeed sets the scheduler-local random seed used for jitter.
 func WithRandomSeed(seed int64) Option {
 	return func(s *Scheduler) {
-		s.rng = rand.New(rand.NewSource(seed))
+		s.rng = rand.New(rand.NewPCG(uint64(seed), 0))
 	}
 }
 
@@ -153,7 +153,7 @@ func New(opts ...Option) *Scheduler {
 		clock:            realClock{},
 		registry:         make(map[string]TaskFunc),
 		backpressure:     DefaultBackpressureConfig(),
-		rng:              rand.New(rand.NewSource(time.Now().UnixNano())),
+		rng:              rand.New(rand.NewPCG(uint64(time.Now().UnixNano()), 0)),
 		dependents:       make(map[JobID][]JobID),
 		dependencyStatus: make(map[JobID]bool),
 		stopCtx:          ctx,

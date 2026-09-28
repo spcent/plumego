@@ -32,7 +32,7 @@ import (
 	"errors"
 	"io"
 	"math"
-	"math/rand"
+	"math/rand/v2"
 	"net"
 	"net/http"
 	"time"

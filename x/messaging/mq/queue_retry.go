@@ -2,7 +2,7 @@ package mq
 
 import (
 	"math"
-	"math/rand"
+	"math/rand/v2"
 	"sync"
 	"time"
 )
@@ -66,7 +66,7 @@ func DefaultRetryPolicy() RetryPolicy {
 
 var (
 	rngMu sync.Mutex
-	rng   = rand.New(rand.NewSource(time.Now().UnixNano()))
+	rng   = rand.New(rand.NewPCG(uint64(time.Now().UnixNano()), 0))
 )
 
 func randFloat64() float64 {

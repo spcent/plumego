@@ -4,7 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/binary"
 	"errors"
-	mathrand "math/rand"
+	mathrand "math/rand/v2"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -56,11 +56,11 @@ func cryptoSeed() int64 {
 // NewRequestIDGenerator creates a request ID generator with a pre-generated random pool.
 func NewRequestIDGenerator() *RequestIDGenerator {
 	g := &RequestIDGenerator{
-		rng:        mathrand.New(mathrand.NewSource(cryptoSeed())),
+		rng:        mathrand.New(mathrand.NewPCG(uint64(cryptoSeed()), 0)),
 		randomPool: make([]int32, randomPoolSize),
 	}
 	for i := range g.randomPool {
-		g.randomPool[i] = int32(g.rng.Intn(randMax))
+		g.randomPool[i] = int32(g.rng.IntN(randMax))
 	}
 	return g
 }
@@ -127,13 +127,13 @@ func (g *RequestIDGenerator) ensureInitialized() {
 	defer g.poolMu.Unlock()
 
 	if g.rng == nil {
-		g.rng = mathrand.New(mathrand.NewSource(cryptoSeed()))
+		g.rng = mathrand.New(mathrand.NewPCG(uint64(cryptoSeed()), 0))
 	}
 	if len(g.randomPool) == 0 {
 		g.randomPool = make([]int32, randomPoolSize)
 	}
 	for i := range g.randomPool {
-		g.randomPool[i] = int32(g.rng.Intn(randMax))
+		g.randomPool[i] = int32(g.rng.IntN(randMax))
 	}
 }
 
@@ -165,10 +165,10 @@ func (g *RequestIDGenerator) refreshRandomPool() {
 	defer g.poolMu.Unlock()
 
 	if g.rng == nil {
-		g.rng = mathrand.New(mathrand.NewSource(cryptoSeed()))
+		g.rng = mathrand.New(mathrand.NewPCG(uint64(cryptoSeed()), 0))
 	}
 	for i := range g.randomPool {
-		g.randomPool[i] = int32(g.rng.Intn(randMax))
+		g.randomPool[i] = int32(g.rng.IntN(randMax))
 	}
 }
 
@@ -177,9 +177,9 @@ func (g *RequestIDGenerator) randomFallback() int {
 	defer g.poolMu.Unlock()
 
 	if g.rng == nil {
-		g.rng = mathrand.New(mathrand.NewSource(cryptoSeed()))
+		g.rng = mathrand.New(mathrand.NewPCG(uint64(cryptoSeed()), 0))
 	}
-	return g.rng.Intn(randMax)
+	return g.rng.IntN(randMax)
 }
 
 // DecodeRequestID reverses a fixed-width base62 request ID into components.

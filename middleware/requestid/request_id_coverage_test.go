@@ -1,12 +1,12 @@
 package requestid
 
 import (
+	mathrand "math/rand/v2"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/spcent/plumego/contract"
-	mathrand "math/rand"
 )
 
 // TestWithRequestHeaderOption exercises the WithRequestHeader option path
@@ -114,7 +114,7 @@ func TestRequestIDFromRequestNilReturnsEmpty(t *testing.T) {
 func TestRandomFallbackProducesValidValue(t *testing.T) {
 	// Create a generator and zero out the pool to force randomFallback path.
 	g := &RequestIDGenerator{
-		rng:        mathrand.New(mathrand.NewSource(42)),
+		rng:        mathrand.New(mathrand.NewPCG(42, 0)),
 		randomPool: []int32{},
 	}
 	// randomFallback is called from randomValue when poolSize == 0.

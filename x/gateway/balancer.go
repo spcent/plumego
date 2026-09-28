@@ -2,7 +2,7 @@ package gateway
 
 import (
 	"hash/fnv"
-	"math/rand"
+	"math/rand/v2"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -60,7 +60,7 @@ type RandomBalancer struct {
 // NewRandomBalancer creates a new random load balancer
 func NewRandomBalancer() *RandomBalancer {
 	return &RandomBalancer{
-		rng: rand.New(rand.NewSource(time.Now().UnixNano())),
+		rng: rand.New(rand.NewPCG(uint64(time.Now().UnixNano()), 0)),
 	}
 }
 
@@ -72,7 +72,7 @@ func (b *RandomBalancer) Next(pool *BackendPool) (*Backend, error) {
 	}
 
 	b.mu.Lock()
-	index := b.rng.Intn(len(backends))
+	index := b.rng.IntN(len(backends))
 	b.mu.Unlock()
 
 	return backends[index], nil
@@ -81,7 +81,7 @@ func (b *RandomBalancer) Next(pool *BackendPool) (*Backend, error) {
 // Reset resets the random number generator
 func (b *RandomBalancer) Reset() {
 	b.mu.Lock()
-	b.rng = rand.New(rand.NewSource(time.Now().UnixNano()))
+	b.rng = rand.New(rand.NewPCG(uint64(time.Now().UnixNano()), 0))
 	b.mu.Unlock()
 }
 

@@ -3,7 +3,7 @@ package abuse
 import (
 	"errors"
 	"fmt"
-	"math/rand"
+	"math/rand/v2"
 	"runtime"
 	"sync"
 	"sync/atomic"
@@ -485,7 +485,7 @@ func BenchmarkLimiterStressTest(b *testing.B) {
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
-			key := fmt.Sprintf("stress-key-%d", rand.Int63())
+			key := fmt.Sprintf("stress-key-%d", rand.Int64())
 			limiter.Allow(key)
 		}
 	})

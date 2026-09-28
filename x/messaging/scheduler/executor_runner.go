@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math/rand"
+	"math/rand/v2"
 	"time"
 
 	"github.com/spcent/plumego/log"
@@ -201,9 +201,9 @@ func (s *Scheduler) nextJitter(max time.Duration) time.Duration {
 	s.rngMu.Lock()
 	defer s.rngMu.Unlock()
 	if s.rng == nil {
-		s.rng = rand.New(rand.NewSource(time.Now().UnixNano()))
+		s.rng = rand.New(rand.NewPCG(uint64(time.Now().UnixNano()), 0))
 	}
-	return time.Duration(s.rng.Int63n(int64(max)))
+	return time.Duration(s.rng.Int64N(int64(max)))
 }
 
 func (s *Scheduler) worker() {

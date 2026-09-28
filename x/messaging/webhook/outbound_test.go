@@ -7,7 +7,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"math/rand"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -220,9 +219,6 @@ func TestShouldRetryAndBackoff(t *testing.T) {
 	if ShouldRetry(429, nil, 3, 3, true) {
 		t.Fatalf("max attempts reached")
 	}
-
-	// deterministic jitter
-	rand.Seed(1)
 
 	now := time.Now()
 	next := NextBackoff(now, 2, 10*time.Millisecond, 40*time.Millisecond)
