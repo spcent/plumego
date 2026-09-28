@@ -1,0 +1,80 @@
+name: release
+
+# Builds the cmd/plumego CLI for the major platforms and attaches the binaries
+# to a GitHub Release when a version tag (v*) is pushed.
+#
+# The CLI lives in its own nested module with a local replace for repository
+# development, so `go install github.com/spcent/plumego/cmd/plumego@<tag>`
+# depends on the submodule being published separately. Release binaries are the
+# supported distribution path; see cmd/plumego/README.md.
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [linux, darwin, windows]
+        arch: [amd64, arm64]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+
+      - name: Setup Go
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16
+        with:
+          go-version-file: cmd/plumego/go.mod
+
+      - name: Build CLI binary
+        working-directory: cmd/plumego
+        env:
+          GOOS: ${{ matrix.os }}
+          GOARCH: ${{ matrix.arch }}
+          CGO_ENABLED: "0"
+        run: |
+          set -euo pipefail
+          ext=""
+          if [ "$GOOS" = "windows" ]; then ext=".exe"; fi
+          out="plumego-${GOOS}-${GOARCH}${ext}"
+          go build -trimpath \
+            -ldflags "-s -w \
+              -X github.com/spcent/plumego/cmd/plumego.version=${GITHUB_REF_NAME} \
+              -X github.com/spcent/plumego/cmd/plumego.gitCommit=${GITHUB_SHA::7} \
+              -X github.com/spcent/plumego/cmd/plumego.buildDate=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            -o "$out" .
+          echo "Built $out"
+
+      - name: Upload binary
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: plumego-${{ matrix.os }}-${{ matrix.arch }}
+          path: cmd/plumego/plumego-${{ matrix.os }}-${{ matrix.arch }}*
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Download all binaries
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          path: dist
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release create "${GITHUB_REF_NAME}" \
+            --title "${GITHUB_REF_NAME}" \
+            --generate-notes \
+            dist/*/*

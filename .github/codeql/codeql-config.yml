@@ -11,8 +11,6 @@ queries:
 # These files are part of the response processing pipeline and pass through
 # response data without injecting user input into HTML contexts.
 #
-# For actual HTML generation, use utils/html.go escaping functions:
-# - utils.HTMLEscape() for HTML content
-# - utils.JSEscape() for JavaScript contexts
-# - utils.URLQueryEscape() for URL parameters
-# - utils.SanitizeHTML() for basic HTML sanitization
+# For actual HTML escaping, use internal/httputil helpers:
+# - internal/httputil.HTMLEscape() for HTML content
+# - internal/httputil.SanitizeHTML() for basic HTML sanitization

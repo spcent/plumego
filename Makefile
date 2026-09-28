@@ -368,7 +368,7 @@ gates: ## Run all required quality gates (mirrors CI)
 	$(MAKE) reference-vet
 	go test -race -timeout 60s ./...
 	$(MAKE) reference-test
-	go test -coverprofile=/tmp/plumego-stable.cover ./core ./router ./middleware/... ./contract ./security/... ./store/... >/tmp/plumego-stable-cover.log
+	go test -coverprofile=/tmp/plumego-stable.cover ./core ./router ./middleware/... ./contract ./security/... ./store/... ./health ./log ./metrics >/tmp/plumego-stable-cover.log
 	@TOTAL=$$(go tool cover -func=/tmp/plumego-stable.cover | awk '/^total:/ {gsub("%","",$$3); print $$3}'); \
 	echo "Stable-module total coverage: $$TOTAL%"; \
 	awk -v total="$$TOTAL" -v min="70.0" 'BEGIN { if (total+0 < min+0) exit 1 }' || { \

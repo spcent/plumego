@@ -28,12 +28,12 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
         with:
           fetch-depth: 0
 
       - name: Setup Go
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16
         with:
           go-version-file: go.mod
 
@@ -59,6 +59,17 @@ jobs:
           go run ./internal/checks/extension-beta-evidence
           go run ./internal/checks/deprecation-inventory -strict
           go run ./internal/checks/public-entrypoints-sync
+
+      - name: Run stable API snapshot comparison
+        run: |
+          set -euo pipefail
+          TMP="$(mktemp -d)"
+          trap 'rm -rf "$TMP"' EXIT
+          go run ./internal/checks/extension-api-snapshot -module ./core -out "$TMP/core-head.snapshot"
+          go run ./internal/checks/extension-api-snapshot -compare docs/evidence/stable-api/snapshots/core-head.snapshot "$TMP/core-head.snapshot"
+
+      - name: Compile doc snippets
+        run: go run ./internal/tools/doc-snippets
 
       - name: Run go vet
         run: go vet ./...
@@ -194,7 +205,7 @@ jobs:
           cat /tmp/coverage-comment.md
 
       - name: Upload coverage artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: coverage-report
           path: |
@@ -204,7 +215,7 @@ jobs:
 
       - name: Comment coverage summary on PR
         if: github.event_name == 'pull_request'
-        uses: actions/github-script@v7
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b
         with:
           script: |
             const fs = require('fs');
@@ -248,10 +259,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
 
       - name: Setup Go
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16
         with:
           go-version-file: ${{ matrix.module }}/go.mod
 
@@ -278,16 +289,44 @@ jobs:
         working-directory: ${{ matrix.module }}
         run: go test -race -timeout 60s ./...
 
+  dependency-vulnerability-scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+
+      - name: Setup Go
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16
+        with:
+          go-version-file: go.mod
+
+      - name: Install govulncheck
+        run: go install golang.org/x/vuln/cmd/govulncheck@latest
+
+      - name: Scan main module
+        run: govulncheck ./...
+
+      - name: Scan submodules
+        run: |
+          set -euo pipefail
+          for mod in cmd/plumego reference/*/go.mod; do
+            dir="$(dirname "$mod")"
+            echo "==> govulncheck $dir"
+            (cd "$dir" && govulncheck ./...)
+          done
+
   website-quality-gates:
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
 
       - name: Setup Node
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
         with:
           node-version: 24
 
@@ -328,10 +367,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
 
       - name: Setup Go
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16
         with:
           go-version-file: reference/benchmark/go.mod
 
@@ -343,7 +382,7 @@ jobs:
           go test -bench=. -benchmem -count=3 -timeout 180s ./... 2>&1 | tee benchmark.txt
 
       - name: Comment benchmark results
-        uses: actions/github-script@v7
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b
         with:
           script: |
             const fs = require("fs");
@@ -372,10 +411,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
 
       - name: Setup Go
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16
         with:
           go-version-file: go.mod
 

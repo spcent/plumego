@@ -43,6 +43,22 @@ level prefix for warnings, errors, and debug output.
 
 ## Installation
 
+### Prebuilt Release Binaries
+
+The supported distribution path is the release binaries attached to each
+[GitHub release](https://github.com/spcent/plumego/releases). They are built
+for `linux`, `darwin`, and `windows` on `amd64` and `arm64`:
+
+```bash
+# Download the latest release binary for your platform, e.g. darwin/arm64:
+curl -sSL https://github.com/spcent/plumego/releases/latest/download/plumego-darwin-arm64 \
+  -o plumego
+chmod +x plumego
+sudo mv plumego /usr/local/bin/
+
+plumego --help
+```
+
 ### Supported Source Install
 
 ```bash
@@ -64,10 +80,13 @@ Keep local development binaries under the repository-level `bin/` directory
 normal build target, because it is easy to run a stale binary from the module
 directory.
 
-The CLI currently lives in an independent nested module with a local
+The CLI lives in an independent nested module with a local
 `replace github.com/spcent/plumego => ../..` directive for repository
-development. Until the release checklist verifies tagged module installation,
-the supported install path is building from a checked-out Plumego repository.
+development. Because the replace points into the checked-out source, `go
+install github.com/spcent/plumego/cmd/plumego@<tag>` is only available after the
+nested module is published separately. Until then, the supported install paths
+are the **prebuilt release binaries** above or building from a checked-out
+Plumego repository.
 
 ### Tagged Install Verification
 

@@ -1,0 +1,40 @@
+# Dependabot update configuration.
+#
+# - Go module groups are kept broad so one version bump covers the main module
+#   and every standalone reference/example module.
+# - GitHub Actions are tracked so SHA-pinned actions are kept current.
+# - npm updates cover the website and any frontend use-case app.
+
+version: 2
+updates:
+  - package-ecosystem: "gomod"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      go-modules:
+        patterns:
+          - "*"
+    open-pull-requests-limit: 10
+    commit-message:
+      prefix: "build(deps)"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "build(deps)"
+
+  - package-ecosystem: "npm"
+    directory: "/website"
+    schedule:
+      interval: "weekly"
+    groups:
+      npm-deps:
+        patterns:
+          - "*"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "build(deps)"

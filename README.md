@@ -155,7 +155,7 @@ All remaining `x/*` extensions are **experimental**: APIs may change in any
 minor version without notice. Do not use them in production services without
 explicit project-level stabilization.
 
-See [`STABILITY.md`](./docs/release/STABILITY.md) for the full v1 guarantee, [`docs/release/COMPATIBILITY.md`](./COMPATIBILITY.md) for upgrade paths, and [`docs/reference/extension-stability-policy.md`](./docs/reference/extension-stability-policy.md) for detailed promotion criteria.
+See [`STABILITY.md`](./docs/release/STABILITY.md) for the full v1 guarantee, [`COMPATIBILITY.md`](./docs/release/COMPATIBILITY.md) for upgrade paths, and [`docs/reference/extension-stability-policy.md`](./docs/reference/extension-stability-policy.md) for detailed promotion criteria.
 
 ## Agent-First Design
 
