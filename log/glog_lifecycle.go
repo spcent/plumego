@@ -1,5 +1,10 @@
 package log
 
+import (
+	"fmt"
+	"os"
+)
+
 func (l *gLogger) Flush() {
 	l.mu.RLock()
 	defer l.mu.RUnlock()
@@ -28,7 +33,11 @@ func (l *gLogger) Close() {
 
 	for level, file := range l.logFiles {
 		if file != nil {
-			_ = file.Close()
+			if err := file.Close(); err != nil {
+				// Close() cannot surface the error through its signature; report
+				// it to stderr rather than silently dropping it.
+				fmt.Fprintf(os.Stderr, "log: failed to close log file: %v\n", err)
+			}
 			delete(l.logFiles, level)
 			delete(l.currentSize, level)
 		}

@@ -60,7 +60,7 @@ func (kv *KVStore) makeDiskStateLocked() diskState {
 
 // persistState writes a diskState to the backing file atomically.
 // It must NOT be called while holding kv.mu.
-func (kv *KVStore) persistState(state diskState) error {
+func (kv *KVStore) persistState(state diskState) (retErr error) {
 	raw, err := json.Marshal(state)
 	if err != nil {
 		return fmt.Errorf("encode state: %w", err)
@@ -71,20 +71,27 @@ func (kv *KVStore) persistState(state diskState) error {
 	if err != nil {
 		return fmt.Errorf("create temp state: %w", err)
 	}
+	// Deferred close covers every early-return path; the success path closes
+	// explicitly below so a close error can be reported.
+	defer tmp.Close()
+
 	tmpPath := tmp.Name()
 	committed := false
 	defer func() {
 		if !committed {
-			_ = os.Remove(tmpPath)
+			// Best-effort cleanup so a failed persist does not leave a stray
+			// temp file. The failure is secondary to the persist error, but is
+			// folded in so it is not silently dropped.
+			if removeErr := os.Remove(tmpPath); removeErr != nil && !errors.Is(removeErr, os.ErrNotExist) {
+				retErr = errors.Join(retErr, fmt.Errorf("remove temp state %q: %w", tmpPath, removeErr))
+			}
 		}
 	}()
 
 	if _, err := tmp.Write(raw); err != nil {
-		_ = tmp.Close()
 		return fmt.Errorf("write temp state: %w", err)
 	}
 	if err := tmp.Sync(); err != nil {
-		_ = tmp.Close()
 		return fmt.Errorf("sync temp state: %w", err)
 	}
 	if err := tmp.Close(); err != nil {

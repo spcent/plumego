@@ -34,6 +34,9 @@ func (c *CachedRoutePolicyProvider) RoutePolicy(ctx context.Context, tenantID st
 	}
 
 	if c.cache != nil {
+		// Cache writes are best-effort: the policy was already resolved, so a
+		// failed write is intentionally discarded here and the next Get simply
+		// re-fetches from the provider.
 		_ = c.cache.Set(ctx, tenantID, policy)
 	}
 

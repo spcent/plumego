@@ -27,7 +27,9 @@ func (l *gLogger) initLogFiles() error {
 		}
 		for _, level := range openedLevels {
 			if file := l.logFiles[level]; file != nil {
-				_ = file.Close()
+				if err := file.Close(); err != nil {
+					fmt.Fprintf(os.Stderr, "log: failed to close log file: %v\n", err)
+				}
 				delete(l.logFiles, level)
 				delete(l.currentSize, level)
 			}
@@ -132,9 +134,12 @@ func (l *gLogger) rotateIfNeeded(level Level, logSize int64) (logDir, program st
 
 // rotateLogFile rotates the log file for the given level
 func (l *gLogger) rotateLogFile(level Level) error {
-	// Close the current log file
+	// Close the current log file. A failed close is reported to stderr but does
+	// not abort the rotation; the replacement file is opened next.
 	if file, ok := l.logFiles[level]; ok {
-		file.Close()
+		if err := file.Close(); err != nil {
+			fmt.Fprintf(os.Stderr, "log: failed to close rotated log file: %v\n", err)
+		}
 	}
 
 	// Generate new log filename with timestamp

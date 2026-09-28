@@ -57,7 +57,12 @@ func (c *InMemoryRoutePolicyCache) Get(ctx context.Context, tenantID string) (Ro
 		return RoutePolicy{}, false
 	}
 	if time.Now().UTC().After(entry.expiresAt) {
-		_ = c.Delete(ctx, tenantID)
+		// Expired entry: remove it under a write lock so the next Get re-fetches
+		// from upstream. Deleting inline avoids a nested Delete call whose error
+		// this read path has no way to surface.
+		c.mu.Lock()
+		delete(c.entries, tenantID)
+		c.mu.Unlock()
 		return RoutePolicy{}, false
 	}
 	return entry.policy, true

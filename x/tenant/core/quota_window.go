@@ -2,6 +2,8 @@ package tenant
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"time"
 )
 
@@ -65,14 +67,20 @@ func (m *WindowQuotaManager) Allow(ctx context.Context, tenantID string, req Quo
 			LimitTokens:   limit.Tokens,
 		})
 		if err != nil || !allowed {
+			// Compensate for earlier window reservations. A failed compensation
+			// Release leaks the reservation, so it is surfaced rather than
+			// silently dropped.
+			var releaseErrs error
 			for _, item := range reserved {
-				_ = m.store.Release(ctx, QuotaReleaseRequest{
+				if releaseErr := m.store.Release(ctx, QuotaReleaseRequest{
 					TenantID:      tenantID,
 					Window:        item.window,
 					WindowStart:   item.windowStart,
 					DeltaRequests: req.Requests,
 					DeltaTokens:   req.Tokens,
-				})
+				}); releaseErr != nil {
+					releaseErrs = errors.Join(releaseErrs, releaseErr)
+				}
 			}
 
 			retryAfter := time.Until(quotaWindowEnd(windowStart, limit.Window))
@@ -86,10 +94,14 @@ func (m *WindowQuotaManager) Allow(ctx context.Context, tenantID string, req Quo
 				RemainingTokens:   remaining(limit.Tokens, usage.Tokens),
 				RetryAfter:        retryAfter,
 			}
-			if err != nil {
-				return result, err
+			baseErr := err
+			if baseErr == nil {
+				baseErr = ErrQuotaExceeded
 			}
-			return result, ErrQuotaExceeded
+			if releaseErrs != nil {
+				return result, errors.Join(baseErr, fmt.Errorf("quota compensation release failed: %w", releaseErrs))
+			}
+			return result, baseErr
 		}
 
 		reserved = append(reserved, reservation{window: limit.Window, windowStart: windowStart})

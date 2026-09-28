@@ -153,7 +153,11 @@ func (l *gLogger) logInternal(level Level, calldepth int, messageBuilder func() 
 	// Check if log file needs rotation
 	if l.logDir != "" {
 		for _, writtenLevel := range l.fileLevelsForLog(level) {
-			_ = l.checkLogRotation(writtenLevel, int64(len(logLine)))
+			if err := l.checkLogRotation(writtenLevel, int64(len(logLine))); err != nil {
+				// Reported once per logger so a sustained rotation failure does
+				// not amplify into a stderr write on every log call.
+				l.reportRotationError(err)
+			}
 		}
 	}
 
@@ -176,6 +180,12 @@ func (l *gLogger) logInternal(level Level, calldepth int, messageBuilder func() 
 func (l *gLogger) reportWriteError(err error) {
 	l.writeErrOnce.Do(func() {
 		fmt.Fprintf(os.Stderr, "glog: failed to write log output: %v\n", err)
+	})
+}
+
+func (l *gLogger) reportRotationError(err error) {
+	l.writeErrOnce.Do(func() {
+		fmt.Fprintf(os.Stderr, "glog: log rotation failed: %v\n", err)
 	})
 }
 

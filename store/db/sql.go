@@ -248,10 +248,14 @@ func WithTransaction(ctx context.Context, db DB, txOpts *sql.TxOptions, fn func(
 		return fmt.Errorf("%w: begin transaction returned nil transaction", ErrTransactionFailed)
 	}
 
-	// Defer rollback in case of panic or error
+	// Defer rollback in case of panic or error. A failed rollback during panic
+	// recovery is folded into the re-panicked value so it is not silently
+	// dropped; on a successful rollback the original panic value is preserved.
 	defer func() {
 		if p := recover(); p != nil {
-			_ = tx.Rollback()
+			if rollbackErr := tx.Rollback(); rollbackErr != nil {
+				panic(fmt.Errorf("panic: %v; rollback failed: %w", p, rollbackErr))
+			}
 			panic(p)
 		}
 	}()
