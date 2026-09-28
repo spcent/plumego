@@ -370,7 +370,7 @@ func TestWithRouteStateNilPointerSkipped(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// cloneReflectValue edge cases via Details()
+// Detail cloning edge cases via Details()
 // ---------------------------------------------------------------------------
 
 func TestDetailsCloneNilInterfaceValue(t *testing.T) {
@@ -438,8 +438,9 @@ func TestDetailsCloneDeeplyNestedMapFallsBackGracefully(t *testing.T) {
 }
 
 func TestDetailsCloneMapWithNonStringKey(t *testing.T) {
-	// map[int]string has a non-string key — cloneReflectValue returns (v, false)
-	// so it falls back to passthrough (the original value is returned as-is).
+	// map[int]string has a non-string key and is not a supported JSON-like
+	// container, so it falls through to passthrough (the original value is
+	// returned by reference).
 	intKeyMap := map[int]string{1: "one", 2: "two"}
 	err := NewErrorBuilder().
 		Type(TypeInternal).
@@ -462,8 +463,8 @@ func TestDetailsCloneMapWithNonStringKey(t *testing.T) {
 }
 
 func TestDetailsCloneInterfaceWrappingInterface(t *testing.T) {
-	// Wrap a concrete string inside an interface{} — cloneReflectValue should
-	// recurse into the Elem() and return the cloned scalar.
+	// Wrap a concrete string inside an interface{} — the dynamic type is a
+	// string, which cloneDetailValue returns as-is.
 	var inner interface{} = "wrapped-string"
 	err := NewErrorBuilder().
 		Type(TypeInternal).
@@ -496,7 +497,7 @@ func TestDetailsCloneNilMapReturnsNil(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// cloneDetailValue — []map[string]any branch (currently 0%)
+// cloneDetailValue — []map[string]any branch
 // ---------------------------------------------------------------------------
 
 func TestDetailsCloneSliceOfMaps(t *testing.T) {
@@ -547,14 +548,12 @@ func TestDetailsCloneAnyMapAllEmptyKeysReturnsNil(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// cloneReflectValue — depth > 16 branch
+// deeply nested map[string]any — cloned recursively without a depth limit
 // ---------------------------------------------------------------------------
 
 func TestCloneReflectValueDepthExceeded(t *testing.T) {
-	// A map nested > 16 levels triggers the depth guard.  cloneReflectValue
-	// returns (v, false) and cloneReflectDetailValue falls back to passthrough.
-	// Build 18 levels deep using map[string]any so each level IS a string-keyed
-	// map — the depth limit fires before it can fully clone.
+	// A deeply nested map[string]any is cloned recursively by cloneAnyMap with
+	// no depth limit. Build 18 levels deep and verify the key survives.
 	inner := map[string]any{"leaf": "value"}
 	for i := 0; i < 17; i++ {
 		inner = map[string]any{"child": inner}
@@ -575,13 +574,12 @@ func TestCloneReflectValueDepthExceeded(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// cloneReflectValue — Interface case that recurses into Elem()
+// typed []uint inside map[string]any — fast-path clone
 // ---------------------------------------------------------------------------
 
 func TestCloneReflectValueInterfaceElem(t *testing.T) {
-	// map[string]interface{} containing a typed []uint — hits the Interface
-	// case inside cloneReflectValue (the map value kind is Interface for
-	// map[string]any, and the elem is a []uint which goes through reflect Slice).
+	// map[string]any containing a typed []uint — the fast-path type switch
+	// clones the slice so later caller mutations stay isolated.
 	counts := []uint{1, 2, 3}
 	detail := map[string]any{"counts": counts}
 
@@ -605,14 +603,12 @@ func TestCloneReflectValueInterfaceElem(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// makeAssignable — ConvertibleTo branch
+// typed []uint32 inside map[string]any — fast-path clone
 // ---------------------------------------------------------------------------
 
 func TestMakeAssignableConvertibleTo(t *testing.T) {
-	// map[string][]uint — cloneReflectValue handles the slice element via
-	// makeAssignable; the cloned reflect.Value may need Convert to match the
-	// target type (e.g. when the value was obtained via Index() and needs
-	// explicit re-typing).  Use a typed uint slice inside a map[string]any.
+	// map[string]any containing a typed []uint32 — the fast-path type switch
+	// clones the slice so later caller mutations stay isolated.
 	uslice := []uint32{10, 20, 30}
 	err := NewErrorBuilder().
 		Type(TypeInternal).
@@ -841,14 +837,12 @@ func TestDetailsCloneTypedScalarSlices(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// cloneReflectValue — depth > 16 reached via reflect path
-// cloneReflectValue is also reached when a []uint or similar typed slice is
-// stored; depth > 16 is tested here using a recursive reflect construction.
+// deeply nested []any — cloned recursively without a depth limit
 // ---------------------------------------------------------------------------
 
 func TestCloneReflectValueDepthGuardViaReflect(t *testing.T) {
-	// []interface{} with 17 levels of wrapping — the reflect Interface branch
-	// recurses, eventually hitting depth > 16.
+	// []any with 18 levels of wrapping is cloned recursively by cloneAnySlice
+	// with no depth limit.
 	var nested interface{} = "leaf"
 	for i := 0; i < 18; i++ {
 		nested = []interface{}{nested}
@@ -868,13 +862,12 @@ func TestCloneReflectValueDepthGuardViaReflect(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// cloneReflectValue — nil Interface branch
+// nil pointer inside map[string]any — passthrough
 // ---------------------------------------------------------------------------
 
 func TestCloneReflectValueNilInterface(t *testing.T) {
-	// A map[string]any with a nil-interface value exercises the Interface
-	// case where v.IsNil() == true in cloneReflectValue (after reflect
-	// dispatches through the Interface kind on the outer any).
+	// A map[string]any with a nil-pointer value: pointers are unsupported
+	// clone shapes and pass through by reference without panicking.
 	m := map[string]any{"nilval": (*int)(nil)}
 
 	err := NewErrorBuilder().
@@ -890,7 +883,7 @@ func TestCloneReflectValueNilInterface(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// cloneReflectValue — nil Slice and nil Map branches (non-any typed)
+// nil typed slice and nil typed map — cloned as nil without panicking
 // ---------------------------------------------------------------------------
 
 func TestCloneReflectValueNilTypedSlice(t *testing.T) {
@@ -966,13 +959,12 @@ func TestWriteJSONEncodingFailure(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// cloneReflectValue — Interface kind branch
-// Reached when cloneReflectValue recurses into elements of a map whose value
-// type is a named interface (so iter.Value().Kind() == reflect.Interface).
+// map with named-interface values — passthrough
 // ---------------------------------------------------------------------------
 
-// namedInterface is a named interface type used to produce a reflect.Value
-// with Kind() == reflect.Interface inside a typed map.
+// namedInterface is a named interface type used as a detail value that is not
+// one of the supported container shapes, so it exercises the compatibility
+// passthrough path in cloneDetailValue.
 type namedInterface interface {
 	Value() string
 }
@@ -981,9 +973,9 @@ type namedInterfaceImpl struct{ v string }
 
 func (n namedInterfaceImpl) Value() string { return n.v }
 
-func TestCloneReflectValueInterfaceKindBranch(t *testing.T) {
-	// map[string]namedInterface — when iterated via reflect, each map value
-	// has Kind() == reflect.Interface, exercising that branch.
+func TestCloneNamedInterfaceMapPassthrough(t *testing.T) {
+	// map[string]namedInterface — not one of the supported container shapes,
+	// so the whole map is passed through by reference via cloneDetailValue.
 	m := map[string]namedInterface{
 		"key": namedInterfaceImpl{"hello"},
 	}
@@ -994,8 +986,7 @@ func TestCloneReflectValueInterfaceKindBranch(t *testing.T) {
 		Detail("m", m).
 		Build()
 
-	// Must not panic. The value may be passed through since the cloned
-	// Interface handling may return (v, false) if assignability fails.
+	// Must not panic. The unsupported shape is passed through as-is.
 	got := err.Details()
 	if _, ok := got["m"]; !ok {
 		// passthrough is acceptable
@@ -1003,9 +994,9 @@ func TestCloneReflectValueInterfaceKindBranch(t *testing.T) {
 	}
 }
 
-func TestCloneReflectValueNilInterfaceKindBranch(t *testing.T) {
-	// map[string]namedInterface with a nil value — exercises IsNil() == true
-	// inside the Interface case of cloneReflectValue.
+func TestCloneNamedInterfaceNilValuePassthrough(t *testing.T) {
+	// map[string]namedInterface with a nil value — the unsupported shape is
+	// passed through by reference without any reflection.
 	m := map[string]namedInterface{
 		"nilkey": nil,
 	}
@@ -1020,9 +1011,9 @@ func TestCloneReflectValueNilInterfaceKindBranch(t *testing.T) {
 	_ = err.Details()
 }
 
-// stringNamedInterface is a named interface whose implementor holds a string
-// (a clonable scalar), so cloneReflectValue can successfully clone the Elem()
-// and then reach the AssignableTo checks in the Interface case.
+// stringNamedInterface is a named interface holding a string-based concrete
+// type, another unsupported detail shape that goes through compatibility
+// passthrough in cloneDetailValue.
 type stringNamedInterface interface {
 	StringValue() string
 }
@@ -1031,10 +1022,9 @@ type stringNamedInterfaceImpl string
 
 func (s stringNamedInterfaceImpl) StringValue() string { return string(s) }
 
-func TestCloneReflectValueInterfaceAssignableBranch(t *testing.T) {
-	// When the Elem() of an Interface value is a string (clonable), the clone
-	// succeeds and execution reaches the AssignableTo checks.
-	// map[string]stringNamedInterface holds a string-based concrete type.
+func TestCloneNamedInterfaceStringImplPassthrough(t *testing.T) {
+	// map[string]stringNamedInterface holds a string-based concrete type —
+	// not a supported container shape, so it is passed through by reference.
 	m := map[string]stringNamedInterface{
 		"k": stringNamedInterfaceImpl("hello"),
 	}
@@ -1053,14 +1043,12 @@ func TestCloneReflectValueInterfaceAssignableBranch(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// cloneReflectValue — depth > 16 via recursive map iteration
+// deeply nested map[string]any — recursive deep copy
 // ---------------------------------------------------------------------------
 
-func TestCloneReflectValueDepthGuardViaMapIteration(t *testing.T) {
-	// A map[string]map[string]... chain 18 levels deep. Since each level
-	// is a typed map[string]string-compatible nesting, the reflect Map
-	// branch will recurse and eventually hit depth > 16.
-	// Build as map[string]any so it enters the reflect path on second level.
+func TestCloneDeeplyNestedAnyMap(t *testing.T) {
+	// A map[string]any chain 18 levels deep. cloneAnyMap/cloneDetailValue
+	// recurse without a depth limit, deep-copying every level.
 	inner := map[string]any{"v": "leaf"}
 	for i := 0; i < 18; i++ {
 		inner = map[string]any{"child": map[string]any(inner)}
@@ -1072,29 +1060,24 @@ func TestCloneReflectValueDepthGuardViaMapIteration(t *testing.T) {
 		Detail("deep", inner).
 		Build()
 
-	// cloneAnyMap handles the outer map[string]any level by level.
-	// When the reflect path hits depth > 16, it returns false → passthrough.
+	// cloneAnyMap handles the outer map[string]any level by level,
+	// recursing through every nested level without hitting a depth cap.
 	got := err.Details()
 	if _, ok := got["deep"]; !ok {
-		t.Fatal("Details(): key 'deep' missing for deeply nested typed map")
+		t.Fatal("Details(): key 'deep' missing for deeply nested map")
 	}
 }
 
 // ---------------------------------------------------------------------------
-// makeAssignable — ConvertibleTo path
-// Triggered when the reflect-cloned value needs a Convert() call to match
-// the map/slice element type.  A map[string]int32 whose cloned element comes
-// back as int32 (assignable), but we can trigger the Convert path by using a
-// named type that is convertible but not directly assignable.
+// named scalar type — compatibility passthrough
 // ---------------------------------------------------------------------------
 
 type myInt32 int32
 
-func TestMakeAssignableConvertiblePath(t *testing.T) {
-	// map[string]myInt32 — cloneReflectValue will try to clone each value
-	// (kind Int32) and then makeAssignable(int32Value, myInt32Type).
-	// Since myInt32 is not the same type as int32 it is not assignable, but
-	// it IS convertible, so the Convert path is exercised.
+func TestCloneNamedScalarTypePassthrough(t *testing.T) {
+	// map[string]myInt32 — the element type is a named scalar, not one of the
+	// supported primitive map shapes, so the whole map is passed through by
+	// reference via cloneDetailValue.
 	m := map[string]myInt32{"x": 42}
 
 	err := NewErrorBuilder().
@@ -1107,7 +1090,7 @@ func TestMakeAssignableConvertiblePath(t *testing.T) {
 	if got == nil {
 		t.Fatal("Details(): nil map for map[string]myInt32")
 	}
-	// The value is either cloned (via Convert) or passed through.
+	// The value is passed through as-is.
 	if _, ok := got["m"]; !ok {
 		t.Fatal("Details(): key 'm' missing for myInt32 map")
 	}

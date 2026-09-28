@@ -3,7 +3,6 @@ package contract
 import (
 	"errors"
 	"net/http"
-	"reflect"
 )
 
 // ErrorCategory describes the high-level class of an API error for observability.
@@ -449,140 +448,114 @@ func cloneDetailValue(value any) any {
 	switch v := value.(type) {
 	case map[string]any:
 		return cloneAnyMap(v)
+	case map[string]string:
+		return clonePrimitiveMap(v)
+	case map[string]int:
+		return clonePrimitiveMap(v)
+	case map[string]int64:
+		return clonePrimitiveMap(v)
+	case map[string]uint:
+		return clonePrimitiveMap(v)
+	case map[string]uint64:
+		return clonePrimitiveMap(v)
+	case map[string]float64:
+		return clonePrimitiveMap(v)
+	case map[string]float32:
+		return clonePrimitiveMap(v)
+	case map[string]bool:
+		return clonePrimitiveMap(v)
+	case map[string][]string:
+		return cloneStringSliceMap(v)
 	case []any:
-		out := make([]any, len(v))
-		for i, item := range v {
-			out[i] = cloneDetailValue(item)
-		}
-		return out
+		return cloneAnySlice(v)
 	case []map[string]any:
-		out := make([]map[string]any, len(v))
-		for i, item := range v {
-			out[i] = cloneAnyMap(item)
-		}
-		return out
+		return cloneMapSlice(v)
+	case []map[string]string:
+		return cloneStringMapSlice(v)
 	case []string:
-		return append([]string(nil), v...)
+		return cloneSlice(v)
 	case []int:
-		return append([]int(nil), v...)
+		return cloneSlice(v)
 	case []int64:
-		return append([]int64(nil), v...)
+		return cloneSlice(v)
+	case []uint:
+		return cloneSlice(v)
+	case []uint64:
+		return cloneSlice(v)
 	case []float64:
-		return append([]float64(nil), v...)
+		return cloneSlice(v)
+	case []float32:
+		return cloneSlice(v)
 	case []bool:
-		return append([]bool(nil), v...)
+		return cloneSlice(v)
+	case []int32:
+		return cloneSlice(v)
+	case []int16:
+		return cloneSlice(v)
+	case []int8:
+		return cloneSlice(v)
+	case []uint16:
+		return cloneSlice(v)
+	case []uint32:
+		return cloneSlice(v)
+	case []uint8:
+		return cloneSlice(v)
 	default:
-		if cloned, ok := cloneReflectDetailValue(value); ok {
-			return cloned
-		}
+		// Unsupported shapes (structs, pointers, arrays, non-string-key maps,
+		// named interfaces, and exotic container types) are intentionally passed
+		// through by reference: the caller keeps ownership and the error carries
+		// the value as-is (compatibility passthrough).
 		return value
 	}
 }
 
-func cloneReflectDetailValue(value any) (any, bool) {
-	v := reflect.ValueOf(value)
-	if !v.IsValid() {
-		return value, true
-	}
-	cloned, ok := cloneReflectValue(v, 0)
-	if !ok {
-		return value, false
-	}
-	return cloned.Interface(), true
+// cloneSlice returns a copy of a primitive slice, isolating the detail from
+// later caller mutations. It is only used with primitive element types, whose
+// values are immutable and need no per-element cloning.
+func cloneSlice[T any](in []T) []T {
+	return append([]T(nil), in...)
 }
 
-func cloneReflectValue(v reflect.Value, depth int) (reflect.Value, bool) {
-	if depth > 16 {
-		return v, false
+// clonePrimitiveMap returns a copy of a string-keyed map whose values are
+// immutable primitives, isolating the detail from later caller mutations.
+func clonePrimitiveMap[V any](in map[string]V) map[string]V {
+	out := make(map[string]V, len(in))
+	for k, val := range in {
+		out[k] = val
 	}
-	switch v.Kind() {
-	case reflect.Interface:
-		if v.IsNil() {
-			return reflect.Zero(v.Type()), true
-		}
-		cloned, ok := cloneReflectValue(v.Elem(), depth+1)
-		if !ok {
-			return v, false
-		}
-		if cloned.Type().AssignableTo(v.Type()) {
-			return cloned, true
-		}
-		if cloned.Type().AssignableTo(v.Type().Elem()) {
-			out := reflect.New(v.Type()).Elem()
-			out.Set(cloned)
-			return out, true
-		}
-		return v, false
-	case reflect.Map:
-		if v.Type().Key().Kind() != reflect.String {
-			return v, false
-		}
-		if v.IsNil() {
-			return reflect.Zero(v.Type()), true
-		}
-		out := reflect.MakeMapWithSize(v.Type(), v.Len())
-		iter := v.MapRange()
-		for iter.Next() {
-			cloned, ok := cloneReflectValue(iter.Value(), depth+1)
-			if !ok {
-				return v, false
-			}
-			cloned, ok = makeAssignable(cloned, v.Type().Elem())
-			if !ok {
-				return v, false
-			}
-			out.SetMapIndex(iter.Key(), cloned)
-		}
-		return out, true
-	case reflect.Slice:
-		if v.IsNil() {
-			return reflect.Zero(v.Type()), true
-		}
-		out := reflect.MakeSlice(v.Type(), v.Len(), v.Len())
-		for i := 0; i < v.Len(); i++ {
-			cloned, ok := cloneReflectValue(v.Index(i), depth+1)
-			if !ok {
-				return v, false
-			}
-			cloned, ok = makeAssignable(cloned, v.Type().Elem())
-			if !ok {
-				return v, false
-			}
-			out.Index(i).Set(cloned)
-		}
-		return out, true
-	case reflect.Array:
-		out := reflect.New(v.Type()).Elem()
-		for i := 0; i < v.Len(); i++ {
-			cloned, ok := cloneReflectValue(v.Index(i), depth+1)
-			if !ok {
-				return v, false
-			}
-			cloned, ok = makeAssignable(cloned, v.Type().Elem())
-			if !ok {
-				return v, false
-			}
-			out.Index(i).Set(cloned)
-		}
-		return out, true
-	case reflect.String, reflect.Bool,
-		reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
-		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr,
-		reflect.Float32, reflect.Float64:
-		return v, true
-	default:
-		return v, false
-	}
+	return out
 }
 
-func makeAssignable(v reflect.Value, target reflect.Type) (reflect.Value, bool) {
-	if v.Type().AssignableTo(target) {
-		return v, true
+func cloneAnySlice(in []any) []any {
+	out := make([]any, len(in))
+	for i, item := range in {
+		out[i] = cloneDetailValue(item)
 	}
-	if v.Type().ConvertibleTo(target) {
-		return v.Convert(target), true
+	return out
+}
+
+func cloneMapSlice(in []map[string]any) []map[string]any {
+	out := make([]map[string]any, len(in))
+	for i, item := range in {
+		out[i] = cloneAnyMap(item)
 	}
-	return v, false
+	return out
+}
+
+func cloneStringMapSlice(in []map[string]string) []map[string]string {
+	out := make([]map[string]string, len(in))
+	for i, item := range in {
+		out[i] = clonePrimitiveMap(item)
+	}
+	return out
+}
+
+func cloneStringSliceMap(in map[string][]string) map[string][]string {
+	out := make(map[string][]string, len(in))
+	for k, val := range in {
+		out[k] = cloneSlice(val)
+	}
+	return out
 }
 
 func normalizeErrorHTTPStatus(status int) (int, bool) {
