@@ -258,9 +258,9 @@ func (c Config) Validate() error {
 
 // NewLimiter creates a limiter.
 //
-// NewLimiter fails closed for invalid explicit configuration by returning a
-// disabled limiter that denies requests. Use NewLimiterWithConfig when the
-// caller needs the configuration error.
+// Invalid explicit configuration is treated as a programming error and panics,
+// matching the MustXxx constructor convention. Use NewLimiterWithConfig when
+// the caller needs the configuration error returned instead of a panic.
 //
 // Example:
 //

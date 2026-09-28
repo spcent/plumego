@@ -40,7 +40,7 @@ type cacheItem struct {
 func NewMemoryCache() *MemoryCache {
 	cache, err := NewMemoryCacheWithConfig(DefaultConfig())
 	if err != nil {
-		panic(fmt.Sprintf("cache: NewMemoryCache with default config: %v", err))
+		panic(fmt.Errorf("cache: NewMemoryCache with default config: %w", err))
 	}
 	return cache
 }

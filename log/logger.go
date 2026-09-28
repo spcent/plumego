@@ -61,7 +61,9 @@ type StructuredLogger interface {
 	Fatal(msg string, fields ...Fields)
 
 	// Context-aware variants preserve the call shape for request-scoped logging.
-	// Logger implementations must not infer transport metadata from ctx.
+	// Implementations read only the log package's own self-contained carrier
+	// (log.WithRequestID / log.RequestIDFromContext); they must not infer
+	// transport metadata from other packages' context keys.
 	DebugCtx(ctx context.Context, msg string, fields ...Fields)
 	InfoCtx(ctx context.Context, msg string, fields ...Fields)
 	WarnCtx(ctx context.Context, msg string, fields ...Fields)
@@ -101,7 +103,7 @@ func NewLogger(configs ...LoggerConfig) StructuredLogger {
 	case "", LoggerFormatText:
 		return newDefaultLogger(cfg)
 	default:
-		panic(fmt.Sprintf("log.NewLogger: unsupported format %q", cfg.Format))
+		panic(fmt.Errorf("log.NewLogger: unsupported format %q", cfg.Format))
 	}
 }
 
@@ -140,29 +142,29 @@ func (l *defaultLogger) Fatal(msg string, fields ...Fields) {
 
 // DebugCtx logs at DEBUG level with context.
 // When RespectVerbosity is enabled, debug logging is gated on V(1).
-// Context is accepted for interface compatibility; this backend does not extract
-// transport metadata from ctx (see StructuredLogger contract).
-func (l *defaultLogger) DebugCtx(_ context.Context, msg string, fields ...Fields) {
+// Context-carried values from the log package's own carrier (log.WithRequestID)
+// are merged into the entry; explicit fields take precedence.
+func (l *defaultLogger) DebugCtx(ctx context.Context, msg string, fields ...Fields) {
 	if l.respectVerbosity && !l.getBackend().vAt(1, 2) {
 		return
 	}
-	l.logWithLevel(DEBUG, msg, mergeFieldArgs(fields))
+	l.logWithLevel(DEBUG, msg, mergeFieldArgs(append([]Fields{ctxFields(ctx)}, fields...)))
 }
 
-func (l *defaultLogger) InfoCtx(_ context.Context, msg string, fields ...Fields) {
-	l.logWithLevel(INFO, msg, mergeFieldArgs(fields))
+func (l *defaultLogger) InfoCtx(ctx context.Context, msg string, fields ...Fields) {
+	l.logWithLevel(INFO, msg, mergeFieldArgs(append([]Fields{ctxFields(ctx)}, fields...)))
 }
 
-func (l *defaultLogger) WarnCtx(_ context.Context, msg string, fields ...Fields) {
-	l.logWithLevel(WARNING, msg, mergeFieldArgs(fields))
+func (l *defaultLogger) WarnCtx(ctx context.Context, msg string, fields ...Fields) {
+	l.logWithLevel(WARNING, msg, mergeFieldArgs(append([]Fields{ctxFields(ctx)}, fields...)))
 }
 
-func (l *defaultLogger) ErrorCtx(_ context.Context, msg string, fields ...Fields) {
-	l.logWithLevel(ERROR, msg, mergeFieldArgs(fields))
+func (l *defaultLogger) ErrorCtx(ctx context.Context, msg string, fields ...Fields) {
+	l.logWithLevel(ERROR, msg, mergeFieldArgs(append([]Fields{ctxFields(ctx)}, fields...)))
 }
 
-func (l *defaultLogger) FatalCtx(_ context.Context, msg string, fields ...Fields) {
-	l.logWithLevel(FATAL, msg, mergeFieldArgs(fields))
+func (l *defaultLogger) FatalCtx(ctx context.Context, msg string, fields ...Fields) {
+	l.logWithLevel(FATAL, msg, mergeFieldArgs(append([]Fields{ctxFields(ctx)}, fields...)))
 }
 
 func (l *defaultLogger) logWithLevel(level Level, msg string, fields Fields) {

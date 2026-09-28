@@ -220,6 +220,36 @@ func TestJSONFormatLoggerInfoCtxDoesNotAutoAttachTransportFields(t *testing.T) {
 	}
 }
 
+func TestJSONFormatLoggerInfoCtxAttachesCarrierRequestID(t *testing.T) {
+	var buf bytes.Buffer
+	logger := newTestJSONLogger(t, LoggerConfig{
+		Output: &buf,
+		Level:  INFO,
+	})
+
+	logger.InfoCtx(WithRequestID(t.Context(), "req-123"), "test message")
+
+	entry := decodeTestJSONLogEntry(t, buf.Bytes())
+	if entry.RequestID != "req-123" {
+		t.Fatalf("expected request_id from log carrier, got %q", entry.RequestID)
+	}
+}
+
+func TestJSONFormatLoggerInfoCtxExplicitRequestIDOverridesCarrier(t *testing.T) {
+	var buf bytes.Buffer
+	logger := newTestJSONLogger(t, LoggerConfig{
+		Output: &buf,
+		Level:  INFO,
+	})
+
+	logger.InfoCtx(WithRequestID(t.Context(), "carrier-id"), "test message", Fields{RequestIDField: "explicit-id"})
+
+	entry := decodeTestJSONLogEntry(t, buf.Bytes())
+	if entry.RequestID != "explicit-id" {
+		t.Fatalf("expected explicit request_id to override carrier, got %q", entry.RequestID)
+	}
+}
+
 func TestJSONFormatLoggerContextLevels(t *testing.T) {
 	tests := []struct {
 		name      string

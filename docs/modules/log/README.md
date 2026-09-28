@@ -44,8 +44,10 @@
 - JSON output owns the reserved `time`, `level`, and `msg` keys.
 - JSON output stringifies field values that `encoding/json` cannot encode,
   preserving safe sibling values in common nested maps and slices.
-- Context-aware methods keep the request-scoped call shape but do not read
-  transport metadata from `context.Context`.
+- Context-aware methods keep the request-scoped call shape. They read only the
+  `log` package's own self-contained carrier (`log.WithRequestID` /
+  `log.RequestIDFromContext`) and must not read transport metadata from other
+  packages' `context.Context` keys (for example `contract` request accessors).
 - The glog-style file backend, flag initialization, and rotation helpers are
   internal backend behavior. They are not application bootstrap APIs.
 
@@ -58,4 +60,6 @@
 - keep lifecycle/start-stop hooks and CLI flag bootstrap out of the stable public path
 - never log secrets, tokens, signatures, or private keys
 - keep reusable test logging helpers out of stable `log`; use `x/observability/testlog`
-- attach `request_id` and other transport metadata explicitly at call sites; stable `log` must not read them from context
+- populate `request_id` for request-scoped logging through the `log` carrier
+  (`log.WithRequestID`) instead of attaching transport metadata from other
+  packages' context keys

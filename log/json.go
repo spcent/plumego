@@ -94,36 +94,33 @@ func (l *jsonLogger) Fatal(msg string, fields ...Fields) {
 }
 
 // DebugCtx logs a debug message with context and optional fields.
+// Context-carried values from the log package's own carrier (log.WithRequestID)
+// are merged into the entry; explicit fields take precedence.
 func (l *jsonLogger) DebugCtx(ctx context.Context, msg string, fields ...Fields) {
-	_ = ctx
 	if l.respectVerbosity && !l.vAt(1) {
 		return
 	}
-	l.log(DEBUG, msg, mergeFieldArgs(fields))
+	l.log(DEBUG, msg, mergeFieldArgs(append([]Fields{ctxFields(ctx)}, fields...)))
 }
 
 // InfoCtx logs an info message with context and optional fields.
 func (l *jsonLogger) InfoCtx(ctx context.Context, msg string, fields ...Fields) {
-	_ = ctx
-	l.log(INFO, msg, mergeFieldArgs(fields))
+	l.log(INFO, msg, mergeFieldArgs(append([]Fields{ctxFields(ctx)}, fields...)))
 }
 
 // WarnCtx logs a warning message with context and optional fields.
 func (l *jsonLogger) WarnCtx(ctx context.Context, msg string, fields ...Fields) {
-	_ = ctx
-	l.log(WARNING, msg, mergeFieldArgs(fields))
+	l.log(WARNING, msg, mergeFieldArgs(append([]Fields{ctxFields(ctx)}, fields...)))
 }
 
 // ErrorCtx logs an error message with context and optional fields.
 func (l *jsonLogger) ErrorCtx(ctx context.Context, msg string, fields ...Fields) {
-	_ = ctx
-	l.log(ERROR, msg, mergeFieldArgs(fields))
+	l.log(ERROR, msg, mergeFieldArgs(append([]Fields{ctxFields(ctx)}, fields...)))
 }
 
 // FatalCtx logs a fatal message with context then calls os.Exit(1).
 func (l *jsonLogger) FatalCtx(ctx context.Context, msg string, fields ...Fields) {
-	_ = ctx
-	l.log(FATAL, msg, mergeFieldArgs(fields))
+	l.log(FATAL, msg, mergeFieldArgs(append([]Fields{ctxFields(ctx)}, fields...)))
 	os.Exit(1)
 }
 

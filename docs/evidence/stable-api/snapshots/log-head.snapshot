@@ -8,8 +8,11 @@ symbol	github.com/spcent/plumego/log	const	INFO	const INFO Level = 0
 symbol	github.com/spcent/plumego/log	const	LoggerFormatDiscard	const LoggerFormatDiscard LoggerFormat = "discard"
 symbol	github.com/spcent/plumego/log	const	LoggerFormatJSON	const LoggerFormatJSON LoggerFormat = "json"
 symbol	github.com/spcent/plumego/log	const	LoggerFormatText	const LoggerFormatText LoggerFormat = "text"
+symbol	github.com/spcent/plumego/log	const	RequestIDField	const RequestIDField = "request_id"
 symbol	github.com/spcent/plumego/log	const	WARNING	const WARNING Level = 1
 symbol	github.com/spcent/plumego/log	func	NewLogger	func NewLoggerfunc(configs ...LoggerConfig) StructuredLogger
+symbol	github.com/spcent/plumego/log	func	RequestIDFromContext	func RequestIDFromContextfunc(ctx context.Context) (string, bool)
+symbol	github.com/spcent/plumego/log	func	WithRequestID	func WithRequestIDfunc(ctx context.Context, id string) context.Context
 symbol	github.com/spcent/plumego/log	type	Fields	type Fields map[string]any
 symbol	github.com/spcent/plumego/log	type	Level	type Level int
 symbol	github.com/spcent/plumego/log	type	LoggerConfig	type LoggerConfig struct { Format LoggerFormat Output io.Writer ErrorOutput io.Writer Level Level Fields Fields RespectVerbosity bool Verbosity int }

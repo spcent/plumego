@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/spcent/plumego/contract"
+	"github.com/spcent/plumego/log"
 )
 
 // RequestIDFromRequest extracts the canonical request id from context or headers.
@@ -31,6 +32,9 @@ func AttachRequestID(w http.ResponseWriter, r *http.Request, id string, includeI
 		return r
 	}
 	ctx := contract.WithRequestID(r.Context(), id)
+	// Populate the log package's self-contained request-ID carrier so the
+	// *Ctx logging methods attach the correlation ID to request-scoped entries.
+	ctx = log.WithRequestID(ctx, id)
 	if includeInRequest {
 		r.Header.Set(contract.RequestIDHeader, id)
 	}
