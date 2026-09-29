@@ -85,8 +85,7 @@ func (p *OpenAIProvider) Complete(ctx context.Context, req *CompletionRequest) (
 
 	// Check error
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("api error (status %d): %s", resp.StatusCode, string(body))
+		return nil, fmt.Errorf("api error (status %d): %s", resp.StatusCode, readErrorBody(resp.Body))
 	}
 
 	// Parse response
@@ -120,9 +119,9 @@ func (p *OpenAIProvider) CompleteStream(ctx context.Context, req *CompletionRequ
 
 	// Check error
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
+		body := readErrorBody(resp.Body)
 		resp.Body.Close()
-		return nil, fmt.Errorf("api error (status %d): %s", resp.StatusCode, string(body))
+		return nil, fmt.Errorf("api error (status %d): %s", resp.StatusCode, body)
 	}
 
 	return &StreamReader{
