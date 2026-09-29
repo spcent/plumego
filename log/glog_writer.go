@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -17,6 +18,20 @@ var logBufferPool = sync.Pool{
 	},
 }
 
+// appendDecimal writes v as a base-10 integer into b, right-aligned to width
+// digits with the given pad byte (typically '0'). Values wider than width are
+// written in full. The result appends without allocating.
+func appendDecimal(b []byte, v int, width int, pad byte) []byte {
+	digits := 1
+	for tmp := v / 10; tmp > 0; tmp /= 10 {
+		digits++
+	}
+	for i := digits; i < width; i++ {
+		b = append(b, pad)
+	}
+	return strconv.AppendInt(b, int64(v), 10)
+}
+
 func (l *gLogger) formatHeader(level Level, file string, line int) []byte {
 	buf := logBufferPool.Get().([]byte)
 	buf = buf[:0] // Reset buffer to empty
@@ -26,14 +41,28 @@ func (l *gLogger) formatHeader(level Level, file string, line int) []byte {
 		file = file[idx+1:]
 	}
 
-	// Build header using buffer
+	// Build header directly into the pooled buffer. Format:
+	// MMDD HH:MM:SS.microseconds %7d [file:line]
 	buf = append(buf, levelInitial(level)) // First letter of level
-	buf = append(buf, fmt.Sprintf("%02d%02d %02d:%02d:%02d.%06d %7d [%s:%d] ",
-		now.Month(), now.Day(),
-		now.Hour(), now.Minute(), now.Second(),
-		now.Nanosecond()/1000,
-		pid,
-		file, line)...)
+	buf = appendDecimal(buf, int(now.Month()), 2, '0')
+	buf = appendDecimal(buf, now.Day(), 2, '0')
+	buf = append(buf, ' ')
+	buf = appendDecimal(buf, now.Hour(), 2, '0')
+	buf = append(buf, ':')
+	buf = appendDecimal(buf, now.Minute(), 2, '0')
+	buf = append(buf, ':')
+	buf = appendDecimal(buf, now.Second(), 2, '0')
+	buf = append(buf, '.')
+	buf = appendDecimal(buf, now.Nanosecond()/1000, 6, '0')
+	buf = append(buf, ' ')
+	buf = appendDecimal(buf, pid, 7, ' ')
+	buf = append(buf, ' ')
+	buf = append(buf, '[')
+	buf = append(buf, file...)
+	buf = append(buf, ':')
+	buf = strconv.AppendInt(buf, int64(line), 10)
+	buf = append(buf, ']')
+	buf = append(buf, ' ')
 
 	return buf
 }
