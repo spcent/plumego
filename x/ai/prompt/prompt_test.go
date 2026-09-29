@@ -314,7 +314,7 @@ func TestLoadBuiltinTemplates(t *testing.T) {
 	storage := NewMemoryStorage()
 	engine := NewEngine(storage)
 
-	err := LoadBuiltinTemplates(engine)
+	err := LoadBuiltinTemplates(t.Context(), engine)
 	if err != nil {
 		t.Fatalf("LoadBuiltinTemplates() error = %v", err)
 	}
