@@ -362,7 +362,23 @@ gates: ## Run all required quality gates (mirrors CI)
 	TMP=$$(mktemp -d "$${TMPDIR:-/tmp}/plumego-stable-api.XXXXXX"); \
 	trap 'rm -rf "$$TMP"' EXIT; \
 	go run ./internal/checks/extension-api-snapshot -module ./core -out "$$TMP/core-head.snapshot"; \
-	go run ./internal/checks/extension-api-snapshot -compare docs/evidence/stable-api/snapshots/core-head.snapshot "$$TMP/core-head.snapshot"
+	go run ./internal/checks/extension-api-snapshot -compare docs/evidence/stable-api/snapshots/core-head.snapshot "$$TMP/core-head.snapshot"; \
+	go run ./internal/checks/extension-api-snapshot -module ./router -out "$$TMP/router-head.snapshot"; \
+	go run ./internal/checks/extension-api-snapshot -compare docs/evidence/stable-api/snapshots/router-head.snapshot "$$TMP/router-head.snapshot"; \
+	go run ./internal/checks/extension-api-snapshot -module ./contract/... -out "$$TMP/contract-head.snapshot"; \
+	go run ./internal/checks/extension-api-snapshot -compare docs/evidence/stable-api/snapshots/contract-head.snapshot "$$TMP/contract-head.snapshot"; \
+	go run ./internal/checks/extension-api-snapshot -module ./middleware/... -out "$$TMP/middleware-head.snapshot"; \
+	go run ./internal/checks/extension-api-snapshot -compare docs/evidence/stable-api/snapshots/middleware-head.snapshot "$$TMP/middleware-head.snapshot"; \
+	go run ./internal/checks/extension-api-snapshot -module ./security/... -out "$$TMP/security-head.snapshot"; \
+	go run ./internal/checks/extension-api-snapshot -compare docs/evidence/stable-api/snapshots/security-head.snapshot "$$TMP/security-head.snapshot"; \
+	go run ./internal/checks/extension-api-snapshot -module ./store/... -out "$$TMP/store-head.snapshot"; \
+	go run ./internal/checks/extension-api-snapshot -compare docs/evidence/stable-api/snapshots/store-head.snapshot "$$TMP/store-head.snapshot"; \
+	go run ./internal/checks/extension-api-snapshot -module ./health/... -out "$$TMP/health-head.snapshot"; \
+	go run ./internal/checks/extension-api-snapshot -compare docs/evidence/stable-api/snapshots/health-head.snapshot "$$TMP/health-head.snapshot"; \
+	go run ./internal/checks/extension-api-snapshot -module ./log/... -out "$$TMP/log-head.snapshot"; \
+	go run ./internal/checks/extension-api-snapshot -compare docs/evidence/stable-api/snapshots/log-head.snapshot "$$TMP/log-head.snapshot"; \
+	go run ./internal/checks/extension-api-snapshot -module ./metrics/... -out "$$TMP/metrics-head.snapshot"; \
+	go run ./internal/checks/extension-api-snapshot -compare docs/evidence/stable-api/snapshots/metrics-head.snapshot "$$TMP/metrics-head.snapshot"
 	go run ./internal/tools/doc-snippets
 	go vet ./...
 	$(MAKE) reference-vet
