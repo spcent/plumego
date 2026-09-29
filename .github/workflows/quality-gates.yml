@@ -69,6 +69,15 @@ jobs:
       - name: Run standard tests
         run: go test -timeout 20s ./...
 
+      - name: Run fuzz smoke tests
+        run: |
+          set -euo pipefail
+          # Give each fuzz target a short budget to catch panics and invariant
+          # violations on arbitrary inputs.
+          for pkg in ./contract ./security/jwt ./security/password ./router; do
+            go test -run '^$' -fuzz '^Fuzz' -fuzztime 10s "$pkg"
+          done
+
       - name: Run optional workerfleet Mongo integration tests
         env:
           WORKERFLEET_MONGO_TEST_URI: ${{ secrets.WORKERFLEET_MONGO_TEST_URI }}
