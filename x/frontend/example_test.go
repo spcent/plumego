@@ -201,6 +201,10 @@ func ExampleRegisterFromDir_full() {
 	serveExample(r)
 }
 
+// serveExample drives the compile-only examples above: each Example wires a
+// frontend mount and then calls this helper, which would listen on a real port
+// if executed. The examples intentionally carry no // Output: block so go test
+// compiles them without running a blocking server.
 func serveExample(h http.Handler) {
 	if err := http.ListenAndServe(":8080", h); err != nil {
 		panic(err)
